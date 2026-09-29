@@ -3,46 +3,206 @@
   "$id": "auras.schema.json",
   "title": "Auras (efectos temporales)",
   "type": "object",
-  "required": ["auras"],
+  "required": [
+    "auras"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "auras": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "name", "kind", "durationMs", "isDebuff", "icon"],
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "durationMs",
+          "isDebuff",
+          "icon"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/id" },
-          "name": { "type": "string" },
-          "kind": { "enum": ["dot", "hot", "stat_mod", "stun", "root", "silence", "shield", "slow"] },
-          "isDebuff": { "type": "boolean" },
-          "school": { "$ref": "common.schema.json#/$defs/school" },
-          "durationMs": { "type": "integer", "minimum": 500 },
-          "tickMs": { "type": "integer", "minimum": 500, "description": "Requerido para dot/hot" },
-          "maxStacks": { "type": "integer", "minimum": 1, "default": 1 },
-          "base": { "type": "number", "minimum": 0, "description": "Por tick (dot/hot) o total (shield)" },
-          "apCoef": { "type": "number", "minimum": 0 },
-          "spCoef": { "type": "number", "minimum": 0 },
-          "pct": { "type": "number", "minimum": 0, "maximum": 1, "description": "slow: reducción de velocidad" },
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "dot",
+              "hot",
+              "stat_mod",
+              "stun",
+              "root",
+              "silence",
+              "shield",
+              "slow"
+            ]
+          },
+          "isDebuff": {
+            "type": "boolean"
+          },
+          "school": {
+            "$ref": "common.schema.json#/$defs/school"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 500
+          },
+          "tickMs": {
+            "type": "integer",
+            "minimum": 500,
+            "description": "Requerido para dot/hot"
+          },
+          "maxStacks": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "base": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Por tick (dot/hot) o total (shield)"
+          },
+          "apCoef": {
+            "type": "number",
+            "minimum": 0
+          },
+          "spCoef": {
+            "type": "number",
+            "minimum": 0
+          },
+          "pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "slow: reducción de velocidad"
+          },
           "mods": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "stats": { "$ref": "common.schema.json#/$defs/stats" },
-              "damageTakenPct": { "type": "number", "minimum": -0.9, "maximum": 2 },
-              "damageDonePct": { "type": "number", "minimum": -0.9, "maximum": 2 },
-              "speedPct": { "type": "number", "minimum": -0.9, "maximum": 2 }
+              "stats": {
+                "$ref": "common.schema.json#/$defs/stats"
+              },
+              "damageTakenPct": {
+                "type": "number",
+                "minimum": -0.9,
+                "maximum": 2
+              },
+              "damageDonePct": {
+                "type": "number",
+                "minimum": -0.9,
+                "maximum": 2
+              },
+              "speedPct": {
+                "type": "number",
+                "minimum": -0.9,
+                "maximum": 2
+              }
             }
           },
-          "icon": { "type": "string" }
+          "icon": {
+            "type": "string"
+          },
+          "removesKinds": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "dot",
+                "hot",
+                "stat_mod",
+                "stun",
+                "root",
+                "silence",
+                "shield",
+                "slow"
+              ]
+            },
+            "description": "Al aplicarse elimina las auras de estos tipos del objetivo (p. ej. Carrera rompe root/slow)."
+          },
+          "immuneKinds": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "dot",
+                "hot",
+                "stat_mod",
+                "stun",
+                "root",
+                "silence",
+                "shield",
+                "slow"
+              ]
+            },
+            "description": "Mientras dura, el objetivo ignora auras nuevas de estos tipos."
+          }
         },
         "allOf": [
-          { "if": { "properties": { "kind": { "enum": ["dot", "hot"] } } }, "then": { "required": ["tickMs", "base"] } },
-          { "if": { "properties": { "kind": { "const": "shield" } } }, "then": { "required": ["base"] } },
-          { "if": { "properties": { "kind": { "const": "slow" } } }, "then": { "required": ["pct"] } },
-          { "if": { "properties": { "kind": { "const": "stat_mod" } } }, "then": { "required": ["mods"] } }
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "dot",
+                    "hot"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "tickMs",
+                "base"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "shield"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "base"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "slow"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "pct"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "stat_mod"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "mods"
+              ]
+            }
+          }
         ]
       }
     }

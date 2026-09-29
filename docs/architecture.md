@@ -32,10 +32,13 @@ Protocol  ←  Game  ←  Server  →  Persistence
 - `PixelRealms.Protocol`: `record` DTOs, `MessageType` enum, `ProtocolVersion` const, `JsonSerializerContext`
   (System.Text.Json **source generated**, `camelCase`). Cero dependencias.
 - `PixelRealms.Content`: modelos inmutables (`ClassDef`, `SpellDef`, `EffectDef`, `ItemTemplate`,
-  `MonsterTemplate`, `LootTable`), `ContentDb` con diccionarios `FrozenDictionary<string, T>`, validación.
-- `PixelRealms.Game`: `World`, `Player`, `Monster`, `Actor`, sistemas (`MovementSystem`, `CastSystem`,
-  `AuraSystem`, `AiSystem`, `RegenSystem`, `LootSystem`, `RespawnSystem`, `InterestSystem`), servicios
-  (`CombatCalculator`, `Inventory`, `PartyService`, `ChatService`). Emite `IGameEvent`s en una lista por tick.
+  `MonsterTemplate`, `LootTable`, `Rules`), `ContentDb` con diccionarios `FrozenDictionary<string, T>`, validación.
+  `Rules` (de `content/rules.json`) se inyecta como `IRules` en todos los sistemas; recarga en caliente por comando admin (ADR-008).
+- `PixelRealms.Game`: `World` = colección de `MapInstance` (estado vivo: jugadores, monstruos, loot, amenaza, AOI) sobre
+  `MapData` inmutables compartidos (ADR-007); `Player`, `Monster`, `Actor`; sistemas por instancia (`MovementSystem`, `CastSystem`,
+  `AuraSystem`, `AiSystem`, `RegenSystem`, `LootSystem`, `RespawnSystem`, `InterestSystem`), servicios globales
+  (`CombatCalculator`, `StatCalculator`, `AffinityResolver`, `Inventory`, `TradeService`, `PartyService`, `ChatService`, `PvpService`).
+  Emite `IGameEvent`s en una lista por tick.
 - `PixelRealms.Persistence`: `GameDbContext`, entidades EF, `ICharacterRepository`, `IAccountRepository`.
 - `PixelRealms.Server`: `Program.cs` (minimal APIs), `ConnectionManager`, `WebSocketSession`,
   `GameLoopService : BackgroundService` (arranca el hilo), `MessageRouter`, `SnapshotBuilder`, `SaveService`.
@@ -45,7 +48,7 @@ Protocol  ←  Game  ←  Server  →  Persistence
 Tick fijo `Δt = 50 ms` (20 Hz) en un **hilo dedicado** (`new Thread(..., IsBackground=true)`), con
 acumulador y `Stopwatch` para no derivar. Si un tick tarda > 50 ms se registra `warn` con duración.
 
-Orden estricto de cada tick:
+Orden estricto de cada tick (los pasos 3–9 se ejecutan **por cada `MapInstance`**; el cambio de mapa de un jugador se aplica en el paso 2):
 1. `DrainInbound()` – vacía `Channel<InboundMessage>` (máx 500 msgs/tick). Conexiones/desconexiones incluidas.
 2. `Commands` – valida y aplica intenciones (`MessageRouter` → handlers). Handlers **no** calculan daño:
    encolan acciones (`BeginCast`, `SetMoveInput`, `InventoryOp`).
@@ -118,5 +121,6 @@ sequenceDiagram
 - Backups: `pg_dump` diario por cron → 7 copias.
 
 ## 8. Límites conocidos (aceptados en MVP)
-- Un solo proceso/mapa-zona; sin sharding. Objetivo: 50 jugadores y 300 monstruos a < 10 ms/tick.
+- Un solo proceso; varias `MapInstance` (MVP: `meadow` y `mine`, una copia de cada); sin sharding. Objetivo: 50 jugadores y 300 monstruos a < 10 ms/tick.
+- Una copia por mapa: el jefe de la Mina es compartido. Instancias por grupo = N `MapInstance` del mismo `MapData` (post-MVP, sin cambios de protocolo).
 - JSON en vez de binario (≈ 25 KB/s por cliente a 10 Hz). Optimización a MessagePack en backlog (HU-OPS-05).

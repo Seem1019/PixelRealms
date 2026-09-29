@@ -3,49 +3,141 @@
   "$id": "monsters.schema.json",
   "title": "Plantillas de monstruos",
   "type": "object",
-  "required": ["monsters"],
+  "required": [
+    "monsters"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "monsters": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "name", "level", "hp", "damageMin", "damageMax", "attackSpeedMs", "attackRange", "armor", "aggroRange", "leashRange", "speed", "xp", "lootTableId", "respawnSec", "sprite"],
+        "required": [
+          "id",
+          "name",
+          "level",
+          "type",
+          "hp",
+          "damageMin",
+          "damageMax",
+          "attackSpeedMs",
+          "attackRange",
+          "armor",
+          "aggroRange",
+          "leashRange",
+          "speed",
+          "lootTableId",
+          "respawnSec",
+          "sprite"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/id" },
-          "name": { "type": "string" },
-          "level": { "type": "integer", "minimum": 1, "maximum": 12 },
-          "hp": { "type": "integer", "minimum": 1 },
-          "damageMin": { "type": "integer", "minimum": 0 },
-          "damageMax": { "type": "integer", "minimum": 0 },
-          "school": { "$ref": "common.schema.json#/$defs/school", "default": "physical" },
-          "attackSpeedMs": { "type": "integer", "minimum": 500 },
-          "attackRange": { "type": "number", "minimum": 1, "description": "tiles" },
-          "armor": { "type": "integer", "minimum": 0 },
-          "aggroRange": { "type": "number", "minimum": 0, "description": "tiles; 0 = pasivo" },
-          "leashRange": { "type": "number", "minimum": 5 },
-          "speed": { "type": "number", "minimum": 0.5, "description": "tiles/s" },
-          "xp": { "type": "integer", "minimum": 0 },
-          "lootTableId": { "$ref": "common.schema.json#/$defs/id" },
-          "respawnSec": { "type": "integer", "minimum": 5 },
-          "boss": { "type": "boolean", "default": false },
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "common.schema.json#/$defs/level"
+          },
+          "type": {
+            "$ref": "common.schema.json#/$defs/monsterType"
+          },
+          "hp": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "damageMin": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "damageMax": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "school": {
+            "$ref": "common.schema.json#/$defs/school",
+            "default": "physical"
+          },
+          "attackSpeedMs": {
+            "type": "integer",
+            "minimum": 500
+          },
+          "attackRange": {
+            "type": "number",
+            "minimum": 1,
+            "description": "tiles"
+          },
+          "armor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "aggroRange": {
+            "type": "number",
+            "minimum": 0,
+            "description": "tiles; 0 = pasivo"
+          },
+          "leashRange": {
+            "type": "number",
+            "minimum": 5
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.5,
+            "description": "tiles/s"
+          },
+          "lootTableId": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
+          "respawnSec": {
+            "type": "integer",
+            "minimum": 5
+          },
+          "boss": {
+            "type": "boolean",
+            "default": false
+          },
           "spells": {
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["spellId", "cooldownMs"],
+              "required": [
+                "spellId"
+              ],
               "properties": {
-                "spellId": { "$ref": "common.schema.json#/$defs/id" },
-                "cooldownMs": { "type": "integer", "minimum": 1000 },
-                "hpBelowPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "Solo lo usa bajo este % de vida" },
-                "target": { "enum": ["current", "random_not_top_threat", "self"], "default": "current", "description": "A quién apunta el hechizo" }
-              }
+                "spellId": {
+                  "$ref": "common.schema.json#/$defs/id"
+                },
+                "hpBelowPct": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Solo lo usa bajo este % de vida"
+                },
+                "target": {
+                  "enum": [
+                    "current",
+                    "random_not_top_threat",
+                    "self"
+                  ],
+                  "default": "current",
+                  "description": "A quién apunta el hechizo"
+                }
+              },
+              "description": "El cooldown y el casteo se toman del hechizo en spells.json."
             }
           },
-          "sprite": { "type": "string" }
+          "sprite": {
+            "type": "string"
+          },
+          "_note": {
+            "type": "string"
+          }
         }
       }
     }

@@ -1,17 +1,20 @@
 {
   "$schema": "./schemas/auras.schema.json",
   "auras": [
-    { "id": "warrior_rend_bleed", "name": "Desgarro", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 12000, "tickMs": 3000, "base": 4, "apCoef": 0.05, "icon": "spells/rend" },
-    { "id": "warrior_shield_block_aura", "name": "Bloqueo con escudo", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": { "damageTakenPct": -0.3 }, "icon": "spells/shield_block" },
-    { "id": "rogue_gouge_stun", "name": "Gubia", "kind": "stun", "isDebuff": true, "durationMs": 3000, "icon": "spells/gouge" },
-    { "id": "rogue_poison", "name": "Veneno", "kind": "dot", "isDebuff": true, "school": "nature", "durationMs": 9000, "tickMs": 3000, "maxStacks": 3, "base": 3, "apCoef": 0.04, "icon": "spells/poison_blade" },
-    { "id": "rogue_sprint_aura", "name": "Carrera", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": { "speedPct": 0.5 }, "icon": "spells/sprint" },
-    { "id": "mage_chill", "name": "Helado", "kind": "slow", "isDebuff": true, "durationMs": 4000, "pct": 0.4, "icon": "spells/frostbolt" },
-    { "id": "mage_frost_nova_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 4000, "icon": "spells/frost_nova" },
-    { "id": "mage_mana_shield_aura", "name": "Escudo de maná", "kind": "shield", "isDebuff": false, "durationMs": 20000, "base": 40, "spCoef": 1.0, "icon": "spells/mana_shield" },
-    { "id": "priest_renew_hot", "name": "Renovar", "kind": "hot", "isDebuff": false, "school": "holy", "durationMs": 12000, "tickMs": 3000, "base": 8, "spCoef": 0.25, "icon": "spells/renew" },
-    { "id": "priest_power_shield_aura", "name": "Escudo sagrado", "kind": "shield", "isDebuff": false, "durationMs": 15000, "base": 50, "spCoef": 0.8, "icon": "spells/power_shield" },
-    { "id": "bread_hot", "name": "Comiendo", "kind": "hot", "isDebuff": false, "school": "nature", "durationMs": 15000, "tickMs": 3000, "base": 10, "icon": "items/bread" },
-    { "id": "lich_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova" }
+    {"id": "warrior_rend_bleed", "name": "Desgarro", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 12000, "tickMs": 3000, "base": 4, "apCoef": 0.05, "icon": "spells/rend"},
+    {"id": "warrior_shield_block_aura", "name": "Bloqueo con escudo", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": {"damageTakenPct": -0.3}, "icon": "spells/shield_block"},
+    {"id": "warrior_charge_stun", "name": "Cargado", "kind": "stun", "isDebuff": true, "durationMs": 1000, "icon": "spells/charge"},
+    {"id": "rogue_gouge_stun", "name": "Gubia", "kind": "stun", "isDebuff": true, "durationMs": 3000, "icon": "spells/gouge"},
+    {"id": "rogue_poison", "name": "Veneno", "kind": "dot", "isDebuff": true, "school": "magic", "durationMs": 9000, "tickMs": 3000, "maxStacks": 3, "base": 3, "apCoef": 0.04, "icon": "spells/poison_blade"},
+    {"id": "rogue_sprint_aura", "name": "Carrera", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": {"speedPct": 0.5}, "removesKinds": ["root", "slow"], "immuneKinds": ["root", "slow"], "icon": "spells/sprint"},
+    {"id": "mage_chill", "name": "Helado", "kind": "slow", "isDebuff": true, "durationMs": 4000, "pct": 0.4, "icon": "spells/frostbolt"},
+    {"id": "mage_frost_nova_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 4000, "icon": "spells/frost_nova"},
+    {"id": "mage_mana_shield_aura", "name": "Escudo de maná", "kind": "shield", "isDebuff": false, "durationMs": 20000, "base": 40, "spCoef": 1.0, "icon": "spells/mana_shield"},
+    {"id": "priest_renew_hot", "name": "Renovar", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 12000, "tickMs": 3000, "base": 8, "spCoef": 0.25, "icon": "spells/renew"},
+    {"id": "priest_power_shield_aura", "name": "Escudo sagrado", "kind": "shield", "isDebuff": false, "durationMs": 15000, "base": 50, "spCoef": 0.8, "icon": "spells/power_shield"},
+    {"id": "bread_hot", "name": "Comiendo", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 15000, "tickMs": 3000, "base": 10, "icon": "items/bread"},
+    {"id": "foreman_whip_bleed", "name": "Latigazo", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 9000, "tickMs": 3000, "base": 8, "icon": "spells/whip"},
+    {"id": "foreman_rally_aura", "name": "Enfurecido", "kind": "stat_mod", "isDebuff": false, "durationMs": 10000, "mods": {"damageDonePct": 0.25}, "icon": "spells/rally"},
+    {"id": "lich_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"}
   ]
 }

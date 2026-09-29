@@ -15,6 +15,7 @@ description: Crear, editar y balancear contenido data-driven del juego (clases, 
 | `content/monsters.json` | `schemas/monsters.schema.json` | stats, IA (aggro/leash), XP, botín, hechizos |
 | `content/loot_tables.json` | `schemas/loot_tables.schema.json` | oro y probabilidades por item |
 | `content/vendors.json` | `schemas/vendors.schema.json` | NPCs vendedores y qué venden |
+| `content/rules.json` | `schemas/rules.schema.json` | **todas las constantes**: XP, grupo, combate, conversión por clase, afinidad, PvP, botín, jefes (ADR-008) |
 Tipos compartidos (ids, enums, stats): `schemas/common.schema.json`.
 
 ## Convenciones de ID
@@ -32,7 +33,10 @@ Tipos compartidos (ids, enums, stats): `schemas/common.schema.json`.
 | `restore_resource` | `resource`, `amount` | |
 | `apply_aura` | `auraId` | la aura calcula su `base + coef·poder` **al aplicarse** (snapshot) |
 | `taunt` | `durationMs` | |
+| `dash` | `minRange?` | el lanzador se coloca adyacente al objetivo (Carga); exige LOS |
 Tipos de aura: `dot`, `hot`, `stat_mod` (`mods.stats`, `damageTakenPct`, `damageDonePct`, `speedPct`), `stun`, `root`, `silence`, `shield`, `slow`.
+Campos extra de aura: `removesKinds` (quita esas auras al aplicarse), `immuneKinds` (bloquea esas auras mientras dura). Los `boss: true` ignoran `rules.combat.bossImmuneToAuraKinds`.
+Escuelas: solo `physical` y `magic` (ADR-010).
 Targeting: `self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`, `target_aoe_enemies` (+ `aoeRadius`, `maxTargets`).
 
 **Si una idea no cabe en estos efectos**, no la fuerces con hacks: propone al usuario un nuevo tipo de efecto
@@ -43,29 +47,39 @@ Targeting: `self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`, `targ
 2. Edita el JSON respetando el orden (agrupado por clase / por nivel).
 3. Valida: `dotnet run --project server/tools/ContentValidator -- content/`. Debe verificar:
    schema, ids únicos, referencias (`auraId`, `useSpellId`, `lootTableId`, `itemId`, `startingItems`, vendors),
-   `damageMin ≤ damageMax`, `min ≤ max`, clase de `startingItems` puede equiparlos, `levelReq` de hechizos 1..10,
-   hechizos de clase con `cost.resource` = recurso de la clase.
+   `damageMin ≤ damageMax`, `min ≤ max`, `startingItems` con afinidad alta para su clase, `levelReq` 1..maxLevel,
+   hechizos de clase con `cost.resource` = recurso de la clase, `items[].scaling` = `rules.affinity.weaponScaling[weaponType]`,
+   `monsters[].type == boss` ⇔ `boss: true`, `groups[].rolls ≤ entradas`, y todo lo de `rules.json` (HU-003 CA 4b).
 4. Si añades `icon`/`sprite` nuevos, crea un placeholder (skill `pixel-art-assets`) o lista los assets faltantes.
 5. Balance: compara con la guía de abajo; si te sales, justifícalo en el commit.
 
-## Guía de balance (MVP, niveles 1–10)
-- **Tiempo para matar** un monstruo de su nivel en solitario: 8–15 s. Para el jefe con 5 jugadores nivel 10: 90–150 s.
+## Guía de balance (nivel máximo 15; MVP = Tier 1, niveles 1–6)
+- **Equipo libre:** ningún item lleva `classes`. El rendimiento por clase sale de `rules.affinity` (×1.0/0.85/0.7) y
+  `rules.classScaling`. Al diseñar un item piensa en su clase de afinidad alta; las demás lo usarán peor automáticamente.
+- **Piso de viabilidad:** cualquier clase con cualquier equipo debe matar un monstruo normal de su nivel perdiendo < 50 % de vida
+  solo con ataque básico (tabla en `docs/design/combat.md` §Referencia). Si un cambio lo rompe, ajusta `classScaling`, no el item.
+- **Tiempo para matar** un monstruo normal de su nivel en solitario con rotación completa: 8–15 s (solo básicos: 18–30 s).
+- **Jefes** (`rules.boss`): un jefe de nivel B lo matan 3 jugadores de nivel B−2 en 60–100 s; 2 de nivel B; 1 de B+1 + 1 de B−1.
+  Vida del jefe ≈ `DPS(3 jugadores nivel B−2, con el mago quedándose sin maná a los ~30 s) × 80 s`. Daño del jefe: el tanque de nivel
+  B−2 debe morir en ~30 s sin curas (obliga a llevar sanador o pociones) y un dps de nivel B en ~25 s.
 - **DPS de hechizo** ≈ `(base + coef·poder) / max(castMs, 1000 GCD)`. Un hechizo de 2 s debe hacer ~1.8× uno instantáneo sin CD.
 - Coeficientes: instantáneo sin CD `spCoef` 0.4–0.5; 2 s `0.7–0.8`; 3 s `1.0`. AoE ×0.5–0.6 del single-target.
 - Curación por maná ≈ 1.0–1.3 vida por punto de maná; daño por maná ≈ 0.9–1.1.
 - Stats de item por nivel y rareza (presupuesto de puntos): `nivel × {common 0.5, uncommon 1, rare 1.5, epic 2}` redondeado.
 - Probabilidades: uncommon 3–5 %, rare 1–2 %, epic de jefe ~33 % cada uno (1 garantizado recomendable).
-- XP de monstruo ≈ `10 + 12·nivel` (normal), ×8–10 para jefe.
+- **XP de monstruo no se escribe:** `round((5·nivel + 1) · tipo)` con `type` normal 1.0 / hard 1.2 (a distancia o con mecánica) / elite 3 / boss 10.
+- **Monstruos por nivel:** al menos un monstruo normal por cada nivel de la zona (sin huecos), o el jugador se atasca.
+- **PvP:** la clase favorecida del triángulo (Mago > Guerrero > Pícaro > Mago) gana el 60–70 % de duelos simulados con equipo igual; si supera el 80 % es absoluta y hay que bajar la palanca (hechizo o `classAdvantage`).
 Pide al subagente `content-designer` una revisión de balance cuando agregues más de 3 entradas.
 
 ## Ejemplo: nuevo hechizo con DoT
 ```json
 // spells.json
 { "id": "priest_shadow_word_pain", "name": "Palabra de las sombras: Dolor", "source": "class", "classId": "priest",
-  "levelReq": 6, "school": "shadow", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 25 },
+  "levelReq": 6, "school": "magic", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 25 },
   "range": 8, "targeting": "enemy", "effects": [{ "type": "apply_aura", "auraId": "priest_swp_dot" }],
   "icon": "spells/shadow_word_pain", "description": "Daño de sombras durante 18 s." }
 // auras.json
-{ "id": "priest_swp_dot", "name": "Dolor", "kind": "dot", "isDebuff": true, "school": "shadow",
+{ "id": "priest_swp_dot", "name": "Dolor", "kind": "dot", "isDebuff": true, "school": "magic",
   "durationMs": 18000, "tickMs": 3000, "base": 6, "spCoef": 0.18, "icon": "spells/shadow_word_pain" }
 ```

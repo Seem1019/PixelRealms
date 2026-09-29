@@ -1,80 +1,9 @@
 {
   "$schema": "./schemas/classes.schema.json",
   "classes": [
-    {
-      "id": "warrior",
-      "name": "Guerrero",
-      "role": "tank",
-      "resource": "rage",
-      "baseHp": 60,
-      "baseStats": { "str": 12, "agi": 7, "int": 3, "spi": 4, "sta": 12 },
-      "statsPerLevel": { "str": 2, "agi": 1, "int": 0, "spi": 1, "sta": 2 },
-      "allowedWeapons": ["sword", "axe", "mace"],
-      "allowedArmor": ["cloth", "leather", "mail", "plate", "shield", "jewelry"],
-      "startingItems": [
-        { "itemId": "worn_sword", "equip": true },
-        { "itemId": "recruit_mail_shirt", "equip": true },
-        { "itemId": "wooden_shield", "equip": true },
-        { "itemId": "bread", "qty": 5 }
-      ],
-      "sprite": "characters/warrior",
-      "description": "Protege al grupo con escudo y acero. Genera ira al golpear y al recibir golpes."
-    },
-    {
-      "id": "rogue",
-      "name": "Pícaro",
-      "role": "melee_dps",
-      "resource": "energy",
-      "baseHp": 50,
-      "baseStats": { "str": 8, "agi": 13, "int": 3, "spi": 4, "sta": 9 },
-      "statsPerLevel": { "str": 1, "agi": 2, "int": 0, "spi": 1, "sta": 1 },
-      "allowedWeapons": ["dagger", "sword"],
-      "allowedArmor": ["cloth", "leather", "jewelry"],
-      "startingItems": [
-        { "itemId": "worn_dagger", "equip": true },
-        { "itemId": "leather_vest", "equip": true },
-        { "itemId": "bread", "qty": 5 }
-      ],
-      "sprite": "characters/rogue",
-      "description": "Golpes rápidos, venenos y aturdimientos. Su energía se regenera sola."
-    },
-    {
-      "id": "mage",
-      "name": "Mago",
-      "role": "ranged_dps",
-      "resource": "mana",
-      "baseHp": 40,
-      "baseMana": 60,
-      "baseStats": { "str": 3, "agi": 5, "int": 14, "spi": 9, "sta": 8 },
-      "statsPerLevel": { "str": 0, "agi": 1, "int": 2, "spi": 1, "sta": 1 },
-      "allowedWeapons": ["staff", "wand"],
-      "allowedArmor": ["cloth", "jewelry"],
-      "startingItems": [
-        { "itemId": "apprentice_staff", "equip": true },
-        { "itemId": "novice_robe", "equip": true },
-        { "itemId": "minor_mana_potion", "qty": 3 }
-      ],
-      "sprite": "characters/mage",
-      "description": "Fuego y escarcha a distancia. Frágil, pero controla el campo de batalla."
-    },
-    {
-      "id": "priest",
-      "name": "Sacerdote",
-      "role": "healer",
-      "resource": "mana",
-      "baseHp": 45,
-      "baseMana": 55,
-      "baseStats": { "str": 4, "agi": 4, "int": 12, "spi": 13, "sta": 9 },
-      "statsPerLevel": { "str": 0, "agi": 0, "int": 2, "spi": 2, "sta": 1 },
-      "allowedWeapons": ["mace", "staff"],
-      "allowedArmor": ["cloth", "mail", "jewelry"],
-      "startingItems": [
-        { "itemId": "initiate_mace", "equip": true },
-        { "itemId": "novice_robe", "equip": true },
-        { "itemId": "minor_mana_potion", "qty": 3 }
-      ],
-      "sprite": "characters/priest",
-      "description": "Mantiene vivo al grupo con curas y escudos sagrados."
-    }
+    {"id": "warrior", "name": "Guerrero", "role": "tank", "resource": "rage", "baseHp": 60, "baseStats": {"str": 12, "agi": 7, "int": 3, "spi": 4, "sta": 12}, "statsPerLevel": {"str": 2, "agi": 1, "int": 0, "spi": 1, "sta": 2}, "startingItems": [{"itemId": "worn_sword", "equip": true}, {"itemId": "recruit_mail_shirt", "equip": true}, {"itemId": "wooden_shield", "equip": true}, {"itemId": "bread", "qty": 5}], "sprite": "characters/warrior", "description": "Protege al grupo con escudo y acero. Gana ira al golpear y al recibir golpes. Vence al Pícaro; pierde contra el Mago.", "recommendedWeapons": ["sword", "axe", "mace"], "recommendedArmor": ["cloth", "leather", "mail", "plate", "shield", "jewelry"]},
+    {"id": "rogue", "name": "Pícaro", "role": "melee_dps", "resource": "energy", "baseHp": 50, "baseStats": {"str": 8, "agi": 13, "int": 3, "spi": 4, "sta": 9}, "statsPerLevel": {"str": 1, "agi": 2, "int": 0, "spi": 1, "sta": 1}, "startingItems": [{"itemId": "worn_dagger", "equip": true}, {"itemId": "leather_vest", "equip": true}, {"itemId": "bread", "qty": 5}], "sprite": "characters/rogue", "description": "Golpes rápidos, venenos y aturdimientos. Su energía se regenera sola. Vence al Mago; pierde contra el Guerrero.", "recommendedWeapons": ["dagger", "sword"], "recommendedArmor": ["cloth", "leather", "jewelry"]},
+    {"id": "mage", "name": "Mago", "role": "ranged_dps", "resource": "mana", "baseHp": 40, "baseMana": 60, "baseStats": {"str": 3, "agi": 5, "int": 14, "spi": 9, "sta": 8}, "statsPerLevel": {"str": 0, "agi": 1, "int": 2, "spi": 1, "sta": 1}, "startingItems": [{"itemId": "apprentice_staff", "equip": true}, {"itemId": "novice_robe", "equip": true}, {"itemId": "minor_mana_potion", "qty": 3}], "sprite": "characters/mage", "description": "Daño mágico a distancia y control. Frágil. Vence al Guerrero; pierde contra el Pícaro.", "recommendedWeapons": ["staff", "wand"], "recommendedArmor": ["cloth", "jewelry"]},
+    {"id": "priest", "name": "Sacerdote", "role": "healer", "resource": "mana", "baseHp": 45, "baseMana": 55, "baseStats": {"str": 4, "agi": 4, "int": 12, "spi": 13, "sta": 9}, "statsPerLevel": {"str": 0, "agi": 0, "int": 2, "spi": 2, "sta": 1}, "startingItems": [{"itemId": "initiate_mace", "equip": true}, {"itemId": "novice_robe", "equip": true}, {"itemId": "novice_wand"}, {"itemId": "minor_mana_potion", "qty": 3}], "sprite": "characters/priest", "description": "Mantiene vivo al grupo con curas y escudos. Solo, farmea con varita o maza sin gastar maná.", "recommendedWeapons": ["mace", "staff"], "recommendedArmor": ["cloth", "mail", "jewelry"]}
   ]
 }

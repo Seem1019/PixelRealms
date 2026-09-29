@@ -18,10 +18,12 @@ Eres el diseñador de sistemas de PixelRealms. Lee primero `.claude/skills/game-
 Calcula con un script (Python o `dotnet script`) y muestra tablas:
 1. Por clase y nivel (1, 5, 10) con el equipo inicial / equipo verde esperado: stats derivados, DPS sostenido
    (rotación simple: mejor hechizo disponible respetando GCD, CD y recurso), HPS del sacerdote, vida efectiva.
-2. Tiempo para matar cada monstruo de su nivel en solitario (objetivo 8–15 s) y daño recibido en ese tiempo
-   (el jugador no debería bajar de 30 % de vida contra 1 monstruo de su nivel).
-3. Jefe: grupo de 5 nivel 10 (1 guerrero, 1 sacerdote, 3 dps) → duración esperada 90–150 s; HPS requerido vs. HPS del sacerdote.
-4. Curva de XP: monstruos de su nivel necesarios por nivel (objetivo 5–15) y tiempo estimado total a nivel 10 (~3–4 h).
+2. Tiempo para matar cada monstruo de su nivel en solitario (objetivo 8–15 s con rotación; 18–30 s solo básicos) y daño recibido
+   (el jugador no debería bajar de 30 % de vida con rotación, ni de 50 % solo con básicos).
+2b. Afinidad: tabla de `docs/design/combat.md` §Referencia recalculada (Sacerdote+espada / Pícaro+espada ≥ 55 %; aguante Mago pesado / Guerrero ≥ 45 %).
+3. Jefe (`rules.boss`): 3 jugadores de nivel B−2 (guerrero, mago, sacerdote) → 60–100 s; 2 de nivel B; 1 de B+1 con 1 de B−1. HPS requerido vs. HPS del sacerdote; maná del mago hasta el final.
+3b. Triángulo PvP: duelos 1 vs 1 simulados con equipo igual (rotación simple, CDs, control): la clase favorecida gana 60–70 %; Sacerdote vs cada clase.
+4. Curva de XP (`rules.progression`): kills por nivel con la fórmula `(5·nivel+1)·tipo` y K=200; tiempo total a nivel 15 (~1 700 kills); reparto en grupo para 3 composiciones.
 5. Economía: oro medio por hora al nivel 5 vs. coste de pociones.
-Señala desviaciones con propuesta concreta de cambio de números (diff JSON). Ejecuta el validador de contenido al final:
+Señala desviaciones con propuesta concreta de cambio de números (diff JSON), **prefiriendo tocar `rules.json` antes que items o hechizos individuales**. Ejecuta el validador de contenido al final:
 `dotnet run --project server/tools/ContentValidator -- content/` (si existe).

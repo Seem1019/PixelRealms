@@ -20,14 +20,16 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 | `npcs` | objetos | NPCs (vendedores) |
 | `graveyards` | objetos (puntos) | respawn de jugadores |
 | `zones` | objetos (rectángulos) | nombre de zona, `safe=true` (sin combate), rango de niveles |
-| `portals` | objetos | cambio de mapa (post-MVP) |
+| `portals` | objetos | cambio de mapa (MVP: entrada a la Mina; ADR-007) |
 
 ## Propiedades personalizadas
 - Tile (en el tileset): `solid: bool`, `blocksSight: bool` (paredes sí, arbustos bajos no).
 - Objeto en `spawns`: `monsterId: string` (existe en `content/monsters.json`), `count: int` (1–10), `wanderRadius: float` (tiles).
   Punto = 1 spawn fijo; rectángulo = `count` posiciones aleatorias libres dentro (determinista por seed del mapa).
 - Objeto en `npcs`: `vendorId: string` (en `content/vendors.json`), `name: string`.
-- Objeto en `zones`: `name: string`, `safe: bool`, `minLevel`, `maxLevel`.
+- Objeto en `zones`: `name: string`, `safe: bool`, `minLevel`, `maxLevel`, `landmark: string` (punto de referencia visible).
+- Objeto en `portals`: `portalId`, `targetMapId`, `targetX`, `targetY` (tiles), `minLevel?`. Rectángulo = se activa al pisarlo.
+- Objeto en `graveyards`: uno **por zona** (punto seguro: fogata/santuario); `defaultGraveyard` del mapa es el de la aldea.
 - Mapa: `mapId: string`, `displayName: string`, `defaultGraveyard: string`.
 
 ## Servidor: `TiledMapLoader` (PixelRealms.Game/Map)
@@ -37,7 +39,8 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 3. Construye `CollisionGrid(width, height)` con `solid` y `blocksSight` desde `walls` + `collision`.
 4. Lee objetos → `SpawnDef`, `NpcDef`, `GraveyardDef`, `ZoneDef`. Coordenadas de objetos en píxeles; los puntos de
    Tiled están en la esquina superior-izquierda del objeto si es rectángulo.
-5. Valida: `monsterId`/`vendorId` existen, spawns no caen en sólido, al menos un cementerio. Error → no arranca.
+5. Valida: `monsterId`/`vendorId` existen, spawns no caen en sólido, al menos un cementerio, `targetMapId` de portales existe en `maps/`. Error → no arranca.
+5b. Un `MapData` por archivo; el `GameLoop` crea una `MapInstance` por `MapData` al arrancar (ADR-007). `MapInstance.Id` es un int propio, distinto de `mapId`.
 6. Test: `TiledMapLoaderTests` con `maps/test_small.tmj` (10×10) versionado para tests.
 
 ## Cliente
@@ -50,5 +53,9 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 ## Buenas prácticas de diseño
 - Bordes del mapa siempre sólidos. Caminos de ≥ 3 tiles de ancho. Zonas separadas por cuellos de botella naturales.
 - Densidad: 1 spawn cada ~8×8 tiles en zonas de farmeo; aggro radius no debe solaparse entre grupos.
+- Zonas abiertas: 60–90 s de caminata para cruzarlas (~100×100 tiles útiles a 4 tiles/s), un punto de referencia visible,
+  sendero principal obvio, 2–3 campamentos con subniveles (bajos en la entrada, altos en la salida), ramas laterales con recompensa.
+- Cuevas (mapas aparte): 3–5 salas, 5–10 min; sala del jefe en rama lateral; sala élite antes de la salida al tier siguiente.
+  Todas comparten el tileset `interior` cambiando paleta (mina marrón, cripta verde, fortaleza gris).
 - El pueblo (`safe=true`) debe estar a < 40 tiles de las zonas 1–3.
 - Tras editar: `dotnet test --filter Map` y abrir el cliente para revisar capas `above`.

@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rules.schema.json",
+  "title": "Reglas y constantes del juego (content/rules.json)",
+  "description": "Única fuente de constantes numéricas. El servidor las carga en RulesDb (inmutable) y el cliente las lee para predicción/UI. Cambiar un valor aquí no requiere código.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "boss", "movement", "world"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_doc": { "type": "string" },
+
+    "progression": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maxLevel", "xpCurveK", "xpCurveExponent", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels"],
+      "properties": {
+        "maxLevel": { "type": "integer", "minimum": 2, "maximum": 60, "description": "Nivel máximo. xpParaSubir se define para L = 1..maxLevel-1." },
+        "xpCurveK": { "type": "number", "minimum": 1, "description": "K en xpParaSubir(L) = round(K · L^exp). 100≈5 h, 200≈10 h a nivel 10." },
+        "xpCurveExponent": { "type": "number", "minimum": 1, "maximum": 3, "description": "Exponente de la curva de XP." },
+        "monsterXpPerLevel": { "type": "number", "description": "xpMonstruo = round((monsterXpPerLevel · nivel + monsterXpBase) · tipo)." },
+        "monsterXpBase": { "type": "number" },
+        "monsterTypeMultiplier": {
+          "type": "object", "additionalProperties": false, "required": ["normal", "hard", "elite", "boss"],
+          "properties": { "normal": { "type": "number" }, "hard": { "type": "number" }, "elite": { "type": "number" }, "boss": { "type": "number" } },
+          "description": "Multiplicador de XP por monsters[].type."
+        },
+        "levelDiffGreyAt": { "type": "integer", "maximum": 0, "description": "Si nivelMonstruo − nivelReferencia ≤ este valor, 0 XP (gris)." },
+        "levelDiffModPerLevel": { "type": "number", "description": "mod = 1 + este valor · clamp(diff, −clamp, +clamp)." },
+        "levelDiffClamp": { "type": "integer", "minimum": 0 },
+        "spellUnlockLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Niveles en que cada clase desbloquea su hechizo n.º i (ordenados). Informativo: el valor real es spells[].levelReq." }
+      }
+    },
+
+    "group": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maxMembers", "xpRangeTiles", "activeWindowSec", "bonusBySize", "levelGapFreeLevels", "levelGapDecay", "levelGapMinWeight", "inviteExpireSec", "offlineGraceSec"],
+      "properties": {
+        "maxMembers": { "type": "integer", "minimum": 2, "maximum": 10 },
+        "xpRangeTiles": { "type": "number", "description": "Distancia máxima al monstruo para contar como activo." },
+        "activeWindowSec": { "type": "number", "description": "Ventana en la que un miembro debe haber dañado/curado/recibido daño/usado habilidad para ser activo." },
+        "bonusBySize": { "type": "array", "items": { "type": "number", "minimum": 1 }, "description": "bonoGrupo(N) indexado por N−1; N = 1..maxMembers." },
+        "levelGapFreeLevels": { "type": "integer", "minimum": 0, "description": "Brecha sin penalización (exceso = max(0, brecha − este valor))." },
+        "levelGapDecay": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "peso = max(minWeight, decay^exceso)." },
+        "levelGapMinWeight": { "type": "number", "minimum": 0, "maximum": 1 },
+        "inviteExpireSec": { "type": "number" },
+        "offlineGraceSec": { "type": "number", "description": "Segundos que un miembro desconectado sigue en el grupo." }
+      }
+    },
+
+    "combat": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds"],
+      "properties": {
+        "gcdMs": { "type": "integer", "minimum": 0, "description": "Cooldown global tras cualquier hechizo con triggersGcd." },
+        "critMultiplier": { "type": "number", "minimum": 1 },
+        "varianceMin": { "type": "number" }, "varianceMax": { "type": "number" },
+        "physicalMissBase": { "type": "number" }, "physicalMissPerTargetLevel": { "type": "number", "description": "Fallo extra por nivel del objetivo sobre el atacante." },
+        "magicMissBase": { "type": "number" },
+        "critBase": { "type": "number" }, "critPerAgi": { "type": "number", "description": "Crítico físico por punto de agi (0.003 = 0.3 %)." }, "critPerInt": { "type": "number", "description": "Crítico mágico por punto de int." }, "critCap": { "type": "number" },
+        "dodgeBase": { "type": "number" }, "dodgePerAgi": { "type": "number" }, "dodgeCap": { "type": "number" },
+        "armorPerAgi": { "type": "number", "description": "Armadura innata por punto de agi." },
+        "mitigationPerLevel": { "type": "number", "description": "mitig = armor / (armor + perLevel · nivelAtacante + constant)." },
+        "mitigationConstant": { "type": "number" }, "mitigationCap": { "type": "number", "maximum": 1 },
+        "basicAttackPowerDivisor": { "type": "number", "description": "raw básico = roll·afinidad + poder / divisor · segundosDeSwing." },
+        "castRangeToleranceTiles": { "type": "number", "description": "Tolerancia extra de rango al terminar un casteo." },
+        "inCombatWindowSec": { "type": "number" },
+        "hpRegenDelaySec": { "type": "number" }, "hpRegenPerSpi": { "type": "number" }, "hpRegenPerSta": { "type": "number" },
+        "manaRegenPerSpiPer5s": { "type": "number" }, "manaRegenPerIntPer5s": { "type": "number" }, "manaRegenCastingPenalty": { "type": "number", "description": "Multiplicador de regen durante 5 s tras gastar maná." },
+        "ragePerHitDealt": { "type": "number", "description": "Ira ganada por cada golpe/habilidad propia que impacta (plano, no depende del daño)." },
+        "ragePerHitTaken": { "type": "number" }, "rageDecayPerSecOutOfCombat": { "type": "number" },
+        "energyPerSec": { "type": "number" }, "resourceCap": { "type": "number", "description": "Tope de ira y energía." },
+        "threatPerDamage": { "type": "number" }, "threatPerHeal": { "type": "number" }, "threatSwitchMelee": { "type": "number" }, "threatSwitchRanged": { "type": "number" }, "tauntThreatBonus": { "type": "number" },
+        "respawnHpPct": { "type": "number" }, "respawnResourcePct": { "type": "number" },
+        "corpseLifetimeSec": { "type": "number", "description": "Segundos que dura un cadáver saqueable." },
+        "bossImmuneToAuraKinds": { "type": "array", "items": { "type": "string" }, "description": "Tipos de aura que no afectan a monstruos con boss=true." }
+      }
+    },
+
+    "classScaling": {
+      "type": "object", "additionalProperties": false, "required": ["warrior", "rogue", "mage", "priest"],
+      "description": "Conversión de stats primarios a derivados por clase. Es lo que hace que un Mago con espada pegue menos que un Pícaro con la misma espada.",
+      "properties": {
+        "warrior": { "$ref": "#/$defs/classScaling" }, "rogue": { "$ref": "#/$defs/classScaling" },
+        "mage": { "$ref": "#/$defs/classScaling" }, "priest": { "$ref": "#/$defs/classScaling" }
+      }
+    },
+
+    "affinity": {
+      "type": "object", "additionalProperties": false, "required": ["multipliers", "weaponScaling", "byClass"],
+      "properties": {
+        "multipliers": { "type": "object", "additionalProperties": false, "required": ["alta", "media", "baja"],
+          "properties": { "alta": { "type": "number" }, "media": { "type": "number" }, "baja": { "type": "number" } },
+          "description": "Multiplica TODA la contribución numérica del item (daño de arma, armadura, spellPower, stats) según la afinidad de la clase con su tipo." },
+        "weaponScaling": { "type": "object", "additionalProperties": { "enum": ["str", "agi", "int"] }, "description": "Stat que decide la escuela del ataque básico: str/agi → físico con attackPower; int → mágico con spellPower." },
+        "byClass": { "type": "object", "additionalProperties": false, "required": ["warrior", "rogue", "mage", "priest"],
+          "properties": {
+            "warrior": { "$ref": "#/$defs/affinityMap" }, "rogue": { "$ref": "#/$defs/affinityMap" },
+            "mage": { "$ref": "#/$defs/affinityMap" }, "priest": { "$ref": "#/$defs/affinityMap" }
+          } }
+      }
+    },
+
+    "classAdvantage": {
+      "type": "object", "additionalProperties": false, "required": ["warrior", "rogue", "mage", "priest"],
+      "properties": {
+        "_doc": { "type": "string" },
+        "warrior": { "$ref": "#/$defs/advantageRow" }, "rogue": { "$ref": "#/$defs/advantageRow" },
+        "mage": { "$ref": "#/$defs/advantageRow" }, "priest": { "$ref": "#/$defs/advantageRow" }
+      }
+    },
+
+    "pvp": {
+      "type": "object", "additionalProperties": false, "required": ["rulesets", "defaultRuleset", "enabledRulesets"],
+      "properties": {
+        "rulesets": { "type": "object", "additionalProperties": { "$ref": "#/$defs/pvpRuleset" }, "description": "Un ruleset por modo de PvP. MVP: solo duel. Futuro: group_duel, open_world, faction." },
+        "defaultRuleset": { "type": "string" },
+        "enabledRulesets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "loot": {
+      "type": "object", "additionalProperties": false, "required": ["ownerMode", "exclusiveSec", "lootRangeTiles", "eligibleRangeTiles", "goldSplit", "announceRarityFrom"],
+      "properties": {
+        "ownerMode": { "enum": ["random_per_item", "free_for_all"], "description": "random_per_item: cada item que cae se asigna al azar (uniforme) a un miembro elegible; solo él lo ve brillar y puede tomarlo." },
+        "exclusiveSec": { "type": "number", "description": "Tras este tiempo cualquiera puede tomar lo no reclamado." },
+        "lootRangeTiles": { "type": "number" },
+        "eligibleRangeTiles": { "type": "number", "description": "Distancia máxima al cadáver para entrar en el sorteo." },
+        "goldSplit": { "enum": ["equal", "to_looter"] },
+        "announceRarityFrom": { "enum": ["junk", "common", "uncommon", "rare", "epic"] }
+      }
+    },
+
+    "economy": {
+      "type": "object", "additionalProperties": false, "required": ["vendorBuyMultiplier", "vendorRangeTiles", "copperPerSilver", "silverPerGold"],
+      "properties": { "vendorBuyMultiplier": { "type": "number" }, "vendorRangeTiles": { "type": "number" }, "copperPerSilver": { "type": "integer" }, "silverPerGold": { "type": "integer" } }
+    },
+
+    "boss": {
+      "type": "object", "additionalProperties": false, "required": ["referencePartySize", "referenceLevelOffset", "targetDurationSec", "soloKillable"],
+      "properties": {
+        "_doc": { "type": "string" },
+        "referencePartySize": { "type": "integer" },
+        "referenceLevelOffset": { "type": "integer", "description": "Nivel de los jugadores de referencia relativo al del jefe." },
+        "targetDurationSec": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "soloKillable": { "type": "boolean" }
+      }
+    },
+
+    "movement": {
+      "type": "object", "additionalProperties": false, "required": ["baseSpeedTilesPerSec", "sayRangeTiles", "aoiCellTiles"],
+      "properties": { "baseSpeedTilesPerSec": { "type": "number" }, "sayRangeTiles": { "type": "number" }, "aoiCellTiles": { "type": "integer" } }
+    },
+
+    "world": {
+      "type": "object", "additionalProperties": false, "required": ["startMapId", "mvpTier", "zoneCrossTimeSecTarget"],
+      "properties": { "startMapId": { "type": "string" }, "mvpTier": { "type": "integer" }, "zoneCrossTimeSecTarget": { "type": "array", "items": { "type": "number" } } }
+    }
+  },
+
+  "$defs": {
+    "statConv": { "type": "object", "additionalProperties": false, "required": ["str", "agi", "int"],
+      "properties": { "str": { "type": "number", "minimum": 0 }, "agi": { "type": "number", "minimum": 0 }, "int": { "type": "number", "minimum": 0 } } },
+    "classScaling": {
+      "type": "object", "additionalProperties": false, "required": ["hpPerSta", "manaPerInt", "ap", "sp", "armorMult", "haste"],
+      "properties": {
+        "hpPerSta": { "type": "number", "description": "maxHp = baseHp + sta · hpPerSta" },
+        "manaPerInt": { "type": "number", "description": "maxMana = baseMana + int · manaPerInt (0 si la clase no usa maná)" },
+        "ap": { "$ref": "#/$defs/statConv", "description": "attackPower = Σ stat · ap[stat]" },
+        "sp": { "$ref": "#/$defs/statConv", "description": "spellPower = Σ stat · sp[stat] + spellPower de items" },
+        "armorMult": { "type": "number", "description": "Multiplica la armadura que aporta el equipo." },
+        "haste": { "type": "number", "exclusiveMinimum": 0, "description": "swingMs = weapon.speedMs / haste. Velocidad base de ataque de la clase." }
+      }
+    },
+    "affinityMap": { "type": "object", "additionalProperties": { "enum": ["alta", "media", "baja"] }, "description": "weaponType|armorType → afinidad. Lo que falte se considera baja." },
+    "advantageRow": { "type": "object", "additionalProperties": false, "required": ["warrior", "rogue", "mage", "priest"],
+      "properties": { "warrior": { "type": "number" }, "rogue": { "type": "number" }, "mage": { "type": "number" }, "priest": { "type": "number" } } },
+    "pvpRuleset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requiresConsent", "endAtHpPct", "restoreOnEnd", "xpLoss", "goldLoss", "itemLoss", "allowedInSafeZones", "requestExpireSec", "countdownSec", "maxDistanceTiles"],
+      "properties": {
+        "requiresConsent": { "type": "boolean" },
+        "endAtHpPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "El combate termina cuando un participante baja a este % de vida (0 = muerte real)." },
+        "restoreOnEnd": { "type": "boolean", "description": "Restaurar vida/recurso de ambos al terminar." },
+        "xpLoss": { "type": "number" }, "goldLoss": { "type": "number" }, "itemLoss": { "type": "boolean" },
+        "allowedInSafeZones": { "type": "boolean" },
+        "requestExpireSec": { "type": "number" }, "countdownSec": { "type": "number" },
+        "maxDistanceTiles": { "type": "number", "description": "Si un duelista se aleja más, pierde el duelo." }
+      }
+    }
+  }
+}

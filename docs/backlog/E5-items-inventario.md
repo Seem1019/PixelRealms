@@ -9,12 +9,14 @@
 - Skills: `inventory-items`, `net-protocol`, `godot-client`
 
 **Criterios de aceptación**
-1. **Dado** un monstruo que maté (o mi grupo) **cuando** muere **entonces** se tira su tabla de botín y, si hay algo, el cadáver brilla para mí (y no para otros).
-2. **Dado** que hago clic en el cadáver a ≤ 2 tiles **entonces** se abre la ventana de botín con oro e items (color de rareza).
+1. **Dado** un monstruo que maté (o mi grupo) **cuando** muere **entonces** se tira su tabla de botín (`entries` independientes + `groups` garantizados) y **cada item se asigna al azar (uniforme) a un miembro elegible** (vivo, a ≤ `rules.loot.eligibleRangeTiles`); el cadáver brilla solo para quienes ganaron algo.
+2. **Dado** que hago clic en el cadáver a ≤ 2 tiles **entonces** se abre la ventana de botín con oro e items (color de rareza) y el **nombre del dueño** de cada item; los que no son míos aparecen atenuados y no se pueden tomar (`Error{not_owner}`).
 3. **Dado** "Tomar todo" o clic en un item **entonces** pasa a mi bolsa; si no cabe, `Error{bag_full}` y queda en el cadáver.
-4. **Dado** que pasan 30 s **entonces** cualquiera puede lootear; a los 60 s el cadáver desaparece con lo que quede.
+4. **Dado** que pasan `rules.loot.exclusiveSec` (30 s) **entonces** cualquiera del grupo puede tomar lo no reclamado; a los `corpseLifetimeSec` (60 s) el cadáver desaparece con lo que quede.
+4b. **Dado** 4 miembros elegibles y 1 000 kills simulados con `SeededRng` **entonces** cada uno recibe ≈ 25 % de los items (±3 %) y la probabilidad de que un mismo jugador se lleve los 3 items de un cadáver es ≈ 1/16.
+4c. **Dado** el Capataz **entonces** siempre cae exactamente un item de su `groups` (uno de los tres raros).
 5. **Dado** dos jugadores que envían `LootTake` del mismo item en el mismo tick **entonces** solo uno lo recibe (test).
-6. **Dado** tests con `FixedRng` **entonces** cubren probabilidades, cantidades `min..max`, `maxItems` y oro.
+6. **Dado** tests con `FixedRng` **entonces** cubren probabilidades, cantidades `min..max`, `maxItems`, `groups` por peso, asignación por item y oro repartido a partes iguales.
 
 ---
 
@@ -33,16 +35,17 @@
 ---
 
 ### HU-052 · Equipar y desequipar
-**Como** jugador **quiero** equiparme armas y armaduras **para** mejorar mis estadísticas.
+**Como** jugador **quiero** equiparme cualquier arma o armadura **para** mejorar mis estadísticas o jugar a mi manera, sabiendo cuánto rinde para mi clase.
 - Prioridad: Must · Estimación: M · Estado: Pendiente
 - Dependencias: HU-051
 - Skills: `inventory-items`, `combat-system`
 
 **Criterios de aceptación**
 1. **Dado** un item equipable **cuando** hago clic derecho o lo arrastro a su slot **entonces** se equipa (intercambiando con lo que hubiera) y mis stats se recalculan (`StatsUpdate`).
-2. **Dado** un item de nivel superior, de otra clase o de tipo no permitido (Mago + placas) **entonces** `Error{level_too_low|wrong_class|cannot_equip}`.
+2. **Dado** un item de nivel superior **entonces** `Error{level_too_low}`. **No existe** restricción por clase ni por tipo: un Mago equipa placas y espada (afinidad baja) y sus stats se recalculan con `rules.affinity` y `rules.classScaling`.
+2b. **Dado** un Mago que equipa `iron_sword` (+2 str, +1 sta, afinidad baja ×0.7) **entonces** recibe +1.4 str y +0.7 sta, es decir `attackPower +0.84` (1.4 · ap.str 0.6) y `maxHp +7` (0.7 · hpPerSta 10); el daño del arma cuenta como 4.2–7.7. Test con números exactos para las 4 clases.
 3. **Dado** que desequipo con la bolsa llena **entonces** `Error{bag_full}`.
-4. **Dado** que cambio de arma **entonces** el auto-ataque usa el daño y velocidad nuevos desde el siguiente swing.
+4. **Dado** que cambio de arma **entonces** el ataque básico usa el daño, la escuela (`scaling`), el rango y la velocidad nuevos desde el siguiente swing.
 5. **Dado** que me quito un item con +aguante **entonces** mi vida actual no supera la nueva máxima.
 6. **Dado** otros jugadores **entonces** ven el cambio de arma si el sprite lo soporta (post-MVP: solo arma principal).
 
@@ -58,6 +61,7 @@
 1. **Dado** que paso el ratón sobre un item (bolsa, equipo, botín, vendedor) **entonces** veo el tooltip con todos los campos de la skill `inventory-items` §Cliente.
 2. **Dado** un equipable **entonces** se muestran las diferencias con el item equipado en ese slot (▲ verde / ▼ rojo) incluido DPS del arma.
 3. **Dado** un requisito no cumplido **entonces** aparece en rojo.
+3b. **Dado** cualquier equipable **entonces** el tooltip muestra "Afinidad: alta/media/baja (×1.0/×0.85/×0.7)" para mi clase (verde/amarillo/rojo) y los valores del item **ya multiplicados** por la afinidad, con el valor base entre paréntesis si difiere.
 4. **Dado** `tooltip_builder.gd` **entonces** tiene tests GUT con 3 items de ejemplo (arma, armadura, consumible).
 
 ---
@@ -125,5 +129,25 @@
 - Skills: `inventory-items`, `game-content`
 
 **Criterios de aceptación**
-1. **Dado** que creo un Guerrero **entonces** aparece con Espada gastada, Cota de recluta y Escudo de madera equipados y 5 Panes en la bolsa (según `classes.json`).
-2. **Dado** cada clase **entonces** un test verifica que su equipo inicial es equipable por ella (también lo verifica el validador de contenido).
+1. **Dado** que creo un Guerrero **entonces** aparece con Espada gastada, Cota de recluta y Escudo de madera equipados y 5 Panes en la bolsa; un Sacerdote lleva Maza de iniciado equipada y una Varita de novicio en la bolsa (según `classes.json`).
+2. **Dado** cada clase **entonces** un test verifica que su equipo inicial existe, cabe en la bolsa y tiene afinidad **alta** para ella (también lo verifica el validador de contenido).
+
+---
+
+### HU-059 · Intercambio entre jugadores
+**Como** jugador **quiero** intercambiar items y oro con un amigo **para** darle el botín que me cayó y a él le sirve.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-051, HU-057, HU-060
+- Skills: `inventory-items`, `net-protocol`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** otro jugador a ≤ 3 tiles **cuando** hago clic derecho → "Intercambiar" (o `/trade Nombre`) **entonces** recibe una solicitud (expira en 30 s); al aceptar se abre la ventana en ambos (`TradeUpdate`).
+2. **Dado** la ventana **cuando** arrastro items de mi bolsa (hasta 6) o escribo oro **entonces** el otro ve mi oferta en vivo; cualquier cambio de oferta **desmarca** la confirmación de ambos.
+3. **Dado** que ambos pulsan "Confirmar" con la misma oferta vista **entonces** el servidor valida (propiedad, cantidades, espacio en ambas bolsas, oro ≥ 0) y mueve todo en **una operación atómica**; si algo falla, nadie pierde nada y se muestra el motivo.
+4. **Dado** que uno se aleja > 3 tiles, se desconecta, muere o cancela **entonces** el intercambio se cancela (`TradeUpdate{state:"cancelled"}`) y los items vuelven a estar disponibles.
+5. **Dado** los tests de propiedad de HU-051 **entonces** incluyen intercambios aleatorios entre 2 personajes: la suma de `(templateId → qty)` y de oro de ambos se conserva y ningún `ItemInstance.Id` se duplica.
+6. **Dado** cada intercambio completado **entonces** se escriben filas `trade_out`/`trade_in` en `item_audit_log` con el id de la contraparte.
+
+**Notas técnicas**
+- `TradeSession { A, B, offerA, offerB, confirmedA, confirmedB, version }`; toda `TradeConfirm` lleva `version` y se ignora si no coincide (evita confirmar una oferta cambiada en el mismo tick).
+- Los items ofrecidos se marcan `locked` en la bolsa: no se pueden mover, usar, vender ni destruir mientras dura el intercambio.

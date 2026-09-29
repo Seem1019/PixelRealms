@@ -48,12 +48,14 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - Skills: `game-content`, `dotnet-server`
 
 **Criterios de aceptación**
-1. **Dado** `content/` válido **cuando** ejecuto `dotnet run --project server/tools/ContentValidator -- content/` **entonces** imprime un resumen (`4 clases, 26 hechizos, 12 auras, 28 items, 6 monstruos, 6 tablas, 1 vendedor`) y sale con código 0.
+1. **Dado** `content/` válido **cuando** ejecuto `dotnet run --project server/tools/ContentValidator -- content/` **entonces** imprime un resumen (`4 clases, 30 hechizos, 15 auras, 37 items, 10 monstruos, 10 tablas, 1 vendedor, rules OK`) y sale con código 0.
 2. **Dado** un item con un campo no permitido **cuando** valido **entonces** falla indicando archivo, ruta JSON (`/items/3/dmgMin`) y mensaje, código ≠ 0.
 3. **Dado** una tabla de botín que referencia un `itemId` inexistente **cuando** valido **entonces** falla con "lt_wolf: itemId 'wolf_fangg' no existe en items.json".
 4. **Dado** un hechizo de clase cuyo `cost.resource` no coincide con el recurso de la clase **entonces** falla.
+4b. **Dado** `content/rules.json` **entonces** se valida con `rules.schema.json` y se comprueba: `affinity.byClass` cubre todos los `weaponType`/`armorType`, `weaponScaling` coincide con `items[].scaling`, `bonusBySize` tiene `maxMembers` entradas, los `levelReq` de cada clase coinciden con `spellUnlockLevels`, `monsters[].level ≤ maxLevel`, y `groups[].rolls ≤ entradas`.
+4c. **Dado** `RulesDb` cargado **entonces** los sistemas reciben las constantes por inyección (`IRules`), y `/reload rules` (admin) recarga el archivo en caliente sin reiniciar; si el nuevo archivo es inválido se conserva el anterior y se loguea `error`.
 5. **Dado** el servidor arrancando **cuando** el contenido es inválido **entonces** no arranca y muestra los mismos errores.
-6. **Dado** `ContentDb` cargado **entonces** expone `Spell(id)`, `Item(id)`, `Monster(id)`, `Aura(id)`, `Class(id)`, `LootTable(id)`, `Vendor(id)` con `FrozenDictionary` y lanza `KeyNotFoundException` con mensaje claro.
+6. **Dado** `ContentDb` cargado **entonces** expone `Spell(id)`, `Item(id)`, `Monster(id)`, `Aura(id)`, `Class(id)`, `LootTable(id)`, `Vendor(id)`, `Rules` con `FrozenDictionary` y lanza `KeyNotFoundException` con mensaje claro.
 
 **Notas técnicas**
 - Schemas en `content/schemas/` (draft 2020-12, `$ref` entre archivos) → `JsonSchema.Net` con `SchemaRegistry`.
@@ -76,7 +78,7 @@ determinista donde agregar sistemas.
 **Criterios de aceptación**
 1. **Dado** el servidor corriendo **entonces** el loop ejecuta 20 ticks/s (±1 medido en 10 s) y loguea cada 30 s `tick p50/p99` y número de entidades.
 2. **Dado** un tick que tarda > 50 ms **entonces** se loguea `warn` y el loop no intenta "recuperar" más de 3 ticks atrasados (evita espiral de la muerte).
-3. **Dado** `PixelRealms.Game` **entonces** no referencia ASP.NET ni EF, y existen `IGameClock`, `IRng`, `World`, `TickContext`, `IGameEvent`.
+3. **Dado** `PixelRealms.Game` **entonces** no referencia ASP.NET ni EF, y existen `IGameClock`, `IRng`, `World`, `MapData` (estático, compartido), `MapInstance` (estado dinámico), `TickContext`, `IGameEvent`. `World` contiene una colección de `MapInstance` y el loop las recorre todas (ADR-007), aunque al inicio haya una sola.
 4. **Dado** los helpers de test **entonces** existen `FakeClock`, `SeededRng`, `FixedRng`, `WorldBuilder`, `TickRunner` y un test de ejemplo que avanza 40 ticks.
 5. **Dado** Ctrl+C **entonces** el loop se detiene limpiamente (`StopAsync`) en < 1 s.
 

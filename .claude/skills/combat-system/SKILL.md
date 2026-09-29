@@ -11,25 +11,28 @@ está construido y cómo extenderlo sin romperlo.
 ## Piezas (PixelRealms.Game/Combat)
 | Clase | Responsabilidad |
 |---|---|
-| `StatCalculator` | stats primarios (clase + nivel + equipo + auras) → derivados (`maxHp`, `attackPower`, `spellPower`, `crit`, `armor`…). Cachea y se invalida con `actor.MarkStatsDirty()` |
+| `StatCalculator` | stats primarios (clase + nivel + equipo **× afinidad** + auras) → derivados con la matriz `rules.classScaling` (`maxHp`, `attackPower`, `spellPower`, `crit`, `armor`, `haste`…). Cachea y se invalida con `actor.MarkStatsDirty()` |
+| `AffinityResolver` | `(classId, item) → mult` desde `rules.affinity`; lo usan `StatCalculator` (stats/armor/spellPower) y `AutoAttackSystem` (roll del arma) |
+| `PvpService` | `CanAttack(a, b) → PvpRuleset?`; `DuelSession`s por `MapInstance`; fin de duelo al `endAtHpPct` (ADR-011) |
 | `CombatCalculator` | funciones **puras**: `RollPhysical`, `RollSpell`, `RollHeal`, `Mitigation(armor, level)`. Reciben `IRng` |
 | `CastSystem` | `TryBeginCast(caster, spell, target) → CastResult`, avance por tick, interrupciones, GCD y cooldowns |
 | `EffectResolver` | aplica `EffectDef[]` sobre la lista de objetivos resuelta por `TargetResolver` |
 | `AuraSystem` | aplicar/refrescar/stack, ticks, expiración, `shield` absorbe, `stat_mod` invalida stats |
 | `ThreatTable` | por monstruo: `Add(actor, amount)`, `Top()`, reglas 110 %/130 %, `taunt` |
-| `AutoAttackSystem` | swing timer por `weapon.speedMs` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango |
+| `AutoAttackSystem` | swing timer `weapon.speedMs / haste` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango; escuela y poder según `weapon.scaling` (str/agi → físico melee 1.5; int → mágico 6 tiles con proyectil). Sin coste de recurso |
 | `DeathSystem` | hp ≤ 0 → `Dead`, limpia auras, crea `LootBag`, XP, evento `Died`; jugadores: espera `Respawn` |
 
 ## Pipeline de un hechizo
 ```
 CastSpell(msg) ─► CastSystem.TryBeginCast
    ├─ validar: conoce, levelReq, !dead, !stunned, !silenced(si no físico), !casting, CD, GCD,
-   │           recurso ≥ coste, objetivo válido para targeting, rango (tiles, centro a centro), LOS
+   │           recurso ≥ coste, objetivo válido para targeting (jugador enemigo solo si PvpService.CanAttack), rango, LOS
    ├─ castMs == 0 ─► Resolve inmediato
    └─ castMs > 0  ─► CastState{spell, target, endsAtMs} + evento CastStarted; GCD arranca YA
 tick: si now ≥ endsAtMs ─► revalidar (rango +1 tile, LOS, objetivo vivo, recurso) ─► Resolve
 Resolve: descontar recurso ─► iniciar CD ─► projectile? programar impacto a now + dist/speed ─► EffectResolver
 EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto ─► efectos en orden ─► eventos
+            (`dash` mueve al lanzador antes del resto de efectos; auras sobre boss filtradas por bossImmuneToAuraKinds)
 ```
 - El impacto programado (proyectil) se guarda en `PendingImpacts` (cola por `atMs`) y se resuelve aunque el lanzador
   muera; si el objetivo murió, se descarta.
@@ -39,10 +42,12 @@ EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto 
 1. Todo roll usa `IRng` inyectado. Los tests usan `FixedRng(0.5, 0.01, ...)` para forzar hit/crit/miss.
 2. **Tests con números exactos** para cada fórmula de `docs/design/combat.md`: si cambias una fórmula, el test
    cambia en el mismo commit y la doc también.
-3. Nunca `if (spell.Id == "...")`. Todo comportamiento especial se expresa como efecto/aura en `content/`.
+3. Nunca `if (spell.Id == "...")` ni `if (classId == "mage")`. Todo comportamiento especial se expresa como efecto/aura en `content/` o como número en `rules.json`.
+3b. **Ningún número mágico**: GCD, crit, mitigación, ira, amenaza… se leen de `IRules` (ADR-008). Los tests de fórmulas cargan el `rules.json` real.
 4. Daño se aplica en este orden: `damageTakenPct`/`damageDonePct` → `shield` absorbe → hp. Evento reporta `absorb` aparte.
 5. Curar a un objetivo en combate agrega amenaza del sanador a **todos** los monstruos que tienen al objetivo en su tabla.
 6. Un actor muerto no castea, no recibe curas (salvo resurrección futura), no genera amenaza.
+7. En duelo, el daño que dejaría al rival por debajo de `endAtHpPct` se recorta a ese umbral y dispara `DuelEnded`; nunca se llama a `DeathSystem`.
 
 ## IA de monstruos (`Ai/MonsterBrain`)
 Máquina de estados: `Idle → Aggro → Chase → Attack → Evade`. Detalles en `docs/design/combat.md` §Monstruos.
@@ -60,6 +65,6 @@ Máquina de estados: `Idle → Aggro → Chase → Attack → Evade`. Detalles e
 - Auras: íconos sobre el marco de unidad con barrido de duración.
 
 ## Tests mínimos por cambio de combate
-- Fórmula: valores exactos con `FixedRng`.
+- Fórmula: valores exactos con `FixedRng`, para las 4 clases y al menos una combinación fuera de rol (Mago + espada + placas).
 - Validaciones: un test por código de error (`out_of_range`, `no_los`, `on_cooldown`, `on_gcd`, `not_enough_resource`, `invalid_target`, `stunned`, `silenced`).
 - Integración de tick: castear bola de fuego (2 s) → tras 39 ticks no hay daño, tras 40 sí.

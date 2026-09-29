@@ -1,7 +1,8 @@
 # PixelRealms — Memoria del proyecto para Claude Code
 
 Mini-MMORPG 2D pixel art top-down para ~20 jugadores (amigos). Inspiración: Heartwood Online.
-Combate **tab-target** en tiempo real, 4 clases, hechizos, items, inventario, equipo, botín, chat y grupos.
+Combate **tab-target** en tiempo real, 4 clases con **equipo libre y afinidad**, hechizos, botín asignado por item, inventario,
+intercambio, chat, grupos y **duelos**. Nivel máximo 15 en 3 tiers; el MVP es el Tier 1 (aldea, campos, colinas, Mina y su jefe).
 
 > Idioma: el código, los identificadores y los commits van en **inglés**. La documentación, las HUs y los
 > comentarios de diseño van en **español**.
@@ -9,6 +10,8 @@ Combate **tab-target** en tiempo real, 4 clases, hechizos, items, inventario, eq
 ## Arquitectura en una línea
 Cliente **Godot 4 (GDScript)** "tonto" ⇄ **WebSocket + JSON** ⇄ Servidor **.NET 10 autoritativo** (tick 20 Hz) ⇄ **PostgreSQL 17**.
 El contenido del juego vive en `content/*.json` (validado con JSON Schema) y lo leen el cliente y el servidor.
+**Toda constante numérica** (XP, GCD, crit, afinidades, PvP…) está en `content/rules.json` (ADR-008): nada hardcodeado.
+El mundo son varios mapas (`MapData` estático + `MapInstance` dinámica, ADR-007): las zonas de un tier en un mapa, cada cueva en el suyo.
 
 Detalle: `docs/architecture.md` · Protocolo: `docs/protocol.md` · BD: `docs/database.md` · Diseño: `docs/design/`
 
@@ -24,7 +27,7 @@ server/            Solución .NET (PixelRealms.sln)
   tests/*.Tests                 xUnit v3 + Shouldly (+ Testcontainers para Persistence)
 client/            Proyecto Godot (project.godot)
   autoload/ scenes/ scripts/ ui/ assets/ tests/ (GUT)
-content/           JSON de juego + content/schemas/*.schema.json
+content/           JSON de juego + rules.json (constantes) + content/schemas/*.schema.json
 maps/              Mapas Tiled (.tmj) + tilesets (fuente de verdad del mundo)
 shared/test-vectors/  Casos JSON que DEBEN pasar en servidor (xUnit) y cliente (GUT)
 docs/              Arquitectura, ADRs, diseño, backlog (HUs), prompts
@@ -39,7 +42,8 @@ docs/              Arquitectura, ADRs, diseño, backlog (HUs), prompts
 3. **`PixelRealms.Game` es puro y determinista:** sin `DateTime.Now`, sin `Random` global, sin IO.
    Inyecta `IGameClock` y `IRng` (semilla). Todo sistema nuevo nace con tests unitarios.
 4. **Datos, no código.** Una clase, hechizo, item o monstruo nuevo = JSON en `content/` + validador verde.
-   Si hace falta código, es porque falta un *tipo de efecto* genérico (ver skill `game-content`).
+   Si hace falta código, es porque falta un *tipo de efecto* genérico (ver skill `game-content`). Ningún número mágico:
+   toda constante se lee de `rules.json` vía `IRules`. Nada de `if (classId == ...)`: las diferencias entre clases son tablas.
 5. **Protocolo versionado.** Cambiar un mensaje = actualizar `docs/protocol.md`, DTO C#, parser GDScript y
    subir `ProtocolVersion` si rompe compatibilidad (skill `net-protocol`).
 6. **Movimiento idéntico en ambos lados.** Cualquier cambio a movimiento/colisión debe pasar
@@ -89,5 +93,8 @@ Subagentes (`.claude/agents/`): `server-authority-reviewer`, `content-designer`,
 ## Glosario
 - **Tick**: paso de simulación del servidor (50 ms). **Snapshot**: estado enviado al cliente (cada 2 ticks = 10 Hz).
 - **AOI** (Area of Interest): entidades que un jugador ve (celdas de 16×16 tiles, radio 1 celda).
-- **GCD**: global cooldown (1.0 s). **Aura**: efecto temporal (DoT, HoT, buff, debuff, stun, escudo).
+- **GCD**: global cooldown (`rules.combat.gcdMs`). **Aura**: efecto temporal (DoT, HoT, buff, debuff, stun, escudo).
+- **Afinidad**: alta/media/baja de una clase con un tipo de arma/armadura; multiplica todo lo numérico del item (`rules.affinity`).
+- **MapData / MapInstance**: datos estáticos de un mapa (compartidos) / estado vivo de una copia del mapa. **Portal**: objeto que cambia de mapa.
+- **Ruleset PvP**: reglas de un modo de PvP (`rules.pvp`); el MVP solo tiene `duel`.
 - **Template** (`ItemTemplate`, `MonsterTemplate`): definición en JSON. **Instance**: copia viva en el mundo.

@@ -7,7 +7,7 @@
 - Skills: `world-maps`, `godot-client`, `dotnet-server`
 
 **Criterios de aceptación**
-1. **Dado** `maps/meadow.tmj` (versión inicial 64×64 con pueblo, pradera y un muro de prueba) **cuando** arranca el servidor **entonces** construye la `CollisionGrid` y loguea tamaño, spawns y cementerios.
+1. **Dado** `maps/meadow.tmj` (versión inicial 64×64 con aldea, campos y un muro de prueba) **cuando** arranca el servidor **entonces** construye un `MapData` (`CollisionGrid`, spawns, portales, puntos seguros, zonas) por cada mapa de `maps/` y crea una `MapInstance` de cada uno; loguea tamaño, spawns y puntos seguros.
 2. **Dado** un spawn sobre un tile sólido o un `monsterId` inexistente **entonces** el servidor no arranca y explica el error.
 3. **Dado** el cliente en la escena `World` **entonces** se ve el mapa con capas `ground`, `detail`, `walls` y `above` por encima de las entidades.
 4. **Dado** `maps/test_small.tmj` **entonces** `TiledMapLoaderTests` cubre: CSV, flags de flip, `solid`, `blocksSight`, objetos de cada tipo.
@@ -107,3 +107,23 @@
 3. **Dado** un jugador conectado **entonces** se guarda cada 60 s si hubo cambios (`Dirty`).
 4. **Dado** que el guardado falla **entonces** reintenta 3 veces con backoff y loguea `error` con el DTO; el tick nunca se bloquea.
 5. **Dado** los tests de Persistence **entonces** cubren guardar y cargar un personaje completo (Testcontainers).
+
+---
+
+### HU-027 · Portales y cambio de mapa
+**Como** jugador **quiero** entrar a la Mina Abandonada por su portal **para** llegar a la mazmorra y su jefe.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-020, HU-023, HU-026
+- Skills: `world-maps`, `dotnet-server`, `net-protocol`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** un objeto de la capa `portals` (`targetMapId`, `targetX`, `targetY`, `minLevel?`) **cuando** camino sobre él (o envío `UsePortal{portalId}` estando a ≤ 1 tile) **entonces** el servidor me saca de la `MapInstance` actual (`EntityDespawn{reason:"left"}` a quienes me veían), me mete en la de destino y me envía `ChangeMap{mapId, x, y}` seguido de los `EntitySpawn` de la nueva AOI.
+2. **Dado** el cliente **cuando** recibe `ChangeMap` **entonces** muestra un fundido a negro, carga la escena del mapa (`res://maps/<mapId>.tscn`) y coloca al jugador; el HUD no se reinicia.
+3. **Dado** que estoy en combate o muerto **entonces** el portal se rechaza (`Error{in_combat|is_dead}`).
+4. **Dado** un `minLevel` no alcanzado **entonces** `Error{level_too_low}` y un mensaje "Necesitas nivel 4".
+5. **Dado** dos jugadores en mapas distintos **entonces** no se ven, no se oyen por `say`, y `party` y `global` sí funcionan; los marcos de grupo muestran el nombre del mapa.
+6. **Dado** el guardado **entonces** `characters.map_id`, `x`, `y` reflejan el mapa nuevo; al reconectar aparezco allí.
+
+**Notas técnicas**
+- ADR-007. `MapData` inmutable y compartido; `MapInstance` con su propio `InterestSystem`, monstruos, loot y tabla de amenaza.
+- `MapInstance.Id` ≠ `mapId` desde el día uno (permite N instancias del mismo mapa en el futuro sin tocar el protocolo: el cliente solo conoce `mapId`).

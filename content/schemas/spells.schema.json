@@ -3,113 +3,310 @@
   "$id": "spells.schema.json",
   "title": "Hechizos y habilidades",
   "type": "object",
-  "required": ["spells"],
+  "required": [
+    "spells"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "spells": {
       "type": "array",
-      "items": { "$ref": "#/$defs/spell" }
+      "items": {
+        "$ref": "#/$defs/spell"
+      }
     }
   },
   "$defs": {
     "spell": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "source", "school", "castMs", "cooldownMs", "range", "targeting", "effects", "icon", "description"],
+      "required": [
+        "id",
+        "name",
+        "source",
+        "school",
+        "castMs",
+        "cooldownMs",
+        "range",
+        "targeting",
+        "effects",
+        "icon",
+        "description"
+      ],
       "properties": {
-        "id": { "$ref": "common.schema.json#/$defs/id" },
-        "name": { "type": "string" },
-        "source": { "enum": ["class", "item", "monster"] },
-        "classId": { "$ref": "common.schema.json#/$defs/classId" },
-        "levelReq": { "type": "integer", "minimum": 1, "maximum": 10 },
-        "school": { "$ref": "common.schema.json#/$defs/school" },
-        "castMs": { "type": "integer", "minimum": 0, "maximum": 10000 },
-        "cooldownMs": { "type": "integer", "minimum": 0 },
-        "triggersGcd": { "type": "boolean", "default": true },
+        "id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "class",
+            "item",
+            "monster"
+          ]
+        },
+        "classId": {
+          "$ref": "common.schema.json#/$defs/classId"
+        },
+        "levelReq": {
+          "$ref": "common.schema.json#/$defs/level"
+        },
+        "school": {
+          "$ref": "common.schema.json#/$defs/school"
+        },
+        "castMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "cooldownMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "triggersGcd": {
+          "type": "boolean",
+          "default": true
+        },
         "cost": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["resource", "amount"],
+          "required": [
+            "resource",
+            "amount"
+          ],
           "properties": {
-            "resource": { "$ref": "common.schema.json#/$defs/resource" },
-            "amount": { "type": "integer", "minimum": 0 }
+            "resource": {
+              "$ref": "common.schema.json#/$defs/resource"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
-        "range": { "type": "number", "minimum": 0, "description": "En tiles. 0 = sobre uno mismo." },
+        "range": {
+          "type": "number",
+          "minimum": 0,
+          "description": "En tiles. 0 = sobre uno mismo."
+        },
         "targeting": {
-          "enum": ["self", "enemy", "ally", "self_aoe_enemies", "self_aoe_allies", "target_aoe_enemies"],
+          "enum": [
+            "self",
+            "enemy",
+            "ally",
+            "self_aoe_enemies",
+            "self_aoe_allies",
+            "target_aoe_enemies"
+          ],
           "description": "ally incluye a uno mismo si no hay objetivo aliado seleccionado"
         },
-        "aoeRadius": { "type": "number", "minimum": 0.5, "maximum": 10 },
-        "maxTargets": { "type": "integer", "minimum": 1, "default": 10 },
+        "aoeRadius": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 10
+        },
+        "maxTargets": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        },
         "projectile": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["sprite", "speed"],
+          "required": [
+            "sprite",
+            "speed"
+          ],
           "properties": {
-            "sprite": { "type": "string" },
-            "speed": { "type": "number", "description": "tiles/s; solo visual, el servidor retrasa el impacto dist/speed" }
+            "sprite": {
+              "type": "string"
+            },
+            "speed": {
+              "type": "number",
+              "description": "tiles/s; solo visual, el servidor retrasa el impacto dist/speed"
+            }
           }
         },
-        "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } },
-        "icon": { "type": "string" },
-        "vfx": { "type": "string" },
-        "description": { "$ref": "common.schema.json#/$defs/localizedText" }
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        },
+        "icon": {
+          "type": "string"
+        },
+        "vfx": {
+          "type": "string"
+        },
+        "description": {
+          "$ref": "common.schema.json#/$defs/localizedText"
+        }
       },
       "allOf": [
-        { "if": { "properties": { "source": { "const": "class" } } }, "then": { "required": ["classId", "levelReq", "cost"] } },
-        { "if": { "properties": { "targeting": { "enum": ["self_aoe_enemies", "self_aoe_allies", "target_aoe_enemies"] } } }, "then": { "required": ["aoeRadius"] } }
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "class"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "classId",
+              "levelReq",
+              "cost"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "targeting": {
+                "enum": [
+                  "self_aoe_enemies",
+                  "self_aoe_allies",
+                  "target_aoe_enemies"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "aoeRadius"
+            ]
+          }
+        }
       ]
     },
     "effect": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "damage" },
-            "base": { "type": "number", "minimum": 0 },
-            "apCoef": { "type": "number", "minimum": 0 },
-            "spCoef": { "type": "number", "minimum": 0 },
-            "weaponPct": { "type": "number", "minimum": 0, "description": "% del golpe de arma sumado (1.0 = 100%)" }
+            "type": {
+              "const": "damage"
+            },
+            "base": {
+              "type": "number",
+              "minimum": 0
+            },
+            "apCoef": {
+              "type": "number",
+              "minimum": 0
+            },
+            "spCoef": {
+              "type": "number",
+              "minimum": 0
+            },
+            "weaponPct": {
+              "type": "number",
+              "minimum": 0,
+              "description": "% del golpe de arma sumado (1.0 = 100%)"
+            }
           },
-          "required": ["type", "base"]
+          "required": [
+            "type",
+            "base"
+          ]
         },
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "heal" },
-            "base": { "type": "number", "minimum": 0 },
-            "spCoef": { "type": "number", "minimum": 0 }
+            "type": {
+              "const": "heal"
+            },
+            "base": {
+              "type": "number",
+              "minimum": 0
+            },
+            "spCoef": {
+              "type": "number",
+              "minimum": 0
+            }
           },
-          "required": ["type", "base"]
+          "required": [
+            "type",
+            "base"
+          ]
         },
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "restore_resource" },
-            "resource": { "$ref": "common.schema.json#/$defs/resource" },
-            "amount": { "type": "integer", "minimum": 1 }
+            "type": {
+              "const": "restore_resource"
+            },
+            "resource": {
+              "$ref": "common.schema.json#/$defs/resource"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1
+            }
           },
-          "required": ["type", "resource", "amount"]
+          "required": [
+            "type",
+            "resource",
+            "amount"
+          ]
         },
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "apply_aura" },
-            "auraId": { "$ref": "common.schema.json#/$defs/id" }
+            "type": {
+              "const": "apply_aura"
+            },
+            "auraId": {
+              "$ref": "common.schema.json#/$defs/id"
+            }
           },
-          "required": ["type", "auraId"]
+          "required": [
+            "type",
+            "auraId"
+          ]
         },
         {
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "taunt" },
-            "durationMs": { "type": "integer", "minimum": 500 }
+            "type": {
+              "const": "taunt"
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 500
+            }
           },
-          "required": ["type", "durationMs"]
+          "required": [
+            "type",
+            "durationMs"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "dash"
+            },
+            "minRange": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Distancia mínima al objetivo para poder usarlo"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "El lanzador se desplaza hasta quedar adyacente al objetivo (servidor teletransporta en ≤ 3 ticks; cliente interpola). Requiere targeting enemy y LOS."
         }
       ]
     }

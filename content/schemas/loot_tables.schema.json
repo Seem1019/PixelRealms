@@ -3,40 +3,133 @@
   "$id": "loot_tables.schema.json",
   "title": "Tablas de botín",
   "type": "object",
-  "required": ["lootTables"],
+  "required": [
+    "lootTables"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "lootTables": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "gold", "entries"],
+        "required": [
+          "id",
+          "gold",
+          "entries"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "id": {
+            "$ref": "common.schema.json#/$defs/id"
+          },
           "gold": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["min", "max"],
-            "properties": { "min": { "type": "integer", "minimum": 0 }, "max": { "type": "integer", "minimum": 0 } }
-          },
-          "entries": {
-            "type": "array",
-            "description": "Cada entrada se tira de forma independiente",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["itemId", "chance"],
-              "properties": {
-                "itemId": { "$ref": "common.schema.json#/$defs/id" },
-                "chance": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-                "min": { "type": "integer", "minimum": 1, "default": 1 },
-                "max": { "type": "integer", "minimum": 1, "default": 1 }
+            "required": [
+              "min",
+              "max"
+            ],
+            "properties": {
+              "min": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           },
-          "maxItems": { "type": "integer", "minimum": 1, "default": 4, "description": "Tope de items distintos por cadáver" }
+          "entries": {
+            "type": "array",
+            "description": "Cada entrada se tira de forma independiente. Cada item que cae se asigna a un miembro elegible al azar (rules.loot.ownerMode).",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "itemId",
+                "chance"
+              ],
+              "properties": {
+                "itemId": {
+                  "$ref": "common.schema.json#/$defs/id"
+                },
+                "chance": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                },
+                "min": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1
+                },
+                "max": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1
+                }
+              }
+            }
+          },
+          "maxItems": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 4,
+            "description": "Tope de items distintos por cadáver (los de groups no cuentan)."
+          },
+          "groups": {
+            "type": "array",
+            "description": "Botín garantizado: de cada grupo caen exactamente `rolls` items elegidos por peso (sin repetir). Úsalo para jefes.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rolls",
+                "entries"
+              ],
+              "properties": {
+                "rolls": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "entries": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "itemId",
+                      "weight"
+                    ],
+                    "properties": {
+                      "itemId": {
+                        "$ref": "common.schema.json#/$defs/id"
+                      },
+                      "weight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "min": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1
+                      },
+                      "max": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

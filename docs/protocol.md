@@ -45,25 +45,31 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `PartyInvite` / `PartyRespond` / `PartyLeave` / `PartyKick` | `{ name }` / `{ accept }` / `{}` / `{ name }` | reglas de grupo (máx 5) |
 | `SetHotbar` | `{ slot, kind: "spell"|"item"|null, ref? }` | slot 0–9 |
 | `Respawn` | `{}` | está muerto |
+| `UsePortal` | `{ portalId }` | a ≤ 1 tile, vivo, fuera de combate, `minLevel` |
+| `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo activo |
+| `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
 | `AdminCommand` | `{ text }` | `accounts.is_admin` |
 
 ## Servidor → Cliente
 
 | t | d | Cuándo |
 |---|---|---|
-| `Welcome` | `{ selfId, tick, tickRate:20, snapshotRate:10, map: "meadow", self: SelfState, inventory, equipment, hotbar, knownSpells: string[] }` | tras `Hello` válido |
+| `Welcome` | `{ selfId, tick, tickRate:20, snapshotRate:10, mapId: "meadow", self: SelfState, inventory, equipment, hotbar, knownSpells: string[], rulesHash }` | tras `Hello` válido (`rulesHash` permite al cliente detectar un `rules.json` distinto) |
 | `Snapshot` | `{ tick, ackSeq, self: { x, y, speed, hp, maxHp, res, maxRes }, ents: EntState[] }` (`speed` en tiles/s, incluye auras) | cada 2 ticks |
 | `EntitySpawn` | `{ id, kind, templateId, name, x, y, dir, level, classId?, hpPct, flags }` | entra a tu AOI |
 | `EntityDespawn` | `{ id, reason: "left"|"died"|"despawn" }` | sale de tu AOI |
 | `CastStarted` | `{ casterId, spellId, targetId?, durationMs }` | inicio de casteo (a la AOI) |
 | `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled" }` | |
-| `CombatEvent` | `{ src, dst, spellId?, kind: "dmg"|"heal"|"miss"|"dodge"|"absorb", amount, crit, school }` | resolución |
+| `CombatEvent` | `{ src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }` | resolución |
 | `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, stacks, durationMs }` / `{ targetId, auraId }` | |
 | `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
 | `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | al cambiar |
 | `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[] }` | |
 | `InventoryUpdate` | `{ bag: (ItemStack|null)[24], equipment: (ItemStack|null)[9], gold, reqId? }` | tras cualquier op (estado completo v1) |
-| `LootWindow` | `{ lootId, gold, items: { templateId, qty }[] }` | tras `LootOpen` |
+| `LootWindow` | `{ lootId, gold, items: { index, templateId, qty, ownerId, freeInMs }[] }` | tras `LootOpen` |
+| `ChangeMap` | `{ mapId, x, y }` | tras `UsePortal`; sigue una AOI nueva completa |
+| `DuelUpdate` | `{ state: "requested"\|"countdown"\|"active"\|"ended"\|"declined", opponentId, winnerId?, startsInMs? }` | ciclo de vida del duelo |
+| `TradeUpdate` | `{ state: "requested"\|"open"\|"completed"\|"cancelled", partnerId, version, mine: Offer, theirs: Offer, confirmedMine, confirmedTheirs, reason? }` | ciclo de vida del intercambio |
 | `VendorWindow` | `{ npcId, items: { templateId, price }[] }` | |
 | `ChatMessage` | `{ channel, from, text, ts }` | |
 | `PartyUpdate` | `{ leader, members: { name, entityId?, classId, level, hpPct, online }[] }` | |
@@ -77,7 +83,8 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 ## Códigos de error
 `bad_version`, `bad_ticket`, `rate_limited`, `not_found`, `out_of_range`, `no_los`, `on_cooldown`, `on_gcd`,
 `not_enough_resource`, `invalid_target`, `is_dead`, `is_casting`, `stunned`, `silenced`, `bag_full`,
-`not_enough_gold`, `cannot_equip`, `level_too_low`, `wrong_class`, `forbidden`, `invalid_payload`.
+`not_enough_gold`, `level_too_low`, `not_owner`, `in_combat`, `pvp_not_allowed`, `duel_busy`, `trade_busy`, `trade_version`, `forbidden`, `invalid_payload`.
+(`cannot_equip` y `wrong_class` **no existen**: cualquier clase equipa cualquier item, ADR-009.)
 
 ## Reglas de evolución
 1. Añadir un campo opcional **no** rompe → no se sube versión.

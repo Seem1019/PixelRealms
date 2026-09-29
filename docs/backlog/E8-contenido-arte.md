@@ -1,15 +1,15 @@
 # E8 · Contenido y arte
 
-### HU-080 · Mapa "meadow" completo
+### HU-080 · Mapa "meadow" completo (Tier 1)
 **Como** jugador **quiero** un mundo variado con zonas por nivel **para** explorar mientras progreso.
 - Prioridad: Must · Estimación: L · Estado: Pendiente
 - Dependencias: HU-031, HU-055
 - Skills: `world-maps`, `pixel-art-assets`
 
 **Criterios de aceptación**
-1. **Dado** `maps/meadow.tmj` 128×128 **entonces** contiene las zonas del GDD (Pueblo Robledal seguro, Pradera, Bosque Sombrío, Ruinas, entrada a la Cripta) con capas y propiedades de la skill `world-maps`.
-2. **Dado** los spawns **entonces** hay suficientes monstruos para que 5 jugadores suban del 1 al 10 sin esperar respawns (≥ 20 slimes, 20 jabalíes, 20 lobos, 15 goblins, 15 esqueletos).
-3. **Dado** el mapa **entonces** hay 2 cementerios (pueblo y ruinas) y el vendedor en el pueblo.
+1. **Dado** `maps/meadow.tmj` **entonces** contiene las zonas del Tier 1 del GDD (Aldea Robledal `safe`, Campos 1–3, Colinas 3–5 y la entrada a la Mina) con capas y propiedades de la skill `world-maps`. Cada zona se cruza a pie en 60–90 s (`rules.world.zoneCrossTimeSecTarget`, ~100×100 tiles útiles), tiene un punto de referencia visible, un sendero principal, 2–3 campamentos con subniveles (más bajos cerca de la entrada) y al menos una rama lateral con recompensa.
+2. **Dado** los spawns **entonces** hay suficientes monstruos para que 5 jugadores suban del 1 al 5 sin esperar respawns (≥ 20 slimes, 20 jabalíes, 15 bandidos, 20 lobos, 15 goblins).
+3. **Dado** el mapa **entonces** hay un punto seguro (`graveyards`) por zona (aldea, campos, colinas), el vendedor en la aldea y el portal a `mine` al final de las Colinas (`minLevel: 4`).
 4. **Dado** un recorrido a pie **entonces** no hay zonas inaccesibles ni huecos en las colisiones (verificado con un test de flood-fill desde el pueblo).
 
 ---
@@ -39,17 +39,17 @@
 
 ---
 
-### HU-083 · Mazmorra y jefe Rey Liche Menor
-**Como** grupo de nivel 10 **queremos** un jefe desafiante **para** tener un objetivo final y botín épico.
+### HU-083 · Mina Abandonada y jefe Capataz Grask
+**Como** grupo de nivel 4–6 **queremos** una cueva con jefe **para** tener el objetivo final del Tier 1 y botín raro.
 - Prioridad: Should · Estimación: L · Estado: Pendiente
-- Dependencias: HU-036, HU-062, HU-080
+- Dependencias: HU-027, HU-036, HU-062, HU-080
 - Skills: `world-maps`, `combat-system`, `game-content`
 
 **Criterios de aceptación**
-1. **Dado** la Cripta (zona del mapa o mapa `crypt.tmj` con portal) **entonces** tiene 6–10 esqueletos antes del jefe.
-2. **Dado** el jefe **entonces** usa Descarga de sombras cada 4 s sobre un objetivo aleatorio que no sea el tanque, y Nova gélida bajo el 70 % de vida.
-3. **Dado** 5 jugadores nivel 10 con equipo verde **entonces** el combate dura 90–150 s (verificado por `content-designer` y una partida de prueba).
-4. **Dado** su muerte **entonces** suelta al menos un épico garantizado (ajustar `loot_tables.json` si hace falta) y se anuncia en el chat global.
+1. **Dado** `maps/mine.tmj` (mapa aparte, ADR-007) **entonces** tiene 3–5 salas: entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds + puzle simple: palancas) → rama lateral con la sala del jefe, y Sala 3 (Gólem élite) → salida hacia el Tier 2 (cerrada en el MVP). Recorrido 5–10 min; paleta marrón del tileset interior.
+2. **Dado** el jefe **entonces** usa Golpe de pico (AoE alrededor de su objetivo) cada 10 s, Latigazo (sangrado) sobre alguien que no sea el tanque cada 8 s, y ¡A trabajar! (+25 % daño) bajo el 50 %; es inmune a aturdir, raíz y ralentizar.
+3. **Dado** 3 jugadores de nivel 4 con equipo verde **entonces** el combate dura 60–100 s y lo ganan con un sanador o con pociones; 2 jugadores de nivel 6, o uno de 7 con uno de 5, también lo ganan (`rules.boss`; verificado por `content-designer` y una partida de prueba).
+4. **Dado** su muerte **entonces** suelta exactamente un raro de su `groups` (Pico, Peto o Amuleto), asignado al azar a un miembro, y se anuncia en el chat global con el nombre del ganador.
 
 ---
 
@@ -60,6 +60,6 @@
 - Skills: `game-content`, `combat-system`
 
 **Criterios de aceptación**
-1. **Dado** el subagente `content-designer` **entonces** produce `docs/design/balance-report.md` con las 5 tablas de su definición.
+1. **Dado** el subagente `content-designer` **entonces** produce `docs/design/balance-report.md` con las tablas de su definición, incluida la de afinidad (piso de viabilidad 55–65 % daño / 50–60 % aguante) y el triángulo PvP (duelos simulados 1 vs 1 con equipo igual: la clase favorecida gana 60–70 %).
 2. **Dado** el informe **entonces** las desviaciones fuera de rango se corrigen en `content/` con commit `content(balance): ...` justificado.
 3. **Dado** una sesión de juego con amigos **entonces** se recogen sensaciones en `docs/design/playtest-notes.md` y se crean HUs para lo que requiera código.

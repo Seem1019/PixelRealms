@@ -1,0 +1,147 @@
+{
+  "$schema": "./schemas/rules.schema.json",
+  "_doc": "Toda constante numérica del juego vive aquí. Nada de esto va hardcodeado en C# ni en GDScript. Descripción de cada campo en schemas/rules.schema.json.",
+
+  "progression": {
+    "maxLevel": 15,
+    "xpCurveK": 200,
+    "xpCurveExponent": 1.6,
+    "monsterXpPerLevel": 5,
+    "monsterXpBase": 1,
+    "monsterTypeMultiplier": { "normal": 1.0, "hard": 1.2, "elite": 3.0, "boss": 10.0 },
+    "levelDiffGreyAt": -5,
+    "levelDiffModPerLevel": 0.1,
+    "levelDiffClamp": 4,
+    "spellUnlockLevels": [1, 1, 3, 6, 10]
+  },
+
+  "group": {
+    "maxMembers": 5,
+    "xpRangeTiles": 40,
+    "activeWindowSec": 90,
+    "bonusBySize": [1.0, 1.30, 1.55, 1.80, 2.00],
+    "levelGapFreeLevels": 2,
+    "levelGapDecay": 0.75,
+    "levelGapMinWeight": 0.10,
+    "inviteExpireSec": 60,
+    "offlineGraceSec": 300
+  },
+
+  "combat": {
+    "gcdMs": 1000,
+    "critMultiplier": 1.5,
+    "varianceMin": 0.95,
+    "varianceMax": 1.05,
+    "physicalMissBase": 0.05,
+    "physicalMissPerTargetLevel": 0.01,
+    "magicMissBase": 0.04,
+    "critBase": 0.05,
+    "critPerAgi": 0.003,
+    "critPerInt": 0.003,
+    "critCap": 0.40,
+    "dodgeBase": 0.03,
+    "dodgePerAgi": 0.002,
+    "dodgeCap": 0.25,
+    "armorPerAgi": 1.0,
+    "mitigationPerLevel": 20,
+    "mitigationConstant": 100,
+    "mitigationCap": 0.75,
+    "basicAttackPowerDivisor": 14,
+    "castRangeToleranceTiles": 1.0,
+    "inCombatWindowSec": 6,
+    "hpRegenDelaySec": 6,
+    "hpRegenPerSpi": 0.5,
+    "hpRegenPerSta": 0.2,
+    "manaRegenPerSpiPer5s": 1.0,
+    "manaRegenPerIntPer5s": 0.1,
+    "manaRegenCastingPenalty": 0.3,
+    "ragePerHitDealt": 6,
+    "ragePerHitTaken": 4,
+    "rageDecayPerSecOutOfCombat": 2,
+    "energyPerSec": 10,
+    "resourceCap": 100,
+    "threatPerDamage": 1.0,
+    "threatPerHeal": 0.5,
+    "threatSwitchMelee": 1.10,
+    "threatSwitchRanged": 1.30,
+    "tauntThreatBonus": 0.10,
+    "respawnHpPct": 0.5,
+    "respawnResourcePct": 0.5,
+    "corpseLifetimeSec": 60,
+    "bossImmuneToAuraKinds": ["stun", "root", "slow"]
+  },
+
+  "classScaling": {
+    "warrior": { "hpPerSta": 12, "manaPerInt": 0, "ap": { "str": 2.0, "agi": 0.5, "int": 0.3 }, "sp": { "str": 0.5, "agi": 0.2, "int": 0.8 }, "armorMult": 1.0, "haste": 1.0 },
+    "rogue":   { "hpPerSta": 10, "manaPerInt": 0, "ap": { "str": 1.0, "agi": 2.0, "int": 0.3 }, "sp": { "str": 0.2, "agi": 0.5, "int": 0.8 }, "armorMult": 0.85, "haste": 1.15 },
+    "mage":    { "hpPerSta": 10, "manaPerInt": 8, "ap": { "str": 0.6, "agi": 0.4, "int": 1.4 }, "sp": { "str": 0.0, "agi": 0.0, "int": 1.5 }, "armorMult": 0.75, "haste": 0.9 },
+    "priest":  { "hpPerSta": 10, "manaPerInt": 8, "ap": { "str": 0.7, "agi": 0.4, "int": 1.4 }, "sp": { "str": 0.0, "agi": 0.0, "int": 1.3 }, "armorMult": 0.85, "haste": 0.9 }
+  },
+
+  "affinity": {
+    "multipliers": { "alta": 1.0, "media": 0.85, "baja": 0.7 },
+    "weaponScaling": { "sword": "str", "axe": "str", "mace": "str", "dagger": "agi", "staff": "int", "wand": "int" },
+    "byClass": {
+      "warrior": { "sword": "alta", "axe": "alta", "mace": "alta", "dagger": "media", "staff": "baja", "wand": "baja",
+                   "plate": "alta", "mail": "alta", "shield": "alta", "leather": "media", "cloth": "baja", "jewelry": "alta" },
+      "rogue":   { "dagger": "alta", "sword": "alta", "axe": "media", "mace": "media", "staff": "baja", "wand": "baja",
+                   "leather": "alta", "cloth": "media", "mail": "media", "plate": "baja", "shield": "baja", "jewelry": "alta" },
+      "mage":    { "staff": "alta", "wand": "alta", "dagger": "media", "sword": "baja", "axe": "baja", "mace": "baja",
+                   "cloth": "alta", "leather": "media", "mail": "baja", "plate": "baja", "shield": "baja", "jewelry": "alta" },
+      "priest":  { "mace": "alta", "staff": "alta", "wand": "alta", "sword": "media", "dagger": "media", "axe": "baja",
+                   "cloth": "alta", "mail": "alta", "leather": "media", "plate": "baja", "shield": "baja", "jewelry": "alta" }
+    }
+  },
+
+  "classAdvantage": {
+    "_doc": "Multiplicador de daño del atacante (fila) sobre el defensor (columna) en PvP. 1.0 = sin ajuste. Palanca fina del triángulo; la identidad la dan los hechizos.",
+    "warrior": { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 },
+    "rogue":   { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 },
+    "mage":    { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 },
+    "priest":  { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 }
+  },
+
+  "pvp": {
+    "rulesets": {
+      "duel": { "requiresConsent": true, "endAtHpPct": 0.01, "restoreOnEnd": true, "xpLoss": 0, "goldLoss": 0, "itemLoss": false, "allowedInSafeZones": true, "requestExpireSec": 30, "countdownSec": 3, "maxDistanceTiles": 30 }
+    },
+    "defaultRuleset": "duel",
+    "enabledRulesets": ["duel"]
+  },
+
+  "loot": {
+    "ownerMode": "random_per_item",
+    "exclusiveSec": 30,
+    "lootRangeTiles": 2,
+    "eligibleRangeTiles": 40,
+    "goldSplit": "equal",
+    "announceRarityFrom": "uncommon"
+  },
+
+  "economy": {
+    "vendorBuyMultiplier": 4,
+    "vendorRangeTiles": 3,
+    "copperPerSilver": 100,
+    "silverPerGold": 100
+  },
+
+  "boss": {
+    "_doc": "Objetivo de diseño de cada jefe de nivel B: 3 jugadores de nivel B-2 con equipo de su nivel lo matan en targetDurationSec; 2 de nivel B también; 1 de nivel B+1 con 1 de nivel B-1 igual.",
+    "referencePartySize": 3,
+    "referenceLevelOffset": -2,
+    "targetDurationSec": [60, 100],
+    "soloKillable": false
+  },
+
+  "movement": {
+    "baseSpeedTilesPerSec": 4,
+    "sayRangeTiles": 20,
+    "aoiCellTiles": 16
+  },
+
+  "world": {
+    "startMapId": "meadow",
+    "mvpTier": 1,
+    "zoneCrossTimeSecTarget": [60, 90]
+  }
+}
