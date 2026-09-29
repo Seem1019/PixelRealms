@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "Tipos comunes de contenido",
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,47}$" },
+    "classId": { "enum": ["warrior", "rogue", "mage", "priest"] },
+    "resource": { "enum": ["mana", "rage", "energy"] },
+    "school": { "enum": ["physical", "fire", "frost", "shadow", "holy", "nature", "arcane"] },
+    "rarity": { "enum": ["junk", "common", "uncommon", "rare", "epic"] },
+    "equipSlot": { "enum": ["head", "neck", "chest", "hands", "legs", "feet", "ring", "main_hand", "off_hand"] },
+    "weaponType": { "enum": ["sword", "axe", "mace", "dagger", "staff", "wand"] },
+    "armorType": { "enum": ["cloth", "leather", "mail", "plate", "shield", "jewelry"] },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "str": { "type": "integer" },
+        "agi": { "type": "integer" },
+        "int": { "type": "integer" },
+        "spi": { "type": "integer" },
+        "sta": { "type": "integer" }
+      }
+    },
+    "localizedText": { "type": "string", "minLength": 1, "maxLength": 300 }
+  }
+}

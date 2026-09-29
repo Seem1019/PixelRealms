@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vendors.schema.json",
+  "title": "Vendedores NPC",
+  "type": "object",
+  "required": ["vendors"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "vendors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "sprite", "items"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "name": { "type": "string" },
+          "sprite": { "type": "string" },
+          "items": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" }, "minItems": 1, "uniqueItems": true }
+        }
+      }
+    }
+  }
+}

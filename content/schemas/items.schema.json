@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "items.schema.json",
+  "title": "Plantillas de items",
+  "type": "object",
+  "required": ["items"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "type", "rarity", "icon", "sellPrice"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "name": { "type": "string" },
+          "type": { "enum": ["weapon", "armor", "consumable", "material", "junk"] },
+          "rarity": { "$ref": "common.schema.json#/$defs/rarity" },
+          "levelReq": { "type": "integer", "minimum": 1, "maximum": 10, "default": 1 },
+          "classes": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/classId" }, "description": "Omitido = cualquier clase que pueda usar el tipo" },
+          "slot": { "$ref": "common.schema.json#/$defs/equipSlot" },
+          "weaponType": { "$ref": "common.schema.json#/$defs/weaponType" },
+          "armorType": { "$ref": "common.schema.json#/$defs/armorType" },
+          "damageMin": { "type": "integer", "minimum": 1 },
+          "damageMax": { "type": "integer", "minimum": 1 },
+          "speedMs": { "type": "integer", "minimum": 1000, "maximum": 4000 },
+          "armor": { "type": "integer", "minimum": 0 },
+          "spellPower": { "type": "integer", "minimum": 0 },
+          "stats": { "$ref": "common.schema.json#/$defs/stats" },
+          "maxStack": { "type": "integer", "minimum": 1, "maximum": 200, "default": 1 },
+          "useSpellId": { "$ref": "common.schema.json#/$defs/id" },
+          "useCooldownMs": { "type": "integer", "minimum": 0 },
+          "sellPrice": { "type": "integer", "minimum": 0, "description": "En cobre" },
+          "vendorPrice": { "type": "integer", "minimum": 1, "description": "Precio de compra si lo vende un NPC; por defecto sellPrice*4" },
+          "icon": { "type": "string" },
+          "description": { "$ref": "common.schema.json#/$defs/localizedText" }
+        },
+        "allOf": [
+          { "if": { "properties": { "type": { "const": "weapon" } } }, "then": { "required": ["slot", "weaponType", "damageMin", "damageMax", "speedMs"] } },
+          { "if": { "properties": { "type": { "const": "armor" } } }, "then": { "required": ["slot", "armorType"] } },
+          { "if": { "properties": { "type": { "const": "consumable" } } }, "then": { "required": ["useSpellId", "maxStack"] } }
+        ]
+      }
+    }
+  }
+}

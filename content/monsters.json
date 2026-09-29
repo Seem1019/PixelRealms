@@ -1,0 +1,11 @@
+{
+  "$schema": "./schemas/monsters.schema.json",
+  "monsters": [
+    { "id": "slime", "name": "Slime", "level": 1, "hp": 40, "damageMin": 2, "damageMax": 4, "attackSpeedMs": 2000, "attackRange": 1.2, "armor": 0, "aggroRange": 0, "leashRange": 12, "speed": 2, "xp": 20, "lootTableId": "lt_slime", "respawnSec": 30, "sprite": "monsters/slime" },
+    { "id": "boar", "name": "Jabalí", "level": 2, "hp": 70, "damageMin": 3, "damageMax": 6, "attackSpeedMs": 2000, "attackRange": 1.2, "armor": 10, "aggroRange": 4, "leashRange": 14, "speed": 3.5, "xp": 35, "lootTableId": "lt_boar", "respawnSec": 40, "sprite": "monsters/boar" },
+    { "id": "wolf", "name": "Lobo sombrío", "level": 4, "hp": 130, "damageMin": 6, "damageMax": 10, "attackSpeedMs": 1800, "attackRange": 1.2, "armor": 25, "aggroRange": 6, "leashRange": 16, "speed": 4.5, "xp": 60, "lootTableId": "lt_wolf", "respawnSec": 45, "sprite": "monsters/wolf" },
+    { "id": "goblin_archer", "name": "Goblin arquero", "level": 5, "hp": 140, "damageMin": 5, "damageMax": 9, "attackSpeedMs": 2200, "attackRange": 6, "armor": 20, "aggroRange": 7, "leashRange": 16, "speed": 3.5, "xp": 70, "lootTableId": "lt_goblin", "respawnSec": 45, "spells": [{ "spellId": "goblin_shoot", "cooldownMs": 3000 }], "sprite": "monsters/goblin_archer" },
+    { "id": "skeleton_warrior", "name": "Esqueleto guerrero", "level": 7, "hp": 260, "damageMin": 10, "damageMax": 16, "attackSpeedMs": 2200, "attackRange": 1.2, "armor": 80, "aggroRange": 6, "leashRange": 18, "speed": 3.5, "xp": 110, "lootTableId": "lt_skeleton", "respawnSec": 60, "sprite": "monsters/skeleton_warrior" },
+    { "id": "lesser_lich_king", "name": "Rey Liche Menor", "level": 10, "hp": 2500, "damageMin": 18, "damageMax": 28, "school": "shadow", "attackSpeedMs": 2500, "attackRange": 1.5, "armor": 150, "aggroRange": 8, "leashRange": 25, "speed": 3.0, "xp": 800, "lootTableId": "lt_lich_king", "respawnSec": 900, "boss": true, "spells": [{ "spellId": "lich_shadow_bolt", "cooldownMs": 4000, "target": "random_not_top_threat" }, { "spellId": "lich_frost_nova", "cooldownMs": 15000, "hpBelowPct": 0.7 }], "sprite": "monsters/lich_king" }
+  ]
+}

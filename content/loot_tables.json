@@ -1,0 +1,39 @@
+{
+  "$schema": "./schemas/loot_tables.schema.json",
+  "lootTables": [
+    { "id": "lt_slime", "gold": { "min": 1, "max": 5 }, "entries": [
+      { "itemId": "slime_goo", "chance": 0.7, "min": 1, "max": 2 },
+      { "itemId": "minor_healing_potion", "chance": 0.05 }
+    ] },
+    { "id": "lt_boar", "gold": { "min": 3, "max": 10 }, "entries": [
+      { "itemId": "boar_tusk", "chance": 0.6 },
+      { "itemId": "boar_hide_boots", "chance": 0.04 },
+      { "itemId": "bread", "chance": 0.2, "min": 1, "max": 2 }
+    ] },
+    { "id": "lt_wolf", "gold": { "min": 8, "max": 20 }, "entries": [
+      { "itemId": "wolf_pelt", "chance": 0.65 },
+      { "itemId": "wolf_fang_dagger", "chance": 0.03 },
+      { "itemId": "wolf_tooth_necklace", "chance": 0.04 },
+      { "itemId": "minor_healing_potion", "chance": 0.08 }
+    ] },
+    { "id": "lt_goblin", "gold": { "min": 10, "max": 25 }, "entries": [
+      { "itemId": "iron_sword", "chance": 0.03 },
+      { "itemId": "oak_staff", "chance": 0.03 },
+      { "itemId": "apprentice_hood", "chance": 0.04 },
+      { "itemId": "minor_mana_potion", "chance": 0.1 }
+    ] },
+    { "id": "lt_skeleton", "gold": { "min": 20, "max": 45 }, "entries": [
+      { "itemId": "bone_fragment", "chance": 0.7, "min": 1, "max": 3 },
+      { "itemId": "iron_helm", "chance": 0.04 },
+      { "itemId": "blessed_mace", "chance": 0.03 },
+      { "itemId": "bone_ring", "chance": 0.02 },
+      { "itemId": "ruin_greataxe", "chance": 0.01 }
+    ] },
+    { "id": "lt_lich_king", "gold": { "min": 300, "max": 600 }, "maxItems": 3, "entries": [
+      { "itemId": "lich_kings_scepter", "chance": 0.34 },
+      { "itemId": "cryptguard_breastplate", "chance": 0.33 },
+      { "itemId": "shadowstep_boots", "chance": 0.33 },
+      { "itemId": "bone_ring", "chance": 0.5 }
+    ] }
+  ]
+}

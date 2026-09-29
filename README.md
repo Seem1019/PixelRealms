@@ -1,0 +1,24 @@
+# PixelRealms
+
+Mini-MMORPG 2D pixel art para jugar con amigos: 4 clases, hechizos, botín, inventario, grupos y un jefe final.
+Cliente **Godot 4 (GDScript)** · Servidor **.NET 10** autoritativo · **PostgreSQL** · WebSocket + JSON.
+
+## Empezar
+1. Instala las herramientas de `docs/prompts/README.md` §1.
+2. `git init && git add . && git commit -m "chore: project scaffolding"`.
+3. Abre Claude Code en esta carpeta y sigue `docs/prompts/01-arranque.md` (P0 → P6).
+
+## Mapa de la documentación
+| Documento | Contenido |
+|---|---|
+| `CLAUDE.md` | memoria del proyecto para Claude Code: reglas, comandos, skills |
+| `docs/architecture.md` | arquitectura, game loop, red, predicción, persistencia, despliegue |
+| `docs/protocol.md` | catálogo de mensajes cliente ⇄ servidor |
+| `docs/database.md` | modelo de datos |
+| `docs/decisions.md` | decisiones de arquitectura (ADR) |
+| `docs/design/gdd.md` · `combat.md` | diseño de juego y fórmulas |
+| `docs/backlog/` | épicas e historias de usuario con criterios de aceptación |
+| `docs/prompts/` | prompts listos para Claude Code |
+| `content/` | clases, hechizos, auras, items, monstruos, botín y vendedores (JSON + schemas) |
+| `shared/test-vectors/` | casos que cliente y servidor deben resolver igual |
+| `.claude/skills/` · `.claude/agents/` | skills y subagentes del proyecto |

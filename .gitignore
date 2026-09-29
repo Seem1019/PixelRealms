@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+appsettings.Production.json
+
+# Godot
+.godot/
+client/content/
+*.import.bak
+export_presets.cfg.bak
+builds/
+
+# Entorno y secretos
+.env
+*.pem
+.claude/settings.local.json
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

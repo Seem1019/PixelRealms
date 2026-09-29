@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "loot_tables.schema.json",
+  "title": "Tablas de botín",
+  "type": "object",
+  "required": ["lootTables"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "lootTables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "gold", "entries"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "gold": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["min", "max"],
+            "properties": { "min": { "type": "integer", "minimum": 0 }, "max": { "type": "integer", "minimum": 0 } }
+          },
+          "entries": {
+            "type": "array",
+            "description": "Cada entrada se tira de forma independiente",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["itemId", "chance"],
+              "properties": {
+                "itemId": { "$ref": "common.schema.json#/$defs/id" },
+                "chance": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "min": { "type": "integer", "minimum": 1, "default": 1 },
+                "max": { "type": "integer", "minimum": 1, "default": 1 }
+              }
+            }
+          },
+          "maxItems": { "type": "integer", "minimum": 1, "default": 4, "description": "Tope de items distintos por cadáver" }
+        }
+      }
+    }
+  }
+}

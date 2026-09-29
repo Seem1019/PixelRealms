@@ -1,0 +1,11 @@
+{
+  "$schema": "./schemas/vendors.schema.json",
+  "vendors": [
+    {
+      "id": "robledal_general_goods",
+      "name": "Marta la tendera",
+      "sprite": "npcs/shopkeeper",
+      "items": ["minor_healing_potion", "minor_mana_potion", "bread"]
+    }
+  ]
+}

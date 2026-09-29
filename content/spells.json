@@ -1,0 +1,192 @@
+{
+  "$schema": "./schemas/spells.schema.json",
+  "spells": [
+    {
+      "id": "warrior_heroic_strike", "name": "Golpe heroico", "source": "class", "classId": "warrior", "levelReq": 1,
+      "school": "physical", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "rage", "amount": 15 },
+      "range": 1.5, "targeting": "enemy",
+      "effects": [{ "type": "damage", "base": 8, "apCoef": 0.6, "weaponPct": 0.5 }],
+      "icon": "spells/heroic_strike", "description": "Un golpe potente con el arma."
+    },
+    {
+      "id": "warrior_taunt", "name": "Provocar", "source": "class", "classId": "warrior", "levelReq": 1,
+      "school": "physical", "castMs": 0, "cooldownMs": 8000, "cost": { "resource": "rage", "amount": 0 },
+      "range": 6, "targeting": "enemy", "triggersGcd": false,
+      "effects": [{ "type": "taunt", "durationMs": 3000 }],
+      "icon": "spells/taunt", "description": "Obliga al enemigo a atacarte durante 3 s."
+    },
+    {
+      "id": "warrior_rend", "name": "Desgarrar", "source": "class", "classId": "warrior", "levelReq": 3,
+      "school": "physical", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "rage", "amount": 10 },
+      "range": 1.5, "targeting": "enemy",
+      "effects": [{ "type": "apply_aura", "auraId": "warrior_rend_bleed" }],
+      "icon": "spells/rend", "description": "Hace sangrar al objetivo durante 12 s."
+    },
+    {
+      "id": "warrior_shield_block", "name": "Bloqueo con escudo", "source": "class", "classId": "warrior", "levelReq": 5,
+      "school": "physical", "castMs": 0, "cooldownMs": 20000, "cost": { "resource": "rage", "amount": 10 },
+      "range": 0, "targeting": "self", "triggersGcd": false,
+      "effects": [{ "type": "apply_aura", "auraId": "warrior_shield_block_aura" }],
+      "icon": "spells/shield_block", "description": "Reduce el daño recibido un 30 % durante 6 s."
+    },
+    {
+      "id": "warrior_whirlwind", "name": "Torbellino", "source": "class", "classId": "warrior", "levelReq": 8,
+      "school": "physical", "castMs": 0, "cooldownMs": 10000, "cost": { "resource": "rage", "amount": 25 },
+      "range": 0, "targeting": "self_aoe_enemies", "aoeRadius": 2, "maxTargets": 4,
+      "effects": [{ "type": "damage", "base": 10, "apCoef": 0.5, "weaponPct": 0.7 }],
+      "icon": "spells/whirlwind", "description": "Golpea a hasta 4 enemigos a tu alrededor."
+    },
+
+    {
+      "id": "rogue_sinister_strike", "name": "Golpe siniestro", "source": "class", "classId": "rogue", "levelReq": 1,
+      "school": "physical", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "energy", "amount": 40 },
+      "range": 1.5, "targeting": "enemy",
+      "effects": [{ "type": "damage", "base": 10, "apCoef": 0.7, "weaponPct": 0.6 }],
+      "icon": "spells/sinister_strike", "description": "Un tajo rápido y preciso."
+    },
+    {
+      "id": "rogue_gouge", "name": "Gubia", "source": "class", "classId": "rogue", "levelReq": 1,
+      "school": "physical", "castMs": 0, "cooldownMs": 15000, "cost": { "resource": "energy", "amount": 25 },
+      "range": 1.5, "targeting": "enemy",
+      "effects": [{ "type": "damage", "base": 3 }, { "type": "apply_aura", "auraId": "rogue_gouge_stun" }],
+      "icon": "spells/gouge", "description": "Aturde al objetivo 3 s."
+    },
+    {
+      "id": "rogue_poison_blade", "name": "Hoja envenenada", "source": "class", "classId": "rogue", "levelReq": 3,
+      "school": "nature", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "energy", "amount": 20 },
+      "range": 1.5, "targeting": "enemy",
+      "effects": [{ "type": "apply_aura", "auraId": "rogue_poison" }],
+      "icon": "spells/poison_blade", "description": "Veneno que se acumula hasta 3 veces."
+    },
+    {
+      "id": "rogue_sprint", "name": "Carrera", "source": "class", "classId": "rogue", "levelReq": 5,
+      "school": "physical", "castMs": 0, "cooldownMs": 30000, "cost": { "resource": "energy", "amount": 0 },
+      "range": 0, "targeting": "self", "triggersGcd": false,
+      "effects": [{ "type": "apply_aura", "auraId": "rogue_sprint_aura" }],
+      "icon": "spells/sprint", "description": "+50 % de velocidad durante 6 s."
+    },
+    {
+      "id": "rogue_eviscerate", "name": "Eviscerar", "source": "class", "classId": "rogue", "levelReq": 8,
+      "school": "physical", "castMs": 0, "cooldownMs": 6000, "cost": { "resource": "energy", "amount": 35 },
+      "range": 1.5, "targeting": "enemy",
+      "effects": [{ "type": "damage", "base": 30, "apCoef": 1.2 }],
+      "icon": "spells/eviscerate", "description": "Un golpe final devastador."
+    },
+
+    {
+      "id": "mage_fireball", "name": "Bola de fuego", "source": "class", "classId": "mage", "levelReq": 1,
+      "school": "fire", "castMs": 2000, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 20 },
+      "range": 8, "targeting": "enemy", "projectile": { "sprite": "vfx/fireball", "speed": 12 },
+      "effects": [{ "type": "damage", "base": 18, "spCoef": 0.8 }],
+      "icon": "spells/fireball", "description": "Lanza una bola de fuego."
+    },
+    {
+      "id": "mage_frostbolt", "name": "Descarga de escarcha", "source": "class", "classId": "mage", "levelReq": 1,
+      "school": "frost", "castMs": 1800, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 18 },
+      "range": 8, "targeting": "enemy", "projectile": { "sprite": "vfx/frostbolt", "speed": 10 },
+      "effects": [{ "type": "damage", "base": 14, "spCoef": 0.7 }, { "type": "apply_aura", "auraId": "mage_chill" }],
+      "icon": "spells/frostbolt", "description": "Daño de escarcha que ralentiza un 40 % durante 4 s."
+    },
+    {
+      "id": "mage_frost_nova", "name": "Nova de escarcha", "source": "class", "classId": "mage", "levelReq": 3,
+      "school": "frost", "castMs": 0, "cooldownMs": 20000, "cost": { "resource": "mana", "amount": 25 },
+      "range": 0, "targeting": "self_aoe_enemies", "aoeRadius": 3,
+      "effects": [{ "type": "damage", "base": 5, "spCoef": 0.2 }, { "type": "apply_aura", "auraId": "mage_frost_nova_root" }],
+      "icon": "spells/frost_nova", "description": "Congela en el sitio a los enemigos cercanos durante 4 s."
+    },
+    {
+      "id": "mage_mana_shield", "name": "Escudo de maná", "source": "class", "classId": "mage", "levelReq": 5,
+      "school": "arcane", "castMs": 0, "cooldownMs": 20000, "cost": { "resource": "mana", "amount": 30 },
+      "range": 0, "targeting": "self",
+      "effects": [{ "type": "apply_aura", "auraId": "mage_mana_shield_aura" }],
+      "icon": "spells/mana_shield", "description": "Absorbe daño durante 20 s."
+    },
+    {
+      "id": "mage_flame_burst", "name": "Estallido de llamas", "source": "class", "classId": "mage", "levelReq": 8,
+      "school": "fire", "castMs": 2500, "cooldownMs": 8000, "cost": { "resource": "mana", "amount": 45 },
+      "range": 8, "targeting": "target_aoe_enemies", "aoeRadius": 2, "maxTargets": 6,
+      "effects": [{ "type": "damage", "base": 22, "spCoef": 0.6 }],
+      "icon": "spells/flame_burst", "description": "Explosión de fuego alrededor del objetivo."
+    },
+
+    {
+      "id": "priest_heal", "name": "Sanar", "source": "class", "classId": "priest", "levelReq": 1,
+      "school": "holy", "castMs": 2500, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 25 },
+      "range": 8, "targeting": "ally",
+      "effects": [{ "type": "heal", "base": 25, "spCoef": 1.0 }],
+      "icon": "spells/heal", "description": "Restaura vida a un aliado."
+    },
+    {
+      "id": "priest_smite", "name": "Castigo", "source": "class", "classId": "priest", "levelReq": 1,
+      "school": "holy", "castMs": 2000, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 15 },
+      "range": 8, "targeting": "enemy",
+      "effects": [{ "type": "damage", "base": 13, "spCoef": 0.7 }],
+      "icon": "spells/smite", "description": "Golpea al enemigo con luz sagrada."
+    },
+    {
+      "id": "priest_renew", "name": "Renovar", "source": "class", "classId": "priest", "levelReq": 3,
+      "school": "holy", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 20 },
+      "range": 8, "targeting": "ally",
+      "effects": [{ "type": "apply_aura", "auraId": "priest_renew_hot" }],
+      "icon": "spells/renew", "description": "Cura poco a poco durante 12 s."
+    },
+    {
+      "id": "priest_power_shield", "name": "Palabra de poder: Escudo", "source": "class", "classId": "priest", "levelReq": 5,
+      "school": "holy", "castMs": 0, "cooldownMs": 6000, "cost": { "resource": "mana", "amount": 30 },
+      "range": 8, "targeting": "ally",
+      "effects": [{ "type": "apply_aura", "auraId": "priest_power_shield_aura" }],
+      "icon": "spells/power_shield", "description": "Escudo que absorbe daño durante 15 s."
+    },
+    {
+      "id": "priest_prayer_of_healing", "name": "Rezo de sanación", "source": "class", "classId": "priest", "levelReq": 8,
+      "school": "holy", "castMs": 3000, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 55 },
+      "range": 0, "targeting": "self_aoe_allies", "aoeRadius": 6, "maxTargets": 5,
+      "effects": [{ "type": "heal", "base": 20, "spCoef": 0.6 }],
+      "icon": "spells/prayer_of_healing", "description": "Cura a todos los aliados cercanos."
+    },
+
+    {
+      "id": "item_minor_heal", "name": "Curación menor", "source": "item",
+      "school": "holy", "castMs": 0, "cooldownMs": 0, "triggersGcd": false,
+      "range": 0, "targeting": "self",
+      "effects": [{ "type": "heal", "base": 60 }],
+      "icon": "items/potion_red", "description": "Restaura 60 de vida."
+    },
+    {
+      "id": "item_minor_mana", "name": "Maná menor", "source": "item",
+      "school": "arcane", "castMs": 0, "cooldownMs": 0, "triggersGcd": false,
+      "range": 0, "targeting": "self",
+      "effects": [{ "type": "restore_resource", "resource": "mana", "amount": 60 }],
+      "icon": "items/potion_blue", "description": "Restaura 60 de maná."
+    },
+    {
+      "id": "item_eat_bread", "name": "Comer", "source": "item",
+      "school": "nature", "castMs": 0, "cooldownMs": 0, "triggersGcd": false,
+      "range": 0, "targeting": "self",
+      "effects": [{ "type": "apply_aura", "auraId": "bread_hot" }],
+      "icon": "items/bread", "description": "Restaura vida durante 15 s."
+    },
+
+    {
+      "id": "goblin_shoot", "name": "Disparo", "source": "monster",
+      "school": "physical", "castMs": 1000, "cooldownMs": 3000,
+      "range": 7, "targeting": "enemy", "projectile": { "sprite": "vfx/arrow", "speed": 16 },
+      "effects": [{ "type": "damage", "base": 9 }],
+      "icon": "spells/shoot", "description": "Dispara una flecha."
+    },
+    {
+      "id": "lich_shadow_bolt", "name": "Descarga de sombras", "source": "monster",
+      "school": "shadow", "castMs": 2000, "cooldownMs": 4000,
+      "range": 10, "targeting": "enemy", "projectile": { "sprite": "vfx/shadow_bolt", "speed": 9 },
+      "effects": [{ "type": "damage", "base": 45 }],
+      "icon": "spells/shadow_bolt", "description": "Energía de sombras concentrada."
+    },
+    {
+      "id": "lich_frost_nova", "name": "Nova gélida", "source": "monster",
+      "school": "frost", "castMs": 1500, "cooldownMs": 15000,
+      "range": 0, "targeting": "self_aoe_enemies", "aoeRadius": 4,
+      "effects": [{ "type": "damage", "base": 20 }, { "type": "apply_aura", "auraId": "lich_root" }],
+      "icon": "spells/frost_nova", "description": "Congela a todos los que estén cerca."
+    }
+  ]
+}
