@@ -11,7 +11,7 @@
 1b. **Dado** un Slime (nv 1, normal), un Goblin arquero (nv 5, hard), un Gólem (nv 6, elite) y el Capataz (nv 6, boss) matados por un nivel 5 **entonces** dan 4 (diff −4 → ×0.6), 31, 102 y 341 XP; un Slime para un nivel 6 da 0 (gris). Tests exactos.
 2. **Dado** la barra de XP en el HUD **entonces** muestra `xp / xpNext` y texto al pasar el ratón.
 3. **Dado** un monstruo que otro jugador (fuera de mi grupo) taggeó primero **entonces** no recibo XP ni botín.
-4. **Dado** `rules.progression.maxLevel` (15) **entonces** no se acumula XP y la barra muestra "Nivel máximo".
+4. **Dado** el tope de nivel de la fase activa (`rules.progression.levelCapByPhase[world.currentPhase − 1]`, 6 en la Fase 1) **entonces** no se acumula XP y la barra muestra "Nivel máximo".
 
 ---
 
@@ -22,10 +22,11 @@
 - Skills: `combat-system`, `godot-client`
 
 **Criterios de aceptación**
-1. **Dado** que alcanzo la XP necesaria (`round(K · L^1.6)`, `K` y exponente de `rules.progression`) **entonces** subo de nivel (el sobrante se conserva; puede subir varios niveles de golpe), stats +`statsPerLevel`, vida y recurso llenos.
+1. **Dado** que alcanzo la XP necesaria (`round(K_L · L^1.6)`: `xpCurveKByLevel` para los niveles 1 y 2, `xpCurveK` para el resto, exponente de `rules.progression`) **entonces** subo de nivel (el sobrante se conserva; puede subir varios niveles de golpe), stats +`statsPerLevel`, vida y recurso llenos.
 2. **Dado** un nivel que desbloquea hechizos **entonces** `LevelUp{newSpells}` y el cliente los coloca en la primera casilla libre de la hotbar con un aviso.
 3. **Dado** la subida **entonces** los demás en la AOI ven un efecto visual y el nivel actualizado sobre mi nombre.
-4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (200, 606, 1 160 … 13 641) y los niveles de desbloqueo 1, 1, 3, 6, 10.
+3b. **Dado** un nivel en el que un hechizo sube de rango (tabla de rangos del rediseño de kits) **entonces** en la Fase 1 el rango sube solo, `LevelUp{rankUps}` lo informa y el cliente muestra un aviso.
+4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (100, 455, 1 160 … 13 641) y los niveles de desbloqueo 1, 1, 3, 6, 10.
 
 ---
 
@@ -42,14 +43,33 @@
 
 ---
 
-### HU-043 · Libro de hechizos y hotbar configurable
-**Como** jugador **quiero** ver mis hechizos y organizarlos en la barra **para** jugar a mi manera.
-- Prioridad: Should · Estimación: M · Estado: Pendiente
+### HU-043 · Libro de hechizos y barra (4 hechizos + 4 utilizables)
+**Como** jugador **quiero** ver mis hechizos y elegir cuáles llevo en la barra **para** armar mi build.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
 - Dependencias: HU-041
 - Skills: `godot-client`, `net-protocol`
 
 **Criterios de aceptación**
 1. **Dado** la tecla P **entonces** se abre el libro con todos los hechizos de mi clase; los no aprendidos en gris con "Nivel X".
-2. **Dado** un hechizo aprendido **cuando** lo arrastro a la hotbar **entonces** se asigna (`SetHotbar`) y persiste entre sesiones.
-3. **Dado** un consumible **cuando** lo arrastro a la hotbar **entonces** la casilla muestra la cantidad total en bolsa y lo usa al pulsarla.
+2. **Dado** un hechizo aprendido **cuando** lo arrastro a una de las 4 casillas de hechizo (teclas 1–4) **entonces** se asigna (`SetHotbar`) y persiste entre sesiones.
+3. **Dado** un consumible **cuando** lo arrastro a una de las 4 casillas de utilizables (teclas 5–8) **entonces** la casilla muestra la cantidad total en bolsa y lo usa al pulsarla.
 4. **Dado** Shift + arrastrar fuera de la barra **entonces** se quita.
+5. **Dado** un hechizo en una casilla de utilizables o un consumible en una de hechizo **entonces** el servidor lo rechaza (`invalid_payload`).
+
+---
+
+### HU-044 · Cambio de clase en NPC (Fases 1–2)
+**Como** jugador **quiero** cambiar la clase de mi personaje en la Aldea **para** probar otra clase sin empezar de cero.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-041, HU-043, HU-052
+- Skills: `dotnet-server`, `net-protocol`, `godot-client`, `world-maps`
+
+**Criterios de aceptación**
+1. **Dado** el NPC de cambio de clase de la Aldea **cuando** hago clic a ≤ 3 tiles fuera de combate **entonces** veo las otras 3 clases (rol, recurso y descripción) y puedo elegir una.
+2. **Dado** que confirmo **entonces** conservo nivel, XP, items, equipo y oro; cambian la clase, los stats base, el recurso (lleno) y los hechizos (los de la nueva clase hasta mi nivel); la barra de hechizos se rellena con los nuevos y el equipo se recalcula con la afinidad de la nueva clase.
+3. **Dado** que estoy en combate, muerto, en duelo o en un intercambio **entonces** `Error{in_combat|is_dead|duel_busy|trade_busy}`.
+4. **Dado** `rules.world.currentPhase` mayor que `rules.progression.classChange.npcUntilPhase` **entonces** el NPC no ofrece el cambio (en la Fase 3 lo sustituyen el bono de XP `altCatchUp` y el almacén compartido, que se diseñan en esa fase).
+5. **Dado** el cambio **entonces** el personaje se guarda de inmediato y se loguea la clase anterior y la nueva.
+
+**Notas técnicas**
+- Mensaje nuevo C→S para pedir el cambio (skill `net-protocol`) y un tipo de NPC nuevo en la capa `npcs` (skill `world-maps`).

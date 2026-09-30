@@ -2,24 +2,25 @@
 
 ## Nuevo hechizo
 ```
-Usando la skill game-content, agrega al Sacerdote un hechizo de nivel 6 "Palabra de las sombras: Dolor":
-DoT de sombras de 18 s, instantáneo, 25 de maná. Ajusta los números con la guía de balance de la skill,
-muéstrame el cálculo de daño total a nivel 6 y 10 frente a Castigo, valida con ContentValidator y crea el ícono
-placeholder o lista el asset faltante.
+Usando la skill game-content, diseña el hechizo de área nuevo del Sacerdote que reemplaza a Rezo de sanación
+(GDD §Hechizos): área pequeña apuntada (`ground_aoe_all`) que cura a los aliados y daña a los enemigos, con un daño
+mucho menor que la curación, desbloqueo a nivel ≤ 6. Antes de escribir JSON, dime qué falta en el motor para
+`ground_aoe_all` (ver HU-085 y HU-086) y muéstrame el cálculo de curación y daño a nivel 6 frente a Sanar y Castigo.
+Valida con ContentValidator y crea el ícono placeholder o lista el asset faltante.
 ```
 
 ## Lote de items
 ```
-Usa el subagente content-designer para diseñar 12 items nuevos de nivel 5–9 (3 por clase, mezcla de armas,
+Usa el subagente content-designer para diseñar 12 items nuevos de nivel 4–6 (3 por clase, mezcla de armas,
 armaduras y joyería; 8 uncommon y 4 rare) con el presupuesto de stats de la skill game-content.
-Añádelos a items.json y repártelos en las tablas de botín de goblin y esqueleto con probabilidades de la guía.
+Añádelos a items.json y repártelos en las tablas de botín de goblin y kóbold con probabilidades de la guía.
 Muéstrame una tabla resumen (id, nivel, rareza, slot, stats, fuente) antes de escribir los JSON.
 ```
 
 ## Nuevo monstruo con zona
 ```
-Agrega un monstruo "Araña del bosque" nivel 4–5 que envenena (reutiliza el aura rogue_poison o crea una propia),
-con su tabla de botín, y 2 spawns en el Bosque Sombrío de maps/meadow.tmj (skill world-maps).
+Agrega un monstruo "Araña de las colinas" nivel 4–5 que envenena (reutiliza el aura rogue_poison o crea una propia),
+con su tabla de botín, y 2 spawns en las Colinas de maps/meadow.tmj (skill world-maps).
 Verifica que los spawns no caen en sólido y que no solapan el aggro de los lobos.
 ```
 

@@ -15,7 +15,7 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - **Decisión:** WebSocket de ASP.NET Core, JSON con System.Text.Json source-generated.
 - **Consecuencias:** ~25 KB/s por cliente. Si crece, migrar a MessagePack manteniendo el sobre `{t,d}`.
 
-## ADR-003 · Combate tab-target
+## ADR-003 · Combate tab-target — Reemplazada por ADR-015
 - **Contexto:** los skillshots requieren compensación de latencia y hitboxes precisas; tab-target es fácil de
   validar en servidor y es el estilo de Heartwood/WoW clásico.
 - **Decisión:** selección de objetivo + hotbar; el servidor resuelve impactos (sin proyectiles físicos:
@@ -80,3 +80,34 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   quien ganó algo, todos pueden ver el contenido, solo el dueño toma su item; tras `exclusiveSec` queda libre.
   Botín garantizado de jefes mediante `groups` (uno-de-N por peso). El intercambio entre jugadores entra en el MVP.
 - **Alternativas descartadas:** botín libre (peleas por el item), turnos/round-robin y "al que menos ha recibido" (previsibles, menos emoción).
+
+## ADR-013 · MVP en 3 fases con tope de nivel por fase
+- **Contexto:** el MVP completo va del nivel 1 al 15 en 3 tiers. Se quiere algo jugable pronto, no un MVP eterno.
+- **Decisión:** el MVP se construye en 3 fases, una por tier; cada fase termina jugable y probada con amigos antes de empezar
+  la siguiente. `rules.world.currentPhase` indica la fase activa y `rules.progression.levelCapByPhase` (`[6, 10, 15]`) el tope
+  de nivel efectivo. `maxLevel` (15) sigue siendo el tope absoluto que usan el validador y la BD.
+- **Consecuencias:** abrir una fase = subir `currentPhase` y añadir su contenido, sin migración. Lo que solo sirve a fases
+  futuras no se generaliza antes de tiempo (pilar 6 del GDD).
+
+## ADR-014 · Barra 4+4, hechizos por rangos y maná por golpe
+- **Contexto:** pilar 3 (pocos hechizos que mejoran, builds por elección) y pilar 4 (ningún caster se queda sin maná a mitad
+  de un jefe).
+- **Decisión:** máximo 8 hechizos por clase; se equipan 4 más 4 utilizables (`rules.loadout`). Los hechizos suben de rango con
+  el nivel: automático en la Fase 1, mejora 1-de-2 desde la Fase 2 y una forma de reiniciarlas antes de cerrar el MVP. Todo
+  personaje con maná recupera `maxMana · manaPerBasicHitPctPerSec · swingMs / 1000` por básico que impacta, con cualquier arma;
+  el swing se pausa mientras se castea.
+- **Alternativas descartadas:** hechizo canalizado de maná (ocupa uno de los 4 huecos); solo pociones (una por combate de jefe);
+  maná solo con varita o bastón (castigaba el equipo libre).
+- **Consecuencias:** `SetHotbar` pasa a slots 0–7, `character_hotbar.slot` a 0..7, `LevelUp` gana `rankUps` (opcional).
+
+## ADR-015 · Combate híbrido: tab-target para un objetivo, áreas apuntadas
+- **Contexto:** se quiere posicionamiento y esquiva, al estilo de Albion Online, sin perder la robustez del tab-target en servidor.
+- **Decisión:** el ataque básico, los hechizos de un objetivo (daño, cura, control), Provocar y Carga siguen siendo tab-target.
+  Los hechizos de área se apuntan a un punto del suelo (`ground_aoe_enemies|allies|all`) o se lanzan alrededor del lanzador
+  (`self_aoe_*`). El cliente envía `targetPos`; el servidor valida alcance y LOS, fija el punto en `CastStarted` (todos ven la
+  marca) y resuelve con quien esté dentro al terminar el casteo. Los monstruos siguen la misma regla. Sin fuego amigo. Los
+  proyectiles siguen siendo solo visuales (como en ADR-003).
+- **Alternativas descartadas:** todo con skillshots (compensación de latencia e hitboxes: mucho más código); tab-target puro
+  (áreas sin esquiva ni posicionamiento).
+- **Consecuencias:** `target_aoe_enemies` desaparece (HU-086); `CastSpell` y `CastStarted` ganan campos opcionales; los kits se
+  rediseñan (daño en área para Guerrero y Pícaro). Un área apuntada con `castMs = 0` no se puede esquivar: las de daño llevan casteo.

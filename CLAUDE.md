@@ -1,8 +1,10 @@
 # PixelRealms — Memoria del proyecto para Claude Code
 
 Mini-MMORPG 2D pixel art top-down para ~20 jugadores (amigos). Inspiración: Heartwood Online.
-Combate **tab-target** en tiempo real, 4 clases con **equipo libre y afinidad**, hechizos, botín asignado por item, inventario,
-intercambio, chat, grupos y **duelos**. Nivel máximo 15 en 3 tiers; el MVP es el Tier 1 (aldea, campos, colinas, Mina y su jefe).
+Combate **híbrido** en tiempo real (tab-target para un objetivo, áreas apuntadas libremente; ADR-015), 4 clases con
+**equipo libre y afinidad**, hechizos, botín asignado por item, inventario, intercambio, chat, grupos y **duelos**.
+Nivel máximo 15 en 3 tiers; el MVP son los 3 tiers en 3 fases y la **Fase 1** es el Tier 1 (aldea, campos, colinas, Mina y
+su jefe). Los pilares de diseño (`docs/design/gdd.md` §Pilares) filtran cualquier feature nueva.
 
 > Idioma: el código, los identificadores y los commits van en **inglés**. La documentación, las HUs y los
 > comentarios de diseño van en **español**.
@@ -97,4 +99,6 @@ Subagentes (`.claude/agents/`): `server-authority-reviewer`, `content-designer`,
 - **Afinidad**: alta/media/baja de una clase con un tipo de arma/armadura; multiplica todo lo numérico del item (`rules.affinity`).
 - **MapData / MapInstance**: datos estáticos de un mapa (compartidos) / estado vivo de una copia del mapa. **Portal**: objeto que cambia de mapa.
 - **Ruleset PvP**: reglas de un modo de PvP (`rules.pvp`); el MVP solo tiene `duel`.
+- **Fase**: etapa del MVP, una por tier (Fase 1 = Tier 1, tope de nivel 6); `rules.world.currentPhase` y `rules.progression.levelCapByPhase` (ADR-013).
+- **Barra**: 4 hechizos equipados (teclas 1–4) + 4 utilizables (teclas 5–8), `rules.loadout` (ADR-014).
 - **Template** (`ItemTemplate`, `MonsterTemplate`): definición en JSON. **Instance**: copia viva en el mundo.

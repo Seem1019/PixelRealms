@@ -42,6 +42,8 @@
 2. **Dado** que me alejo **entonces** el swing se pausa y se reanuda al volver al rango (sin reiniciar el temporizador si no pasó el tiempo).
 3. **Dado** un golpe **entonces** se calcula con la fórmula de ataque básico de `docs/design/combat.md` (afinidad del arma, poder / 14 · swing, tabla de impacto, armadura, crit) y se envía `CombatEvent`. Un Guerrero gana `ragePerHitDealt` de ira al impactar.
 4. **Dado** tests con `FixedRng` **entonces** cubren hit, crit, miss, dodge y mitigación por armadura con números exactos.
+5. **Dado** un personaje con maná (cualquier clase y arma) **cuando** un básico impacta **entonces** recupera `maxMana · rules.combat.manaPerBasicHitPctPerSec · (swingMs / 1000)`; un fallo o una esquiva no dan maná. Test: un Mago con espada y un Mago con bastón recuperan el mismo maná por segundo.
+6. **Dado** que empiezo un casteo **entonces** el temporizador del básico se pausa y se reanuda al terminar, interrumpir o cancelar el casteo.
 
 ---
 
@@ -69,9 +71,9 @@
 
 **Criterios de aceptación**
 1. **Dado** los efectos `damage`, `heal`, `restore_resource`, `apply_aura`, `taunt`, `dash` **entonces** `EffectResolver` los aplica en orden sobre los objetivos que devuelve `TargetResolver`. `dash` (Carga) coloca al lanzador adyacente al objetivo en ≤ 3 ticks y exige `distancia ≥ minRange` y LOS.
-2. **Dado** cada `targeting` (`self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`, `target_aoe_enemies`) **entonces** hay test con posiciones concretas (dentro/fuera de radio, `maxTargets` respetado, más cercanos primero).
+2. **Dado** cada `targeting` (`self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`; las áreas `ground_*` van en HU-086) **entonces** hay test con posiciones concretas (dentro/fuera de radio, `maxTargets` respetado, más cercanos primero).
 3. **Dado** `StatCalculator` **entonces** calcula todos los derivados de `docs/design/combat.md` leyendo `rules.classScaling` y `rules.affinity` (afinidad multiplica daño, armadura, spellPower y stats de cada item) con tests exactos para las 4 clases a nivel 1, 5 y 15, incluido un Mago con espada y placas.
-3b. **Dado** las 4 clases con el mismo equipo (`iron_sword` + `recruit_mail_shirt`) **entonces** el DPS básico del Sacerdote está entre el 55 % y el 70 % del Pícaro, y el aguante del Mago entre el 45 % y el 60 % del Guerrero (tests de balance con los valores de `combat.md` §Referencia).
+3b. **Dado** las 4 clases con el mismo equipo (`iron_sword` + `recruit_mail_shirt`) **entonces** el DPS básico del Sacerdote está entre el 55 % y el 65 % del Pícaro, y el aguante del Mago entre el 50 % y el 60 % del Guerrero (márgenes provisionales de `rules.balanceTargets`; tests de balance con los valores de `combat.md` §Referencia).
 4. **Dado** los 20 hechizos de clase del contenido (5 por clase) **entonces** un test paramétrico los lanza todos sobre un maniquí y verifica que no lanzan excepción y producen al menos un evento.
 
 ---
@@ -133,7 +135,7 @@
 - Skills: `godot-client`, `pixel-art-assets`
 
 **Criterios de aceptación**
-1. **Dado** el HUD **entonces** veo: marco propio (retrato/clase, nombre, nivel, barra de vida roja, barra de recurso con color por tipo: maná azul, ira roja oscura, energía amarilla), marco de objetivo, barra de casteo, hotbar de 10 casillas con teclas 1–0.
+1. **Dado** el HUD **entonces** veo: marco propio (retrato/clase, nombre, nivel, barra de vida roja, barra de recurso con color por tipo: maná azul, ira roja oscura, energía amarilla), marco de objetivo, barra de casteo, barra de 4 casillas de hechizo (teclas 1–4) y 4 de utilizables (teclas 5–8) según `rules.loadout`.
 2. **Dado** un `CombatEvent` **entonces** aparecen números flotantes sobre la entidad (colores de la skill `combat-system`) que suben y se desvanecen en 1 s.
 3. **Dado** la hotbar **entonces** cada casilla muestra ícono, tecla, barrido de CD/GCD, y se oscurece si no hay recurso o el objetivo está fuera de rango (rango calculado en cliente, solo visual).
 4. **Dado** un error del servidor **entonces** se muestra en rojo en el centro-arriba 2 s ("No tienes suficiente maná").
@@ -147,8 +149,46 @@
 - Skills: `combat-system`
 
 **Criterios de aceptación**
-1. **Dado** un mago **entonces** regenera maná según `spi`/`int` cada 1 s, reducido al 30 % durante 5 s tras gastar maná.
+1. **Dado** un personaje con maná (Mago, Sacerdote) **entonces** regenera maná según `spi`/`int` cada 1 s, reducido al 30 % durante 5 s tras gastar maná, y además recupera maná con cada básico que impacta (HU-032 CA5).
 2. **Dado** un guerrero **entonces** gana `ragePerHitDealt` (6) por golpe o habilidad que impacta y `ragePerHitTaken` (4) por golpe recibido, y pierde `rageDecayPerSecOutOfCombat` fuera de combate; empieza en 0 al entrar. Carga no cuesta ira y, al impactar su aturdimiento, cuenta como golpe (+6).
 3. **Dado** un pícaro **entonces** gana 10 de energía/s hasta 100.
 4. **Dado** fuera de combate 6 s **entonces** todos regeneran vida según `spi` y `sta`.
 5. **Dado** tests con `FakeClock` **entonces** cubren cada fórmula con números exactos leídos de `rules.json` (si cambia un valor del archivo, el test sigue verde).
+
+---
+
+### HU-086 · Hechizos de área apuntados (combate híbrido)
+**Como** jugador **quiero** lanzar los hechizos de área donde apunte con el ratón y ver las áreas enemigas antes de que golpeen **para** que el combate tenga esquiva y posicionamiento sin perder el tab-target.
+- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Dependencias: HU-034, HU-038
+- Skills: `combat-system`, `net-protocol`, `godot-client`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** un hechizo `ground_aoe_*` **cuando** pulso su tecla **entonces** el cliente muestra el círculo de `aoeRadius` bajo el cursor (en rojo si está fuera de alcance) y al hacer clic envía `CastSpell{spellId, targetPos}` sin necesidad de objetivo seleccionado.
+2. **Dado** un `targetPos` a más de `range + castRangeToleranceTiles` del lanzador o sin línea de visión **entonces** `Error{out_of_range|no_los}`; un `targetPos` con NaN o fuera del mapa devuelve `invalid_payload`.
+3. **Dado** un casteo de área aceptado **entonces** todos en la AOI reciben `CastStarted{targetPos, radius}` y ven la marca en el suelo durante el casteo; el punto no cambia aunque el objetivo se mueva.
+4. **Dado** el fin del casteo **entonces** el área afecta solo a quien está dentro de `aoeRadius` en ese tick (hasta `maxTargets`, los más cercanos al centro); quien salió de la marca no recibe nada (test con posiciones concretas).
+5. **Dado** un monstruo con hechizo de área (Golpe de pico del Capataz) **entonces** usa la misma marca: apunta a la posición de su objetivo al empezar el casteo y los jugadores pueden esquivarlo.
+6. **Dado** el contenido **entonces** `target_aoe_enemies` desaparece del schema, Estallido de llamas y Golpe de pico pasan a `ground_aoe_enemies`, y el validador lo comprueba.
+7. **Dado** un área enemiga **entonces** nunca afecta a aliados ni al lanzador (sin fuego amigo).
+
+**Notas técnicas**
+- ADR-015. `CastState` guarda `targetPos`; `TargetResolver` recibe el punto. `targetPos` y `radius` son campos opcionales del protocolo (no sube `ProtocolVersion`).
+- Los números y el reparto de áreas por clase salen del rediseño de kits (ver `docs/backlog/README.md` §Pendiente de diseño).
+
+---
+
+### HU-085 · Hechizo de área del Sacerdote (`ground_aoe_all`)
+**Como** Sacerdote **quiero** un hechizo de área que cure a mis aliados y dañe un poco a los enemigos **para** tener algo propio tanto en solitario como en grupo.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-086
+- Skills: `combat-system`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** `targeting: ground_aoe_all` **entonces**, dentro del área, los efectos `heal` se aplican a los aliados (incluido el lanzador) y los `damage` a los enemigos; ningún objetivo recibe ambos.
+2. **Dado** el hechizo nuevo del Sacerdote **entonces** reemplaza a `priest_prayer_of_healing` (Rezo de sanación), se desbloquea a nivel ≤ 6 y su daño a enemigos es mucho menor que su curación (test que compara ambos valores a igual `spellPower`).
+3. **Dado** un rival de duelo dentro del área **entonces** recibe la parte de daño solo si `PvpService.CanAttack` lo permite.
+4. **Dado** el validador **entonces** acepta `ground_aoe_all` y exige que el hechizo tenga al menos un efecto `heal` y uno `damage`.
+
+**Notas técnicas**
+- Nombre, radio y números en el rediseño de kits. Usar un `id` nuevo (los ids de contenido no se reutilizan).

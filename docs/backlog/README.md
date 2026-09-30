@@ -1,12 +1,15 @@
-# Backlog — PixelRealms MVP
+# Backlog — PixelRealms MVP · Fase 1 (Tier 1)
+
+> El MVP completo son 3 fases, una por tier (niveles 1–15). Este backlog cubre la **Fase 1**; las Fases 2 y 3 se
+> detallan cuando la Fase 1 esté terminada y probada con amigos (pilar 6 del GDD).
 
 ## Hitos (implementar en este orden)
 | Hito | Resultado jugable | HUs |
 |---|---|---|
 | **M1 · Caminar juntos** | 2+ amigos inician sesión, crean personaje y se ven moverse por el mapa | HU-001 → HU-027 |
-| **M2 · Pelear** | matar slimes con hechizos de clase, morir y reaparecer, ganar XP | HU-030 → HU-041 |
+| **M2 · Pelear** | matar slimes con hechizos de clase (un objetivo y áreas apuntadas), morir y reaparecer, ganar XP | HU-030 → HU-041, HU-085, HU-086 |
 | **M3 · Botín** | lootear (por item, al azar), inventario, equipo libre con afinidad, pociones, vendedor, intercambio | HU-050 → HU-059 |
-| **M4 · Grupo y duelos** | chat, grupos, XP compartida, duelos, subir de nivel en el Tier 1 | HU-042, HU-043, HU-060 → HU-064 |
+| **M4 · Grupo y duelos** | chat, grupos, XP compartida, duelos, subir de nivel en el Tier 1 | HU-042 → HU-044, HU-060 → HU-064 |
 | **M5 · Online** | servidor en VPS con `wss://`, versión web, Tier 1 completo con la Mina y el Capataz | HU-070 → HU-084 |
 
 ## Índice
@@ -44,7 +47,8 @@
 | HU-040 | Ganar experiencia | E4 | Must | S | Pendiente |
 | HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Pendiente |
 | HU-042 | Panel de personaje (stats) | E4 | Should | M | Pendiente |
-| HU-043 | Libro de hechizos y hotbar configurable | E4 | Should | M | Pendiente |
+| HU-043 | Libro de hechizos y barra (4 hechizos + 4 utilizables) | E4 | Must | M | Pendiente |
+| HU-044 | Cambio de clase en NPC (Fases 1–2) | E4 | Must | M | Pendiente |
 | HU-050 | Botín de monstruos | E5 | Must | L | Pendiente |
 | HU-051 | Inventario (bolsa de 24) | E5 | Must | L | Pendiente |
 | HU-052 | Equipar y desequipar (equipo libre con afinidad) | E5 | Must | M | Pendiente |
@@ -58,7 +62,7 @@
 | HU-060 | Chat (decir, global, susurro) | E6 | Must | M | Pendiente |
 | HU-061 | Grupos (invitar, aceptar, salir, expulsar) | E6 | Must | M | Pendiente |
 | HU-062 | Marcos de grupo y XP/oro compartidos | E6 | Must | M | Pendiente |
-| HU-063 | Lista de jugadores en línea | E6 | Could | S | Pendiente |
+| HU-063 | Lista de jugadores en línea | E6 | Should | S | Pendiente |
 | HU-064 | Duelos (PvP amistoso) | E6 | Must | L | Pendiente |
 | HU-070 | Comandos de administrador | E7 | Should | M | Pendiente |
 | HU-071 | Rate limiting y protección de mensajes | E7 | Must | M | Pendiente |
@@ -70,7 +74,14 @@
 | HU-081 | Arte de clases y monstruos | E8 | Must | L | Pendiente |
 | HU-082 | Íconos de items y hechizos | E8 | Must | M | Pendiente |
 | HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Pendiente |
-| HU-084 | Pasada de balance | E8 | Should | M | Pendiente |
+| HU-084 | Pasada de balance | E8 | Must | M | Pendiente |
+| HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Pendiente |
+| HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Pendiente |
+
+## Pendiente de diseño (antes de implementar rangos y áreas)
+- **Rediseño de kits** con el combate híbrido (ADR-015): hasta 8 hechizos por clase, 4 equipados; tabla de rangos por
+  nivel (Fase 1) y mejoras 1-de-2 (Fase 2); **daño en área para el Guerrero y el Pícaro**; nombre y números del hechizo
+  del Sacerdote. Afecta a HU-041 (rangos), HU-085 y HU-086.
 
 Estimación: **S** ≤ 1 sesión de Claude Code · **M** 1–3 sesiones · **L** 3+ sesiones (considera dividirla).
 

@@ -8,7 +8,7 @@ description: Crear, editar y balancear contenido data-driven del juego (clases, 
 ## Archivos
 | Archivo | Schema | Qué define |
 |---|---|---|
-| `content/classes.json` | `schemas/classes.schema.json` | clases, stats base y por nivel, armas/armaduras permitidas, equipo inicial |
+| `content/classes.json` | `schemas/classes.schema.json` | clases, stats base y por nivel, armas/armaduras recomendadas (solo informativo, ADR-009), equipo inicial |
 | `content/spells.json` | `schemas/spells.schema.json` | hechizos de clase, de items (consumibles) y de monstruos |
 | `content/auras.json` | `schemas/auras.schema.json` | DoT, HoT, buffs/debuffs, stun, root, silence, shield, slow |
 | `content/items.json` | `schemas/items.schema.json` | armas, armaduras, consumibles, materiales, basura |
@@ -37,7 +37,10 @@ Tipos compartidos (ids, enums, stats): `schemas/common.schema.json`.
 Tipos de aura: `dot`, `hot`, `stat_mod` (`mods.stats`, `damageTakenPct`, `damageDonePct`, `speedPct`), `stun`, `root`, `silence`, `shield`, `slow`.
 Campos extra de aura: `removesKinds` (quita esas auras al aplicarse), `immuneKinds` (bloquea esas auras mientras dura). Los `boss: true` ignoran `rules.combat.bossImmuneToAuraKinds`.
 Escuelas: solo `physical` y `magic` (ADR-010).
-Targeting: `self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`, `target_aoe_enemies` (+ `aoeRadius`, `maxTargets`).
+Targeting (combate híbrido, ADR-015): un objetivo (tab-target) `self`, `enemy`, `ally`; área `self_aoe_enemies`,
+`self_aoe_allies` y, desde HU-086, `ground_aoe_enemies`, `ground_aoe_allies`, `ground_aoe_all` (punto apuntado; `ground_aoe_all`
+cura aliados y daña enemigos). `target_aoe_enemies` se elimina en HU-086. Campos `aoeRadius`, `maxTargets`. Las áreas
+apuntadas de daño llevan `castMs > 0` para que se puedan esquivar.
 
 **Si una idea no cabe en estos efectos**, no la fuerces con hacks: propone al usuario un nuevo tipo de efecto
 (requiere código en `EffectResolver`, schema, tests y esta tabla) y crea una HU para ello.
@@ -53,14 +56,18 @@ Targeting: `self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`, `targ
 4. Si añades `icon`/`sprite` nuevos, crea un placeholder (skill `pixel-art-assets`) o lista los assets faltantes.
 5. Balance: compara con la guía de abajo; si te sales, justifícalo en el commit.
 
-## Guía de balance (nivel máximo 15; MVP = Tier 1, niveles 1–6)
+## Guía de balance (nivel máximo 15; Fase 1 = Tier 1, niveles 1–6; márgenes en `rules.balanceTargets`)
 - **Equipo libre:** ningún item lleva `classes`. El rendimiento por clase sale de `rules.affinity` (×1.0/0.85/0.7) y
   `rules.classScaling`. Al diseñar un item piensa en su clase de afinidad alta; las demás lo usarán peor automáticamente.
 - **Piso de viabilidad:** cualquier clase con cualquier equipo debe matar un monstruo normal de su nivel perdiendo < 50 % de vida
   solo con ataque básico (tabla en `docs/design/combat.md` §Referencia). Si un cambio lo rompe, ajusta `classScaling`, no el item.
+- **XP/hora en solitario** contando descansos: diferencia entre clases ≤ 15 % (`soloXpPerHourSpreadPct`). Esa es la medida de
+  "cualquier clase es igual de buena elección", no el tiempo por kill.
+- **Hechizos por clase:** máximo 8 (`rules.loadout.maxSpellsPerClass`), 4 equipados. Antes de añadir un hechizo, mejora uno por rangos (pilar 3).
+- **Duración:** 20–30 h del 1 al 15 con una clase (`hoursToMaxLevel`).
 - **Tiempo para matar** un monstruo normal de su nivel en solitario con rotación completa: 8–15 s (solo básicos: 18–30 s).
 - **Jefes** (`rules.boss`): un jefe de nivel B lo matan 3 jugadores de nivel B−2 en 60–100 s; 2 de nivel B; 1 de B+1 + 1 de B−1.
-  Vida del jefe ≈ `DPS(3 jugadores nivel B−2, con el mago quedándose sin maná a los ~30 s) × 80 s`. Daño del jefe: el tanque de nivel
+  Vida del jefe ≈ `DPS(3 jugadores nivel B−2, contando el maná por golpe) × 80 s`; ningún caster debe quedarse sin maná antes del final si alterna básicos (pilar 4). Daño del jefe: el tanque de nivel
   B−2 debe morir en ~30 s sin curas (obliga a llevar sanador o pociones) y un dps de nivel B en ~25 s.
 - **DPS de hechizo** ≈ `(base + coef·poder) / max(castMs, 1000 GCD)`. Un hechizo de 2 s debe hacer ~1.8× uno instantáneo sin CD.
 - Coeficientes: instantáneo sin CD `spCoef` 0.4–0.5; 2 s `0.7–0.8`; 3 s `1.0`. AoE ×0.5–0.6 del single-target.
@@ -69,7 +76,7 @@ Targeting: `self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`, `targ
 - Probabilidades: uncommon 3–5 %, rare 1–2 %, epic de jefe ~33 % cada uno (1 garantizado recomendable).
 - **XP de monstruo no se escribe:** `round((5·nivel + 1) · tipo)` con `type` normal 1.0 / hard 1.2 (a distancia o con mecánica) / elite 3 / boss 10.
 - **Monstruos por nivel:** al menos un monstruo normal por cada nivel de la zona (sin huecos), o el jugador se atasca.
-- **PvP:** la clase favorecida del triángulo (Mago > Guerrero > Pícaro > Mago) gana el 60–70 % de duelos simulados con equipo igual; si supera el 80 % es absoluta y hay que bajar la palanca (hechizo o `classAdvantage`).
+- **PvP:** la clase favorecida del triángulo (Mago > Guerrero > Pícaro > Mago) gana el 60–75 % de duelos simulados con equipo igual (`duelFavoriteWinRate`); si supera el 75 % hay que bajar la palanca (hechizo o `classAdvantage`).
 Pide al subagente `content-designer` una revisión de balance cuando agregues más de 3 entradas.
 
 ## Ejemplo: nuevo hechizo con DoT

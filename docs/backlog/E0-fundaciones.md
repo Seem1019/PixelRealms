@@ -106,7 +106,7 @@ determinista donde agregar sistemas.
 
 **Notas técnicas**
 - Ajustes exactos de ventana/filtros en skill `godot-client`.
-- Input Map: `move_up/down/left/right` (WASD + flechas), `target_next` (Tab), `hotbar_1..0`, `toggle_inventory` (I), `toggle_character` (C), `toggle_spellbook` (P), `chat_focus` (Enter), `ui_cancel` (Esc).
+- Input Map: `move_up/down/left/right` (WASD + flechas), `target_next` (Tab), `spell_1..4` (teclas 1–4), `usable_1..4` (teclas 5–8), `toggle_inventory` (I), `toggle_character` (C), `toggle_spellbook` (P), `chat_focus` (Enter), `ui_cancel` (Esc).
 - `Theme` pixel inicial con fuente libre (ver `CREDITS.md`).
 
 ---

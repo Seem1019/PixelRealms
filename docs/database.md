@@ -45,7 +45,7 @@ erDiagram
   }
   character_hotbar {
     uuid character_id PK,FK
-    smallint slot PK "0..9"
+    smallint slot PK "0..7 (0–3 hechizos, 4–7 utilizables)"
     smallint kind "0=spell 1=item"
     text ref
   }

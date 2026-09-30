@@ -54,22 +54,27 @@ Lecturas:
 | 2 × nivel 6 (Pícaro, Mago) | ~47 | ~50 s | justo: el Pícaro (200 hp) aguanta ~25 s por pasada, hay que alternar aggro |
 | Nivel 7 + nivel 5 (Guerrero + Mago) | ~44 | ~55 s | cómodo con Bloqueo |
 
-Los tres objetivos de `rules.boss` se cumplen sobre el papel. Lo que hay que verificar jugando: el Golpe de pico (AoE)
+Los tres objetivos de `rules.boss` se cumplen sobre el papel.
+**Pendiente (2026-09-30):** estas cifras son anteriores al maná por golpe (GDD §Ataque básico): con él, el Mago ya no se
+queda sin maná a los ~30 s y el jefe caerá antes. También cambia el Golpe de pico, que ahora es un área marcada que se puede
+esquivar (combate híbrido, ADR-015). Recalcular en HU-084. Lo que hay que verificar jugando: el Golpe de pico (AoE)
 castiga a los melee que se apilan y el Latigazo obliga al sanador a curar a alguien distinto del tanque.
 
-## 5. Curva de XP (K = 200, nivel máximo 15)
+## 5. Curva de XP (K = 100 en nivel 1, 150 en nivel 2, 200 desde el 3; nivel máximo 15)
 | Nivel | XP para subir | Kills de un mob normal de tu nivel | Nivel | XP | Kills |
 |---|---|---|---|---|---|
-| 1→2 | 200 | 33 | 8→9 | 5 572 | 136 |
-| 2→3 | 606 | 55 | 9→10 | 6 727 | 146 |
+| 1→2 | 100 | 17 | 8→9 | 5 572 | 136 |
+| 2→3 | 455 | 41 | 9→10 | 6 727 | 146 |
 | 3→4 | 1 160 | 72 | 10→11 | 7 962 | 156 |
 | 4→5 | 1 838 | 88 | 11→12 | 9 274 | 166 |
 | 5→6 | 2 627 | 101 | 12→13 | 10 659 | 175 |
 | 6→7 | 3 516 | 113 | 13→14 | 12 115 | 184 |
 | 7→8 | 4 500 | 125 | 14→15 | 13 641 | 192 |
 
-Total: 80 397 XP, ~1 740 kills de tu nivel (menos si matas naranjas: +10 % por nivel de diferencia hasta +40 %).
-Tier 1 (1→6): 6 431 XP, ~350 kills.
+Total: 80 146 XP, ~1 710 kills de tu nivel (menos si matas naranjas: +10 % por nivel de diferencia hasta +40 %).
+Tier 1 (1→6): 6 180 XP, ~319 kills.
+Objetivo de duración: 20–30 h del 1 al 15 con una clase (`rules.balanceTargets.hoursToMaxLevel`); a 8–15 s por kill eso son
+~4–7 h de combate puro, así que hay que medirlo en HU-084.
 
 Reparto en grupo (niveles 10 / 8 / 5, monstruo normal nv 9 = 46 XP): referencia 10 → mod 0.9; bono(3) 1.55 → pool 64.2;
 pesos 1.00 / 1.00 / 0.42 → **26.5 / 26.5 / 11.2 XP**. Sin piso: la brecha penaliza a propósito.
@@ -82,5 +87,6 @@ pesos 1.00 / 1.00 / 0.42 → **26.5 / 26.5 / 11.2 XP**. Sin piso: la brecha pena
 | Mago | parejo | burst del Mago vs. Escudo + Sanar; se decide por maná y por quién acierta primero el control |
 
 Opción si se quiere meterlo en la figura: convertir el triángulo en un ciclo de 4 (Mago > Guerrero > Pícaro > Sacerdote > Mago)
-dándole al Sacerdote un `silence` corto (Palabra de poder: Silencio, 3 s) que solo importa contra casters. Hoy no se hace: el
-Sacerdote es soporte y su ventaja en PvP debe venir de curar a un aliado, no de ganar 1 vs 1.
+dándole al Sacerdote un `silence` corto (Palabra de poder: Silencio, 3 s) que solo importa contra casters. Hoy no se hace: los
+duelos son siempre 1 vs 1 (pilar 7), así que en PvP el Sacerdote nunca tiene un aliado al que curar. Su identidad en duelo es
+el desgaste: gana al Guerrero, empata con el Mago y pierde con el Pícaro.

@@ -4,6 +4,17 @@ Todas las fórmulas viven en `PixelRealms.Game/Combat/CombatCalculator.cs` y `St
 valores exactos. **Toda constante viene de `content/rules.json`** (`rules.combat`, `rules.classScaling`, `rules.affinity`);
 aquí se citan los valores por defecto para poder leer las fórmulas. Cambio de fórmula ⇒ tests + esta página en el mismo commit.
 
+## Modelo de combate: híbrido (ADR-015)
+- **Un objetivo ⇒ tab-target:** ataque básico y hechizos con `targeting` `self`, `enemy` o `ally` (daño, cura, control,
+  `taunt`, `dash`). Requieren objetivo seleccionado; se esquivan solo con la tabla de impacto.
+- **Área ⇒ se apunta libremente:** `self_aoe_enemies` / `self_aoe_allies` (círculo alrededor del lanzador) y
+  `ground_aoe_enemies` / `ground_aoe_allies` / `ground_aoe_all` (círculo de `aoeRadius` en el punto `targetPos` que envía el
+  cliente, a ≤ `range` + `castRangeToleranceTiles` del lanzador y con LOS al punto). `ground_aoe_all` aplica los efectos
+  de cura a aliados y los de daño a enemigos (hechizo del Sacerdote). `target_aoe_enemies` desaparece (HU-086).
+- El punto se fija en `CastStarted` (todos ven la marca en el suelo) y el área se resuelve al terminar el casteo con los
+  objetivos que estén dentro en ese tick. Salir de la marca esquiva el golpe; los monstruos siguen la misma regla.
+- Sin fuego amigo. `maxTargets` elige los más cercanos al centro del área.
+
 ## Stats primarios
 `str` (fuerza), `agi` (agilidad), `int` (intelecto), `spi` (espíritu), `sta` (aguante).
 Fuentes: `baseStats` de clase + `statsPerLevel · (nivel − 1)` + equipo **× afinidad** + auras (`stat_mod`).
@@ -51,6 +62,11 @@ escuela  = weaponScaling[weapon.weaponType] ∈ {str, agi} → physical con atta
 raw      = weaponRoll(min..max) · afinidad + poder / basicAttackPowerDivisor(14) · (swingMs / 1000)
 ```
 Sin coste de recurso. Reanuda al volver al rango sin reiniciar el temporizador. No activa GCD.
+**El temporizador del básico no avanza mientras se castea** (se reanuda al terminar el casteo).
+**Maná por golpe:** todo personaje con maná, con cualquier arma, recupera al impactar
+`maná = maxMana · manaPerBasicHitPctPerSec (0.015) · (swingMs / 1000)`. Fallos y esquivas no dan maná. Normalizado por
+`swingMs`: un arma rápida no da más maná por segundo que una lenta. Referencia (Mago nv 4, ~240 de maná, bastón): Bola de
+fuego sin parar ⇒ sin maná en ~26 s; 2 hechizos por 1 básico ⇒ ~80 s; 1:1 ⇒ más de 6 min.
 Genera ira (Guerrero): `ragePerHitDealt` (6) al impactar, `ragePerHitTaken` (4) al recibir cualquier golpe.
 
 ## Daño físico (habilidades con `school: physical`)
@@ -86,6 +102,9 @@ Físico: `miss 5 %` (+1 % por nivel del objetivo sobre el atacante) → `dodge` 
 - Rango y LOS se validan al iniciar y al terminar (tolerancia `castRangeToleranceTiles` = 1 al terminar).
 - LOS: Bresenham sobre la grilla de colisión (tiles con `blocksSight`).
 - Efecto `dash` (Carga): el lanzador se coloca adyacente al objetivo en ≤ 3 ticks; requiere LOS y `distancia ≥ minRange`.
+- Hechizos de área `ground_*`: rango y LOS se validan contra `targetPos` al iniciar; el punto no se mueve durante el casteo
+  y al terminar se toman los objetivos dentro de `aoeRadius`.
+- Mientras se castea, el ataque básico se pausa (ver §Ataque básico).
 
 ## Auras (`content/auras.json`)
 Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `tickMs`, `maxStacks`, `base`, `apCoef`,
@@ -115,6 +134,8 @@ Los duelistas no generan aggro ni amenaza mientras dura el duelo.
 - Ira: `+ragePerHitDealt` por golpe/habilidad propia que impacta, `+ragePerHitTaken` por golpe recibido,
   `−rageDecayPerSecOutOfCombat` fuera de combate. Tope `resourceCap` (100). Empieza en 0.
 - Energía: `+energyPerSec` (10) siempre. Tope 100.
+- Maná: regeneración por `spi`/`int` (tabla de derivados) **más** maná por cada ataque básico que impacta
+  (`manaPerBasicHitPctPerSec`, ver §Ataque básico). Única otra fuente en combate: pociones (CD compartido de 60 s).
 - "En combate": hizo o recibió daño en los últimos `inCombatWindowSec` (6).
 
 ## Muerte y reaparición

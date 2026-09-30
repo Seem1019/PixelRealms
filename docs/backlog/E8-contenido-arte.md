@@ -41,25 +41,25 @@
 
 ### HU-083 · Mina Abandonada y jefe Capataz Grask
 **Como** grupo de nivel 4–6 **queremos** una cueva con jefe **para** tener el objetivo final del Tier 1 y botín raro.
-- Prioridad: Should · Estimación: L · Estado: Pendiente
-- Dependencias: HU-027, HU-036, HU-062, HU-080
+- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Dependencias: HU-027, HU-036, HU-062, HU-080, HU-086
 - Skills: `world-maps`, `combat-system`, `game-content`
 
 **Criterios de aceptación**
-1. **Dado** `maps/mine.tmj` (mapa aparte, ADR-007) **entonces** tiene 3–5 salas: entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds + puzle simple: palancas) → rama lateral con la sala del jefe, y Sala 3 (Gólem élite) → salida hacia el Tier 2 (cerrada en el MVP). Recorrido 5–10 min; paleta marrón del tileset interior.
-2. **Dado** el jefe **entonces** usa Golpe de pico (AoE alrededor de su objetivo) cada 10 s, Latigazo (sangrado) sobre alguien que no sea el tanque cada 8 s, y ¡A trabajar! (+25 % daño) bajo el 50 %; es inmune a aturdir, raíz y ralentizar.
-3. **Dado** 3 jugadores de nivel 4 con equipo verde **entonces** el combate dura 60–100 s y lo ganan con un sanador o con pociones; 2 jugadores de nivel 6, o uno de 7 con uno de 5, también lo ganan (`rules.boss`; verificado por `content-designer` y una partida de prueba).
+1. **Dado** `maps/mine.tmj` (mapa aparte, ADR-007) **entonces** tiene 3–5 salas: entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds + puzle simple: palancas) → rama lateral con la sala del jefe, y Sala 3 (Gólem élite) → salida hacia el Tier 2 (cerrada en la Fase 1). Recorrido 5–10 min; paleta marrón del tileset interior.
+2. **Dado** el jefe **entonces** usa Golpe de pico (área marcada en el suelo sobre la posición de su objetivo, esquivable; HU-086) cada 10 s, Latigazo (sangrado) sobre alguien que no sea el tanque cada 8 s, y ¡A trabajar! (+25 % daño) bajo el 50 %; es inmune a aturdir, raíz y ralentizar.
+3. **Dado** 3 jugadores de nivel 4 con equipo verde **entonces** el combate dura 60–100 s y lo ganan con un sanador o con pociones; 2 jugadores de nivel 6 también lo ganan (el caso de un nivel 7 con uno de 5 se valida al abrir la Fase 2, porque el tope de la Fase 1 es 6) (`rules.boss`; verificado por `content-designer` y una partida de prueba).
 4. **Dado** su muerte **entonces** suelta exactamente un raro de su `groups` (Pico, Peto o Amuleto), asignado al azar a un miembro, y se anuncia en el chat global con el nombre del ganador.
 
 ---
 
 ### HU-084 · Pasada de balance
 **Como** diseñador **quiero** revisar números con datos **para** que ninguna clase sea inútil o rota.
-- Prioridad: Should · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Pendiente
 - Dependencias: HU-041, HU-052, HU-062
 - Skills: `game-content`, `combat-system`
 
 **Criterios de aceptación**
-1. **Dado** el subagente `content-designer` **entonces** produce `docs/design/balance-report.md` con las tablas de su definición, incluida la de afinidad (piso de viabilidad 55–65 % daño / 50–60 % aguante) y el triángulo PvP (duelos simulados 1 vs 1 con equipo igual: la clase favorecida gana 60–70 %).
+1. **Dado** el subagente `content-designer` **entonces** produce `docs/design/balance-report.md` con las tablas de su definición, incluida la de afinidad (piso de viabilidad 55–65 % daño / 50–60 % aguante) el triángulo PvP (duelos simulados 1 vs 1 con equipo igual: la clase favorecida gana 60–75 %), la XP por hora en solitario de cada clase contando descansos (diferencia ≤ 15 %), si el Mago y el Sacerdote llegan con maná al final del jefe, y las horas estimadas del 1 al 15 (objetivo 20–30 h). Todos los márgenes salen de `rules.balanceTargets`.
 2. **Dado** el informe **entonces** las desviaciones fuera de rango se corrigen en `content/` con commit `content(balance): ...` justificado.
-3. **Dado** una sesión de juego con amigos **entonces** se recogen sensaciones en `docs/design/playtest-notes.md` y se crean HUs para lo que requiera código.
+3. **Dado** una sesión de juego con amigos **entonces** se cronometra, para un jugador nuevo, el tiempo desde abrir el enlace hasta la primera pelea en grupo con un amigo (objetivo ≤ 5 min), se recogen sensaciones en `docs/design/playtest-notes.md` y se crean HUs para lo que requiera código.

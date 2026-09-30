@@ -46,11 +46,14 @@ Mañana jugamos 4 personas. Prepara:
 2. 4 cuentas de prueba o instrucciones de registro para ellos.
 3. Un mensaje corto para enviarles (link web, controles básicos, cómo formar grupo).
 4. Qué métricas mirar durante la sesión y dónde.
+5. Cómo cronometrar a un jugador nuevo desde que abre el enlace hasta su primera pelea en grupo (objetivo ≤ 5 min, pilar 1).
 ```
 
 ## Convertir feedback en HUs
 ```
 Estas son las notas del playtest: <pega notas>.
+Contrasta cada petición de diseño con los pilares de docs/design/gdd.md y marca como candidata a descartar la que no
+sirva a ninguno (dime por qué).
 Agrúpalas por tema, separa bugs de peticiones de diseño, y crea las HUs correspondientes en docs/backlog/
 con la plantilla (criterios Dado/Cuando/Entonces), prioridad y estimación. Actualiza el índice de README.md.
 ```

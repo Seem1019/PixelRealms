@@ -49,7 +49,7 @@
 
 ### HU-063 · Lista de jugadores en línea
 **Como** jugador **quiero** ver quién está conectado **para** saber si mis amigos están jugando.
-- Prioridad: Could · Estimación: S · Estado: Pendiente
+- Prioridad: Should · Estimación: S · Estado: Pendiente
 - Dependencias: HU-060
 - Skills: `net-protocol`, `godot-client`
 

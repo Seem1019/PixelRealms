@@ -4,7 +4,9 @@
 
   "progression": {
     "maxLevel": 15,
+    "levelCapByPhase": [6, 10, 15],
     "xpCurveK": 200,
+    "xpCurveKByLevel": { "1": 100, "2": 150 },
     "xpCurveExponent": 1.6,
     "monsterXpPerLevel": 5,
     "monsterXpBase": 1,
@@ -12,7 +14,9 @@
     "levelDiffGreyAt": -5,
     "levelDiffModPerLevel": 0.1,
     "levelDiffClamp": 4,
-    "spellUnlockLevels": [1, 1, 3, 6, 10]
+    "spellUnlockLevels": [1, 1, 3, 6, 10],
+    "classChange": { "npcUntilPhase": 2 },
+    "altCatchUp": { "fromPhase": 3, "xpMultiplier": 2.0 }
   },
 
   "group": {
@@ -55,6 +59,7 @@
     "manaRegenPerSpiPer5s": 1.0,
     "manaRegenPerIntPer5s": 0.1,
     "manaRegenCastingPenalty": 0.3,
+    "manaPerBasicHitPctPerSec": 0.015,
     "ragePerHitDealt": 6,
     "ragePerHitTaken": 4,
     "rageDecayPerSecOutOfCombat": 2,
@@ -125,6 +130,22 @@
     "silverPerGold": 100
   },
 
+  "loadout": {
+    "maxSpellsPerClass": 8,
+    "spellSlots": 4,
+    "usableSlots": 4
+  },
+
+  "balanceTargets": {
+    "_doc": "Objetivos de diseño provisionales (pilares del GDD). No afectan a la simulación: los verifican HU-084 y el subagente content-designer.",
+    "offRoleDamagePct": [0.55, 0.65],
+    "offRoleSurvivalPct": [0.50, 0.60],
+    "soloXpPerHourSpreadPct": 0.15,
+    "duelFavoriteWinRate": [0.60, 0.75],
+    "hoursToMaxLevel": [20, 30],
+    "firstGroupFightMinutes": 5
+  },
+
   "boss": {
     "_doc": "Objetivo de diseño de cada jefe de nivel B: 3 jugadores de nivel B-2 con equipo de su nivel lo matan en targetDurationSec; 2 de nivel B también; 1 de nivel B+1 con 1 de nivel B-1 igual.",
     "referencePartySize": 3,
@@ -141,7 +162,7 @@
 
   "world": {
     "startMapId": "meadow",
-    "mvpTier": 1,
+    "currentPhase": 1,
     "zoneCrossTimeSecTarget": [60, 90]
   }
 }

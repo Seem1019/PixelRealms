@@ -5,35 +5,59 @@
 > este documento y `rules.json` difieren, manda `rules.json` y hay que corregir este documento.
 
 ## Pilares
-1. **Jugar con amigos en 5 minutos:** entrar por navegador, crear personaje, formar grupo, pelear.
-2. **Roles claros, equipo libre:** tanque (Guerrero), daño físico (Pícaro), daño mágico (Mago), sanador (Sacerdote).
-   Cualquier clase puede llevar cualquier equipo; el equipo de su rol rinde claramente mejor (afinidad).
-3. **Botín que se siente:** rarezas por color, equipo que cambia números visibles, cada item cae para alguien concreto.
-4. **Pequeño pero pulido:** el MVP es el Tier 1 completo (Aldea, Campos, Colinas, Mina Abandonada y su jefe).
-5. **PvP amistoso:** duelos por consentimiento mutuo, sin penalizaciones, con un triángulo de ventajas entre clases.
-   La arquitectura permite crecer a PvP grupal y abierto sin reescribir (`rules.pvp.rulesets`).
+1. **Juntos en 5 minutos:** PixelRealms es para un grupo cerrado de ~20 amigos. Un jugador nuevo pasa de abrir el
+   enlace en el navegador a pelear en grupo con un amigo en ≤ 5 minutos. Con amigos de hasta 2 niveles de diferencia,
+   jugar en grupo rinde al menos lo mismo que jugar solo.
+2. **La subida de 1 a 15 es el juego:** no hay endgame: el contenido es subir de nivel, y tiene que disfrutarse y durar
+   (objetivo: 20–30 horas de juego del 1 al 15 con una clase). Los primeros niveles llegan rápido, cada 2–3 niveles algo mejora de forma visible (un rango de hechizo, una zona o
+   un jefe) y empezar otra clase nunca es tedioso.
+3. **Pocas piezas, mucho juego:** cada sistema usa las mínimas reglas que lo hacen divertido. Cada clase tiene como
+   máximo 8 hechizos, lleva 4 equipados a la vez y los mejora por rangos al subir de nivel; la variedad sale de combinar
+   hechizos y mejoras (builds), no de sumar mecánicas. Está lo básico de un MMO (daño en área, control, críticos, daño y
+   curación en el tiempo, escudos) y no hay elementos, combinaciones elementales ni estados que interactúan entre sí.
+4. **Cualquier clase es igual de buena elección:** cada clase tiene un rol de grupo único (tanque: Guerrero · daño
+   físico: Pícaro · daño mágico: Mago · sanador: Sacerdote) y su propia forma de subir en solitario. Con cualquier clase
+   se sube del 1 al 15 a un ritmo parecido (medido en XP por hora contando descansos, no en tiempo por kill) y en grupo
+   cada rol se nota. Cualquier clase equipa cualquier item, pero fuera de rol rinde menos que el especialista. Ningún
+   contenido exige una composición concreta. *Márgenes provisionales, a fijar en HU-084: fuera de rol 55–65 % del
+   especialista; XP/hora entre clases ±15 %.*
+5. **Botín sin discusiones:** cada item que cae tiene dueño desde el primer momento (lo asigna el servidor, al azar
+   dentro del grupo) y todo lo que aporta se ve como números en su tooltip, comparado con lo que llevas puesto. Entre
+   amigos nunca hay que negociar un reparto; si el item no te sirve, lo intercambias.
+6. **Pequeño y terminado, por fases:** el MVP completo son 3 tiers y 15 niveles, sin endgame, construido en 3 fases (una
+   por tier). Cada fase termina jugable y probada con amigos antes de empezar la siguiente; la Fase 1 (Tier 1: Aldea,
+   Campos, Colinas, Mina Abandonada y Capataz Grask; niveles 1–6) es lo primero que se juega. Una feature entra en una
+   fase solo si se usa en ella y sirve a otro pilar; lo que solo prepara fases futuras o el post-MVP no se detalla ni se
+   generaliza antes de tiempo. "Terminada" = cada acción del jugador tiene respuesta visible y no hay bugs conocidos que
+   corten una sesión.
+7. **Duelos entre amigos, sin consecuencias:** el PvP es siempre un duelo 1 vs 1 aceptado por ambos, sin pérdidas de
+   ningún tipo y posible en cualquier sitio. Cada clase tiene rivales favorables y desfavorables reconocibles (Mago >
+   Guerrero > Pícaro > Mago; el Sacerdote gana por desgaste y pierde contra el control), pero ninguna gana siempre: con
+   nivel y equipo iguales, el favorito gana entre el 60 % y el 75 % de los duelos (objetivo provisional, HU-084).
 
 ## Bucle principal
-Explorar → matar monstruos → botín/XP → subir nivel (nuevo hechizo) → mejor equipo → zona más difícil → cueva de
+Explorar → matar monstruos → botín/XP → subir nivel (hechizo nuevo o rango) → mejor equipo → zona más difícil → cueva de
 transición con jefe (en grupo) → siguiente tier. Entre medias: duelos con amigos e intercambio de items.
 
 ## Mundo
 Nivel máximo **15** (`rules.progression.maxLevel`), tres tiers, dos cuevas de transición y una fortaleza final.
+**El MVP completo son los tres tiers** y se construye en tres fases, una por tier: cada fase se juega y se prueba antes
+de empezar la siguiente. Tope de nivel por fase: 6 / 10 / 15 (`rules.progression.levelCapByPhase`, fase activa en `rules.world.currentPhase`).
 Biomas distintos por tier ⇒ **un tileset por tier**, no por zona. Todas las cuevas comparten el tileset "interior"
 cambiando la paleta (mina marrón, cripta verde, fortaleza gris).
 
 ```
-TIER 1 · Pradera (nv 1-5)                        ← MVP
+TIER 1 · Pradera (nv 1-5)                        ← Fase 1
    [Aldea Robledal · hub] ── [Campos 1-3] ── [Colinas 3-5]
                                                  │
                                     ⟨Mina Abandonada⟩  jefe: Capataz Grask nv 6
                                                  │ salida
-TIER 2 · Bosque (nv 6-10)                        ▼   ← diseñado, backlog
+TIER 2 · Bosque (nv 6-10)                        ▼   ← Fase 2 (diseñado)
    [Linde del Bosque 6-8] ── [Pantano 8-10]
           │ atajo: puente roto (se baja desde el Bosque)
           └────► Colinas                    ⟨Cripta de Raíces⟩  jefe: Árbol Podrido nv 11
                                                  │ salida
-TIER 3 · Montaña (nv 11-15)                      ▼   ← diseñado, backlog
+TIER 3 · Montaña (nv 11-15)                      ▼   ← Fase 3 (diseñado)
    [Paso Nevado 11-13] ── [Ruinas 13-15]
           │ atajo: teleférico (se activa desde la Montaña)
           └────► Aldea                      ⟨Fortaleza⟩  jefe final nv 15 (sin salida)
@@ -62,7 +86,7 @@ TIER 3 · Montaña (nv 11-15)                      ▼   ← diseñado, backlog
   ```
 - Dentro de la cueva **no hay más cambios de mapa**: las salas se delimitan con monstruos, puertas y puzles.
 
-### Tier 1 (MVP) en detalle
+### Tier 1 (Fase 1) en detalle
 | Zona | Mapa | Niveles | Monstruos |
 |---|---|---|---|
 | Aldea Robledal (hub, `safe`) | `meadow` | — | Marta la tendera, cementerio, duelos permitidos |
@@ -78,8 +102,38 @@ TIER 3 · Montaña (nv 11-15)                      ▼   ← diseñado, backlog
 | Mago | Maná | Daño mágico a distancia, control | Bastón, Varita · Tela | Mantiene la distancia (Escarcha, Nova) |
 | Sacerdote | Maná | Curación, escudos | Maza, Bastón, Varita · Tela, Malla | Desgaste (curas + Castigo) |
 
-Cada clase tiene **5 hechizos** que se desbloquean en los niveles `1, 1, 3, 6, 10` (`rules.progression.spellUnlockLevels`).
-El detalle de cada uno está en `content/spells.json`. Con el tope en 15 hay espacio para más hechizos después.
+### Modelo de combate: híbrido (ADR-015)
+Mezcla de tab-target y combate de acción, al estilo de Albion Online:
+- **Un objetivo = tab-target.** Ataque básico, hechizos de daño o cura a un objetivo, control a un objetivo, Provocar y
+  Carga: se selecciona el objetivo (clic o Tab) y el servidor resuelve el impacto. No se esquivan moviéndose; solo con la
+  tabla de impacto (fallo, esquiva).
+- **Áreas = se apuntan libremente.** Un hechizo de área se lanza sobre el punto del suelo que marca el cursor, dentro de
+  su alcance (`ground`), o alrededor del lanzador (`self`), sin necesidad de objetivo seleccionado. En la Fase 1 solo hay
+  círculos; conos y líneas son una ampliación posible si un kit las necesita.
+- **Las áreas se ven y se esquivan.** El punto se fija al empezar el casteo, todos ven la marca en el suelo durante el
+  casteo y el área se resuelve al terminar, con quien esté dentro en ese momento. Salir de la marca esquiva el golpe.
+  Vale igual para monstruos: el Golpe de pico del Capataz es un área marcada. Por eso las áreas apuntadas de daño deben
+  tener casteo o retardo visible (regla para el rediseño de kits).
+- Sin fuego amigo: las áreas enemigas no dañan a aliados. El servidor valida el punto (alcance + `castRangeToleranceTiles`,
+  línea de visión al punto); el cliente solo envía la intención (`CastSpell{targetPos}`).
+
+### Hechizos, rangos y builds
+- Cada clase tiene **como máximo 8 hechizos** y lleva **4 equipados** a la vez. La barra tiene además **4 casillas de
+  utilizables** (poción de vida y otros consumibles). Teclas: **1–4** hechizos, **5–8** utilizables
+  (`rules.loadout`).
+- Los hechizos **mejoran por rangos** al subir de nivel, en lugar de aprender uno nuevo cada pocos niveles.
+  **Fase 1:** los rangos suben solos. **Fase 2:** al subir un rango se elige **1 de 2 mejoras**; las builds salen de qué
+  4 hechizos llevas equipados y qué mejoras eliges. Antes de cerrar el MVP (Fase 2 o 3) debe existir una forma de
+  **reiniciar las mejoras**.
+- Punto de partida (Fase 1): el kit actual de **5 hechizos** por clase, desbloqueados en los niveles `1, 1, 3, 6, 10`
+  (`rules.progression.spellUnlockLevels`), con el detalle en `content/spells.json`. Los rangos, los hechizos que faltan
+  hasta 8, las áreas del combate híbrido y cuándo se pueden cambiar los hechizos equipados están **por diseñar**
+  (rediseño de kits, pendiente antes de implementar los rangos).
+- **Daño en área:** hoy solo lo tiene el Mago (Nova de escarcha nv 3, Estallido de llamas nv 10); el Guerrero y el
+  Pícaro no tienen. Pendiente del rediseño de kits.
+- **Nuevo hechizo del Sacerdote** (reemplaza a Rezo de sanación): área pequeña que se apunta libremente y cura a los
+  aliados y daña a los enemigos, con un daño mucho menor que la curación. Se desbloquea dentro de la Fase 1 (nivel ≤ 6).
+  Necesita un targeting nuevo (`ground_aoe_all`: el efecto depende de si el objetivo es aliado o enemigo).
 
 ### Ataque básico (todas las clases)
 - Toda arma tiene un ataque básico que **no consume recurso**. Su único límite es la velocidad de ataque:
@@ -87,6 +141,12 @@ El detalle de cada uno está en `content/spells.json`. Con el tope en 15 hay esp
 - El stat de escalado del arma (`items[].scaling`) decide la escuela: espada/hacha/maza (`str`) y daga (`agi`) hacen
   daño **físico** con `attackPower`; bastón y varita (`int`) hacen daño **mágico** con `spellPower` a 6 tiles.
 - Un Sacerdote o un Mago puede farmear solo con varita sin gastar maná; también puede usar espada, con menor rendimiento.
+- **Maná por golpe:** todo personaje con maná recupera maná con cada ataque básico que impacta, sea cual sea el arma:
+  `maná = maxMana · manaPerBasicHitPctPerSec · (swingMs / 1000)`, valor base **1,5 %** (`rules.combat.manaPerBasicHitPctPerSec = 0.015`).
+  Se normaliza por `swingMs` para que un arma rápida no dé más maná por segundo que una lenta. Fallos y esquivas no dan
+  maná, y el temporizador del ataque básico no avanza mientras se castea (si no, castear sin parar también recuperaría
+  maná). Referencia (Mago nv 4, ~240 de maná, bastón): lanzando Bola de fuego sin parar se queda sin maná en ~26 s;
+  alternando 2 hechizos por 1 básico aguanta ~80 s (un combate de jefe); alternando 1:1 aguanta más de 6 minutos.
 
 ### Equipamiento libre con afinidad
 - **Cualquier clase equipa cualquier item.** No existen errores `wrong_class` ni `cannot_equip` por tipo; solo `level_too_low`.
@@ -97,11 +157,13 @@ El detalle de cada uno está en `content/spells.json`. Con el tope en 15 hay esp
   saca `attackPower` sobre todo de `int` (×1.4) y poco de `str` (×0.6); un Pícaro al revés. Por eso un Mago con espada
   pega, pero menos que un Pícaro con la misma espada, y un Pícaro con placas aguanta, pero menos que un Guerrero.
 - `classes[].recommendedWeapons/recommendedArmor` son solo informativos: el tooltip muestra "Afinidad: alta/media/baja".
-- **Piso de viabilidad:** fuera de rol se rinde entre el 55 % y el 65 % del especialista en daño con básicos, y entre el
-  50 % y el 60 % en aguante. Cualquier clase con cualquier equipo completa el contenido en solitario (ver `combat.md` §Afinidad).
+- **Piso de viabilidad** (márgenes provisionales, se fijan en HU-084)**:** fuera de rol se rinde entre el 55 % y el
+  65 % del especialista en daño con básicos, y entre el 50 % y el 60 % en aguante.
+  Cualquier clase con cualquier equipo completa el contenido en solitario (ver `combat.md` §Afinidad).
 
 ### Triángulo de ventajas (PvP 1 vs 1, nivel y equipo equivalentes)
 **Mago > Guerrero > Pícaro > Mago.** Significativa, no absoluta: la habilidad y el equipo pueden revertirla.
+Objetivo provisional (HU-084): con nivel y equipo iguales, el favorito gana entre el 60 % y el 75 % de los duelos.
 - *Mago > Guerrero:* Escarcha (ralentiza) y Nova (raíz) mantienen al Guerrero lejos; Carga tiene 15 s de CD frente a
   Nova 20 s, así que el Guerrero llega una vez y luego vuelve a quedarse atrás.
 - *Guerrero > Pícaro:* más vida, armadura y Bloqueo; el Pícaro no puede alejarse sin dejar de pegar, y su Gubia se
@@ -114,8 +176,13 @@ El detalle de cada uno está en `content/spells.json`. Con el tope en 15 hay esp
 
 ## Progresión
 Todas las constantes en `rules.progression` y `rules.group`.
-- **XP para subir** de `L` a `L+1`: `round(K · L^1.6)` con `K = 200`, `L = 1..14`.
-  200, 606, 1 160, 1 838, 2 627, 3 516, 4 500, 5 572, 6 727, 7 962, 9 274, 10 659, 12 115, 13 641 (total 80 397 ≈ 1 700 kills).
+- **XP para subir** de `L` a `L+1`: `round(K_L · L^1.6)`, `L = 1..14`, con `K_1 = 100`, `K_2 = 150` y `K = 200` desde el
+  nivel 3 (arranque más rápido).
+  100, 455, 1 160, 1 838, 2 627, 3 516, 4 500, 5 572, 6 727, 7 962, 9 274, 10 659, 12 115, 13 641 (total 80 146 ≈ 1 710 kills;
+  subir a nivel 2 son ~17 slimes y el primer hechizo nuevo, en nivel 3, llega tras ~58 kills).
+- **Duración objetivo:** 20–30 h del 1 al 15 con una clase (`rules.balanceTargets.hoursToMaxLevel`). Con la guía de balance
+  actual (8–15 s por kill con rotación), ~1 710 kills son unas 4–7 h de combate puro; el resto lo ponen viajes, descansos,
+  cuevas y grupo. Si al medirlo en HU-084 no alcanza, se ajusta la curva.
 - **XP por monstruo** (ya no se escribe en `monsters.json`, se calcula): `round((5 · nivel + 1) · tipo)` con
   `tipo`: normal 1.0 · hard (a distancia / con mecánica) 1.2 · élite 3 · jefe 10.
 - **Modificador por diferencia de nivel:** `diff = nivelMonstruo − nivelReferencia`; si `diff ≤ −5` → 0 XP (gris);
@@ -131,12 +198,20 @@ Todas las constantes en `rules.progression` y `rules.group`.
   ```
   Ejemplo: niveles 10/8/5 matan un monstruo normal de nivel 9 (46 XP): mod 0.9, bono 1.55, pesos 1/1/0.42 → 26.5 / 26.5 / 11.2.
   No hay piso: la penalización por brecha es intencional para evitar el *carry*.
-- Al subir de nivel: stats `+statsPerLevel`, vida y recurso llenos, hechizos nuevos según `levelReq`.
+- Al subir de nivel: stats `+statsPerLevel`, vida y recurso llenos, hechizos nuevos o rangos según `levelReq`.
+
+## Cambio de clase
+Cambiar de clase nunca debe ser tedioso.
+- **Fases 1 y 2:** un NPC en la Aldea cambia la clase del personaje conservando nivel, items y oro (con equipo libre, el
+  equipo sigue sirviendo, con la afinidad de la nueva clase).
+- **Fase 3:** se retira el NPC. Para probar otra clase se crea un personaje nuevo, que gana **XP ×2** mientras esté por
+  debajo del nivel más alto de la cuenta; la cuenta tiene un **almacén compartido** entre sus personajes para pasarle equipo.
 
 ## Jefes
 - Objetivo de diseño de un jefe de nivel **B** (`rules.boss`): **3 jugadores de nivel B−2** con equipo de su nivel lo
   matan en **60–100 s**; **2 jugadores de nivel B** también; **1 de nivel B+1 con 1 de nivel B−1** también, más fácil.
-  Nadie lo mata solo a nivel equivalente (`soloKillable: false`).
+  Nadie lo mata solo a nivel equivalente (`soloKillable: false`). En la Fase 1 (tope 6) el caso B+1 con B−1 del Capataz no
+  existe: se valida al abrir la Fase 2.
 - Los jefes son inmunes a aturdir, raíz y ralentizar (`rules.combat.bossImmuneToAuraKinds`).
 - Todo el contenido que no es jefe o minijefe (`type: boss|elite`) lo completa cualquier clase en solitario.
 
@@ -149,6 +224,7 @@ Todas las constantes en `rules.progression` y `rules.group`.
 - El cadáver **brilla solo para quien ganó algo**; todos pueden abrirlo y ver qué cayó, pero solo el dueño de cada item
   puede tomarlo. Tras 30 s (`exclusiveSec`) lo no reclamado queda libre; el cadáver dura 60 s.
 - El oro se reparte a partes iguales (`goldSplit`). Items `uncommon+` se anuncian en el chat de grupo.
+- **Rareza por color** en el nombre, el tooltip y la ventana de botín: junk gris, common blanco, uncommon verde, rare azul, epic morado.
 - **Intercambio entre jugadores** (ventana de trade con doble confirmación) forma parte del MVP.
 
 ## Economía
@@ -165,8 +241,8 @@ Todas las constantes en `rules.progression` y `rules.group`.
 - Termina cuando un participante baja al 1 % de vida (`endAtHpPct`), se aleja más de 30 tiles, se desconecta o se rinde
   (`/rendirse`). Al terminar ambos recuperan vida y recurso completos. Sin pérdida de XP, oro, items ni durabilidad.
 - Permitido en la aldea y en cualquier zona. Los monstruos ignoran a los duelistas y viceversa (no se puede usar un mob de escudo).
-- Arquitectura: un `PvpRuleset` (`rules.pvp.rulesets`) define quién puede atacar a quién, cómo termina y qué se pierde.
-  El MVP solo activa `duel`; PvP grupal y abierto son rulesets nuevos, no código nuevo.
+- Nota técnica (ADR-011): un `PvpRuleset` (`rules.pvp.rulesets`) define quién puede atacar a quién, cómo termina y qué
+  se pierde. El MVP solo activa `duel`; PvP grupal y abierto son post-MVP.
 
 ## Social
 - Chat: `say` (radio 20 tiles), `global`, `party`, susurro `/w Nombre`.
@@ -177,5 +253,5 @@ Toda variable numérica está en `content/rules.json`, validada por `content/sch
 `RulesDb` inmutable. El admin puede recargarla en caliente con `/reload rules`. Nada de esto se hardcodea.
 
 ## Fuera del MVP (backlog "después")
-Tiers 2 y 3 (mapas, monstruos, dos jefes), instancias por grupo, PvP grupal y abierto, oficios, gremios, subasta,
-monturas, talentos, misiones, más hechizos por clase, sonido espacial.
+Instancias por grupo, PvP grupal y abierto, oficios, gremios, subasta, monturas, árboles de talentos (las builds salen
+de los hechizos equipados y sus mejoras), misiones, más de 8 hechizos por clase, sonido espacial.

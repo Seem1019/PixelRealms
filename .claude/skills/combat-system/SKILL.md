@@ -1,6 +1,6 @@
 ---
 name: combat-system
-description: Implementación del combate tab-target en el servidor — pipeline de casteo, resolución de efectos, fórmulas de daño/curación, auras, amenaza, IA de monstruos, muerte y respawn — y su reflejo en el cliente (cast bar, textos flotantes, auras). Úsala al tocar cualquier cosa de combate.
+description: Implementación del combate híbrido (tab-target para un objetivo, áreas apuntadas; ADR-015) en el servidor — pipeline de casteo, resolución de efectos, fórmulas de daño/curación, auras, amenaza, IA de monstruos, muerte y respawn — y su reflejo en el cliente (cast bar, textos flotantes, auras). Úsala al tocar cualquier cosa de combate.
 ---
 
 # Sistema de combate
@@ -19,7 +19,7 @@ está construido y cómo extenderlo sin romperlo.
 | `EffectResolver` | aplica `EffectDef[]` sobre la lista de objetivos resuelta por `TargetResolver` |
 | `AuraSystem` | aplicar/refrescar/stack, ticks, expiración, `shield` absorbe, `stat_mod` invalida stats |
 | `ThreatTable` | por monstruo: `Add(actor, amount)`, `Top()`, reglas 110 %/130 %, `taunt` |
-| `AutoAttackSystem` | swing timer `weapon.speedMs / haste` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango; escuela y poder según `weapon.scaling` (str/agi → físico melee 1.5; int → mágico 6 tiles con proyectil). Sin coste de recurso |
+| `AutoAttackSystem` | swing timer `weapon.speedMs / haste` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango; escuela y poder según `weapon.scaling` (str/agi → físico melee 1.5; int → mágico 6 tiles con proyectil). Sin coste de recurso; al impactar devuelve maná a quien lo tenga (`maxMana · rules.combat.manaPerBasicHitPctPerSec · swingMs/1000`, cualquier arma). El swing se pausa mientras el actor castea |
 | `DeathSystem` | hp ≤ 0 → `Dead`, limpia auras, crea `LootBag`, XP, evento `Died`; jugadores: espera `Respawn` |
 
 ## Pipeline de un hechizo
@@ -27,6 +27,7 @@ está construido y cómo extenderlo sin romperlo.
 CastSpell(msg) ─► CastSystem.TryBeginCast
    ├─ validar: conoce, levelReq, !dead, !stunned, !silenced(si no físico), !casting, CD, GCD,
    │           recurso ≥ coste, objetivo válido para targeting (jugador enemigo solo si PvpService.CanAttack), rango, LOS
+   │           `ground_*`: targetPos obligatorio, rango y LOS al punto; el punto queda fijo en CastState (ADR-015)
    ├─ castMs == 0 ─► Resolve inmediato
    └─ castMs > 0  ─► CastState{spell, target, endsAtMs} + evento CastStarted; GCD arranca YA
 tick: si now ≥ endsAtMs ─► revalidar (rango +1 tile, LOS, objetivo vivo, recurso) ─► Resolve
@@ -63,6 +64,8 @@ Máquina de estados: `Idle → Aggro → Chase → Attack → Evade`. Detalles e
 - Hotbar: al enviar `CastSpell`, muestra GCD **predicho** (1 s) de inmediato; `Cooldown` del servidor lo corrige; un
   `Error{on_cooldown|...}` lo revierte.
 - Auras: íconos sobre el marco de unidad con barrido de duración.
+- Áreas apuntadas: al pulsar la tecla se muestra el círculo de `aoeRadius` bajo el cursor y el clic envía `targetPos`;
+  `CastStarted{targetPos, radius}` dibuja la marca en el suelo para todos hasta que el casteo termina.
 
 ## Tests mínimos por cambio de combate
 - Fórmula: valores exactos con `FixedRng`, para las 4 clases y al menos una combinación fuera de rol (Mago + espada + placas).

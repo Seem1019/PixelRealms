@@ -5,17 +5,19 @@
   "description": "Única fuente de constantes numéricas. El servidor las carga en RulesDb (inmutable) y el cliente las lee para predicción/UI. Cambiar un valor aquí no requiere código.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "boss", "movement", "world"],
+  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "loadout", "balanceTargets", "boss", "movement", "world"],
   "properties": {
     "$schema": { "type": "string" },
     "_doc": { "type": "string" },
 
     "progression": {
       "type": "object", "additionalProperties": false,
-      "required": ["maxLevel", "xpCurveK", "xpCurveExponent", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels"],
+      "required": ["maxLevel", "levelCapByPhase", "xpCurveK", "xpCurveExponent", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "classChange", "altCatchUp"],
       "properties": {
-        "maxLevel": { "type": "integer", "minimum": 2, "maximum": 60, "description": "Nivel máximo. xpParaSubir se define para L = 1..maxLevel-1." },
-        "xpCurveK": { "type": "number", "minimum": 1, "description": "K en xpParaSubir(L) = round(K · L^exp). 100≈5 h, 200≈10 h a nivel 10." },
+        "maxLevel": { "type": "integer", "minimum": 2, "maximum": 60, "description": "Nivel máximo absoluto del MVP. xpParaSubir se define para L = 1..maxLevel-1." },
+        "levelCapByPhase": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Tope de nivel efectivo por fase del MVP (índice = fase − 1). El tope activo es levelCapByPhase[world.currentPhase − 1]; el último valor debe ser igual a maxLevel." },
+        "xpCurveK": { "type": "number", "minimum": 1, "description": "K por defecto en xpParaSubir(L) = round(K_L · L^exp)." },
+        "xpCurveKByLevel": { "type": "object", "additionalProperties": { "type": "number", "minimum": 1 }, "propertyNames": { "pattern": "^[0-9]+$" }, "description": "K_L para niveles concretos (clave = L); los niveles no listados usan xpCurveK. Hace el arranque más rápido (L1 = 100, L2 = 150)." },
         "xpCurveExponent": { "type": "number", "minimum": 1, "maximum": 3, "description": "Exponente de la curva de XP." },
         "monsterXpPerLevel": { "type": "number", "description": "xpMonstruo = round((monsterXpPerLevel · nivel + monsterXpBase) · tipo)." },
         "monsterXpBase": { "type": "number" },
@@ -27,7 +29,13 @@
         "levelDiffGreyAt": { "type": "integer", "maximum": 0, "description": "Si nivelMonstruo − nivelReferencia ≤ este valor, 0 XP (gris)." },
         "levelDiffModPerLevel": { "type": "number", "description": "mod = 1 + este valor · clamp(diff, −clamp, +clamp)." },
         "levelDiffClamp": { "type": "integer", "minimum": 0 },
-        "spellUnlockLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Niveles en que cada clase desbloquea su hechizo n.º i (ordenados). Informativo: el valor real es spells[].levelReq." }
+        "spellUnlockLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Niveles en que cada clase desbloquea su hechizo n.º i (ordenados). Informativo: el valor real es spells[].levelReq." },
+        "classChange": { "type": "object", "additionalProperties": false, "required": ["npcUntilPhase"],
+          "properties": { "npcUntilPhase": { "type": "integer", "minimum": 0, "description": "Última fase en la que el NPC de la Aldea cambia la clase conservando nivel, items y oro (0 = nunca)." } } },
+        "altCatchUp": { "type": "object", "additionalProperties": false, "required": ["fromPhase", "xpMultiplier"],
+          "properties": {
+            "fromPhase": { "type": "integer", "minimum": 1, "description": "Fase desde la que un personaje por debajo del nivel más alto de su cuenta gana XP extra." },
+            "xpMultiplier": { "type": "number", "minimum": 1, "description": "Multiplicador de XP mientras el personaje esté por debajo del nivel más alto de la cuenta." } } }
       }
     },
 
@@ -49,7 +57,7 @@
 
     "combat": {
       "type": "object", "additionalProperties": false,
-      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds"],
+      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaPerBasicHitPctPerSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds"],
       "properties": {
         "gcdMs": { "type": "integer", "minimum": 0, "description": "Cooldown global tras cualquier hechizo con triggersGcd." },
         "critMultiplier": { "type": "number", "minimum": 1 },
@@ -66,6 +74,7 @@
         "inCombatWindowSec": { "type": "number" },
         "hpRegenDelaySec": { "type": "number" }, "hpRegenPerSpi": { "type": "number" }, "hpRegenPerSta": { "type": "number" },
         "manaRegenPerSpiPer5s": { "type": "number" }, "manaRegenPerIntPer5s": { "type": "number" }, "manaRegenCastingPenalty": { "type": "number", "description": "Multiplicador de regen durante 5 s tras gastar maná." },
+        "manaPerBasicHitPctPerSec": { "type": "number", "minimum": 0, "description": "Maná por ataque básico que impacta, para cualquier personaje con maná y cualquier arma: maxMana · este valor · (swingMs / 1000). Normalizado por swingMs para que la velocidad del arma no cambie el maná por segundo. Fallos y esquivas no dan maná; el swing no avanza mientras se castea." },
         "ragePerHitDealt": { "type": "number", "description": "Ira ganada por cada golpe/habilidad propia que impacta (plano, no depende del daño)." },
         "ragePerHitTaken": { "type": "number" }, "rageDecayPerSecOutOfCombat": { "type": "number" },
         "energyPerSec": { "type": "number" }, "resourceCap": { "type": "number", "description": "Tope de ira y energía." },
@@ -135,6 +144,30 @@
       "properties": { "vendorBuyMultiplier": { "type": "number" }, "vendorRangeTiles": { "type": "number" }, "copperPerSilver": { "type": "integer" }, "silverPerGold": { "type": "integer" } }
     },
 
+    "loadout": {
+      "type": "object", "additionalProperties": false, "required": ["maxSpellsPerClass", "spellSlots", "usableSlots"],
+      "properties": {
+        "maxSpellsPerClass": { "type": "integer", "minimum": 1, "description": "Máximo de hechizos de clase por clase (el validador lo comprueba)." },
+        "spellSlots": { "type": "integer", "minimum": 1, "description": "Hechizos equipados a la vez (teclas 1–4)." },
+        "usableSlots": { "type": "integer", "minimum": 0, "description": "Casillas de utilizables/consumibles (teclas 5–8)." }
+      }
+    },
+
+    "balanceTargets": {
+      "type": "object", "additionalProperties": false,
+      "required": ["offRoleDamagePct", "offRoleSurvivalPct", "soloXpPerHourSpreadPct", "duelFavoriteWinRate", "hoursToMaxLevel", "firstGroupFightMinutes"],
+      "description": "Objetivos de diseño provisionales derivados de los pilares del GDD. No afectan a la simulación.",
+      "properties": {
+        "_doc": { "type": "string" },
+        "offRoleDamagePct": { "$ref": "#/$defs/range01", "description": "Daño con básicos fuera de rol / especialista." },
+        "offRoleSurvivalPct": { "$ref": "#/$defs/range01", "description": "Aguante fuera de rol / Guerrero." },
+        "soloXpPerHourSpreadPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "Diferencia máxima de XP/hora en solitario (contando descansos) entre clases." },
+        "duelFavoriteWinRate": { "$ref": "#/$defs/range01", "description": "Victorias del favorito del triángulo en duelos con nivel y equipo iguales." },
+        "hoursToMaxLevel": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 2, "maxItems": 2, "description": "Horas de juego del 1 al 15 con una clase." },
+        "firstGroupFightMinutes": { "type": "number", "minimum": 0, "description": "Minutos máximos desde abrir el enlace hasta pelear en grupo con un amigo." }
+      }
+    },
+
     "boss": {
       "type": "object", "additionalProperties": false, "required": ["referencePartySize", "referenceLevelOffset", "targetDurationSec", "soloKillable"],
       "properties": {
@@ -152,12 +185,13 @@
     },
 
     "world": {
-      "type": "object", "additionalProperties": false, "required": ["startMapId", "mvpTier", "zoneCrossTimeSecTarget"],
-      "properties": { "startMapId": { "type": "string" }, "mvpTier": { "type": "integer" }, "zoneCrossTimeSecTarget": { "type": "array", "items": { "type": "number" } } }
+      "type": "object", "additionalProperties": false, "required": ["startMapId", "currentPhase", "zoneCrossTimeSecTarget"],
+      "properties": { "startMapId": { "type": "string" }, "currentPhase": { "type": "integer", "minimum": 1, "description": "Fase activa del MVP (1 = Tier 1). Decide el tope de nivel (progression.levelCapByPhase) y las reglas por fase." }, "zoneCrossTimeSecTarget": { "type": "array", "items": { "type": "number" } } }
     }
   },
 
   "$defs": {
+    "range01": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 2, "maxItems": 2 },
     "statConv": { "type": "object", "additionalProperties": false, "required": ["str", "agi", "int"],
       "properties": { "str": { "type": "number", "minimum": 0 }, "agi": { "type": "number", "minimum": 0 }, "int": { "type": "number", "minimum": 0 } } },
     "classScaling": {

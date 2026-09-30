@@ -32,7 +32,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Ping` | `{ clientTime }` | — |
 | `MoveInput` | `{ seq, dx, dy }` dx,dy ∈ {-1,0,1} | seq creciente; vivo; no aturdido/raíz |
 | `SelectTarget` | `{ targetId? }` | entidad existe y está en AOI |
-| `CastSpell` | `{ spellId, targetId?, reqId }` | conoce el hechizo, nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no casteando, no aturdido/silenciado |
+| `CastSpell` | `{ spellId, targetId?, targetPos?: Vec2, reqId }` | conoce el hechizo, nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no casteando, no aturdido/silenciado. Hechizos `ground_*` (ADR-015): `targetPos` obligatorio, a ≤ `range + castRangeToleranceTiles` y con LOS al punto |
 | `CancelCast` | `{}` | — |
 | `AutoAttack` | `{ on: bool }` | tiene arma; objetivo hostil |
 | `InventoryMove` | `{ from: SlotRef, to: SlotRef, qty?, reqId }` | ver skill `inventory-items` |
@@ -43,7 +43,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `VendorOpen` / `VendorBuy` / `VendorSell` | `{ npcId }` / `{ npcId, templateId, qty }` / `{ npcId, itemId, qty }` | distancia ≤ 3 tiles, oro, espacio |
 | `ChatSend` | `{ channel: "say"|"party"|"global"|"whisper", text, to? }` | 1–200 chars, rate limit, sanitizado |
 | `PartyInvite` / `PartyRespond` / `PartyLeave` / `PartyKick` | `{ name }` / `{ accept }` / `{}` / `{ name }` | reglas de grupo (máx 5) |
-| `SetHotbar` | `{ slot, kind: "spell"|"item"|null, ref? }` | slot 0–9 |
+| `SetHotbar` | `{ slot, kind: "spell"|"item"|null, ref? }` | slot 0–7: 0–3 solo `spell` (teclas 1–4), 4–7 solo `item` (teclas 5–8) (`rules.loadout`, ADR-014) |
 | `Respawn` | `{}` | está muerto |
 | `UsePortal` | `{ portalId }` | a ≤ 1 tile, vivo, fuera de combate, `minLevel` |
 | `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo activo |
@@ -58,13 +58,13 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Snapshot` | `{ tick, ackSeq, self: { x, y, speed, hp, maxHp, res, maxRes }, ents: EntState[] }` (`speed` en tiles/s, incluye auras) | cada 2 ticks |
 | `EntitySpawn` | `{ id, kind, templateId, name, x, y, dir, level, classId?, hpPct, flags }` | entra a tu AOI |
 | `EntityDespawn` | `{ id, reason: "left"|"died"|"despawn" }` | sale de tu AOI |
-| `CastStarted` | `{ casterId, spellId, targetId?, durationMs }` | inicio de casteo (a la AOI) |
+| `CastStarted` | `{ casterId, spellId, targetId?, targetPos?, radius?, durationMs }` | inicio de casteo (a la AOI); en áreas apuntadas `targetPos` y `radius` sirven para dibujar la marca en el suelo |
 | `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled" }` | |
 | `CombatEvent` | `{ src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }` | resolución |
 | `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, stacks, durationMs }` / `{ targetId, auraId }` | |
 | `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
 | `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | al cambiar |
-| `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[] }` | |
+| `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[], rankUps?: { spellId, rank }[] }` | `rankUps`: hechizos que subieron de rango (ADR-014) |
 | `InventoryUpdate` | `{ bag: (ItemStack|null)[24], equipment: (ItemStack|null)[9], gold, reqId? }` | tras cualquier op (estado completo v1) |
 | `LootWindow` | `{ lootId, gold, items: { index, templateId, qty, ownerId, freeInMs }[] }` | tras `LootOpen` |
 | `ChangeMap` | `{ mapId, x, y }` | tras `UsePortal`; sigue una AOI nueva completa |
