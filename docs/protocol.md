@@ -61,7 +61,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `CastStarted` | `{ casterId, spellId, targetId?, targetPos?, dir?, radius?, durationMs }` | inicio de casteo (a la AOI); en áreas y saltos `targetPos` (y `dir` en cono/línea) fijan la marca en el suelo; la forma y el tamaño salen del contenido (`radius` solo si algo los modifica) |
 | `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled"|"failed", reason? }` | `failed` con `reason: out_of_range\|no_los` si al terminar el objetivo quedó fuera (sin coste) |
 | `CombatEvents` | `{ tick, e: { src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }[] }` | una vez por tick y observador con todos los resultados que ve (máx. 64 entradas; si hay más, se parte). Reemplaza al antiguo `CombatEvent` por golpe (ADR-018) |
-| `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, stacks, durationMs }` / `{ targetId, auraId }` | |
+| `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, casterId?, stacks, durationMs }` / `{ targetId, auraId, casterId? }` | `casterId` distingue instancias del mismo aura de lanzadores distintos (ADR-022) |
 | `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
 | `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | al cambiar |
 | `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[], rankUps?: { spellId, rank }[] }` | `rankUps`: hechizos que subieron de rango (ADR-014) |

@@ -48,7 +48,7 @@
 **Criterios de aceptación**
 1. **Dado** `maps/mine.tmj` (mapa aparte, ADR-007) **entonces** tiene 3–5 salas: entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds + puzle simple: palancas) → rama lateral con la sala del jefe, y Sala 3 (Gólem élite) → salida hacia el Tier 2 (cerrada en la Fase 1). Recorrido 5–10 min; paleta marrón del tileset interior.
 2. **Dado** el jefe **entonces** usa Golpe de pico (área marcada en el suelo sobre la posición de su objetivo, esquivable; HU-086) cada 10 s, Latigazo (sangrado) sobre alguien que no sea el tanque cada 8 s, y ¡A trabajar! (+25 % daño) bajo el 50 %; es inmune a aturdir, raíz y ralentizar.
-3. **Dado** 3 jugadores de nivel 4 con equipo verde **entonces** el combate dura 60–100 s y lo ganan con un sanador o con pociones; 2 jugadores de nivel 6 también lo ganan (el caso de un nivel 7 con uno de 5 se valida al abrir la Fase 2, porque el tope de la Fase 1 es 6) (`rules.boss`; verificado por `content-designer` y una partida de prueba).
+3. **Dado** 3 jugadores de nivel 4 con equipo verde **entonces** el combate dura 60–100 s y lo ganan con un sanador o con pociones (el jefe tiene 1 400 de vida: con 2 000 el modelo de `tools/balance/` daba 117–137 s; ver `balance-notes.md` §4); 2 jugadores de nivel 6 también lo ganan (el caso de un nivel 7 con uno de 5 se valida al abrir la Fase 2, porque el tope de la Fase 1 es 6) (`rules.boss`; verificado por `content-designer` y una partida de prueba).
 4. **Dado** su muerte **entonces** suelta exactamente un raro de su `groups` (Pico, Peto o Amuleto), asignado al azar a un miembro, y se anuncia en el chat global con el nombre del ganador.
 
 ---

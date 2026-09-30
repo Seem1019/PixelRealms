@@ -46,41 +46,46 @@ Lecturas:
   base (identidad de tanque), no la afinidad. Subirlo más haría que el Guerrero dejara de sentirse distinto.
 - La varita **es** la opción correcta del Sacerdote en solitario: rinde como la maza pero a distancia (7 casillas, ADR-019), y no gasta maná.
 
-## 4. Jefe del Tier 1: Capataz Grask (nv 6, 2 000 hp, armadura 90, 18–26 de daño cada 2.4 s)
+## 4. Jefe del Tier 1: Capataz Grask (nv 6, 1 400 hp, armadura 90, 18–26 de daño cada 2.4 s)
+Recalculado el 2026-09-30 con el modelo de `tools/balance/` y los números de la Fase 1 (maná por golpe incluido). Con
+2 000 de vida los grupos tardaban 117–137 s; con 1 400:
+
 | Grupo | DPS del grupo | Duración | Notas |
 |---|---|---|---|
-| 3 × nivel 4 (Guerrero, Mago, Sacerdote curando) | ~38 → cae al quedarse el Mago sin maná a los ~30 s | **~60–75 s** | el jefe pega ~6 DPS al tanque; el Sacerdote cura 22 HPS |
-| 3 × nivel 4 (Guerrero, Pícaro, Mago, sin sanador) | ~53 | ~45–55 s | el tanque aguanta ~50 s sin curas: hace falta poción o Pan |
-| 2 × nivel 6 (Pícaro, Mago) | ~47 | ~50 s | justo: el Pícaro (200 hp) aguanta ~25 s por pasada, hay que alternar aggro |
-| Nivel 7 + nivel 5 (Guerrero + Mago) | ~44 | ~55 s | cómodo con Bloqueo |
+| 3 × nivel 4 (Guerrero, Mago, Sacerdote curando) | ~16,5 | **~85 s** | el tanque recibe ~7,6/s; el Sacerdote cura ~9,8/s y pasa el 90 % del tiempo curando |
+| 3 × nivel 4 (Guerrero, Pícaro, Mago, sin sanador) | ~26 | ~54 s | el tanque (288 hp) aguanta ~33 s sin curas: hacen falta pociones o rotar quién aguanta |
+| 2 × nivel 6 (Pícaro, Mago) | ~25 | ~57 s | justo: el Pícaro (200 hp) aguanta ~24 s por pasada, hay que alternar aggro |
+| 2 × nivel 6 (Guerrero, Sacerdote) | ~14 | ~101 s | seguro pero lento: el Sacerdote cura el 69 % del tiempo |
 
-Los tres objetivos de `rules.boss` se cumplen sobre el papel.
-**Pendiente (2026-09-30):** estas cifras son anteriores al maná por golpe (GDD §Ataque básico): con él, el Mago ya no se
-queda sin maná a los ~30 s y el jefe caerá antes. También cambia el Golpe de pico, que ahora es un área marcada que se puede
-esquivar (combate híbrido, ADR-015). Recalcular en HU-084. Lo que hay que verificar jugando: el Golpe de pico (AoE)
-castiga a los melee que se apilan y el Latigazo obliga al sanador a curar a alguien distinto del tanque.
+Nivel 7 + nivel 5 no se puede dar en la Fase 1 (tope 6); se valida al abrir la Fase 2. Lo que hay que verificar jugando
+(HU-084): el Golpe de pico (área marcada, esquivable) castiga a los melee que se apilan y el Latigazo obliga al sanador a
+curar a alguien distinto del tanque.
 
 ## 5. Curva de XP por tiempo (ADR-017; nivel máximo 15)
-`xpParaSubir(L) = round(minutos(L) · (60 / killCycleSecTarget) · (5·L + 1))`, con `killCycleSecTarget = 30` ⇒ kills por nivel = minutos × 2.
+`xpParaSubir(L) = round(minutos(L) · (60 / killCycleSecTarget) · (5·L + 1))`, con `killCycleSecTarget = 36` ⇒ kills por nivel = minutos × 5/3.
 
 | Nivel | Minutos | XP para subir | Kills | Nivel | Minutos | XP | Kills |
 |---|---|---|---|---|---|---|---|
-| 1→2 | 10 | 120 | 20 | 8→9 | 115 | 9 430 | 230 |
-| 2→3 | 20 | 440 | 40 | 9→10 | 130 | 11 960 | 260 |
-| 3→4 | 35 | 1 120 | 70 | 10→11 | 150 | 15 300 | 300 |
-| 4→5 | 50 | 2 100 | 100 | 11→12 | 165 | 18 480 | 330 |
-| 5→6 | 65 | 3 380 | 130 | 12→13 | 180 | 21 960 | 360 |
-| 6→7 | 85 | 5 270 | 170 | 13→14 | 195 | 25 740 | 390 |
-| 7→8 | 100 | 7 200 | 200 | 14→15 | 210 | 29 820 | 420 |
+| 1→2 | 10 | 100 | 17 | 8→9 | 115 | 7 858 | 192 |
+| 2→3 | 20 | 367 | 33 | 9→10 | 130 | 9 967 | 217 |
+| 3→4 | 35 | 933 | 58 | 10→11 | 150 | 12 750 | 250 |
+| 4→5 | 50 | 1 750 | 83 | 11→12 | 165 | 15 400 | 275 |
+| 5→6 | 65 | 2 817 | 108 | 12→13 | 180 | 18 300 | 300 |
+| 6→7 | 85 | 4 392 | 142 | 13→14 | 195 | 21 450 | 325 |
+| 7→8 | 100 | 6 000 | 167 | 14→15 | 210 | 24 850 | 350 |
 
-Total: 152 320 XP, ~3 020 kills de tu nivel, ~25,2 h (menos si matas naranjas: +10 % por nivel de diferencia hasta +40 %).
-Fase 1 (1→6): 7 160 XP, ~360 kills, 3 h · Fase 2 (6→10): 7,2 h · Fase 3 (10→15): 15 h.
-El supuesto de 30 s por kill se mide en HU-084; si no se cumple, se cambia `killCycleSecTarget` y la tabla se recalcula.
+Total: 126 934 XP, ~2 517 kills de tu nivel, ~25,2 h (menos si matas naranjas: +10 % por nivel de diferencia hasta +40 %).
+Fase 1 (1→6): 5 967 XP, ~300 kills, 3 h · Fase 2 (6→10): 7,2 h · Fase 3 (10→15): 15 h.
+El ciclo de 36 s por kill sale del modelo de balance de la Fase 1 (34–38 s según la clase, `balance-report.md`); se
+confirma jugando en HU-084 y, si no se cumple, se cambia `killCycleSecTarget` y la tabla se recalcula.
 
 Reparto en grupo (niveles 10 / 8 / 5, monstruo normal nv 9 = 46 XP): referencia 10 → mod 0.9; bono(3) 1.55 → pool 64.2;
 pesos 1.00 / 1.00 / 0.42 → **26.5 / 26.5 / 11.2 XP**. Sin piso: la brecha penaliza a propósito.
 
 ## 6. Posición del Sacerdote respecto al triángulo
+> **Pendiente:** esta tabla usa los números anteriores al balance de la Fase 1 (Sanar hoy cura ~12 por casteo, ~8 por
+> segundo, y Castigo ya no ralentiza). El triángulo necesita simular movimiento y se mide en HU-084.
+
 | Contra | Resultado esperado | Por qué |
 |---|---|---|
 | Guerrero | **gana** | el Guerrero no interrumpe (sin Carga en CD, 15 s) y su DPS (≈14 a nivel 6) es menor que la cura del Sacerdote (Sanar ≈ 22 HPS + Renovar); el Sacerdote lo desgasta con Castigo y varita |

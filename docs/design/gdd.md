@@ -141,8 +141,9 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   **Fase 1:** los rangos suben solos. **Fase 2:** al subir un rango se elige **1 de 2 mejoras**; las builds salen de qué
   4 hechizos llevas equipados y qué mejoras eliges. Antes de cerrar el MVP (Fase 2 o 3) debe existir una forma de
   **reiniciar las mejoras**.
-- **Pendiente de confirmar:** rangos en los niveles 4, 8 y 12 con +15 % de valor base por rango, e inmunidad de ~3 s al
-  mismo tipo de control tras sufrirlo (`combat.md` §Modelo de combate).
+- **Pendiente de confirmar:** rangos en los niveles 4, 8 y 12 con +15 % de valor base por rango.
+- **Controles y acumulación (ADR-022):** tras un aturdimiento, raíz o silencio, 1,5 s de inmunidad a los tres; efectos del
+  mismo tipo no se suman (manda el más fuerte) y la ralentización máxima es del 40 % (`combat.md` §Auras).
 - **Balance por pentagrama y grupos de hechizos:** `docs/design/class-kits.md` (ADR-020). Cada clase tiene 8 hechizos que
   se desbloquean en los niveles 1, 2, 3, 5, 7, 9, 11 y 13 (`rules.progression.spellUnlockLevels`): en la Fase 1 tiene 4
   (todos equipados) y la elección libre empieza en el nivel 7. Pulso sagrado (nv 5) reemplaza a Rezo de sanación.
@@ -212,16 +213,17 @@ Objetivo provisional (HU-084): con nivel y equipo iguales, el favorito gana entr
 Todas las constantes en `rules.progression` y `rules.group`.
 - **XP para subir: curva por tiempo** (ADR-017). Se diseña en minutos de juego por nivel y la XP se calcula:
   `xpParaSubir(L) = round(minutesPerLevel[L] · (60 / killCycleSecTarget) · xpMonstruoNormal(L))`, con
-  `killCycleSecTarget = 30` (segundos entre kills contando pelea, descanso, botín y caminar; se mide en HU-084).
+  `killCycleSecTarget = 36` (segundos entre kills contando pelea, descanso, botín y caminar; 36 s es lo que da el modelo
+  de balance de la Fase 1, ver `balance-report.md`; se confirma jugando en HU-084).
   `xpRate` (1.0) multiplica toda la XP ganada (playtests, eventos).
 
 | Nivel | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Minutos | 10 | 20 | 35 | 50 | 65 | 85 | 100 | 115 | 130 | 150 | 165 | 180 | 195 | 210 |
-| XP para subir | 120 | 440 | 1 120 | 2 100 | 3 380 | 5 270 | 7 200 | 9 430 | 11 960 | 15 300 | 18 480 | 21 960 | 25 740 | 29 820 |
+| XP para subir | 100 | 367 | 933 | 1 750 | 2 817 | 4 392 | 6 000 | 7 858 | 9 967 | 12 750 | 15 400 | 18 300 | 21 450 | 24 850 |
 
-- Total: 152 320 XP ≈ 3 020 kills ≈ **25,2 h** (Fase 1: 3 h · Fase 2: 7,2 h · Fase 3: 15 h). Subir a nivel 2 son ~20 slimes.
-  Objetivo 20–30 h (`rules.balanceTargets.hoursToMaxLevel`). Si el ciclo real por kill no es 30 s, se cambia
+- Total: 126 934 XP ≈ 2 517 kills ≈ **25,2 h** (Fase 1: 3 h · Fase 2: 7,2 h · Fase 3: 15 h). Subir a nivel 2 son ~17 slimes.
+  Objetivo 20–30 h (`rules.balanceTargets.hoursToMaxLevel`). Si el ciclo real por kill no es 36 s, se cambia
   `killCycleSecTarget` y toda la curva se corrige sola.
 - **XP de contenido futuro** (misiones, mazmorras…): se define en minutos equivalentes,
   `xp = minutos · (60 / killCycleSecTarget) · xpMonstruoNormal(nivel)`, así el contenido nuevo no desajusta la curva. Un tier

@@ -1,7 +1,9 @@
 # Clases: pentagrama, armas de referencia y grupos de hechizos
 
-> Estructura aprobada el 2026-09-30 (ADR-020). `content/spells.json` y `content/auras.json` ya tienen estos 32 hechizos y
-> sus auras con **números provisionales** (`"provisional": true`); los definitivos los fija el agente `content-designer`.
+> Estructura aprobada el 2026-09-30 (ADR-020). `content/spells.json` y `content/auras.json` tienen estos 32 hechizos y sus
+> auras. Los 16 de la Fase 1 (niveles 1–5) tienen **números medidos** (`"provisional": false`, ver
+> [balance-report.md](balance-report.md)); los 16 de las Fases 2 y 3 están escalados a la misma escala pero siguen
+> **provisionales** (`"provisional": true`) hasta su pasada de balance.
 
 ## Pentagrama
 Cada clase se define por 5 puntas, iguales para todas. En el Sacerdote, sus curas ocupan mono-objetivo y área; un hechizo
@@ -9,14 +11,16 @@ que cura aliados y daña enemigos (Pulso sagrado) cuenta en área.
 
 | Clase | Mono-objetivo | Área | Control | Movilidad | Armadura | Total |
 |---|---|---|---|---|---|---|
-| Pícaro | 85 | 15 | 35 | 90 | 25 | 250 |
-| Mago | 45 | 90 | 80 | 20 | 15 | 250 |
+| Pícaro | 85 | 15 | 35 | 85 | 30 | 250 |
+| Mago | 45 | 90 | 70 | 20 | 25 | 250 |
 | Guerrero | 45 | 45 | 50 | 20 | 90 | 250 |
 | Sacerdote | 85 (cura) | 85 (cura) | 25 | 25 | 30 | 250 |
 
 Presupuesto **250** por clase y **100** como máximo por punta (`rules.balanceTargets.pentagram`). Con dos puntas de 85–90
 quedan ~75 puntos para las otras tres (~25 cada una): el perfil se lee claro y ninguna clase queda sin herramientas para
 subir sola (pilar 4). Una punta baja por perfil (el área del Pícaro) es intencional y no se compensa.
+La armadura del Pícaro (30) y del Mago (25) se ajustó a lo medido: bajarla más los dejaba por debajo del piso de
+supervivencia en solitario.
 
 ## Método de medición
 Cada punta se mide con un número concreto al nivel 6 (grupo de la Fase 1) y al 15 (grupo completo), con equipo verde de su
@@ -26,16 +30,19 @@ se calibra una sola vez y queda fijo en `rules.balanceTargets.pentagram`.
 | Punta | Qué se mide |
 |---|---|
 | Mono-objetivo | Daño (o cura) por segundo sostenido durante 30 s contra un solo objetivo. |
-| Área | Daño (o cura) por segundo **adicional** sobre 3 objetivos secundarios agrupados (radio 2 casillas). |
+| Área | Daño (o cura) por segundo sobre el objetivo principal y 3 secundarios agrupados (radio 2 casillas). Un hechizo de área cuenta **entero** aquí, también el daño a su objetivo principal. |
 | Control | Segundos de control por minuto: aturdir 1, raíz 0,6, ralentizar 0,3 por cada 40 %, interrumpir 0,5 s, provocar 0,5. En área, +50 % por objetivo extra, hasta 3. |
 | Movilidad | Casillas extra por minuto frente a caminar (saltos, embestidas, velocidad) más los segundos de control que la habilidad quita, convertidos a distancia. |
-| Armadura | Segundos que se aguanta contra un atacante de referencia (mitad físico, mitad mágico): vida, mitigación, escudos propios y reducciones de daño. Las curas no cuentan aquí. |
+| Armadura | Segundos que se aguanta contra un atacante de referencia **físico** (todos los monstruos del Tier 1 pegan físico): vida, mitigación, escudos propios y reducciones de daño. Las curas y los escudos puestos a aliados no cuentan aquí (cuentan en mono-objetivo). |
 
 - **Aporte de una habilidad** = puntos(base + habilidad) − puntos(base).
 - **Valor de la clase en una punta** = base + los 4 mejores aportes a esa punta.
 - **Base de la clase** = sus estadísticas + el básico de su arma de referencia. La velocidad de movimiento base es igual para
   todas (4 casillas/s), así que aporta 0 a movilidad. En el Sacerdote el básico no cuenta: sus puntas de mono y área son cura.
-- **Herramienta:** un script del `content-designer` genera la tabla de aportes, comprueba la regla 40/75 en las 70
+- **Valores de referencia** (100 puntos, nivel 6; `rules.balanceTargets.pentagram.references`): mono 26,6 de daño por
+  segundo (el básico del Pícaro vale 30); área 63,8 (4 objetivos × 0,6 × mono); control 40 s equivalentes por minuto;
+  movilidad 120 casillas extra por minuto; armadura 88,2 s (el aguante del Guerrero vale 70).
+- **Herramienta:** `tools/balance/` (modelo en Python del `content-designer`) genera la tabla de aportes, comprueba la regla 40/75 en las 70
   combinaciones de cada clase y marca las parejas de habilidades que se potencian (el modelo suma aportes y no las ve).
 
 ### Armas de referencia y básico del arma
@@ -58,9 +65,9 @@ Para que un arma no rompa el perfil del rol:
 2. Ninguna combinación de 4 habilidades, más la base, pasa del **75 %** del presupuesto (187 puntos).
 3. Ninguna combinación supera el valor de la clase en ninguna punta.
 
-Con este borrador, la combinación más cargada de cada clase queda entre 175 y 185 puntos. No hay límites en tiempo real
-(etiquetas, cooldowns compartidos): el freno contra cadenas de control entre varios jugadores sería la inmunidad tras un
-control, pendiente de confirmar.
+Medido en la Fase 1: la habilidad que más suma es Pulso sagrado (39) y la combinación más cargada la del Guerrero (170 de
+187). No hay límites en tiempo real (etiquetas, cooldowns compartidos): el freno contra cadenas de control entre varios
+jugadores es la inmunidad de 1,5 s tras un control (ADR-022).
 
 ## Grupos de hechizos
 8 por clase; se equipan 4 libremente. Desbloqueo en los niveles **1, 2, 3, 5, 7, 9, 11 y 13**
@@ -75,7 +82,7 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 |---|---|---|---|---|
 | Golpe siniestro | 1 | obj | golpe rápido, cooldown ~3 s | Mono 20 |
 | Gubia | 2 | obj | aturde 2 s e interrumpe | Control 15, Mono 5 |
-| Paso sombrío | 3 | salto | salto corto; el siguiente golpe hace más daño; al caer ralentiza 2 s | Mov 25, Mono 5, Control 5 |
+| Paso sombrío | 3 | salto | salto corto; +60 % de daño durante 3 s; al caer ralentiza 0,5 s | Mov 25, Mono 5, Control 5 |
 | Carrera | 5 | propio | +50 % de velocidad; rompe raíz y ralentización | Mov 25 |
 | Eviscerar | 7 | obj | golpe fuerte, cooldown largo | Mono 20 |
 | Cuchillas arrojadizas | 9 | cono | daño en cono y velocidad propia | Área 10, Mov 15 |
@@ -86,7 +93,7 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 | Hechizo | Nv | Forma | Qué hace | Aporta |
 |---|---|---|---|---|
 | Bola de fuego | 1 | obj | casteo 2 s | Mono 20 |
-| Descarga de escarcha | 2 | obj | daño y ralentiza 40 % | Control 15, Mono 5 |
+| Descarga de escarcha | 2 | obj | daño y ralentiza 40 %, cooldown 12 s | Control 15, Mono 5 |
 | Nova de escarcha | 3 | alrededor | enraíza 3 s | Control 30, Área 5 |
 | Estallido de llamas | 5 | suelo | área, casteo 1,5 s | Área 30, Mono 5 |
 | Campo ardiente | 7 | suelo | área pequeña, casteo 0,5 s, cooldown corto | Área 20 |
@@ -98,8 +105,8 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 | Hechizo | Nv | Forma | Qué hace | Aporta |
 |---|---|---|---|---|
 | Golpe heroico | 1 | obj | golpe de clase, cooldown ~3 s | Mono 15 |
-| Provocar | 2 | obj | obliga al monstruo a atacarte 3 s | Control 15 |
-| Carga | 3 | obj (embestida) | te lanza hacia el objetivo y lo aturde 1 s | Mov 15, Control 15 |
+| Provocar | 2 | obj | obliga al monstruo a atacarte 2 s | Control 15 |
+| Carga | 3 | obj (embestida) | te lanza hacia el objetivo y lo aturde 1,5 s | Mov 15, Control 15 |
 | Torbellino | 5 | alrededor | daño y mucha amenaza | Área 20, Mono 5 |
 | Bloqueo con escudo | 7 | propio | −50 % de daño durante 4 s | Armadura 20 |
 | Tajo amplio | 9 | cono | daño frontal | Área 15, Mono 5 |
@@ -110,7 +117,7 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 | Hechizo | Nv | Forma | Qué hace | Aporta |
 |---|---|---|---|---|
 | Sanar | 1 | obj aliado | casteo 1–1,5 s | Mono 30 |
-| Castigo | 2 | obj | daño y ralentiza 20 % | Control 5 |
+| Castigo | 2 | obj | daño a distancia (sin ralentización: se lanza sin parar y la dejaba permanente) | — (su daño lo vigila la XP por hora) |
 | Palabra de poder: Escudo | 3 | obj aliado | escudo y +20 % de velocidad | Mono 20, Mov 10, Armadura 5 |
 | Pulso sagrado | 5 | suelo | cura a aliados; daña poco y ralentiza a enemigos | Área 30, Control 10 |
 | Renovar | 7 | obj aliado | cura en el tiempo | Mono 20 |
@@ -118,8 +125,9 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 | Himno | 11 | alrededor | cura en el tiempo a aliados cercanos | Área 40 |
 | Oración desesperada | 13 | obj aliado | cura más si el aliado tiene menos del 40 % de vida | Mono 15 |
 
-**Perfil en la Fase 1** (mono / área / control / movilidad / armadura): Pícaro 60 / 0 / 20 / 50 / 25 · Mago 45 / 35 / 45 /
-0 / 15 · Guerrero 35 / 20 / 30 / 15 / 70 · Sacerdote 50 / 30 / 15 / 10 / 30.
+**Perfil en la Fase 1, medido** (mono / área / control / movilidad / armadura): Pícaro 57 / 0 / 20 / 50 / 32 · Mago 41 /
+34 / 45 / 0 / 23 · Guerrero 35 / 21 / 29 / 16 / 70 · Sacerdote 51 / 29 / 10 / 11 / 29. Los números de cada hechizo y cómo
+se midieron están en [balance-report.md](balance-report.md).
 
 **Sale del kit anterior:** Desgarrar, Escudo de maná, Rezo de sanación (lo reemplaza Pulso sagrado) y Hoja envenenada
 (pasa a ser Veneno debilitante).
@@ -127,12 +135,12 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 ## Auras del kit (ADR-021)
 - **Reutilizadas (9):** Cargado, Gubia, Veneno, Carrera, Helado (Descarga de escarcha y Cono de frío), Congelado (Nova),
   Bloqueo con escudo, Renovar y Escudo sagrado.
-- **Nuevas (14):** daño extra y ralentización de Paso sombrío; velocidad de Cuchillas arrojadizas; raíz de Tajo mortal;
+- **Nuevas (13):** daño extra y ralentización de Paso sombrío; velocidad de Cuchillas arrojadizas; raíz de Tajo mortal;
   ralentización de Veneno debilitante; aturdimiento de Meteoro; ralentización de Corte de tendón; aturdimiento de Golpe
-  poderoso; ralentización de Castigo; velocidad de Palabra de poder: Escudo; ralentización de Pulso sagrado; velocidad y
+  poderoso; velocidad de Palabra de poder: Escudo; ralentización de Pulso sagrado; velocidad y
   ralentización de Sendero de luz; cura en el tiempo de Himno.
 - **Se quedan para items y monstruos:** Comiendo (Pan), Latigazo y Enfurecido (Capataz), Congelado (Rey Liche, Tier 3).
-- **Eliminadas:** Desgarro y Escudo de maná.
+- **Eliminadas:** Desgarro, Escudo de maná y la ralentización de Castigo (su control pasa a Pulso sagrado).
 - Paso sombrío da "+daño durante 3 s" en lugar de "el siguiente golpe" para no añadir una mecánica de consumir la carga.
 - Torbellino no tiene todavía un mecanismo de "mucha amenaza": hoy genera amenaza solo por su daño.
 

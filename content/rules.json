@@ -6,7 +6,7 @@
     "maxLevel": 15,
     "levelCapByPhase": [6, 10, 15],
     "minutesPerLevel": [10, 20, 35, 50, 65, 85, 100, 115, 130, 150, 165, 180, 195, 210],
-    "killCycleSecTarget": 30,
+    "killCycleSecTarget": 36,
     "xpRate": 1.0,
     "monsterXpPerLevel": 5,
     "monsterXpBase": 1,
@@ -79,7 +79,10 @@
     "respawnResourcePct": 0.5,
     "corpseLifetimeSec": 60,
     "bossImmuneToAuraKinds": ["stun", "root", "slow"],
-    "controlAuraKinds": ["stun", "root", "silence", "slow"]
+    "controlAuraKinds": ["stun", "root", "silence", "slow"],
+    "hardControlKinds": ["stun", "root", "silence"],
+    "hardControlImmunitySec": 1.5,
+    "maxSlowPct": 0.4
   },
 
   "classScaling": {
@@ -173,15 +176,16 @@
     "hoursToMaxLevel": [20, 30],
     "firstGroupFightMinutes": 5,
     "pentagram": {
-      "_doc": "Balance por pentagrama (ADR-020, docs/design/class-kits.md). Los valores de referencia para convertir métricas a puntos se calibran con el content-designer y se añadirán aquí.",
+      "_doc": "Balance por pentagrama (ADR-020, docs/design/class-kits.md). 100 puntos de un eje = la métrica de referencia a nivel 6 (docs/design/balance-report.md, tools/balance/).",
       "budget": 250,
       "maxPerAxis": 100,
       "abilityMaxPoints": 40,
       "loadoutMaxPct": 0.75,
       "referenceLevels": [6, 15],
+      "references": { "level": 6, "singleDps": 26.6, "aoeDps": 63.8, "ccSecPerMin": 40, "mobilityTilesPerMin": 120, "armorTtlSec": 88.2 },
       "classes": {
-        "rogue": { "single": 85, "aoe": 15, "cc": 35, "mobility": 90, "armor": 25, "referenceWeapon": "dagger" },
-        "mage": { "single": 45, "aoe": 90, "cc": 80, "mobility": 20, "armor": 15, "referenceWeapon": "staff" },
+        "rogue": { "single": 85, "aoe": 15, "cc": 35, "mobility": 85, "armor": 30, "referenceWeapon": "dagger" },
+        "mage": { "single": 45, "aoe": 90, "cc": 70, "mobility": 20, "armor": 25, "referenceWeapon": "staff" },
         "warrior": { "single": 45, "aoe": 45, "cc": 50, "mobility": 20, "armor": 90, "referenceWeapon": "sword" },
         "priest": { "single": 85, "aoe": 85, "cc": 25, "mobility": 25, "armor": 30, "referenceWeapon": "wand" }
       }

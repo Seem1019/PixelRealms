@@ -27,7 +27,7 @@
 2. **Dado** un nivel que desbloquea hechizos **entonces** `LevelUp{newSpells}` y el cliente los coloca en la primera casilla libre de la hotbar con un aviso.
 3. **Dado** la subida **entonces** los demás en la AOI ven un efecto visual y el nivel actualizado sobre mi nombre.
 3b. **Dado** un nivel en el que un hechizo sube de rango (tabla de rangos del rediseño de kits) **entonces** en la Fase 1 el rango sube solo, `LevelUp{rankUps}` lo informa y el cliente muestra un aviso.
-4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (120, 440, 1 120 … 29 820; si cambia `killCycleSecTarget` o `minutesPerLevel`, la tabla cambia sin tocar código) y los niveles de desbloqueo 1, 2, 3, 5, 7, 9, 11, 13 (`rules.progression.spellUnlockLevels`).
+4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (100, 367, 933 … 24 850; si cambia `killCycleSecTarget` o `minutesPerLevel`, la tabla cambia sin tocar código) y los niveles de desbloqueo 1, 2, 3, 5, 7, 9, 11, 13 (`rules.progression.spellUnlockLevels`).
 
 ---
 

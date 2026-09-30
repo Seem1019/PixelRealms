@@ -57,7 +57,7 @@
 
     "combat": {
       "type": "object", "additionalProperties": false,
-      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaPerBasicHitPctPerSec", "castMoveSpeedMult", "interruptLockoutMs", "abilityLockMs", "minInstantSpellCooldownMs", "linkdeadInCombatMaxSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds", "controlAuraKinds"],
+      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaPerBasicHitPctPerSec", "castMoveSpeedMult", "interruptLockoutMs", "abilityLockMs", "minInstantSpellCooldownMs", "linkdeadInCombatMaxSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds", "controlAuraKinds", "hardControlKinds", "hardControlImmunitySec", "maxSlowPct"],
       "properties": {
         "gcdMs": { "type": "integer", "minimum": 0, "description": "Cooldown global tras cualquier hechizo con triggersGcd." },
         "critMultiplier": { "type": "number", "minimum": 1 },
@@ -87,7 +87,10 @@
         "respawnHpPct": { "type": "number" }, "respawnResourcePct": { "type": "number" },
         "corpseLifetimeSec": { "type": "number", "description": "Segundos que dura un cadáver saqueable." },
         "bossImmuneToAuraKinds": { "type": "array", "items": { "type": "string" }, "description": "Tipos de aura que no afectan a monstruos con boss=true." },
-        "controlAuraKinds": { "type": "array", "items": { "enum": ["stun", "root", "silence", "slow"] }, "description": "Tipos de aura que son controles: no cuentan para los topes de auras y no se suman entre sí (manda la ralentización más fuerte y el aturdimiento más largo; ADR-021)." }
+        "controlAuraKinds": { "type": "array", "items": { "enum": ["stun", "root", "silence", "slow"] }, "description": "Tipos de aura que son controles: no cuentan para los topes de auras y no se suman entre sí (manda la ralentización más fuerte y el aturdimiento más largo; ADR-021)." },
+        "hardControlKinds": { "type": "array", "items": { "enum": ["stun", "root", "silence"] }, "description": "Controles fuertes: al terminar uno, el objetivo es inmune a todos ellos durante hardControlImmunitySec (ADR-022)." },
+        "hardControlImmunitySec": { "type": "number", "minimum": 0, "description": "Inmunidad a controles fuertes tras sufrir uno (ADR-022)." },
+        "maxSlowPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "Ralentización máxima efectiva; manda la más fuerte y nunca pasa de este valor (ADR-022)." }
       }
     },
 
@@ -207,6 +210,10 @@
             "abilityMaxPoints": { "type": "number", "description": "Máximo que suma una habilidad entre todas sus puntas." },
             "loadoutMaxPct": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Máximo de una combinación de 4 habilidades + base, relativo a budget." },
             "referenceLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+            "references": { "type": "object", "additionalProperties": false,
+              "required": ["level", "singleDps", "aoeDps", "ccSecPerMin", "mobilityTilesPerMin", "armorTtlSec"],
+              "description": "Métrica que vale 100 puntos en cada eje (medida con el modelo de tools/balance/). singleDps: DPS contra un objetivo; aoeDps: DPS total contra 4 objetivos (4 · 0,6 · singleDps); ccSecPerMin: segundos equivalentes de control por minuto; mobilityTilesPerMin: casillas extra por minuto; armorTtlSec: segundos que aguanta contra el atacante físico de referencia (Guerrero ÷ 0,70).",
+              "properties": { "level": { "type": "integer", "minimum": 1 }, "singleDps": { "type": "number", "exclusiveMinimum": 0 }, "aoeDps": { "type": "number", "exclusiveMinimum": 0 }, "ccSecPerMin": { "type": "number", "exclusiveMinimum": 0 }, "mobilityTilesPerMin": { "type": "number", "exclusiveMinimum": 0 }, "armorTtlSec": { "type": "number", "exclusiveMinimum": 0 } } },
             "classes": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": false,
               "required": ["single", "aoe", "cc", "mobility", "armor", "referenceWeapon"],
               "properties": { "single": { "type": "number" }, "aoe": { "type": "number" }, "cc": { "type": "number" }, "mobility": { "type": "number" }, "armor": { "type": "number" }, "referenceWeapon": { "type": "string" } } } }

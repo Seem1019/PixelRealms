@@ -21,13 +21,18 @@ aquí se citan los valores por defecto para poder leer las fórmulas. Cambio de 
 - Sin fuego amigo. `maxTargets` elige los más cercanos al centro del área.
 - **Formas** (`shape`): `circle` (`aoeRadius`), `cone` (`aoeRadius` + `aoeAngleDeg`) y `line` (`aoeLength` + `aoeWidth`); el
   cono y la línea salen del lanzador en la dirección de `targetPos`. Las tres están en el schema; el círculo se implementa en
-  la Fase 1 (HU-086) y el cono y la línea cuando un hechizo los use (hasta entonces el validador los rechaza en contenido).
+  la Fase 1 (HU-086) y el cono y la línea cuando un hechizo los use (hasta entonces, los hechizos que los usan quedan **no disponibles**: ver §Contenido no disponible).
 - **Salto a un punto** (efecto `leap`: `maxRange`, `travelMs`; `travelMs = 0` = teletransporte; HU-087): el lanzador va hasta
   `targetPos`, recortado a la última casilla libre con LOS dentro de `maxRange`. Lo mueve el servidor; el cliente no lo
   predice y suaviza la posición recibida (~100 ms). `root` y `stun` impiden saltar. Los efectos del mismo hechizo que van
   después del `leap` se aplican en el punto de llegada (p. ej. un área al caer). Carga (`dash` a un objetivo) sigue igual.
-- **Pendiente de confirmar:** al terminar un `stun` o un `root`, el objetivo es inmune a ese mismo tipo ~3 s (irá a
-  `rules.combat` cuando se confirme).
+- **Inmunidad tras un control fuerte (ADR-022):** cuando termina un `stun`, `root` o `silence`
+  (`rules.combat.hardControlKinds`), el objetivo es inmune a los tres durante `hardControlImmunitySec` (1,5 s). Vale para
+  jugadores y monstruos; los jefes ya son inmunes a `stun`, `root` y `slow`. El efecto `interrupt` no es un control y corta
+  igual un casteo aunque el objetivo sea inmune.
+- **Contenido no disponible (ADR-023):** el validador conoce las funciones del motor ya implementadas. Un hechizo que use
+  alguna que falte (forma, targeting, efecto o campo) se carga pero queda no disponible: no se aprende ni se equipa, y el
+  validador da un aviso, no un error. Al implementarse la función, el hechizo pasa a estar disponible sin tocar el contenido.
 
 ## Stats primarios
 `str` (fuerza), `agi` (agilidad), `int` (intelecto), `spi` (espíritu), `sta` (aguante).
@@ -149,9 +154,18 @@ tick (`CombatEvents`). Detalle y umbrales de verificación en ADR-018.
 Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `tickMs`, `maxStacks`, `base`, `apCoef`,
 `spCoef`, `pct`, `mods`, `removesKinds`, `immuneKinds`.
 - La cantidad (`base + coef · poder`) se calcula **al aplicarse** (snapshot) y no cambia aunque el lanzador cambie de equipo.
-- Reaplicar la misma aura del mismo lanzador → refresca duración y suma un stack hasta `maxStacks`; los ticks se
-  reinician desde el momento del refresco.
-- Un DoT/HoT de `durationMs = 12000, tickMs = 3000` produce **exactamente 4 ticks** (a 3, 6, 9 y 12 s); el último tick
+- **Acumulación (ADR-022).** Cada aura activa se identifica por (aura, lanzador).
+  - **Mismo lanzador, misma aura:** se renueva a la duración completa (no se suma tiempo). Solo suma cargas un aura con
+    `maxStacks` > 1 (hoy, Veneno), hasta su máximo. **Al renovar no se reinicia el ritmo de ticks.**
+  - **Lanzadores distintos:** daño en el tiempo, cura en el tiempo y escudos **conviven**, cada uno con su icono y sus cargas.
+    Los escudos se gastan primero el que caduca antes.
+  - **Modificadores numéricos** (velocidad, daño hecho, daño recibido, ralentización) de auras distintas o de lanzadores
+    distintos **no se suman: manda el más fuerte**; los demás siguen visibles en gris y toman el relevo si el que manda
+    termina. La velocidad resultante es `base · (1 + mayorBonus) · (1 − mayorRalentización)`.
+  - **Ralentización máxima:** `rules.combat.maxSlowPct` (0.4); no hay inmunidad a ralentizar (la contrarresta Carrera).
+  - Cada instancia cuenta 1 en su tope aunque tenga cargas o esté en gris; los controles no cuentan.
+  - No hay quemaduras ni efectos elementales (ADR-010).
+- Un DoT/HoT de `durationMs = 12000, tickMs = 3000` recién aplicado produce **exactamente 4 ticks** (a 3, 6, 9 y 12 s); el último tick
   ocurre en el mismo tick de servidor que la expiración y **sí cuenta**.
 - `shield` absorbe daño hasta `amount` y se consume. Orden al recibir daño: `damageTakenPct/damageDonePct` → `shield` → hp.
 - **Topes (ADR-021):** una entidad tiene como mucho `rules.limits.maxBuffsPerEntity` (16) auras beneficiosas y

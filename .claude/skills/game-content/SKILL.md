@@ -46,7 +46,7 @@ Targeting (combate híbrido, ADR-015): un objetivo (tab-target) `self`, `enemy`,
 cura aliados y daña enemigos). `target_aoe_enemies` ya no existe. Campos `aoeRadius`, `maxTargets`. Las áreas
 apuntadas de daño llevan `castMs > 0` para que se puedan esquivar.
 Formas (`shape`, ADR-016): `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`), `line` (`aoeLength`, `aoeWidth`); cono y
-línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado hasta que un hechizo necesite los otros.
+línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado; los hechizos que usan algo del motor aún no implementado quedan no disponibles (ADR-023).
 
 **Si una idea no cabe en estos efectos**, no la fuerces con hacks: propone al usuario un nuevo tipo de efecto
 (requiere código en `EffectResolver`, schema, tests y esta tabla) y crea una HU para ello.
@@ -70,7 +70,8 @@ línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado ha
 - **XP/hora en solitario** contando descansos: diferencia entre clases ≤ 15 % (`soloXpPerHourSpreadPct`). Esa es la medida de
   "cualquier clase es igual de buena elección", no el tiempo por kill.
 - **Hechizos por clase:** máximo 8 (`rules.loadout.maxSpellsPerClass`), 4 equipados libremente (sin casillas con tipo). Antes de añadir un hechizo, mejora uno por rangos (pilar 3).
-- **Pentagrama (ADR-020):** los grupos de hechizos y los aportes objetivo están en `docs/design/class-kits.md`. Regla 40/75: una
+- **Pentagrama (ADR-020):** los grupos de hechizos y los aportes objetivo están en `docs/design/class-kits.md`; se miden con
+  `tools/balance/` (`docs/design/balance-report.md`). Un hechizo medido lleva `"provisional": false`. Regla 40/75: una
   habilidad ≤ 40 puntos; una combinación de 4 + base ≤ 75 % del presupuesto; ninguna supera el valor de la clase en ninguna punta.
 - **Básico y armas (ADR-019):** el básico lo da el arma (`rules.weapons`), solo hace daño a un objetivo; mismo presupuesto de daño por
   nivel y rareza para todos los tipos, a distancia ×`rangedDpsMult` (0.8). Hechizos instantáneos de clase: `cooldownMs ≥ 2000`.

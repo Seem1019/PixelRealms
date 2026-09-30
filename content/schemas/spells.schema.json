@@ -178,7 +178,7 @@
         },
         "provisional": {
           "type": "boolean",
-          "description": "true = números provisionales, pendientes de la pasada del content-designer (HU-084)."
+          "description": "true = números provisionales, pendientes de la pasada del content-designer; false = medidos con tools/balance/ (docs/design/balance-report.md)."
         }
       },
       "allOf": [

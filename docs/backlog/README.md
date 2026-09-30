@@ -82,11 +82,12 @@
 | HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Pendiente |
 
 ## Pendiente de diseño
-- **Números definitivos de los 32 hechizos y sus auras** con el `content-designer`, a partir de `docs/design/class-kits.md`
-  (pentagrama, regla 40/75). Hoy `content/` tiene valores provisionales (`"provisional": true`).
-- **Acumulación de efectos e inmunidad tras un control:** propuesta en revisión.
+- **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).
+  Los 16 de la Fase 1 ya están medidos (`"provisional": false`, `docs/design/balance-report.md`); los demás están escalados
+  a la misma escala pero siguen con `"provisional": true`.
+- **Implementar ADR-022 y ADR-023** (acumulación, inmunidad tras control y contenido no disponible) dentro de HU-035 y HU-003.
 - Tabla de rangos por nivel (Fase 1) y mejoras 1-de-2 (Fase 2); cuándo se pueden cambiar los hechizos equipados.
-- **Pendiente de confirmar:** rangos en 4, 8 y 12 (+15 %) e inmunidad de ~3 s tras un control.
+- **Pendiente de confirmar:** rangos en 4, 8 y 12 (+15 %). La inmunidad tras un control quedó en 1,5 s (ADR-022).
 
 Estimación: **S** ≤ 1 sesión de Claude Code · **M** 1–3 sesiones · **L** 3+ sesiones (considera dividirla).
 

@@ -73,6 +73,7 @@
 5. **Dado** el duelo **entonces** no se pierde XP, oro, items ni durabilidad; los monstruos ignoran a los duelistas y estos no pueden atacar monstruos ni a terceros mientras dure.
 6. **Dado** la aldea (`safe=true`) **entonces** los duelos están permitidos (`allowedInSafeZones`); cualquier otro daño entre jugadores sigue prohibido (`Error{pvp_not_allowed}`).
 7. **Dado** `PvpService.CanAttack(a, b)` **entonces** devuelve el ruleset aplicable o `null`; tests: sin duelo → null; en duelo → `duel`; con `enabledRulesets: []` → siempre null.
+8. **Dado** un duelo **entonces** se aplican las mismas reglas de acumulación e inmunidad tras control que en PvE (ADR-022).
 
 **Notas técnicas**
 - ADR-011. `PvpService` es la única puerta: `EffectResolver` le pregunta antes de aplicar daño/auras a un jugador. El pipeline de combate no cambia.

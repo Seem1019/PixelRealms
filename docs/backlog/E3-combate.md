@@ -101,6 +101,9 @@
 7. **Dado** una entidad con `rules.limits.maxBuffsPerEntity` (16) auras beneficiosas **cuando** recibe una aura perjudicial **entonces** se aplica igual; **dado** su grupo lleno **entonces** sale la de ese grupo con menos tiempo restante y entra la nueva (tests para ambos grupos; ADR-021).
 8. **Dado** un control (`rules.combat.controlAuraKinds`) **entonces** no cuenta para ningún tope y se aplica aunque los grupos estén llenos (salvo inmunidad de jefe).
 9. **Dado** dos ralentizaciones activas (20 % y 40 %) **entonces** la velocidad baja un 40 %, no un 52 %; **dado** dos aturdimientos solapados **entonces** dura hasta el que termina más tarde.
+10. **Dado** un aura con `maxStacks` 1 reaplicada por el mismo lanzador **entonces** vuelve a su duración completa sin reiniciar el ritmo de ticks; **dado** Veneno de dos Pícaros **entonces** hay dos instancias con sus propias cargas (hasta 3 cada una) y cuentan 2 en el tope (ADR-022).
+11. **Dado** dos escudos de lanzadores distintos **entonces** conviven y se gasta primero el que caduca antes; **dado** Carrera (+50 %) y Sendero de luz (+30 %) **entonces** la velocidad sube un 50 % y Sendero se muestra en gris hasta que Carrera termina.
+12. **Dado** que termina un `stun`, `root` o `silence` **entonces** el objetivo es inmune a los tres durante `rules.combat.hardControlImmunitySec` (1.5 s) y un control fuerte nuevo da `immune`; un `interrupt` corta el casteo igualmente. Ninguna ralentización supera `maxSlowPct` (0.4).
 
 ---
 
@@ -118,6 +121,7 @@
 5. **Dado** el goblin arquero **entonces** se queda a distancia y usa `goblin_shoot` cuando está listo (cooldown y casteo tomados de `spells.json`).
 5b. **Dado** el Capataz Grask bajo el 50 % **entonces** lanza `foreman_rally` sobre sí mismo; `foreman_whip` siempre va a alguien que no sea el de mayor amenaza.
 5c. **Dado** dos jugadores en duelo **entonces** los monstruos no les hacen aggro ni ellos generan amenaza hasta que el duelo termine.
+5d. **Dado** un monstruo no jefe **entonces** sigue la misma inmunidad tras control que los jugadores (ADR-022); un jefe muestra `immune` a aturdir, enraizar y ralentizar.
 6. **Dado** 300 monstruos **entonces** la IA completa cuesta < 3 ms por tick (benchmark en tests o `LoadBot`).
 
 ---
@@ -147,6 +151,7 @@
 2. **Dado** un `CombatEvents` (lote del tick) **entonces** aparecen números flotantes sobre la entidad (colores de la skill `combat-system`) que suben y se desvanecen en 1 s.
 3. **Dado** la hotbar **entonces** cada casilla muestra ícono, tecla, barrido de CD/GCD, y se oscurece si no hay recurso o el objetivo está fuera de rango (rango calculado en cliente, solo visual).
 4. **Dado** un error del servidor **entonces** se muestra en rojo en el centro-arriba 2 s ("No tienes suficiente maná").
+4b. **Dado** auras del mismo tipo **entonces** las que no mandan se muestran en gris, y un control bloqueado por inmunidad muestra el texto "Inmune" (ADR-022).
 5. **Dado** la barra de casteo **entonces** sigue llenándose aunque me mueva y termina en "Interrumpido" (rojo), "Fuera de alcance" (gris) o sin mensaje si cancelo.
 6. **Dado** efectos visuales **entonces** salen de reservas precreadas (32 marcas de área, 64 proyectiles, 48 textos, 32 impactos) y hay como máximo 24 marcas, 48 proyectiles y 40 textos visibles; nunca se oculta una marca enemiga que me alcanza; los ticks de una misma aura se agrupan y con más de 6 números por entidad y segundo se muestra uno sumado (ADR-018).
 
@@ -182,7 +187,7 @@
 6. **Dado** el contenido **entonces** `target_aoe_enemies` ya no existe en el schema y Estallido de llamas y Golpe de pico usan `ground_aoe_enemies` (hecho en el contenido el 2026-09-30); el validador lo comprueba.
 7. **Dado** un área enemiga **entonces** nunca afecta a aliados ni al lanzador (sin fuego amigo).
 7b. **Dado** la búsqueda de objetivos **entonces** usa la rejilla AOI de la instancia y pruebas de forma sin raíces ni trigonometría; la línea de visión se comprueba desde el centro solo para los candidatos que pasan la forma; `maxTargets` nunca supera `rules.limits.aoeMaxTargetsCap` (10); con `rules.limits.maxAreasPerInstance` áreas activas, un jugador recibe `Error{area_limit}` y un monstruo elige otra acción (ADR-018).
-8. **Dado** el schema de hechizos **entonces** `shape` admite `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`) y `line` (`aoeLength`, `aoeWidth`); en esta HU solo se implementa `circle` y el validador rechaza `cone`/`line` en el contenido hasta que se implementen (ADR-016).
+8. **Dado** el schema de hechizos **entonces** `shape` admite `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`) y `line` (`aoeLength`, `aoeWidth`); en esta HU solo se implementa `circle`; los hechizos con `cone`/`line` quedan no disponibles hasta que se implementen (ADR-023).
 
 **Notas técnicas**
 - ADR-015. `CastState` guarda `targetPos`; `TargetResolver` recibe el punto. `targetPos` y `radius` son campos opcionales del protocolo (no sube `ProtocolVersion`).

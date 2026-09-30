@@ -128,7 +128,7 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - **Contexto:** con una curva fijada en XP, las horas del 1 al 15 dependían de algo no controlado (tiempo por kill) y salían
   4–7 h de combate frente al objetivo de 20–30 h.
 - **Decisión:** la curva se diseña en **minutos por nivel** (`rules.progression.minutesPerLevel`, 25,2 h en total) y la XP se
-  calcula con `killCycleSecTarget` (30 s) y la XP del monstruo normal del nivel. `xpRate` es un multiplicador global. Reemplaza
+  calcula con `killCycleSecTarget` (30 s; 36 s desde el balance de la Fase 1) y la XP del monstruo normal del nivel. `xpRate` es un multiplicador global. Reemplaza
   a `xpCurveK`, `xpCurveKByLevel` y `xpCurveExponent`.
 - **Consecuencias:** si el tiempo real por kill cambia, se ajusta un número. El contenido futuro que da XP se presupuesta en
   minutos equivalentes. Un tier nuevo añade filas a la tabla.
@@ -202,3 +202,22 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - **Consecuencias:** en el peor caso realista una entidad lleva ~9 beneficiosas y ~1–3 perjudiciales que cuentan, así que los
   topes son una red de seguridad. Cambian HU-035 y HU-088. Se eliminan las auras huérfanas Desgarro y Escudo de maná y se
   crean las 14 del kit nuevo.
+
+## ADR-022 · Acumulación de efectos e inmunidad tras un control
+- **Decisión:**
+  - Cada aura activa se identifica por (aura, lanzador). Reaplicarla renueva la duración completa sin reiniciar el ritmo de
+    ticks; solo suman cargas las auras con `maxStacks` > 1.
+  - Daño y cura en el tiempo y escudos de lanzadores distintos conviven; los escudos se gastan por orden de caducidad.
+  - Los modificadores del mismo tipo (velocidad, daño hecho, daño recibido, ralentización) no se suman: manda el más fuerte
+    y los demás se muestran en gris. Ralentización máxima `rules.combat.maxSlowPct` (0.4), sin inmunidad a ralentizar.
+  - Tras un `stun`, `root` o `silence`, el objetivo es inmune a los tres durante `hardControlImmunitySec` (1,5 s), igual para
+    jugadores y monstruos. `interrupt` no es un control. Sin quemaduras.
+- **Alternativas descartadas:** inmunidad de 3 s (demasiado larga) o por tipo de control (se rotaba aturdir → enraizar →
+  aturdir); rendimientos decrecientes (más difíciles de leer en los iconos).
+- **Consecuencias:** `AuraApplied` lleva `casterId`; cambian HU-035, HU-036, HU-038 y HU-064.
+
+## ADR-023 · Contenido que usa funciones del motor aún no implementadas
+- **Decisión:** el validador mantiene la lista de funciones del motor implementadas (formas, targetings, efectos, campos). Un
+  hechizo que use alguna que falte se carga como **no disponible** (no se aprende ni se equipa) y genera un aviso, no un error.
+- **Consecuencias:** el contenido puede ir por delante del motor sin romper la carga; cada HU que implementa una función
+  (HU-085, HU-086, HU-087) habilita sus hechizos sin tocar `content/`.
