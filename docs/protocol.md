@@ -32,7 +32,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Ping` | `{ clientTime }` | — |
 | `MoveInput` | `{ seq, dx, dy }` dx,dy ∈ {-1,0,1} | seq creciente; vivo; no aturdido/raíz |
 | `SelectTarget` | `{ targetId? }` | entidad existe y está en AOI |
-| `CastSpell` | `{ spellId, targetId?, targetPos?: Vec2, reqId }` | conoce el hechizo, nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no casteando, no aturdido/silenciado. Hechizos `ground_*` (ADR-015): `targetPos` obligatorio, a ≤ `range + castRangeToleranceTiles` y con LOS al punto |
+| `CastSpell` | `{ spellId, targetId?, targetPos?: Vec2, reqId }` | conoce el hechizo, nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no aturdido/silenciado, fuera del bloqueo tras interrupción (`locked_out`). Si ya está casteando, el casteo actual se cancela (ADR-019). Área al tope de la instancia → `area_limit`. Hechizos `ground_*`, de cono o línea y con `leap` (ADR-015, ADR-016): `targetPos` obligatorio, a ≤ `range + castRangeToleranceTiles` y con LOS al punto (el cono y la línea solo usan su dirección) |
 | `CancelCast` | `{}` | — |
 | `AutoAttack` | `{ on: bool }` | tiene arma; objetivo hostil |
 | `InventoryMove` | `{ from: SlotRef, to: SlotRef, qty?, reqId }` | ver skill `inventory-items` |
@@ -58,9 +58,9 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Snapshot` | `{ tick, ackSeq, self: { x, y, speed, hp, maxHp, res, maxRes }, ents: EntState[] }` (`speed` en tiles/s, incluye auras) | cada 2 ticks |
 | `EntitySpawn` | `{ id, kind, templateId, name, x, y, dir, level, classId?, hpPct, flags }` | entra a tu AOI |
 | `EntityDespawn` | `{ id, reason: "left"|"died"|"despawn" }` | sale de tu AOI |
-| `CastStarted` | `{ casterId, spellId, targetId?, targetPos?, radius?, durationMs }` | inicio de casteo (a la AOI); en áreas apuntadas `targetPos` y `radius` sirven para dibujar la marca en el suelo |
-| `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled" }` | |
-| `CombatEvent` | `{ src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }` | resolución |
+| `CastStarted` | `{ casterId, spellId, targetId?, targetPos?, dir?, radius?, durationMs }` | inicio de casteo (a la AOI); en áreas y saltos `targetPos` (y `dir` en cono/línea) fijan la marca en el suelo; la forma y el tamaño salen del contenido (`radius` solo si algo los modifica) |
+| `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled"|"failed", reason? }` | `failed` con `reason: out_of_range\|no_los` si al terminar el objetivo quedó fuera (sin coste) |
+| `CombatEvents` | `{ tick, e: { src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }[] }` | una vez por tick y observador con todos los resultados que ve (máx. 64 entradas; si hay más, se parte). Reemplaza al antiguo `CombatEvent` por golpe (ADR-018) |
 | `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, stacks, durationMs }` / `{ targetId, auraId }` | |
 | `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
 | `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | al cambiar |
@@ -82,7 +82,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 
 ## Códigos de error
 `bad_version`, `bad_ticket`, `rate_limited`, `not_found`, `out_of_range`, `no_los`, `on_cooldown`, `on_gcd`,
-`not_enough_resource`, `invalid_target`, `is_dead`, `is_casting`, `stunned`, `silenced`, `bag_full`,
+`not_enough_resource`, `invalid_target`, `is_dead`, `is_casting`, `stunned`, `rooted`, `silenced`, `locked_out`, `area_limit`, `bag_full`,
 `not_enough_gold`, `level_too_low`, `not_owner`, `in_combat`, `pvp_not_allowed`, `duel_busy`, `trade_busy`, `trade_version`, `forbidden`, `invalid_payload`.
 (`cannot_equip` y `wrong_class` **no existen**: cualquier clase equipa cualquier item, ADR-009.)
 

@@ -10,10 +10,24 @@ aquí se citan los valores por defecto para poder leer las fórmulas. Cambio de 
 - **Área ⇒ se apunta libremente:** `self_aoe_enemies` / `self_aoe_allies` (círculo alrededor del lanzador) y
   `ground_aoe_enemies` / `ground_aoe_allies` / `ground_aoe_all` (círculo de `aoeRadius` en el punto `targetPos` que envía el
   cliente, a ≤ `range` + `castRangeToleranceTiles` del lanzador y con LOS al punto). `ground_aoe_all` aplica los efectos
-  de cura a aliados y los de daño a enemigos (hechizo del Sacerdote). `target_aoe_enemies` desaparece (HU-086).
+  positivos (cura, escudo, beneficios) a aliados y los negativos (daño, controles, perjuicios) a enemigos (Pulso sagrado,
+  Sendero de luz). `target_aoe_enemies` ya no existe en el contenido ni en el schema.
+- Un efecto puede llevar `applyTo: "self"` para aplicarse al lanzador aunque el hechizo sea de área o de salto (velocidad
+  propia de Cuchillas arrojadizas, daño extra de Paso sombrío). `heal` admite `bonusBelowHpPct` + `bonusMult` (cura más si el
+  objetivo está por debajo de ese % de vida; Oración desesperada). Efecto `interrupt`: corta el casteo del objetivo y aplica
+  `rules.combat.interruptLockoutMs`.
 - El punto se fija en `CastStarted` (todos ven la marca en el suelo) y el área se resuelve al terminar el casteo con los
   objetivos que estén dentro en ese tick. Salir de la marca esquiva el golpe; los monstruos siguen la misma regla.
 - Sin fuego amigo. `maxTargets` elige los más cercanos al centro del área.
+- **Formas** (`shape`): `circle` (`aoeRadius`), `cone` (`aoeRadius` + `aoeAngleDeg`) y `line` (`aoeLength` + `aoeWidth`); el
+  cono y la línea salen del lanzador en la dirección de `targetPos`. Las tres están en el schema; el círculo se implementa en
+  la Fase 1 (HU-086) y el cono y la línea cuando un hechizo los use (hasta entonces el validador los rechaza en contenido).
+- **Salto a un punto** (efecto `leap`: `maxRange`, `travelMs`; `travelMs = 0` = teletransporte; HU-087): el lanzador va hasta
+  `targetPos`, recortado a la última casilla libre con LOS dentro de `maxRange`. Lo mueve el servidor; el cliente no lo
+  predice y suaviza la posición recibida (~100 ms). `root` y `stun` impiden saltar. Los efectos del mismo hechizo que van
+  después del `leap` se aplican en el punto de llegada (p. ej. un área al caer). Carga (`dash` a un objetivo) sigue igual.
+- **Pendiente de confirmar:** al terminar un `stun` o un `root`, el objetivo es inmune a ese mismo tipo ~3 s (irá a
+  `rules.combat` cuando se confirme).
 
 ## Stats primarios
 `str` (fuerza), `agi` (agilidad), `int` (intelecto), `spi` (espíritu), `sta` (aguante).
@@ -56,9 +70,17 @@ MVP, `resist = 0` salvo auras futuras, falla 4 %, no se esquiva). Bola de fuego 
 diferencia es el efecto secundario, no el elemento.
 
 ## Ataque básico
+El básico lo da **el arma equipada** y **no ocupa ninguna de las 4 casillas de hechizo** (ADR-019). Alcance, animación y
+proyectil por tipo en `rules.weapons` (daga 1,25 · espada/maza/hacha 1,5 · varita 7 · bastón 5 casillas); velocidad y daño en
+cada item; las armas a distancia tienen un 20 % menos de presupuesto de daño (`rangedDpsMult`). Solo hace daño a un objetivo.
+- **Convivencia con los hechizos:** el básico sigue solo mientras haya objetivo en alcance y no se castee. Un hechizo
+  instantáneo **no reinicia** el temporizador, pero abre un bloqueo de `abilityLockMs` (250) en el que no sale el básico ni
+  otro hechizo; si el básico tocaba dentro del bloqueo, sale al terminar. GCD de `gcdMs` (1000) en los hechizos de clase; el
+  básico y los usables no lo activan. Todo hechizo instantáneo de clase tiene `cooldownMs ≥ minInstantSpellCooldownMs` (2000).
 ```
 swingMs  = weapon.speedMs / haste
-escuela  = weaponScaling[weapon.weaponType] ∈ {str, agi} → physical con attackPower ; int → magic con spellPower (rango 6 tiles)
+escuela  = weaponScaling[weapon.weaponType] ∈ {str, agi} → physical con attackPower ; int → magic con spellPower
+alcance  = rules.weapons[weapon.weaponType].rangeTiles
 raw      = weaponRoll(min..max) · afinidad + poder / basicAttackPowerDivisor(14) · (swingMs / 1000)
 ```
 Sin coste de recurso. Reanuda al volver al rango sin reiniciar el temporizador. No activa GCD.
@@ -90,21 +112,38 @@ dmg = round(raw · (1 − resist) · critMult · variance · classAdvantage)    
 
 ## Tabla de impacto (un solo roll por objetivo)
 Físico: `miss 5 %` (+1 % por nivel del objetivo sobre el atacante) → `dodge` → `crit` → `hit`. Mágico: `miss 4 %` → `crit` → `hit`.
-- Un hechizo que **solo aplica auras** (Desgarrar, Hoja envenenada, Escarcha en su parte de aura) pasa por la misma
+- Un hechizo que **solo aplica auras** (Veneno debilitante, Corte de tendón, Escarcha en su parte de aura) pasa por la misma
   tabla: si falla, no aplica nada.
 - Los **ticks de DoT** no fallan ni critican; los DoT físicos sí se mitigan por armadura (calculada al aplicar, *snapshot*).
 
 ## Casteo
-- `castMs = 0` ⇒ instantáneo. Durante un casteo el jugador **no puede moverse**: `MoveInput` con dirección ≠ 0 lo
-  interrumpe (`result: interrupted`). Recibir daño no interrumpe; **un `stun` sí**.
+- `castMs = 0` ⇒ instantáneo. Durante un casteo el jugador **puede moverse** a `velocidad · castMoveSpeedMult` (0.5; ADR-019).
+  Moverse no interrumpe y recibir daño tampoco. **Solo interrumpen** los controles que impiden castear (`stun`; `silence` en
+  hechizos `magic`) y el efecto `interrupt` (`result: interrupted`); después, `interruptLockoutMs` (1500) sin poder castear.
+  `root` y `slow` no interrumpen.
+- **Fin del casteo con objetivo único:** se revalidan alcance (`castRangeToleranceTiles` = 1.5) y LOS; si fallan,
+  `CastEnded{result: failed, reason: out_of_range|no_los}`, sin gastar recurso ni cooldown (el GCD ya se gastó).
+- **Áreas y saltos:** punto, origen y dirección se fijan en `CastStarted` y **no** se revalida el alcance al terminar (la marca
+  ya vista no se cancela porque el lanzador se movió). Solo las cortan las causas de arriba.
+- **Otra habilidad o un salto durante un casteo lo cancela** (`result: cancelled`, sin coste) y se usa la nueva si el GCD lo
+  permite. Los usables (pociones) no cancelan. `CancelCast` (Esc) cancela.
+- **Predicción:** el cliente aplica la velocidad reducida al recibir su propio `CastStarted` y la quita con `CastEnded`;
+  `Snapshot.self.speed` incluye el multiplicador y la reconciliación corrige el desfase (50–100 ms). `movement.json` incluye
+  casos a velocidad reducida. La barra de casteo sigue llenándose en movimiento: "Interrumpido" (rojo), "Fuera de alcance"
+  (gris), nada si se cancela.
 - GCD `gcdMs` (1000) en todo hechizo con `triggersGcd: true` (por defecto). El ataque básico no activa GCD.
 - Recurso se descuenta **al terminar** el casteo; se valida al iniciar y al terminar.
-- Rango y LOS se validan al iniciar y al terminar (tolerancia `castRangeToleranceTiles` = 1 al terminar).
+- Rango y LOS se validan al iniciar y, en hechizos a un objetivo, también al terminar (ver arriba).
 - LOS: Bresenham sobre la grilla de colisión (tiles con `blocksSight`).
 - Efecto `dash` (Carga): el lanzador se coloca adyacente al objetivo en ≤ 3 ticks; requiere LOS y `distancia ≥ minRange`.
 - Hechizos de área `ground_*`: rango y LOS se validan contra `targetPos` al iniciar; el punto no se mueve durante el casteo
   y al terminar se toman los objetivos dentro de `aoeRadius`.
 - Mientras se castea, el ataque básico se pausa (ver §Ataque básico).
+
+## Rendimiento (ADR-018)
+Áreas: se buscan con la rejilla AOI de la instancia y pruebas de forma sin raíces ni trigonometría; las instantáneas se
+evalúan una vez al resolverse; solo interactúan con entidades. Límites en `rules.limits`; eventos de combate agrupados por
+tick (`CombatEvents`). Detalle y umbrales de verificación en ADR-018.
 
 ## Auras (`content/auras.json`)
 Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `tickMs`, `maxStacks`, `base`, `apCoef`,
@@ -115,6 +154,12 @@ Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `t
 - Un DoT/HoT de `durationMs = 12000, tickMs = 3000` produce **exactamente 4 ticks** (a 3, 6, 9 y 12 s); el último tick
   ocurre en el mismo tick de servidor que la expiración y **sí cuenta**.
 - `shield` absorbe daño hasta `amount` y se consume. Orden al recibir daño: `damageTakenPct/damageDonePct` → `shield` → hp.
+- **Topes (ADR-021):** una entidad tiene como mucho `rules.limits.maxBuffsPerEntity` (16) auras beneficiosas y
+  `maxDebuffsPerEntity` (16) perjudiciales. **Un aura nueva siempre se aplica:** si su grupo está lleno, sale la de ese mismo
+  grupo con menos tiempo restante. Los **controles** (`rules.combat.controlAuraKinds`: stun, root, silence, slow) no cuentan
+  para ningún tope; solo pueden no aplicarse por inmunidad de jefe (o por la inmunidad tras un control, si se confirma).
+- **Controles del mismo tipo no se suman:** con varias ralentizaciones activas manda la más fuerte (`pct` mayor); con varios
+  aturdimientos o raíces manda la que termina más tarde. Siguen visibles como iconos, pero solo una tiene efecto.
 - `stun`: no mueve, no castea (interrumpe), no ataca. `root`: no mueve. `silence`: no castea `magic`. `slow`: `speed × (1 − pct)`.
 - `removesKinds`: al aplicarse quita esas auras del objetivo. `immuneKinds`: mientras dura, ignora auras nuevas de esos tipos (Carrera: root, slow).
 - Monstruos con `boss: true` ignoran `bossImmuneToAuraKinds` (stun, root, slow).

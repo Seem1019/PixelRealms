@@ -45,6 +45,8 @@
 2. **Dado** 150 ms de latencia simulada (`Net.simulated_latency_ms`) **cuando** me muevo **entonces** el personaje responde en el mismo frame y no hay tirones visibles al caminar en línea recta.
 3. **Dado** una corrección del servidor (p. ej. me bloqueó algo que el cliente no sabía) **entonces** si el error es < 2 px se corrige suave en 100 ms; si es mayor, salta.
 4. **Dado** el overlay F3 **entonces** muestra inputs pendientes, último `ackSeq` y error de reconciliación en px.
+4b. **Dado** que casteo moviéndome **entonces** el cliente aplica `castMoveSpeedMult` desde su propio `CastStarted` hasta `CastEnded`, y `shared/test-vectors/movement.json` incluye casos a velocidad reducida que pasan en ambos lados.
+5. **Dado** un desplazamiento por habilidad (Carga, salto a un punto) **entonces** el cliente no lo predice: aplica la posición del servidor con un suavizado de ~100 ms (ADR-016).
 
 ---
 
@@ -58,7 +60,7 @@
 1. **Dado** dos jugadores a menos de ~16 tiles **entonces** cada uno recibe `EntitySpawn` del otro (nombre, clase, nivel) y lo ve moverse.
 2. **Dado** que uno se aleja fuera de su AOI **entonces** el otro recibe `EntityDespawn{reason:"left"}` y deja de verlo; al volver, reaparece.
 3. **Dado** 100 ms de interpolación **entonces** el movimiento remoto se ve fluido a 10 snapshots/s, incluso con 5 % de pérdida simulada de snapshots.
-4. **Dado** 30 jugadores simulados (bots de prueba `tools/LoadBot`) **entonces** el tick p99 < 10 ms y cada cliente recibe < 30 KB/s.
+4. **Dado** 30 jugadores simulados (bots de prueba `tools/LoadBot`) **entonces** el tick p99 < 10 ms y cada cliente recibe < 30 KB/s. Los bots también podrán combatir para el escenario de carga de HU-089.
 5. **Dado** la animación **entonces** los remotos usan `walk_<dir>` / `idle_<dir>` según `dir` y `anim` del snapshot.
 
 **Notas técnicas**
@@ -88,7 +90,7 @@
 - Skills: `dotnet-server`, `godot-client`, `net-protocol`
 
 **Criterios de aceptación**
-1. **Dado** que se corta la conexión **entonces** mi personaje queda 10 s en el mundo (quieto) y luego se guarda y desaparece.
+1. **Dado** que se corta la conexión **entonces** mi personaje queda 10 s en el mundo (quieto) y luego se guarda y desaparece; si estaba en combate, sigue hasta salir de combate, con un máximo de `rules.combat.linkdeadInCombatMaxSec` (30 s), y puede morir.
 2. **Dado** que el cliente reconecta en < 10 s (nuevo ticket automático con el JWT) **entonces** retoma el mismo personaje sin pasar por la pantalla de selección.
 3. **Dado** el cliente sin conexión **entonces** muestra "Reconectando… (intento 2/5)" y tras 5 intentos vuelve al login.
 4. **Dado** que cierro el juego con la X **entonces** el cliente envía close normal y el servidor guarda de inmediato (sin esperar 10 s) salvo si estoy en combate.
@@ -107,6 +109,7 @@
 3. **Dado** un jugador conectado **entonces** se guarda cada 60 s si hubo cambios (`Dirty`).
 4. **Dado** que el guardado falla **entonces** reintenta 3 veces con backoff y loguea `error` con el DTO; el tick nunca se bloquea.
 5. **Dado** los tests de Persistence **entonces** cubren guardar y cargar un personaje completo (Testcontainers).
+6. **Dado** el estado de combate **entonces** se guardan vida, recurso y posición al salir, cambiar de mapa, subir de nivel, completar un intercambio, cambiar de clase y morir (además del guardado cada 60 s); nunca en cada tick, y no se guardan cooldowns, auras ni casteos (ADR-018).
 
 ---
 

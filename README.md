@@ -16,7 +16,7 @@ Cliente **Godot 4 (GDScript)** · Servidor **.NET 10** autoritativo · **Postgre
 | `docs/protocol.md` | catálogo de mensajes cliente ⇄ servidor |
 | `docs/database.md` | modelo de datos |
 | `docs/decisions.md` | decisiones de arquitectura (ADR) |
-| `docs/design/gdd.md` · `combat.md` | diseño de juego y fórmulas |
+| `docs/design/gdd.md` · `combat.md` · `class-kits.md` | diseño de juego, fórmulas, pentagrama y hechizos por clase |
 | `docs/backlog/` | épicas e historias de usuario con criterios de aceptación |
 | `docs/prompts/` | prompts listos para Claude Code |
 | `content/` | clases, hechizos, auras, items, monstruos, botín y vendedores (JSON + schemas) |

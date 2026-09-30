@@ -7,10 +7,10 @@
 | Hito | Resultado jugable | HUs |
 |---|---|---|
 | **M1 · Caminar juntos** | 2+ amigos inician sesión, crean personaje y se ven moverse por el mapa | HU-001 → HU-027 |
-| **M2 · Pelear** | matar slimes con hechizos de clase (un objetivo y áreas apuntadas), morir y reaparecer, ganar XP | HU-030 → HU-041, HU-085, HU-086 |
+| **M2 · Pelear** | matar slimes con hechizos de clase (un objetivo y áreas apuntadas), morir y reaparecer, ganar XP | HU-030 → HU-041, HU-085 → HU-088 |
 | **M3 · Botín** | lootear (por item, al azar), inventario, equipo libre con afinidad, pociones, vendedor, intercambio | HU-050 → HU-059 |
 | **M4 · Grupo y duelos** | chat, grupos, XP compartida, duelos, subir de nivel en el Tier 1 | HU-042 → HU-044, HU-060 → HU-064 |
-| **M5 · Online** | servidor en VPS con `wss://`, versión web, Tier 1 completo con la Mina y el Capataz | HU-070 → HU-084 |
+| **M5 · Online** | servidor en VPS con `wss://`, versión web, Tier 1 completo con la Mina y el Capataz | HU-070 → HU-084, HU-089 |
 
 ## Índice
 | ID | Título | Épica | Prioridad | Est. | Estado |
@@ -77,11 +77,16 @@
 | HU-084 | Pasada de balance | E8 | Must | M | Pendiente |
 | HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Pendiente |
 | HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Pendiente |
+| HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Pendiente |
+| HU-088 | Rendimiento del combate | E3 | Must | L | Pendiente |
+| HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Pendiente |
 
-## Pendiente de diseño (antes de implementar rangos y áreas)
-- **Rediseño de kits** con el combate híbrido (ADR-015): hasta 8 hechizos por clase, 4 equipados; tabla de rangos por
-  nivel (Fase 1) y mejoras 1-de-2 (Fase 2); **daño en área para el Guerrero y el Pícaro**; nombre y números del hechizo
-  del Sacerdote. Afecta a HU-041 (rangos), HU-085 y HU-086.
+## Pendiente de diseño
+- **Números definitivos de los 32 hechizos y sus auras** con el `content-designer`, a partir de `docs/design/class-kits.md`
+  (pentagrama, regla 40/75). Hoy `content/` tiene valores provisionales (`"provisional": true`).
+- **Acumulación de efectos e inmunidad tras un control:** propuesta en revisión.
+- Tabla de rangos por nivel (Fase 1) y mejoras 1-de-2 (Fase 2); cuándo se pueden cambiar los hechizos equipados.
+- **Pendiente de confirmar:** rangos en 4, 8 y 12 (+15 %) e inmunidad de ~3 s tras un control.
 
 Estimación: **S** ≤ 1 sesión de Claude Code · **M** 1–3 sesiones · **L** 3+ sesiones (considera dividirla).
 

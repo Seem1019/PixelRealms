@@ -60,7 +60,7 @@ Orden estricto de cada tick (los pasos 3–9 se ejecutan **por cada `MapInstance
 8. `DeathSystem` / `LootSystem` / `RespawnSystem`.
 9. `InterestSystem` – recalcula AOI (celdas de 16×16 tiles) → spawns/despawns por observador.
 10. `Outbound` – cada 2 ticks `SnapshotBuilder` construye un snapshot por jugador; eventos del tick
-    (`CombatEvent`, `AuraApplied`…) se envían a quienes tengan la entidad en su AOI.
+    (`CombatEvents` agrupados por tick, `AuraApplied`…) se envían a quienes tengan la entidad en su AOI.
 11. `Persistence` – jugadores `Dirty` con autosave vencido (60 s) → `CharacterSaveDto` a `SaveService`.
 
 ```mermaid
@@ -75,7 +75,7 @@ sequenceDiagram
   S-->>C: {"t":"CastStarted",...}
   Note over L: 2.0 s después (40 ticks)
   L->>L: EffectResolver → daño 37 (crit)
-  L-->>C: CombatEvent + Snapshot (hpPct)
+  L-->>C: CombatEvents + Snapshot (hpPct)
 ```
 
 ## 4. Red
@@ -99,6 +99,8 @@ sequenceDiagram
   inputs con `seq > ackSeq` usando **el mismo algoritmo** (tests en `shared/test-vectors/movement.json`).
   Si el error es < 2 px, se corrige suavemente (lerp 100 ms); si es mayor, snap.
 - Entidades remotas: buffer de interpolación de 100 ms entre los dos snapshots que rodean `renderTime`.
+- Desplazamientos por habilidad (Carga, saltos a un punto): los aplica el servidor; el cliente no los predice y muestra la
+  posición recibida con un suavizado de ~100 ms (ADR-016). No pasan por `MovementStep` ni por los vectores de movimiento.
 
 ## 5. Persistencia
 - El estado vivo está en memoria. La BD es la copia durable.
@@ -121,6 +123,6 @@ sequenceDiagram
 - Backups: `pg_dump` diario por cron → 7 copias.
 
 ## 8. Límites conocidos (aceptados en MVP)
-- Un solo proceso; varias `MapInstance` (MVP: `meadow` y `mine`, una copia de cada); sin sharding. Objetivo: 50 jugadores y 300 monstruos a < 10 ms/tick.
+- Un solo proceso; varias `MapInstance` (MVP: `meadow` y `mine`, una copia de cada); sin sharding. Objetivo: 50 jugadores y 300 monstruos a < 10 ms/tick; combate ≤ 4 ms p99 por instancia, límites de áreas en `rules.limits` y escenario de carga "Mina llena" (ADR-018, HU-089).
 - Una copia por mapa: el jefe de la Mina es compartido. Instancias por grupo = N `MapInstance` del mismo `MapData` (post-MVP, sin cambios de protocolo).
 - JSON en vez de binario (≈ 25 KB/s por cliente a 10 Hz). Optimización a MessagePack en backlog (HU-OPS-05).

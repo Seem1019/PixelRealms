@@ -44,7 +44,7 @@ Lecturas:
   penalización y se acepta. Si se quiere subir, tocar `affinity.multipliers.baja` a 0.75.
 - El aguante de los casters con armadura pesada queda en ~50 % del Guerrero: la diferencia la hacen `baseHp` y `sta`
   base (identidad de tanque), no la afinidad. Subirlo más haría que el Guerrero dejara de sentirse distinto.
-- La varita **es** la opción correcta del Sacerdote en solitario: rinde como la maza pero a 6 tiles, y no gasta maná.
+- La varita **es** la opción correcta del Sacerdote en solitario: rinde como la maza pero a distancia (7 casillas, ADR-019), y no gasta maná.
 
 ## 4. Jefe del Tier 1: Capataz Grask (nv 6, 2 000 hp, armadura 90, 18–26 de daño cada 2.4 s)
 | Grupo | DPS del grupo | Duración | Notas |
@@ -60,21 +60,22 @@ queda sin maná a los ~30 s y el jefe caerá antes. También cambia el Golpe de 
 esquivar (combate híbrido, ADR-015). Recalcular en HU-084. Lo que hay que verificar jugando: el Golpe de pico (AoE)
 castiga a los melee que se apilan y el Latigazo obliga al sanador a curar a alguien distinto del tanque.
 
-## 5. Curva de XP (K = 100 en nivel 1, 150 en nivel 2, 200 desde el 3; nivel máximo 15)
-| Nivel | XP para subir | Kills de un mob normal de tu nivel | Nivel | XP | Kills |
-|---|---|---|---|---|---|
-| 1→2 | 100 | 17 | 8→9 | 5 572 | 136 |
-| 2→3 | 455 | 41 | 9→10 | 6 727 | 146 |
-| 3→4 | 1 160 | 72 | 10→11 | 7 962 | 156 |
-| 4→5 | 1 838 | 88 | 11→12 | 9 274 | 166 |
-| 5→6 | 2 627 | 101 | 12→13 | 10 659 | 175 |
-| 6→7 | 3 516 | 113 | 13→14 | 12 115 | 184 |
-| 7→8 | 4 500 | 125 | 14→15 | 13 641 | 192 |
+## 5. Curva de XP por tiempo (ADR-017; nivel máximo 15)
+`xpParaSubir(L) = round(minutos(L) · (60 / killCycleSecTarget) · (5·L + 1))`, con `killCycleSecTarget = 30` ⇒ kills por nivel = minutos × 2.
 
-Total: 80 146 XP, ~1 710 kills de tu nivel (menos si matas naranjas: +10 % por nivel de diferencia hasta +40 %).
-Tier 1 (1→6): 6 180 XP, ~319 kills.
-Objetivo de duración: 20–30 h del 1 al 15 con una clase (`rules.balanceTargets.hoursToMaxLevel`); a 8–15 s por kill eso son
-~4–7 h de combate puro, así que hay que medirlo en HU-084.
+| Nivel | Minutos | XP para subir | Kills | Nivel | Minutos | XP | Kills |
+|---|---|---|---|---|---|---|---|
+| 1→2 | 10 | 120 | 20 | 8→9 | 115 | 9 430 | 230 |
+| 2→3 | 20 | 440 | 40 | 9→10 | 130 | 11 960 | 260 |
+| 3→4 | 35 | 1 120 | 70 | 10→11 | 150 | 15 300 | 300 |
+| 4→5 | 50 | 2 100 | 100 | 11→12 | 165 | 18 480 | 330 |
+| 5→6 | 65 | 3 380 | 130 | 12→13 | 180 | 21 960 | 360 |
+| 6→7 | 85 | 5 270 | 170 | 13→14 | 195 | 25 740 | 390 |
+| 7→8 | 100 | 7 200 | 200 | 14→15 | 210 | 29 820 | 420 |
+
+Total: 152 320 XP, ~3 020 kills de tu nivel, ~25,2 h (menos si matas naranjas: +10 % por nivel de diferencia hasta +40 %).
+Fase 1 (1→6): 7 160 XP, ~360 kills, 3 h · Fase 2 (6→10): 7,2 h · Fase 3 (10→15): 15 h.
+El supuesto de 30 s por kill se mide en HU-084; si no se cumple, se cambia `killCycleSecTarget` y la tabla se recalcula.
 
 Reparto en grupo (niveles 10 / 8 / 5, monstruo normal nv 9 = 46 XP): referencia 10 → mod 0.9; bono(3) 1.55 → pool 64.2;
 pesos 1.00 / 1.00 / 0.42 → **26.5 / 26.5 / 11.2 XP**. Sin piso: la brecha penaliza a propósito.

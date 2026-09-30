@@ -100,5 +100,6 @@ Subagentes (`.claude/agents/`): `server-authority-reviewer`, `content-designer`,
 - **MapData / MapInstance**: datos estáticos de un mapa (compartidos) / estado vivo de una copia del mapa. **Portal**: objeto que cambia de mapa.
 - **Ruleset PvP**: reglas de un modo de PvP (`rules.pvp`); el MVP solo tiene `duel`.
 - **Fase**: etapa del MVP, una por tier (Fase 1 = Tier 1, tope de nivel 6); `rules.world.currentPhase` y `rules.progression.levelCapByPhase` (ADR-013).
-- **Barra**: 4 hechizos equipados (teclas 1–4) + 4 utilizables (teclas 5–8), `rules.loadout` (ADR-014).
+- **Barra**: 4 hechizos equipados (teclas 1–4) + 4 utilizables (teclas 5–8), `rules.loadout` (ADR-014). El ataque básico lo da el arma y no ocupa casilla (ADR-019).
+- **Pentagrama**: perfil de cada clase en 5 puntas (mono, área, control, movilidad, armadura); balance con la regla 40/75 (ADR-020, `docs/design/class-kits.md`).
 - **Template** (`ItemTemplate`, `MonsterTemplate`): definición en JSON. **Instance**: copia viva en el mundo.

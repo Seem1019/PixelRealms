@@ -19,7 +19,7 @@ está construido y cómo extenderlo sin romperlo.
 | `EffectResolver` | aplica `EffectDef[]` sobre la lista de objetivos resuelta por `TargetResolver` |
 | `AuraSystem` | aplicar/refrescar/stack, ticks, expiración, `shield` absorbe, `stat_mod` invalida stats |
 | `ThreatTable` | por monstruo: `Add(actor, amount)`, `Top()`, reglas 110 %/130 %, `taunt` |
-| `AutoAttackSystem` | swing timer `weapon.speedMs / haste` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango; escuela y poder según `weapon.scaling` (str/agi → físico melee 1.5; int → mágico 6 tiles con proyectil). Sin coste de recurso; al impactar devuelve maná a quien lo tenga (`maxMana · rules.combat.manaPerBasicHitPctPerSec · swingMs/1000`, cualquier arma). El swing se pausa mientras el actor castea |
+| `AutoAttackSystem` | swing timer `weapon.speedMs / haste` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango; escuela y poder según `weapon.scaling` (str/agi → físico; int → mágico); alcance, animación y proyectil de `rules.weapons` (ADR-019). Un hechizo instantáneo no reinicia el swing, pero abre `abilityLockMs` (250) sin básico. Sin coste de recurso; al impactar devuelve maná a quien lo tenga (`maxMana · rules.combat.manaPerBasicHitPctPerSec · swingMs/1000`, cualquier arma). El swing se pausa mientras el actor castea |
 | `DeathSystem` | hp ≤ 0 → `Dead`, limpia auras, crea `LootBag`, XP, evento `Died`; jugadores: espera `Respawn` |
 
 ## Pipeline de un hechizo
@@ -27,17 +27,20 @@ está construido y cómo extenderlo sin romperlo.
 CastSpell(msg) ─► CastSystem.TryBeginCast
    ├─ validar: conoce, levelReq, !dead, !stunned, !silenced(si no físico), !casting, CD, GCD,
    │           recurso ≥ coste, objetivo válido para targeting (jugador enemigo solo si PvpService.CanAttack), rango, LOS
-   │           `ground_*`: targetPos obligatorio, rango y LOS al punto; el punto queda fijo en CastState (ADR-015)
+   │           `ground_*`, cono, línea y `leap`: targetPos obligatorio, rango y LOS al punto; queda fijo en CastState (ADR-015/016)
    ├─ castMs == 0 ─► Resolve inmediato
    └─ castMs > 0  ─► CastState{spell, target, endsAtMs} + evento CastStarted; GCD arranca YA
 tick: si now ≥ endsAtMs ─► revalidar (rango +1 tile, LOS, objetivo vivo, recurso) ─► Resolve
 Resolve: descontar recurso ─► iniciar CD ─► projectile? programar impacto a now + dist/speed ─► EffectResolver
 EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto ─► efectos en orden ─► eventos
-            (`dash` mueve al lanzador antes del resto de efectos; auras sobre boss filtradas por bossImmuneToAuraKinds)
+            (`dash` y `leap` mueven al lanzador antes del resto de efectos, que se resuelven en el punto de llegada; auras sobre boss filtradas por bossImmuneToAuraKinds)
 ```
 - El impacto programado (proyectil) se guarda en `PendingImpacts` (cola por `atMs`) y se resuelve aunque el lanzador
   muera; si el objetivo murió, se descarta.
-- Interrupción por movimiento: `MovementSystem` notifica `CastSystem.InterruptIfCasting(actor, "interrupted")` cuando llega input ≠ 0.
+- Moverse **no** interrumpe: mientras se castea, `MovementSystem` aplica `rules.combat.castMoveSpeedMult` (0.5). Solo cortan un
+  casteo `stun`, `silence` (hechizos `magic`) y el efecto `interrupt` → `interruptLockoutMs` sin castear (ADR-019).
+- Fin de casteo a un objetivo fuera de alcance (tolerancia 1.5) o sin LOS → `CastEnded{failed}` sin coste. Áreas y saltos: punto
+  fijo, sin revalidar alcance. Un `CastSpell` nuevo o un salto durante un casteo lo cancelan (`cancelled`, sin coste).
 
 ## Reglas de oro
 1. Todo roll usa `IRng` inyectado. Los tests usan `FixedRng(0.5, 0.01, ...)` para forzar hit/crit/miss.
@@ -60,12 +63,18 @@ Máquina de estados: `Idle → Aggro → Chase → Attack → Evade`. Detalles e
 
 ## Cliente
 - `CastStarted` → barra de casteo (propia) o mini-barra sobre la entidad (otros). `CastEnded` la oculta (rojo si interrumpido).
-- `CombatEvent` → número flotante (blanco daño, amarillo crit con "!", verde cura, gris "Falla"/"Esquiva", azul "Absorbe").
+- `CombatEvents` (lote por tick, ADR-018) → número flotante (blanco daño, amarillo crit con "!", verde cura, gris "Falla"/"Esquiva", azul "Absorbe").
 - Hotbar: al enviar `CastSpell`, muestra GCD **predicho** (1 s) de inmediato; `Cooldown` del servidor lo corrige; un
   `Error{on_cooldown|...}` lo revierte.
 - Auras: íconos sobre el marco de unidad con barrido de duración.
+- Saltos (`leap`) y Carga: el cliente no los predice; suaviza la posición del servidor en ~100 ms.
 - Áreas apuntadas: al pulsar la tecla se muestra el círculo de `aoeRadius` bajo el cursor y el clic envía `targetPos`;
   `CastStarted{targetPos, radius}` dibuja la marca en el suelo para todos hasta que el casteo termina.
+
+## Rendimiento (ADR-018)
+- Áreas: rejilla AOI + pruebas de forma sin raíces ni trigonometría; LOS desde el centro solo para candidatos; topes en `rules.limits`.
+- Reservas de capacidad fija para áreas, impactos y auras; eventos del tick en buffer circular; sin LINQ ni closures en sistemas.
+- Presupuesto: combate ≤ 4 ms p99 por instancia; verificación con el escenario de HU-089.
 
 ## Tests mínimos por cambio de combate
 - Fórmula: valores exactos con `FixedRng`, para las 4 clases y al menos una combinación fuera de rol (Mago + espada + placas).

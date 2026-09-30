@@ -108,38 +108,72 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   Carga: se selecciona el objetivo (clic o Tab) y el servidor resuelve el impacto. No se esquivan moviéndose; solo con la
   tabla de impacto (fallo, esquiva).
 - **Áreas = se apuntan libremente.** Un hechizo de área se lanza sobre el punto del suelo que marca el cursor, dentro de
-  su alcance (`ground`), o alrededor del lanzador (`self`), sin necesidad de objetivo seleccionado. En la Fase 1 solo hay
-  círculos; conos y líneas son una ampliación posible si un kit las necesita.
+  su alcance (`ground`), o alrededor del lanzador (`self`), sin necesidad de objetivo seleccionado. Formas: círculo, cono y
+  línea (`shape`, ya en el schema); el cono y la línea salen del lanzador hacia el punto apuntado. El círculo se implementa
+  en la Fase 1 y el cono y la línea cuando un hechizo los necesite.
+- **Saltos y embestidas.** Carga (embestida a un objetivo) es tab-target; los saltos a un punto (`leap`) se apuntan como
+  las áreas. El servidor mueve al personaje (valida alcance, casilla libre y línea de visión) y el cliente no lo predice:
+  solo suaviza el desplazamiento al dibujarlo.
 - **Las áreas se ven y se esquivan.** El punto se fija al empezar el casteo, todos ven la marca en el suelo durante el
   casteo y el área se resuelve al terminar, con quien esté dentro en ese momento. Salir de la marca esquiva el golpe.
   Vale igual para monstruos: el Golpe de pico del Capataz es un área marcada. Por eso las áreas apuntadas de daño deben
   tener casteo o retardo visible (regla para el rediseño de kits).
+- **Castear ralentiza, no inmoviliza (ADR-019).** Se puede mover mientras se castea al **50 %** de la velocidad
+  (`rules.combat.castMoveSpeedMult`). Moverse no corta el casteo y recibir daño tampoco: **solo lo cortan los controles que
+  impiden castear (aturdir; silenciar para hechizos mágicos) y las habilidades de interrumpir**, y tras un corte no se puede
+  castear durante 1,5 s (`interruptLockoutMs`). Raíz y ralentización no cortan.
+  - Si al terminar un hechizo a un objetivo este quedó fuera de alcance (con tolerancia de 1,5 casillas) o de línea de
+    visión, el casteo falla sin gastar recurso ni cooldown (el cooldown global sí).
+  - En las áreas, el punto, el origen y la dirección se fijan al empezar y no se vuelve a comprobar el alcance al terminar:
+    una marca que todos ya vieron no se cancela porque el lanzador se movió.
+  - Usar otra habilidad o un salto durante un casteo lo cancela (sin coste). Las pociones no lo cancelan.
 - Sin fuego amigo: las áreas enemigas no dañan a aliados. El servidor valida el punto (alcance + `castRangeToleranceTiles`,
   línea de visión al punto); el cliente solo envía la intención (`CastSpell{targetPos}`).
+- De Albion solo se toma este combate híbrido: no hay habilidades por arma ni por pieza de armadura, ni una energía común.
+  Las habilidades salen de la clase, que define el rol (ADR-016).
 
 ### Hechizos, rangos y builds
-- Cada clase tiene **como máximo 8 hechizos** y lleva **4 equipados** a la vez. La barra tiene además **4 casillas de
+- Cada clase tiene **como máximo 8 hechizos** y lleva **4 equipados** a la vez, elegidos libremente de su grupo (sin
+  casillas con tipo). La barra tiene además **4 casillas de
   utilizables** (poción de vida y otros consumibles). Teclas: **1–4** hechizos, **5–8** utilizables
   (`rules.loadout`).
 - Los hechizos **mejoran por rangos** al subir de nivel, en lugar de aprender uno nuevo cada pocos niveles.
   **Fase 1:** los rangos suben solos. **Fase 2:** al subir un rango se elige **1 de 2 mejoras**; las builds salen de qué
   4 hechizos llevas equipados y qué mejoras eliges. Antes de cerrar el MVP (Fase 2 o 3) debe existir una forma de
   **reiniciar las mejoras**.
-- Punto de partida (Fase 1): el kit actual de **5 hechizos** por clase, desbloqueados en los niveles `1, 1, 3, 6, 10`
-  (`rules.progression.spellUnlockLevels`), con el detalle en `content/spells.json`. Los rangos, los hechizos que faltan
-  hasta 8, las áreas del combate híbrido y cuándo se pueden cambiar los hechizos equipados están **por diseñar**
-  (rediseño de kits, pendiente antes de implementar los rangos).
-- **Daño en área:** hoy solo lo tiene el Mago (Nova de escarcha nv 3, Estallido de llamas nv 10); el Guerrero y el
-  Pícaro no tienen. Pendiente del rediseño de kits.
-- **Nuevo hechizo del Sacerdote** (reemplaza a Rezo de sanación): área pequeña que se apunta libremente y cura a los
-  aliados y daña a los enemigos, con un daño mucho menor que la curación. Se desbloquea dentro de la Fase 1 (nivel ≤ 6).
-  Necesita un targeting nuevo (`ground_aoe_all`: el efecto depende de si el objetivo es aliado o enemigo).
+- **Pendiente de confirmar:** rangos en los niveles 4, 8 y 12 con +15 % de valor base por rango, e inmunidad de ~3 s al
+  mismo tipo de control tras sufrirlo (`combat.md` §Modelo de combate).
+- **Balance por pentagrama y grupos de hechizos:** `docs/design/class-kits.md` (ADR-020). Cada clase tiene 8 hechizos que
+  se desbloquean en los niveles 1, 2, 3, 5, 7, 9, 11 y 13 (`rules.progression.spellUnlockLevels`): en la Fase 1 tiene 4
+  (todos equipados) y la elección libre empieza en el nivel 7. Pulso sagrado (nv 5) reemplaza a Rezo de sanación.
+  Cuándo se pueden cambiar los hechizos equipados está por definir.
 
 ### Ataque básico (todas las clases)
+- **El ataque básico lo da el arma equipada, no la clase, y no ocupa ninguna de las 4 casillas de hechizo.** Cada tipo de
+  arma tiene su propio básico (ADR-019, `rules.weapons`). Con el equipamiento libre, cualquier clase pega desde el nivel 1
+  con el arma que lleve.
+
+| Tipo | Alcance | Velocidad típica | Daño | Animación |
+|---|---|---|---|---|
+| Daga | 1,25 casillas | rápida (1,6 s) | físico, bajo por golpe | estocada |
+| Espada | 1,5 | media (2,4 s) | físico | tajo |
+| Maza | 1,5 | media (2,6 s) | físico | golpe |
+| Hacha | 1,5 | lenta (3,0–3,4 s) | físico, alto por golpe | tajo pesado |
+| Varita | 7 | rápida (2,0 s) | mágico, bajo | proyectil |
+| Bastón | 5 | lenta (3,0 s) | mágico, alto; da poder de hechizo | proyectil pesado |
+
+- La velocidad y el daño concretos están en cada item. Todos los tipos tienen el mismo presupuesto de daño por segundo por
+  nivel y rareza; las armas a distancia rinden un 20 % menos (`rules.weapons.rangedDpsMult`). El básico solo hace daño a un
+  objetivo: ningún arma da área, control ni movilidad.
+- **Convivencia con los hechizos:** el básico sigue solo mientras haya objetivo en alcance y no se esté casteando. Un
+  hechizo instantáneo no reinicia su temporizador, pero tiene un bloqueo de animación de 250 ms (`abilityLockMs`) en el que
+  no sale el básico ni otro hechizo (si tocaba, sale al terminar). Todos los hechizos de clase tienen cooldown global de 1 s;
+  el básico y los usables no. Ningún hechizo instantáneo de clase tiene menos de 2 s de cooldown
+  (`minInstantSpellCooldownMs`): Golpe siniestro y Golpe heroico quedan en ~3 s y no llegan a ser un segundo básico.
 - Toda arma tiene un ataque básico que **no consume recurso**. Su único límite es la velocidad de ataque:
   `swingMs = arma.speedMs / clase.haste` (`rules.classScaling.<clase>.haste`).
 - El stat de escalado del arma (`items[].scaling`) decide la escuela: espada/hacha/maza (`str`) y daga (`agi`) hacen
-  daño **físico** con `attackPower`; bastón y varita (`int`) hacen daño **mágico** con `spellPower` a 6 tiles.
+  daño **físico** con `attackPower`; bastón y varita (`int`) hacen daño **mágico** con `spellPower` a su alcance (varita 7, bastón 5).
 - Un Sacerdote o un Mago puede farmear solo con varita sin gastar maná; también puede usar espada, con menor rendimiento.
 - **Maná por golpe:** todo personaje con maná recupera maná con cada ataque básico que impacta, sea cual sea el arma:
   `maná = maxMana · manaPerBasicHitPctPerSec · (swingMs / 1000)`, valor base **1,5 %** (`rules.combat.manaPerBasicHitPctPerSec = 0.015`).
@@ -176,13 +210,22 @@ Objetivo provisional (HU-084): con nivel y equipo iguales, el favorito gana entr
 
 ## Progresión
 Todas las constantes en `rules.progression` y `rules.group`.
-- **XP para subir** de `L` a `L+1`: `round(K_L · L^1.6)`, `L = 1..14`, con `K_1 = 100`, `K_2 = 150` y `K = 200` desde el
-  nivel 3 (arranque más rápido).
-  100, 455, 1 160, 1 838, 2 627, 3 516, 4 500, 5 572, 6 727, 7 962, 9 274, 10 659, 12 115, 13 641 (total 80 146 ≈ 1 710 kills;
-  subir a nivel 2 son ~17 slimes y el primer hechizo nuevo, en nivel 3, llega tras ~58 kills).
-- **Duración objetivo:** 20–30 h del 1 al 15 con una clase (`rules.balanceTargets.hoursToMaxLevel`). Con la guía de balance
-  actual (8–15 s por kill con rotación), ~1 710 kills son unas 4–7 h de combate puro; el resto lo ponen viajes, descansos,
-  cuevas y grupo. Si al medirlo en HU-084 no alcanza, se ajusta la curva.
+- **XP para subir: curva por tiempo** (ADR-017). Se diseña en minutos de juego por nivel y la XP se calcula:
+  `xpParaSubir(L) = round(minutesPerLevel[L] · (60 / killCycleSecTarget) · xpMonstruoNormal(L))`, con
+  `killCycleSecTarget = 30` (segundos entre kills contando pelea, descanso, botín y caminar; se mide en HU-084).
+  `xpRate` (1.0) multiplica toda la XP ganada (playtests, eventos).
+
+| Nivel | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Minutos | 10 | 20 | 35 | 50 | 65 | 85 | 100 | 115 | 130 | 150 | 165 | 180 | 195 | 210 |
+| XP para subir | 120 | 440 | 1 120 | 2 100 | 3 380 | 5 270 | 7 200 | 9 430 | 11 960 | 15 300 | 18 480 | 21 960 | 25 740 | 29 820 |
+
+- Total: 152 320 XP ≈ 3 020 kills ≈ **25,2 h** (Fase 1: 3 h · Fase 2: 7,2 h · Fase 3: 15 h). Subir a nivel 2 son ~20 slimes.
+  Objetivo 20–30 h (`rules.balanceTargets.hoursToMaxLevel`). Si el ciclo real por kill no es 30 s, se cambia
+  `killCycleSecTarget` y toda la curva se corrige sola.
+- **XP de contenido futuro** (misiones, mazmorras…): se define en minutos equivalentes,
+  `xp = minutos · (60 / killCycleSecTarget) · xpMonstruoNormal(nivel)`, así el contenido nuevo no desajusta la curva. Un tier
+  nuevo añade filas a `minutesPerLevel`.
 - **XP por monstruo** (ya no se escribe en `monsters.json`, se calcula): `round((5 · nivel + 1) · tipo)` con
   `tipo`: normal 1.0 · hard (a distancia / con mecánica) 1.2 · élite 3 · jefe 10.
 - **Modificador por diferencia de nivel:** `diff = nivelMonstruo − nivelReferencia`; si `diff ≤ −5` → 0 XP (gris);

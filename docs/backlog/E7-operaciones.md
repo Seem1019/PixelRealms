@@ -37,7 +37,7 @@
 **Criterios de aceptación**
 1. **Dado** `GET /health` **entonces** responde 200 con `{status, players, tickP99Ms, uptime}`.
 2. **Dado** Serilog **entonces** en producción escribe JSON a consola con `CharacterName`, `AccountId`, `ConnId` como propiedades cuando aplique.
-3. **Dado** `GET /admin/stats` (JWT admin) **entonces** muestra jugadores, monstruos, mensajes/s entrantes y salientes, bytes/s.
+3. **Dado** `GET /admin/stats` (JWT admin) **entonces** muestra jugadores, monstruos, mensajes/s entrantes y salientes, bytes/s y, por instancia, tiempo de combate p99, áreas y auras activas y memoria asignada por segundo.
 
 ---
 
@@ -77,3 +77,21 @@
 **Criterios de aceptación**
 1. **Dado** un contenedor/cron diario **entonces** ejecuta `pg_dump -Fc` y conserva los últimos 7.
 2. **Dado** `docs/deploy.md` **entonces** documenta cómo restaurar un backup y se ha probado una restauración.
+
+---
+
+### HU-089 · Prueba de carga del combate ("Mina llena")
+**Como** anfitrión **quiero** una prueba de carga del combate repetible **para** detectar lag, fugas de memoria y exceso de tráfico antes de que lo noten mis amigos.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-023, HU-088
+- Skills: `dotnet-server`, `combat-system`
+
+**Criterios de aceptación**
+1. **Dado** `tools/LoadBot` en modo combate **entonces** reproduce el escenario: una instancia, 30 bots y 300 monstruos en 60×60 casillas, 40 áreas activas superpuestas, ~200 auras, un hechizo por GCD (la mitad de área), durante 5 min, y una prueba de resistencia de 30 min.
+2. **Dado** el escenario **entonces** falla si: tick p99 > 15 ms o algún tick > 50 ms; combate p99 > 6 ms por instancia; memoria nueva > 2 MB/s o alguna recolección Gen2; memoria +10 % en 30 min; salida p95 > 40 KB/s por cliente.
+3. **Dado** el cliente web con 24 marcas de área y 40 textos flotantes **entonces** falla si los FPS p5 bajan de 45 en el equipo de referencia.
+4. **Dado** los microbenchmarks **entonces** 1 millón de pruebas de forma < 5 ms y una consulta de área con 100 candidatos < 20 µs.
+5. **Dado** cada HU que toque áreas o auras y el cierre de M2 y M5 **entonces** se ejecuta y el resultado queda en el informe de la HU.
+
+**Notas técnicas**
+- ADR-018. Métricas desde `/admin/stats` (HU-072) y `dotnet-counters`.

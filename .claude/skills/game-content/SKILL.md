@@ -33,14 +33,20 @@ Tipos compartidos (ids, enums, stats): `schemas/common.schema.json`.
 | `restore_resource` | `resource`, `amount` | |
 | `apply_aura` | `auraId` | la aura calcula su `base + coef·poder` **al aplicarse** (snapshot) |
 | `taunt` | `durationMs` | |
+| `interrupt` | — | corta el casteo del objetivo; aplica `rules.combat.interruptLockoutMs` (ADR-019) |
 | `dash` | `minRange?` | el lanzador se coloca adyacente al objetivo (Carga); exige LOS |
+| `leap` | `maxRange`, `travelMs?` | salto a `targetPos` (0 ms = teletransporte); lo mueve el servidor; los efectos siguientes se aplican al caer (HU-087) |
+Campos comunes: `applyTo: "self"` aplica el efecto al lanzador aunque el hechizo sea de área o de salto; `heal` admite
+`bonusBelowHpPct` + `bonusMult` (cura más si el objetivo está por debajo de ese % de vida).
 Tipos de aura: `dot`, `hot`, `stat_mod` (`mods.stats`, `damageTakenPct`, `damageDonePct`, `speedPct`), `stun`, `root`, `silence`, `shield`, `slow`.
 Campos extra de aura: `removesKinds` (quita esas auras al aplicarse), `immuneKinds` (bloquea esas auras mientras dura). Los `boss: true` ignoran `rules.combat.bossImmuneToAuraKinds`.
 Escuelas: solo `physical` y `magic` (ADR-010).
 Targeting (combate híbrido, ADR-015): un objetivo (tab-target) `self`, `enemy`, `ally`; área `self_aoe_enemies`,
 `self_aoe_allies` y, desde HU-086, `ground_aoe_enemies`, `ground_aoe_allies`, `ground_aoe_all` (punto apuntado; `ground_aoe_all`
-cura aliados y daña enemigos). `target_aoe_enemies` se elimina en HU-086. Campos `aoeRadius`, `maxTargets`. Las áreas
+cura aliados y daña enemigos). `target_aoe_enemies` ya no existe. Campos `aoeRadius`, `maxTargets`. Las áreas
 apuntadas de daño llevan `castMs > 0` para que se puedan esquivar.
+Formas (`shape`, ADR-016): `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`), `line` (`aoeLength`, `aoeWidth`); cono y
+línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado hasta que un hechizo necesite los otros.
 
 **Si una idea no cabe en estos efectos**, no la fuerces con hacks: propone al usuario un nuevo tipo de efecto
 (requiere código en `EffectResolver`, schema, tests y esta tabla) y crea una HU para ello.
@@ -63,7 +69,11 @@ apuntadas de daño llevan `castMs > 0` para que se puedan esquivar.
   solo con ataque básico (tabla en `docs/design/combat.md` §Referencia). Si un cambio lo rompe, ajusta `classScaling`, no el item.
 - **XP/hora en solitario** contando descansos: diferencia entre clases ≤ 15 % (`soloXpPerHourSpreadPct`). Esa es la medida de
   "cualquier clase es igual de buena elección", no el tiempo por kill.
-- **Hechizos por clase:** máximo 8 (`rules.loadout.maxSpellsPerClass`), 4 equipados. Antes de añadir un hechizo, mejora uno por rangos (pilar 3).
+- **Hechizos por clase:** máximo 8 (`rules.loadout.maxSpellsPerClass`), 4 equipados libremente (sin casillas con tipo). Antes de añadir un hechizo, mejora uno por rangos (pilar 3).
+- **Pentagrama (ADR-020):** los grupos de hechizos y los aportes objetivo están en `docs/design/class-kits.md`. Regla 40/75: una
+  habilidad ≤ 40 puntos; una combinación de 4 + base ≤ 75 % del presupuesto; ninguna supera el valor de la clase en ninguna punta.
+- **Básico y armas (ADR-019):** el básico lo da el arma (`rules.weapons`), solo hace daño a un objetivo; mismo presupuesto de daño por
+  nivel y rareza para todos los tipos, a distancia ×`rangedDpsMult` (0.8). Hechizos instantáneos de clase: `cooldownMs ≥ 2000`.
 - **Duración:** 20–30 h del 1 al 15 con una clase (`hoursToMaxLevel`).
 - **Tiempo para matar** un monstruo normal de su nivel en solitario con rotación completa: 8–15 s (solo básicos: 18–30 s).
 - **Jefes** (`rules.boss`): un jefe de nivel B lo matan 3 jugadores de nivel B−2 en 60–100 s; 2 de nivel B; 1 de B+1 + 1 de B−1.

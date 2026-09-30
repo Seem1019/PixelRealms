@@ -69,6 +69,7 @@ server/
 ## Estilo C#
 - `record`/`readonly record struct` para datos; clases `sealed` por defecto; `file`-scoped namespaces.
 - Colecciones calientes del tick: `List<T>` reutilizadas, evitar LINQ en rutas por-tick (alloc). `Dictionary<int, Player>`.
+- Combate sin asignaciones por tick: reservas de capacidad fija (áreas, impactos, auras), eventos en buffer circular; memoria nueva ≤ 1 MB/s bajo carga (ADR-018, HU-089).
 - Logs estructurados: `logger.LogInformation("Player {Name} joined map {Map}", ...)`. Nunca loguear passwords/tokens.
 - Constantes de juego en `GameConstants` (tick, GCD, radios AOI); valores de balance en `content/`.
 

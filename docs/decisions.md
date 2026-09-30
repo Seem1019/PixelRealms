@@ -111,3 +111,94 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   (áreas sin esquiva ni posicionamiento).
 - **Consecuencias:** `target_aoe_enemies` desaparece (HU-086); `CastSpell` y `CastStarted` ganan campos opcionales; los kits se
   rediseñan (daño en área para Guerrero y Pícaro). Un área apuntada con `castMs = 0` no se puede esquivar: las de daño llevan casteo.
+
+## ADR-016 · Habilidades por clase; de Albion solo el combate híbrido
+- **Contexto:** se evaluó Albion Online como referencia (habilidades por arma y por pieza de armadura, energía común,
+  casillas por tipo de habilidad).
+- **Decisión:** las habilidades salen de la **clase**, que define el rol (pilar 4). De Albion solo se toma el combate de
+  acción de ADR-015, ampliado con **formas** de área (`shape`: círculo, cono, línea) y **saltos a un punto** (`leap`). Cada clase
+  tiene un grupo de hasta 8 habilidades y el jugador equipa 4 **libremente**, sin casillas con tipo. Los saltos los mueve el
+  servidor; el cliente no los predice y solo suaviza la posición recibida.
+- **Alternativas descartadas:** habilidades por arma (choca con "clase = rol" y multiplica los kits), habilidades de casco,
+  pecho y botas, energía común para todas las clases, casillas golpe/control/definitiva/rol.
+- **Consecuencias:** el schema define ya `shape` y el efecto `leap`; el círculo se implementa en la Fase 1 y el cono y la línea
+  cuando un hechizo los use (HU-086, HU-087). El balance entre clases se hace por clase, no por casilla.
+
+## ADR-017 · Curva de XP por tiempo
+- **Contexto:** con una curva fijada en XP, las horas del 1 al 15 dependían de algo no controlado (tiempo por kill) y salían
+  4–7 h de combate frente al objetivo de 20–30 h.
+- **Decisión:** la curva se diseña en **minutos por nivel** (`rules.progression.minutesPerLevel`, 25,2 h en total) y la XP se
+  calcula con `killCycleSecTarget` (30 s) y la XP del monstruo normal del nivel. `xpRate` es un multiplicador global. Reemplaza
+  a `xpCurveK`, `xpCurveKByLevel` y `xpCurveExponent`.
+- **Consecuencias:** si el tiempo real por kill cambia, se ajusta un número. El contenido futuro que da XP se presupuesta en
+  minutos equivalentes. Un tier nuevo añade filas a la tabla.
+
+## ADR-018 · Estabilidad y rendimiento del combate
+- **Contexto:** formas, saltos y muchas áreas superpuestas sobre un servidor de 20 Hz con un solo hilo de mundo. Objetivos que
+  ya existían: tick p99 < 10 ms con 50 jugadores y 300 monstruos, < 30 KB/s por cliente.
+- **Decisión:**
+  - **Áreas:** se buscan con la rejilla AOI de la instancia (celdas de 16×16 casillas): rectángulo envolvente → celdas →
+    candidatos → prueba de forma. Una rejilla más fina (4×4) solo si el benchmark la pide. Pruebas sin raíces ni
+    trigonometría, con radios y cosenos precalculados al cargar el contenido: círculo por distancia al cuadrado; cono por
+    producto escalar (`dot ≥ 0` y `dot² ≥ |d|²·cos²(α/2)`); línea por proyección (`0 ≤ t ≤ L`, distancia lateral ≤ ancho/2).
+    Línea de visión desde el centro solo para los candidatos que pasan la forma, ordenados por cercanía y cortados en
+    `maxTargets`. Las áreas instantáneas se evalúan una vez al resolverse; las que duran, cada `persistentAreaTickMs` (500 ms)
+    repartidas entre ticks. **Las áreas solo interactúan con entidades, nunca entre sí.**
+  - **Límites (`rules.limits`):** 1 casteo por lanzador; 2 áreas duraderas por lanzador (la tercera reemplaza a la más
+    antigua); 128 áreas por instancia (al tope, el jugador recibe `area_limit` y el monstruo elige otra acción); 256 impactos
+    pendientes por instancia; tope global de 10 objetivos por área. **El tope de auras por entidad está pendiente de revisión.**
+  - **Memoria y tick:** reservas de capacidad fija para áreas, impactos y auras; eventos del tick como estructuras en un buffer
+    circular; listas de resultados reutilizadas (256 ids); sin LINQ ni closures en los sistemas. Presupuesto: tick p99 ≤ 10 ms;
+    combate (casteo, auras, áreas, IA) ≤ 4 ms p99 por instancia; aviso > 25 ms; fallo si algún tick > 50 ms. Memoria nueva
+    ≤ 1 MB/s bajo carga y ninguna recolección completa (Gen2) durante la prueba.
+  - **Red:** `CastStarted` lleva `targetPos` y `dir`; forma y tamaño salen del contenido del cliente. Si llegan áreas
+    duraderas: `AreaSpawn{areaId, spellId, pos, dir, expiresInMs}` / `AreaDespawn{areaId}`. Nada por tick para las áreas.
+    Un `CombatEvents{tick, e:[…]}` por observador y tick (máx. 64 entradas) en lugar de un mensaje por golpe; solo a quien ve
+    al atacante o al objetivo. Presupuesto: ≤ 30 KB/s por cliente (p95), picos ≤ 40 KB/s.
+  - **Guardado:** vida, recurso y posición al salir, cambiar de mapa, subir de nivel, completar un intercambio, cambiar de
+    clase y morir, y cada 60 s si hubo cambios; nunca por tick. No se guardan cooldowns, auras ni casteos. Un personaje
+    desconectado en combate sigue en el mundo hasta salir de combate, máx. `linkdeadInCombatMaxSec` (30 s), y puede morir.
+  - **Cliente:** reservas precreadas (32 marcas de área, 64 proyectiles, 48 textos flotantes, 32 impactos) y máximo visible
+    de 24 marcas, 48 proyectiles y 40 textos, con prioridad para lo propio y del grupo y las áreas enemigas que alcanzan al
+    jugador (esas nunca se ocultan). Ticks de una misma aura agrupados; más de 6 números por entidad y segundo → uno sumado.
+    Objetivo: 60 FPS en la versión web en un equipo modesto.
+- **Verificación (HU-089):** escenario "Mina llena" (una instancia, 30 bots + 300 monstruos en 60×60 casillas, 40 áreas
+  superpuestas, ~200 auras, un hechizo por GCD con la mitad de áreas, 5 min) y prueba de resistencia de 30 min. Fallo si:
+  tick p99 > 15 ms o algún tick > 50 ms; combate p99 > 6 ms; memoria nueva > 2 MB/s o alguna Gen2; memoria +10 % en 30 min;
+  salida p95 > 40 KB/s por cliente; FPS web p5 < 45. Microbenchmarks: 1 millón de pruebas de forma < 5 ms; consulta de área
+  con 100 candidatos < 20 µs. Se ejecuta en cada HU que toque áreas o auras y al cerrar M2 y M5.
+- **Consecuencias:** `CombatEvent` pasa a `CombatEvents` (cambio de protocolo antes de implementarlo). HU-088 y HU-089 nuevas.
+
+## ADR-019 · Básico por arma y casteo en movimiento
+- **Decisión:** el ataque básico lo da el arma equipada y no ocupa ninguna de las 4 casillas. Cada tipo de arma define alcance,
+  animación y proyectil (`rules.weapons`); velocidad y daño están en el item; todos los tipos comparten presupuesto de daño
+  por nivel y rareza y los de distancia rinden un 20 % menos. El básico sigue solo; un hechizo instantáneo no reinicia su
+  temporizador pero abre un bloqueo de 250 ms; GCD de 1 s en los hechizos de clase; los hechizos instantáneos de clase tienen
+  como mínimo 2 s de cooldown. Castear ralentiza al 50 % en vez de inmovilizar; solo cortan un casteo los controles que
+  impiden castear y el efecto `interrupt` (bloqueo de 1,5 s). Otra habilidad o un salto cancela el casteo propio.
+- **Alternativas descartadas:** el básico como una de las 4 habilidades (dejaba al Sacerdote sin daño al nivel 1); reiniciar el
+  básico con cada hechizo (castiga a los melee); castear inmóvil (sin kiting en el combate de acción).
+- **Consecuencias:** cambian HU-032, HU-033 y HU-022 (casos de movimiento a velocidad reducida) y el protocolo (`CastEnded`
+  con `failed` y motivo).
+
+## ADR-020 · Balance por pentagrama y regla 40/75
+- **Decisión:** cada clase se define por 5 puntas (mono-objetivo, área, control, movilidad, armadura) con 250 puntos y un
+  máximo de 100 por punta (`rules.balanceTargets.pentagram`). Se mide con métricas concretas y el arma de referencia de la
+  clase; el aporte de una habilidad es lo que suma sobre la base. Regla 40/75: una habilidad suma como mucho 40 puntos, una
+  combinación de 4 + base no pasa del 75 % del presupuesto y ninguna supera el valor de la clase en ninguna punta. Detalle,
+  armas de referencia y los 32 hechizos en `docs/design/class-kits.md`.
+- **Alternativas descartadas:** casillas con tipo (balance por casilla); límites en tiempo real (etiquetas, cooldowns
+  compartidos), por simplicidad (pilar 3).
+- **Consecuencias:** el `content-designer` fija los números con un script que comprueba las 70 combinaciones por clase.
+  `spellUnlockLevels` pasa a 1, 2, 3, 5, 7, 9, 11, 13.
+
+## ADR-021 · Topes de auras y controles del mismo tipo
+- **Contexto:** la regla inicial de ADR-018 (al tope, el aura nueva reemplaza a otra del mismo tipo) dejaba inmune a efectos
+  negativos a quien tuviera 16 beneficiosas.
+- **Decisión:** topes separados de 16 beneficiosas y 16 perjudiciales por entidad (`rules.limits.maxBuffsPerEntity`,
+  `maxDebuffsPerEntity`). Un aura nueva siempre se aplica; si su grupo está lleno, sale la de ese grupo con menos tiempo
+  restante. Los controles (`rules.combat.controlAuraKinds`) no cuentan para ningún tope. Los controles del mismo tipo no se
+  suman: manda la ralentización más fuerte y el aturdimiento (o raíz) más largo.
+- **Consecuencias:** en el peor caso realista una entidad lleva ~9 beneficiosas y ~1–3 perjudiciales que cuentan, así que los
+  topes son una red de seguridad. Cambian HU-035 y HU-088. Se eliminan las auras huérfanas Desgarro y Escudo de maná y se
+  crean las 14 del kit nuevo.

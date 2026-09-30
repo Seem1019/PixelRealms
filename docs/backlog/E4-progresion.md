@@ -9,6 +9,7 @@
 **Criterios de aceptación**
 1. **Dado** que mato a un monstruo **entonces** recibo `xp = round((5 · nivel + 1) · tipo) · mod` con `tipo` de `monsters[].type` y `mod = 1 + 0.1 · clamp(diff, −4, 4)` (0 si `diff ≤ −5`), todo leído de `rules.progression`, y `XpGain`.
 1b. **Dado** un Slime (nv 1, normal), un Goblin arquero (nv 5, hard), un Gólem (nv 6, elite) y el Capataz (nv 6, boss) matados por un nivel 5 **entonces** dan 4 (diff −4 → ×0.6), 31, 102 y 341 XP; un Slime para un nivel 6 da 0 (gris). Tests exactos.
+1c. **Dado** `rules.progression.xpRate` distinto de 1.0 **entonces** toda la XP ganada se multiplica por él (test con 3.0).
 2. **Dado** la barra de XP en el HUD **entonces** muestra `xp / xpNext` y texto al pasar el ratón.
 3. **Dado** un monstruo que otro jugador (fuera de mi grupo) taggeó primero **entonces** no recibo XP ni botín.
 4. **Dado** el tope de nivel de la fase activa (`rules.progression.levelCapByPhase[world.currentPhase − 1]`, 6 en la Fase 1) **entonces** no se acumula XP y la barra muestra "Nivel máximo".
@@ -22,11 +23,11 @@
 - Skills: `combat-system`, `godot-client`
 
 **Criterios de aceptación**
-1. **Dado** que alcanzo la XP necesaria (`round(K_L · L^1.6)`: `xpCurveKByLevel` para los niveles 1 y 2, `xpCurveK` para el resto, exponente de `rules.progression`) **entonces** subo de nivel (el sobrante se conserva; puede subir varios niveles de golpe), stats +`statsPerLevel`, vida y recurso llenos.
+1. **Dado** que alcanzo la XP necesaria (curva por tiempo, ADR-017: `round(minutesPerLevel[L] · (60 / killCycleSecTarget) · xpMonstruoNormal(L))`, todo de `rules.progression`) **entonces** subo de nivel (el sobrante se conserva; puede subir varios niveles de golpe), stats +`statsPerLevel`, vida y recurso llenos.
 2. **Dado** un nivel que desbloquea hechizos **entonces** `LevelUp{newSpells}` y el cliente los coloca en la primera casilla libre de la hotbar con un aviso.
 3. **Dado** la subida **entonces** los demás en la AOI ven un efecto visual y el nivel actualizado sobre mi nombre.
 3b. **Dado** un nivel en el que un hechizo sube de rango (tabla de rangos del rediseño de kits) **entonces** en la Fase 1 el rango sube solo, `LevelUp{rankUps}` lo informa y el cliente muestra un aviso.
-4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (100, 455, 1 160 … 13 641) y los niveles de desbloqueo 1, 1, 3, 6, 10.
+4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (120, 440, 1 120 … 29 820; si cambia `killCycleSecTarget` o `minutesPerLevel`, la tabla cambia sin tocar código) y los niveles de desbloqueo 1, 2, 3, 5, 7, 9, 11, 13 (`rules.progression.spellUnlockLevels`).
 
 ---
 
