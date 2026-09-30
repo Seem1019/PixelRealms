@@ -5,16 +5,16 @@
   "progression": {
     "maxLevel": 15,
     "levelCapByPhase": [6, 10, 15],
-    "xpCurveK": 200,
-    "xpCurveKByLevel": { "1": 100, "2": 150 },
-    "xpCurveExponent": 1.6,
+    "minutesPerLevel": [10, 20, 35, 50, 65, 85, 100, 115, 130, 150, 165, 180, 195, 210],
+    "killCycleSecTarget": 30,
+    "xpRate": 1.0,
     "monsterXpPerLevel": 5,
     "monsterXpBase": 1,
     "monsterTypeMultiplier": { "normal": 1.0, "hard": 1.2, "elite": 3.0, "boss": 10.0 },
     "levelDiffGreyAt": -5,
     "levelDiffModPerLevel": 0.1,
     "levelDiffClamp": 4,
-    "spellUnlockLevels": [1, 1, 3, 6, 10],
+    "spellUnlockLevels": [1, 2, 3, 5, 7, 9, 11, 13],
     "classChange": { "npcUntilPhase": 2 },
     "altCatchUp": { "fromPhase": 3, "xpMultiplier": 2.0 }
   },
@@ -51,7 +51,7 @@
     "mitigationConstant": 100,
     "mitigationCap": 0.75,
     "basicAttackPowerDivisor": 14,
-    "castRangeToleranceTiles": 1.0,
+    "castRangeToleranceTiles": 1.5,
     "inCombatWindowSec": 6,
     "hpRegenDelaySec": 6,
     "hpRegenPerSpi": 0.5,
@@ -60,6 +60,11 @@
     "manaRegenPerIntPer5s": 0.1,
     "manaRegenCastingPenalty": 0.3,
     "manaPerBasicHitPctPerSec": 0.015,
+    "castMoveSpeedMult": 0.5,
+    "interruptLockoutMs": 1500,
+    "abilityLockMs": 250,
+    "minInstantSpellCooldownMs": 2000,
+    "linkdeadInCombatMaxSec": 30,
     "ragePerHitDealt": 6,
     "ragePerHitTaken": 4,
     "rageDecayPerSecOutOfCombat": 2,
@@ -73,7 +78,8 @@
     "respawnHpPct": 0.5,
     "respawnResourcePct": 0.5,
     "corpseLifetimeSec": 60,
-    "bossImmuneToAuraKinds": ["stun", "root", "slow"]
+    "bossImmuneToAuraKinds": ["stun", "root", "slow"],
+    "controlAuraKinds": ["stun", "root", "silence", "slow"]
   },
 
   "classScaling": {
@@ -136,6 +142,28 @@
     "usableSlots": 4
   },
 
+  "weapons": {
+    "rangedDpsMult": 0.8,
+    "types": {
+      "dagger": { "rangeTiles": 1.25, "animation": "stab", "projectile": false },
+      "sword": { "rangeTiles": 1.5, "animation": "slash", "projectile": false },
+      "mace": { "rangeTiles": 1.5, "animation": "bash", "projectile": false },
+      "axe": { "rangeTiles": 1.5, "animation": "heavy_slash", "projectile": false },
+      "wand": { "rangeTiles": 7, "animation": "bolt", "projectile": true },
+      "staff": { "rangeTiles": 5, "animation": "heavy_bolt", "projectile": true }
+    }
+  },
+
+  "limits": {
+    "maxPersistentAreasPerCaster": 2,
+    "maxAreasPerInstance": 128,
+    "maxPendingImpactsPerInstance": 256,
+    "aoeMaxTargetsCap": 10,
+    "persistentAreaTickMs": 500,
+    "maxBuffsPerEntity": 16,
+    "maxDebuffsPerEntity": 16
+  },
+
   "balanceTargets": {
     "_doc": "Objetivos de diseño provisionales (pilares del GDD). No afectan a la simulación: los verifican HU-084 y el subagente content-designer.",
     "offRoleDamagePct": [0.55, 0.65],
@@ -143,7 +171,21 @@
     "soloXpPerHourSpreadPct": 0.15,
     "duelFavoriteWinRate": [0.60, 0.75],
     "hoursToMaxLevel": [20, 30],
-    "firstGroupFightMinutes": 5
+    "firstGroupFightMinutes": 5,
+    "pentagram": {
+      "_doc": "Balance por pentagrama (ADR-020, docs/design/class-kits.md). Los valores de referencia para convertir métricas a puntos se calibran con el content-designer y se añadirán aquí.",
+      "budget": 250,
+      "maxPerAxis": 100,
+      "abilityMaxPoints": 40,
+      "loadoutMaxPct": 0.75,
+      "referenceLevels": [6, 15],
+      "classes": {
+        "rogue": { "single": 85, "aoe": 15, "cc": 35, "mobility": 90, "armor": 25, "referenceWeapon": "dagger" },
+        "mage": { "single": 45, "aoe": 90, "cc": 80, "mobility": 20, "armor": 15, "referenceWeapon": "staff" },
+        "warrior": { "single": 45, "aoe": 45, "cc": 50, "mobility": 20, "armor": 90, "referenceWeapon": "sword" },
+        "priest": { "single": 85, "aoe": 85, "cc": 25, "mobility": 25, "armor": 30, "referenceWeapon": "wand" }
+      }
+    }
   },
 
   "boss": {

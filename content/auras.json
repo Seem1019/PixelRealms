@@ -1,18 +1,35 @@
 {
   "$schema": "./schemas/auras.schema.json",
   "auras": [
-    {"id": "warrior_rend_bleed", "name": "Desgarro", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 12000, "tickMs": 3000, "base": 4, "apCoef": 0.05, "icon": "spells/rend"},
-    {"id": "warrior_shield_block_aura", "name": "Bloqueo con escudo", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": {"damageTakenPct": -0.3}, "icon": "spells/shield_block"},
+    {"id": "warrior_shield_block_aura", "name": "Bloqueo con escudo", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"damageTakenPct": -0.5}, "icon": "spells/shield_block", "provisional": true},
     {"id": "warrior_charge_stun", "name": "Cargado", "kind": "stun", "isDebuff": true, "durationMs": 1000, "icon": "spells/charge"},
-    {"id": "rogue_gouge_stun", "name": "Gubia", "kind": "stun", "isDebuff": true, "durationMs": 3000, "icon": "spells/gouge"},
+    {"id": "warrior_hamstring_slow", "name": "Tendón cortado", "kind": "slow", "isDebuff": true, "durationMs": 6000, "pct": 0.4, "icon": "spells/hamstring", "provisional": true},
+    {"id": "warrior_mighty_blow_stun", "name": "Aturdido", "kind": "stun", "isDebuff": true, "durationMs": 1000, "icon": "spells/mighty_blow", "provisional": true},
+
+    {"id": "rogue_gouge_stun", "name": "Gubia", "kind": "stun", "isDebuff": true, "durationMs": 2000, "icon": "spells/gouge", "provisional": true},
     {"id": "rogue_poison", "name": "Veneno", "kind": "dot", "isDebuff": true, "school": "magic", "durationMs": 9000, "tickMs": 3000, "maxStacks": 3, "base": 3, "apCoef": 0.04, "icon": "spells/poison_blade"},
     {"id": "rogue_sprint_aura", "name": "Carrera", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": {"speedPct": 0.5}, "removesKinds": ["root", "slow"], "immuneKinds": ["root", "slow"], "icon": "spells/sprint"},
+    {"id": "rogue_shadowstep_empower", "name": "Paso sombrío", "kind": "stat_mod", "isDebuff": false, "durationMs": 3000, "mods": {"damageDonePct": 0.2}, "icon": "spells/shadowstep", "provisional": true},
+    {"id": "rogue_shadowstep_slow", "name": "Desorientado", "kind": "slow", "isDebuff": true, "durationMs": 2000, "pct": 0.4, "icon": "spells/shadowstep", "provisional": true},
+    {"id": "rogue_blades_speed", "name": "Impulso", "kind": "stat_mod", "isDebuff": false, "durationMs": 3000, "mods": {"speedPct": 0.3}, "icon": "spells/throwing_blades", "provisional": true},
+    {"id": "rogue_mortal_root", "name": "Clavado", "kind": "root", "isDebuff": true, "durationMs": 1000, "icon": "spells/mortal_slash", "provisional": true},
+    {"id": "rogue_crippling_slow", "name": "Debilitado", "kind": "slow", "isDebuff": true, "durationMs": 4000, "pct": 0.3, "icon": "spells/crippling_poison", "provisional": true},
+
     {"id": "mage_chill", "name": "Helado", "kind": "slow", "isDebuff": true, "durationMs": 4000, "pct": 0.4, "icon": "spells/frostbolt"},
-    {"id": "mage_frost_nova_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 4000, "icon": "spells/frost_nova"},
-    {"id": "mage_mana_shield_aura", "name": "Escudo de maná", "kind": "shield", "isDebuff": false, "durationMs": 20000, "base": 40, "spCoef": 1.0, "icon": "spells/mana_shield"},
+    {"id": "mage_frost_nova_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova", "provisional": true},
+    {"id": "mage_meteor_stun", "name": "Aturdido", "kind": "stun", "isDebuff": true, "durationMs": 1000, "icon": "spells/meteor", "provisional": true},
+
     {"id": "priest_renew_hot", "name": "Renovar", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 12000, "tickMs": 3000, "base": 8, "spCoef": 0.25, "icon": "spells/renew"},
     {"id": "priest_power_shield_aura", "name": "Escudo sagrado", "kind": "shield", "isDebuff": false, "durationMs": 15000, "base": 50, "spCoef": 0.8, "icon": "spells/power_shield"},
+    {"id": "priest_power_shield_speed", "name": "Paso ligero", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"speedPct": 0.2}, "icon": "spells/power_shield", "provisional": true},
+    {"id": "priest_smite_slow", "name": "Castigado", "kind": "slow", "isDebuff": true, "durationMs": 2000, "pct": 0.2, "icon": "spells/smite", "provisional": true},
+    {"id": "priest_pulse_slow", "name": "Deslumbrado", "kind": "slow", "isDebuff": true, "durationMs": 2000, "pct": 0.3, "icon": "spells/holy_pulse", "provisional": true},
+    {"id": "priest_path_speed", "name": "Sendero de luz", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"speedPct": 0.3}, "icon": "spells/path_of_light", "provisional": true},
+    {"id": "priest_path_slow", "name": "Cegado", "kind": "slow", "isDebuff": true, "durationMs": 3000, "pct": 0.3, "icon": "spells/path_of_light", "provisional": true},
+    {"id": "priest_hymn_hot", "name": "Himno", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 10000, "tickMs": 2000, "base": 5, "spCoef": 0.15, "icon": "spells/hymn", "provisional": true},
+
     {"id": "bread_hot", "name": "Comiendo", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 15000, "tickMs": 3000, "base": 10, "icon": "items/bread"},
+
     {"id": "foreman_whip_bleed", "name": "Latigazo", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 9000, "tickMs": 3000, "base": 8, "icon": "spells/whip"},
     {"id": "foreman_rally_aura", "name": "Enfurecido", "kind": "stat_mod", "isDebuff": false, "durationMs": 10000, "mods": {"damageDonePct": 0.25}, "icon": "spells/rally"},
     {"id": "lich_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"}

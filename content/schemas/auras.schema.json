@@ -140,6 +140,10 @@
               ]
             },
             "description": "Mientras dura, el objetivo ignora auras nuevas de estos tipos."
+          },
+          "provisional": {
+            "type": "boolean",
+            "description": "true = números provisionales (HU-084)."
           }
         },
         "allOf": [

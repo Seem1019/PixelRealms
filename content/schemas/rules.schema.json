@@ -5,20 +5,20 @@
   "description": "Única fuente de constantes numéricas. El servidor las carga en RulesDb (inmutable) y el cliente las lee para predicción/UI. Cambiar un valor aquí no requiere código.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "loadout", "balanceTargets", "boss", "movement", "world"],
+  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "loadout", "weapons", "limits", "balanceTargets", "boss", "movement", "world"],
   "properties": {
     "$schema": { "type": "string" },
     "_doc": { "type": "string" },
 
     "progression": {
       "type": "object", "additionalProperties": false,
-      "required": ["maxLevel", "levelCapByPhase", "xpCurveK", "xpCurveExponent", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "classChange", "altCatchUp"],
+      "required": ["maxLevel", "levelCapByPhase", "minutesPerLevel", "killCycleSecTarget", "xpRate", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "classChange", "altCatchUp"],
       "properties": {
         "maxLevel": { "type": "integer", "minimum": 2, "maximum": 60, "description": "Nivel máximo absoluto del MVP. xpParaSubir se define para L = 1..maxLevel-1." },
         "levelCapByPhase": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Tope de nivel efectivo por fase del MVP (índice = fase − 1). El tope activo es levelCapByPhase[world.currentPhase − 1]; el último valor debe ser igual a maxLevel." },
-        "xpCurveK": { "type": "number", "minimum": 1, "description": "K por defecto en xpParaSubir(L) = round(K_L · L^exp)." },
-        "xpCurveKByLevel": { "type": "object", "additionalProperties": { "type": "number", "minimum": 1 }, "propertyNames": { "pattern": "^[0-9]+$" }, "description": "K_L para niveles concretos (clave = L); los niveles no listados usan xpCurveK. Hace el arranque más rápido (L1 = 100, L2 = 150)." },
-        "xpCurveExponent": { "type": "number", "minimum": 1, "maximum": 3, "description": "Exponente de la curva de XP." },
+        "minutesPerLevel": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1, "description": "Curva por tiempo (ADR-017): minutos de juego para pasar del nivel L al L+1 (índice = L − 1; maxLevel − 1 entradas). xpParaSubir(L) = round(minutesPerLevel[L−1] · (60 / killCycleSecTarget) · xpMonstruoNormal(L))." },
+        "killCycleSecTarget": { "type": "number", "exclusiveMinimum": 0, "description": "Segundos entre un kill y el siguiente contando pelea, descanso, botín y caminar. Supuesto que se mide en HU-084; cambiarlo recalcula toda la curva." },
+        "xpRate": { "type": "number", "exclusiveMinimum": 0, "description": "Multiplicador global de toda la XP ganada (playtests, eventos). 1.0 = normal." },
         "monsterXpPerLevel": { "type": "number", "description": "xpMonstruo = round((monsterXpPerLevel · nivel + monsterXpBase) · tipo)." },
         "monsterXpBase": { "type": "number" },
         "monsterTypeMultiplier": {
@@ -57,7 +57,7 @@
 
     "combat": {
       "type": "object", "additionalProperties": false,
-      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaPerBasicHitPctPerSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds"],
+      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaPerBasicHitPctPerSec", "castMoveSpeedMult", "interruptLockoutMs", "abilityLockMs", "minInstantSpellCooldownMs", "linkdeadInCombatMaxSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "bossImmuneToAuraKinds", "controlAuraKinds"],
       "properties": {
         "gcdMs": { "type": "integer", "minimum": 0, "description": "Cooldown global tras cualquier hechizo con triggersGcd." },
         "critMultiplier": { "type": "number", "minimum": 1 },
@@ -74,6 +74,11 @@
         "inCombatWindowSec": { "type": "number" },
         "hpRegenDelaySec": { "type": "number" }, "hpRegenPerSpi": { "type": "number" }, "hpRegenPerSta": { "type": "number" },
         "manaRegenPerSpiPer5s": { "type": "number" }, "manaRegenPerIntPer5s": { "type": "number" }, "manaRegenCastingPenalty": { "type": "number", "description": "Multiplicador de regen durante 5 s tras gastar maná." },
+        "castMoveSpeedMult": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Multiplicador de velocidad de movimiento mientras se castea (ADR-019). 1 = sin penalización." },
+        "interruptLockoutMs": { "type": "integer", "minimum": 0, "description": "Tiempo sin poder castear tras un corte por control o por el efecto interrupt." },
+        "abilityLockMs": { "type": "integer", "minimum": 0, "description": "Bloqueo de animación tras un hechizo instantáneo: no sale el básico ni otro hechizo; el básico pendiente sale al terminar." },
+        "minInstantSpellCooldownMs": { "type": "integer", "minimum": 0, "description": "Cooldown mínimo de un hechizo de clase instantáneo (lo comprueba el validador)." },
+        "linkdeadInCombatMaxSec": { "type": "number", "minimum": 0, "description": "Tiempo máximo que un personaje desconectado en combate sigue en el mundo (fuera de combate: 10 s)." },
         "manaPerBasicHitPctPerSec": { "type": "number", "minimum": 0, "description": "Maná por ataque básico que impacta, para cualquier personaje con maná y cualquier arma: maxMana · este valor · (swingMs / 1000). Normalizado por swingMs para que la velocidad del arma no cambie el maná por segundo. Fallos y esquivas no dan maná; el swing no avanza mientras se castea." },
         "ragePerHitDealt": { "type": "number", "description": "Ira ganada por cada golpe/habilidad propia que impacta (plano, no depende del daño)." },
         "ragePerHitTaken": { "type": "number" }, "rageDecayPerSecOutOfCombat": { "type": "number" },
@@ -81,7 +86,8 @@
         "threatPerDamage": { "type": "number" }, "threatPerHeal": { "type": "number" }, "threatSwitchMelee": { "type": "number" }, "threatSwitchRanged": { "type": "number" }, "tauntThreatBonus": { "type": "number" },
         "respawnHpPct": { "type": "number" }, "respawnResourcePct": { "type": "number" },
         "corpseLifetimeSec": { "type": "number", "description": "Segundos que dura un cadáver saqueable." },
-        "bossImmuneToAuraKinds": { "type": "array", "items": { "type": "string" }, "description": "Tipos de aura que no afectan a monstruos con boss=true." }
+        "bossImmuneToAuraKinds": { "type": "array", "items": { "type": "string" }, "description": "Tipos de aura que no afectan a monstruos con boss=true." },
+        "controlAuraKinds": { "type": "array", "items": { "enum": ["stun", "root", "silence", "slow"] }, "description": "Tipos de aura que son controles: no cuentan para los topes de auras y no se suman entre sí (manda la ralentización más fuerte y el aturdimiento más largo; ADR-021)." }
       }
     },
 
@@ -153,6 +159,31 @@
       }
     },
 
+    "weapons": {
+      "type": "object", "additionalProperties": false, "required": ["rangedDpsMult", "types"],
+      "properties": {
+        "rangedDpsMult": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Presupuesto de daño por segundo de las armas a distancia relativo a las de cuerpo a cuerpo (mismo nivel y rareza)." },
+        "types": { "type": "object", "description": "Básico por tipo de arma (ADR-019). Las claves deben coincidir con affinity.weaponScaling.",
+          "additionalProperties": { "type": "object", "additionalProperties": false, "required": ["rangeTiles", "animation", "projectile"],
+            "properties": { "rangeTiles": { "type": "number", "exclusiveMinimum": 0 }, "animation": { "type": "string" }, "projectile": { "type": "boolean" } } } }
+      }
+    },
+
+    "limits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maxPersistentAreasPerCaster", "maxAreasPerInstance", "maxPendingImpactsPerInstance", "aoeMaxTargetsCap", "persistentAreaTickMs", "maxBuffsPerEntity", "maxDebuffsPerEntity"],
+      "description": "Topes de rendimiento del combate (ADR-018).",
+      "properties": {
+        "maxPersistentAreasPerCaster": { "type": "integer", "minimum": 0, "description": "Áreas duraderas por lanzador; una nueva por encima del tope reemplaza a la más antigua." },
+        "maxAreasPerInstance": { "type": "integer", "minimum": 1, "description": "Áreas (en casteo + duraderas) por MapInstance. Al tope: el jugador recibe area_limit y el monstruo elige otra acción." },
+        "maxPendingImpactsPerInstance": { "type": "integer", "minimum": 1, "description": "Impactos de proyectil pendientes por MapInstance." },
+        "aoeMaxTargetsCap": { "type": "integer", "minimum": 1, "description": "Tope global de objetivos por área, por encima del maxTargets de cada hechizo." },
+        "persistentAreaTickMs": { "type": "integer", "minimum": 50, "description": "Cada cuánto se evalúa un área que dura en el tiempo (repartidas entre ticks)." },
+        "maxBuffsPerEntity": { "type": "integer", "minimum": 1, "description": "Tope de auras beneficiosas por entidad (ADR-021). Un aura nueva siempre se aplica: si el grupo está lleno, sale la beneficiosa con menos tiempo restante." },
+        "maxDebuffsPerEntity": { "type": "integer", "minimum": 1, "description": "Tope de auras perjudiciales por entidad, sin contar controles (ADR-021). Si está lleno, sale la perjudicial con menos tiempo restante." }
+      }
+    },
+
     "balanceTargets": {
       "type": "object", "additionalProperties": false,
       "required": ["offRoleDamagePct", "offRoleSurvivalPct", "soloXpPerHourSpreadPct", "duelFavoriteWinRate", "hoursToMaxLevel", "firstGroupFightMinutes"],
@@ -164,7 +195,23 @@
         "soloXpPerHourSpreadPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "Diferencia máxima de XP/hora en solitario (contando descansos) entre clases." },
         "duelFavoriteWinRate": { "$ref": "#/$defs/range01", "description": "Victorias del favorito del triángulo en duelos con nivel y equipo iguales." },
         "hoursToMaxLevel": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 2, "maxItems": 2, "description": "Horas de juego del 1 al 15 con una clase." },
-        "firstGroupFightMinutes": { "type": "number", "minimum": 0, "description": "Minutos máximos desde abrir el enlace hasta pelear en grupo con un amigo." }
+        "firstGroupFightMinutes": { "type": "number", "minimum": 0, "description": "Minutos máximos desde abrir el enlace hasta pelear en grupo con un amigo." },
+        "pentagram": {
+          "type": "object", "additionalProperties": false,
+          "required": ["budget", "maxPerAxis", "abilityMaxPoints", "loadoutMaxPct", "referenceLevels", "classes"],
+          "description": "Balance por pentagrama (ADR-020).",
+          "properties": {
+            "_doc": { "type": "string" },
+            "budget": { "type": "number", "description": "Puntos totales por clase." },
+            "maxPerAxis": { "type": "number" },
+            "abilityMaxPoints": { "type": "number", "description": "Máximo que suma una habilidad entre todas sus puntas." },
+            "loadoutMaxPct": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Máximo de una combinación de 4 habilidades + base, relativo a budget." },
+            "referenceLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+            "classes": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": false,
+              "required": ["single", "aoe", "cc", "mobility", "armor", "referenceWeapon"],
+              "properties": { "single": { "type": "number" }, "aoe": { "type": "number" }, "cc": { "type": "number" }, "mobility": { "type": "number" }, "armor": { "type": "number" }, "referenceWeapon": { "type": "string" } } } }
+          }
+        }
       }
     },
 

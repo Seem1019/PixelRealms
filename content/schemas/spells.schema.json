@@ -100,9 +100,11 @@
             "ally",
             "self_aoe_enemies",
             "self_aoe_allies",
-            "target_aoe_enemies"
+            "ground_aoe_enemies",
+            "ground_aoe_allies",
+            "ground_aoe_all"
           ],
-          "description": "ally incluye a uno mismo si no hay objetivo aliado seleccionado"
+          "description": "Un objetivo (tab-target): self, enemy, ally (ally incluye a uno mismo si no hay aliado seleccionado). Área (ADR-015/016): self_aoe_* alrededor del lanzador; ground_aoe_* en targetPos (el cono y la línea salen del lanzador hacia targetPos). ground_aoe_all aplica los efectos positivos a aliados y los negativos a enemigos."
         },
         "aoeRadius": {
           "type": "number",
@@ -146,6 +148,37 @@
         },
         "description": {
           "$ref": "common.schema.json#/$defs/localizedText"
+        },
+        "shape": {
+          "enum": [
+            "circle",
+            "cone",
+            "line"
+          ],
+          "default": "circle",
+          "description": "Forma del área (ADR-016). circle: aoeRadius; cone: aoeRadius + aoeAngleDeg; line: aoeLength + aoeWidth."
+        },
+        "aoeAngleDeg": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 180,
+          "description": "Apertura del cono en grados."
+        },
+        "aoeLength": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 15,
+          "description": "Longitud de la línea en tiles."
+        },
+        "aoeWidth": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 5,
+          "description": "Ancho de la línea en tiles."
+        },
+        "provisional": {
+          "type": "boolean",
+          "description": "true = números provisionales, pendientes de la pasada del content-designer (HU-084)."
         }
       },
       "allOf": [
@@ -172,14 +205,54 @@
                 "enum": [
                   "self_aoe_enemies",
                   "self_aoe_allies",
-                  "target_aoe_enemies"
+                  "ground_aoe_enemies",
+                  "ground_aoe_allies",
+                  "ground_aoe_all"
                 ]
               }
+            },
+            "required": [
+              "targeting"
+            ]
+          },
+          "then": {
+            "if": {
+              "properties": {
+                "shape": {
+                  "const": "line"
+                }
+              },
+              "required": [
+                "shape"
+              ]
+            },
+            "then": {
+              "required": [
+                "aoeLength",
+                "aoeWidth"
+              ]
+            },
+            "else": {
+              "required": [
+                "aoeRadius"
+              ]
             }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "shape": {
+                "const": "cone"
+              }
+            },
+            "required": [
+              "shape"
+            ]
           },
           "then": {
             "required": [
-              "aoeRadius"
+              "aoeAngleDeg"
             ]
           }
         }
@@ -213,6 +286,14 @@
               "type": "number",
               "minimum": 0,
               "description": "% del golpe de arma sumado (1.0 = 100%)"
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
             }
           },
           "required": [
@@ -233,6 +314,24 @@
             "spCoef": {
               "type": "number",
               "minimum": 0
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
+            },
+            "bonusBelowHpPct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "Si el objetivo está por debajo de este % de vida, la cura se multiplica por bonusMult."
+            },
+            "bonusMult": {
+              "type": "number",
+              "minimum": 1
             }
           },
           "required": [
@@ -252,6 +351,14 @@
             "amount": {
               "type": "integer",
               "minimum": 1
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
             }
           },
           "required": [
@@ -268,6 +375,14 @@
             },
             "auraId": {
               "$ref": "common.schema.json#/$defs/id"
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
             }
           },
           "required": [
@@ -284,6 +399,14 @@
             "durationMs": {
               "type": "integer",
               "minimum": 500
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
             }
           },
           "required": [
@@ -301,12 +424,71 @@
               "type": "number",
               "minimum": 0,
               "description": "Distancia mínima al objetivo para poder usarlo"
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
             }
           },
           "required": [
             "type"
           ],
           "description": "El lanzador se desplaza hasta quedar adyacente al objetivo (servidor teletransporta en ≤ 3 ticks; cliente interpola). Requiere targeting enemy y LOS."
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "leap"
+            },
+            "maxRange": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Distancia máxima del salto en tiles."
+            },
+            "travelMs": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Duración del salto; 0 = teletransporte."
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
+            }
+          },
+          "required": [
+            "type",
+            "maxRange"
+          ],
+          "description": "Salto a targetPos (ADR-016, HU-087): lo mueve el servidor; los efectos siguientes se aplican en el punto de llegada."
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "interrupt"
+            },
+            "applyTo": {
+              "enum": [
+                "targets",
+                "self"
+              ],
+              "default": "targets",
+              "description": "self: el efecto se aplica al lanzador aunque el hechizo sea de área o de salto."
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "Corta el casteo del objetivo y aplica rules.combat.interruptLockoutMs (ADR-019)."
         }
       ]
     }
