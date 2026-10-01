@@ -171,7 +171,7 @@ Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `t
 - **Topes (ADR-021):** una entidad tiene como mucho `rules.limits.maxBuffsPerEntity` (16) auras beneficiosas y
   `maxDebuffsPerEntity` (16) perjudiciales. **Un aura nueva siempre se aplica:** si su grupo está lleno, sale la de ese mismo
   grupo con menos tiempo restante. Los **controles** (`rules.combat.controlAuraKinds`: stun, root, silence, slow) no cuentan
-  para ningún tope; solo pueden no aplicarse por inmunidad de jefe (o por la inmunidad tras un control, si se confirma).
+  para ningún tope; solo pueden no aplicarse por inmunidad de jefe o por la inmunidad de 1,5 s tras un control fuerte (ADR-022).
 - **Controles del mismo tipo no se suman:** con varias ralentizaciones activas manda la más fuerte (`pct` mayor); con varios
   aturdimientos o raíces manda la que termina más tarde. Siguen visibles como iconos, pero solo una tiene efecto.
 - `stun`: no mueve, no castea (interrumpe), no ataca. `root`: no mueve. `silence`: no castea `magic`. `slow`: `speed × (1 − pct)`.

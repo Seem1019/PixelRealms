@@ -71,7 +71,8 @@ server/
 - Colecciones calientes del tick: `List<T>` reutilizadas, evitar LINQ en rutas por-tick (alloc). `Dictionary<int, Player>`.
 - Combate sin asignaciones por tick: reservas de capacidad fija (áreas, impactos, auras), eventos en buffer circular; memoria nueva ≤ 1 MB/s bajo carga (ADR-018, HU-089).
 - Logs estructurados: `logger.LogInformation("Player {Name} joined map {Map}", ...)`. Nunca loguear passwords/tokens.
-- Constantes de juego en `GameConstants` (tick, GCD, radios AOI); valores de balance en `content/`.
+- Solo constantes técnicas en `GameConstants` (duración del tick, tamaños de buffers, límites de red). Todo número de juego
+  (GCD, radios AOI, crit, XP, afinidades…) se lee de `content/rules.json` vía `IRules` (ADR-008; regla 4 de `CLAUDE.md`).
 
 ## Tests: helpers que deben existir (crearlos en HU-003/HU-004 si no están)
 - `FakeClock` (avance manual), `SeededRng(seed)` y `FixedRng(params double[] rolls)`.

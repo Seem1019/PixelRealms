@@ -30,7 +30,7 @@ CastSpell(msg) ─► CastSystem.TryBeginCast
    │           `ground_*`, cono, línea y `leap`: targetPos obligatorio, rango y LOS al punto; queda fijo en CastState (ADR-015/016)
    ├─ castMs == 0 ─► Resolve inmediato
    └─ castMs > 0  ─► CastState{spell, target, endsAtMs} + evento CastStarted; GCD arranca YA
-tick: si now ≥ endsAtMs ─► revalidar (rango +1 tile, LOS, objetivo vivo, recurso) ─► Resolve
+tick: si now ≥ endsAtMs ─► revalidar (rango + `castRangeToleranceTiles` (1.5), LOS, objetivo vivo, recurso) ─► Resolve
 Resolve: descontar recurso ─► iniciar CD ─► projectile? programar impacto a now + dist/speed ─► EffectResolver
 EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto ─► efectos en orden ─► eventos
             (`dash` y `leap` mueven al lanzador antes del resto de efectos, que se resuelven en el punto de llegada; auras sobre boss filtradas por bossImmuneToAuraKinds)
@@ -69,7 +69,8 @@ Máquina de estados: `Idle → Aggro → Chase → Attack → Evade`. Detalles e
 - Auras: íconos sobre el marco de unidad con barrido de duración.
 - Saltos (`leap`) y Carga: el cliente no los predice; suaviza la posición del servidor en ~100 ms.
 - Áreas apuntadas: al pulsar la tecla se muestra el círculo de `aoeRadius` bajo el cursor y el clic envía `targetPos`;
-  `CastStarted{targetPos, radius}` dibuja la marca en el suelo para todos hasta que el casteo termina.
+  `CastStarted{targetPos}` (y `dir` en cono/línea) dibuja la marca en el suelo para todos hasta que el casteo termina; la forma y el
+  tamaño salen del contenido del cliente y `radius` solo viaja si algo lo modifica (ADR-018).
 
 ## Rendimiento (ADR-018)
 - Áreas: rejilla AOI + pruebas de forma sin raíces ni trigonometría; LOS desde el centro solo para candidatos; topes en `rules.limits`.
