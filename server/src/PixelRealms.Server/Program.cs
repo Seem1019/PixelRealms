@@ -1,4 +1,6 @@
 using PixelRealms.Content;
+using PixelRealms.Game.Core;
+using PixelRealms.Server.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,10 +14,23 @@ if (load.Content is null)
     Console.Error.WriteLine($"content/ inválido ({load.Report.Errors.Count} errores): el servidor no arranca.");
     return 1;
 }
-builder.Services.AddSingleton(new ReloadableContent(load.Content, contentDir));
+var content = new ReloadableContent(load.Content, contentDir);
+builder.Services.AddSingleton(content);
+
+// HU-004: mundo + simulación en un hilo dedicado (los sistemas se registran en orden explícito en cada HU).
+var world = new World();
+var simulation = new Simulation(world, content.Rules, new SeededRng(Environment.TickCount), new TickClock());
+builder.Services.AddSingleton(world);
+builder.Services.AddSingleton(simulation);
+builder.Services.AddSingleton<GameLoopService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
 
 var app = builder.Build();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health", (GameLoopService loop) =>
+{
+    var (_, p99) = loop.Stats.Percentiles();
+    return Results.Ok(new { status = "ok", tick = loop.TicksRun, tickP99Ms = Math.Round(p99, 2) });
+});
 app.Run();
 return 0;
 

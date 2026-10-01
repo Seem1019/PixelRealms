@@ -87,7 +87,7 @@ cambio compile y se pruebe automáticamente desde el primer día.
 ### HU-004 · Esqueleto del game loop de 20 Hz
 **Como** desarrollador **quiero** un bucle de simulación de paso fijo en un hilo dedicado **para** tener una base
 determinista donde agregar sistemas.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001, HU-003
 - Skills: `dotnet-server`
 
@@ -103,8 +103,12 @@ determinista donde agregar sistemas.
 - `Channel<InboundMessage>` bounded 10 000. `TickContext { long Tick; long NowMs; List<IGameEvent> Events; ... }`.
 - Orden de sistemas documentado en `docs/architecture.md` §3; registrarlos en una lista explícita, no por reflexión.
 
----
+**Notas de implementación**
+- `PixelRealms.Game/Core`: `IGameClock`/`TickClock`, `IRng`/`SeededRng`, `Vec2` (casillas), `EntityId`, `IGameEvent`/`TickContext`, `World` (colección de `MapInstance` sobre `MapData`, ADR-007), `Simulation` (ganchos pre/post + lista explícita de `IMapSystem`), `TickScheduler` (acumulador puro, máx. 3 ticks de recuperación) y `TickStats` (p50/p99 en buffer circular).
+- `Server/Hosting/GameLoopService`: hilo "GameLoop" con Stopwatch, warn > 50 ms, informe p50/p99/entidades cada 30 s, excepción en el tick no tumba el loop, StopAsync < 1 s con gancho `OnStopping`; `InboundChannel` bounded 10 000 (DropWrite).
+- Helpers de test: `FakeClock`/`TickClock`, `SeededRng`, `FixedRng`, `WorldBuilder`, `TickRunner`, `TestContent`; 9 tests de dominio (40 ticks, orden de sistemas, scheduler, stats) y 3 de servidor (20 ticks/s medidos en 2 s, parada < 1 s, excepción).
 
+---
 ### HU-005 · Proyecto Godot base
 **Como** desarrollador **quiero** el proyecto Godot configurado para pixel art y con la arquitectura de autoloads
 **para** construir pantallas sobre una base consistente.

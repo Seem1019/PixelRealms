@@ -40,3 +40,4 @@ dotnet_diagnostic.CA1311.severity = none
 dotnet_diagnostic.CA1822.severity = suggestion
 dotnet_diagnostic.IDE0058.severity = none
 dotnet_diagnostic.CA1720.severity = none   # Int/Single son nombres de stats y puntas del pentagrama (rules.json)
+dotnet_diagnostic.CA1873.severity = none   # argumentos de log: las rutas calientes no loguean

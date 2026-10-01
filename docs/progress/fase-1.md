@@ -21,7 +21,7 @@
 | 1 | HU-001 Monorepo, solución .NET y CI | M1 | — | Hecha | commit `feat(infra)` |
 | 2 | HU-002 Infra local con Docker | M1 | 001 | Pendiente | compose + .env.example + migración `Initial` |
 | 3 | HU-003 Carga y validación de contenido | M1 | 001 | Hecha | validador propio en vez de JsonSchema.Net (provisional) |
-| 4 | HU-004 Game loop 20 Hz | M1 | 001, 003 | Pendiente | |
+| 4 | HU-004 Game loop 20 Hz | M1 | 001, 003 | Hecha | |
 | 5 | HU-005 Proyecto Godot base | M1 | 001 | Pendiente | GUT sí; YATI no descargable (ver bloqueos) |
 | 6 | HU-006 Protocolo base | M1 | 004, 005 | Pendiente | |
 | 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Pendiente | |
