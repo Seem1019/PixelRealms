@@ -18,9 +18,9 @@
 ## Orden de ejecución (hitos de `docs/backlog/README.md`)
 | # | HU | Hito | Depende de | Estado | Notas |
 |---|---|---|---|---|---|
-| 1 | HU-001 Monorepo, solución .NET y CI | M1 | — | En curso | |
+| 1 | HU-001 Monorepo, solución .NET y CI | M1 | — | Hecha | commit `feat(infra)` |
 | 2 | HU-002 Infra local con Docker | M1 | 001 | Pendiente | compose + .env.example + migración `Initial` |
-| 3 | HU-003 Carga y validación de contenido | M1 | 001 | Pendiente | parte de `tools/ContentCheck` |
+| 3 | HU-003 Carga y validación de contenido | M1 | 001 | Hecha | validador propio en vez de JsonSchema.Net (provisional) |
 | 4 | HU-004 Game loop 20 Hz | M1 | 001, 003 | Pendiente | |
 | 5 | HU-005 Proyecto Godot base | M1 | 001 | Pendiente | GUT sí; YATI no descargable (ver bloqueos) |
 | 6 | HU-006 Protocolo base | M1 | 004, 005 | Pendiente | |
@@ -32,7 +32,11 @@
 | 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | Pendiente | HU-084 y las validaciones jugando quedan fuera |
 
 ## Decisiones provisionales (revisar)
-_(se añaden al tomarlas: qué se eligió, qué se descartó y por qué)_
+- **HU-003 · validación de schemas sin JsonSchema.Net.** Se eligió portar el `SchemaValidator` de `tools/ContentCheck`
+  (subconjunto de draft 2020-12 con exactamente las palabras clave que usan los schemas del repo) a `PixelRealms.Content`.
+  Descartado: JsonSchema.Net (NuGet bloqueado en el sandbox). Reversible: sustituir la clase `Validation/SchemaValidator`
+  por `JsonSchema.Net` + `SchemaRegistry` sin tocar el resto. Riesgo: una palabra clave nueva en un schema no se valida
+  hasta añadirla.
 
 ## Sin compilar / sin ejecutar en esta sesión
 _(código escrito que requiere NuGet, Docker o el editor de Godot)_

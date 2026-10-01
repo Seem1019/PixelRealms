@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace PixelRealms.Tools.ContentCheck;
+namespace PixelRealms.Content.Validation;
 
 /// <summary>
 /// Validador de un subconjunto de JSON Schema draft 2020-12: justo las palabras clave que usan los schemas de

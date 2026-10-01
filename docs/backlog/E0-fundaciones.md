@@ -48,7 +48,7 @@ cambio compile y se pruebe automáticamente desde el primer día.
 
 ### HU-003 · Carga y validación de contenido (ContentValidator)
 **Como** diseñador **quiero** que el contenido JSON se valide automáticamente **para** detectar errores antes de ejecutar el juego.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `game-content`, `dotnet-server`
 
@@ -77,8 +77,13 @@ cambio compile y se pruebe automáticamente desde el primer día.
   `PixelRealms.Content`: porta sus reglas (y su lista de funciones del motor implementadas), añade los tests y el hook, y
   después borra `tools/ContentCheck/`.
 
----
+**Notas de implementación**
+- `PixelRealms.Content`: `Defs/` (records inmutables, enums en snake_case, defaults del schema), `ContentJson` (camelCase, `UnmappedMemberHandling.Disallow`), `ContentLoader` (schemas → cruzadas → `ContentDb`), `ContentDb` (`FrozenDictionary`, `KeyNotFoundException` con mensaje), `ReloadableContent` (recarga de rules.json conservando el anterior si es inválido).
+- Validación de schemas con `Validation/SchemaValidator` propio (subconjunto de 2020-12 que usan los schemas del repo) en lugar de JsonSchema.Net: decisión provisional porque el entorno no tenía NuGet; cambiar a JsonSchema.Net es un reemplazo local de esa clase (ver `docs/progress/fase-1.md`).
+- `Validation/CrossRefValidator` con todas las reglas de la skill game-content y CA 3/4/4b/4d; `EngineCapabilities` es la lista de funciones del motor implementadas (ADR-023): los 4 hechizos de cono/línea quedan no disponibles con aviso.
+- CLI `server/tools/ContentValidator`; el servidor no arranca con contenido inválido (CA5); hook PostToolUse en `.claude/settings.json` → `tools/hooks/validate-content.sh`; `tools/ContentCheck` retirado. Tests en `Game.Tests/Content/ContentLoaderTests` (20 casos, uno por regla).
 
+---
 ### HU-004 · Esqueleto del game loop de 20 Hz
 **Como** desarrollador **quiero** un bucle de simulación de paso fijo en un hilo dedicado **para** tener una base
 determinista donde agregar sistemas.

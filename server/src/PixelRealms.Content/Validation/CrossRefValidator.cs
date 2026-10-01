@@ -1,22 +1,18 @@
 using System.Text.Json;
 
-namespace PixelRealms.Tools.ContentCheck;
+namespace PixelRealms.Content.Validation;
 
 /// <summary>
 /// Validaciones cruzadas entre archivos de content/: ids únicos, referencias (auras, hechizos, items, tablas, clases),
 /// coherencia con rules.json y las reglas de la skill game-content §Procedimiento (HU-003 CA 3, 4, 4b, 4d).
 /// </summary>
-public static class CrossRefChecks
+public static class CrossRefValidator
 {
-    // ADR-023: funciones del motor ya implementadas. Lo que no esté aquí deja el hechizo "no disponible" (aviso, no error).
-    // Hoy no hay motor: la lista refleja lo que la Fase 1 implementa primero (HU-034/HU-086/HU-087); el cono y la línea llegan después.
-    private static readonly HashSet<string> ImplementedShapes = new(StringComparer.Ordinal) { "circle" };
-    private static readonly HashSet<string> ImplementedTargetings = new(StringComparer.Ordinal)
-        { "self", "enemy", "ally", "self_aoe_enemies", "self_aoe_allies", "ground_aoe_enemies", "ground_aoe_allies", "ground_aoe_all" };
-    private static readonly HashSet<string> ImplementedEffects = new(StringComparer.Ordinal)
-        { "damage", "heal", "restore_resource", "apply_aura", "taunt", "dash", "interrupt", "leap" };
+    private static HashSet<string> ImplementedShapes => EngineCapabilities.Shapes;
+    private static HashSet<string> ImplementedTargetings => EngineCapabilities.Targetings;
+    private static HashSet<string> ImplementedEffects => EngineCapabilities.Effects;
 
-    public static void Run(IReadOnlyDictionary<string, JsonDocument> files, Report report)
+    public static void Run(IReadOnlyDictionary<string, JsonDocument> files, ValidationReport report)
     {
         var classes = Arr(files["classes"], "classes");
         var spells = Arr(files["spells"], "spells");
@@ -378,7 +374,7 @@ public static class CrossRefChecks
         return d;
     }
 
-    private static HashSet<string> UniqueIds(string file, string key, List<JsonElement> list, Report report)
+    private static HashSet<string> UniqueIds(string file, string key, List<JsonElement> list, ValidationReport report)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < list.Count; i++)

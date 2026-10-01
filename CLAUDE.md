@@ -62,8 +62,7 @@ docker compose up -d postgres                       # Postgres 17 en :5432
 dotnet build server/PixelRealms.sln
 dotnet test  server/PixelRealms.sln
 dotnet run --project server/src/PixelRealms.Server  # http://localhost:5080, ws://localhost:5080/ws
-dotnet run --project server/tools/ContentValidator -- content/   # definitivo (HU-003)
-dotnet run --project tools/ContentCheck -- content/              # validador base hasta que exista el anterior
+dotnet run --project server/tools/ContentValidator -- content/
 dotnet ef migrations add <Name> -p server/src/PixelRealms.Persistence -s server/src/PixelRealms.Server
 # Cliente (Godot en PATH como `godot`)
 godot --path client --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit

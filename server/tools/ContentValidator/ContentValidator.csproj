@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- CLI: `dotnet run --project server/tools/ContentValidator -- content/` (HU-003). -->
+  <!-- CLI: dotnet run -p server/tools/ContentValidator (HU-003); argumento: ruta a content/. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>PixelRealms.Tools.ContentValidator</RootNamespace>

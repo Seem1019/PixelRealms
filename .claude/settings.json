@@ -25,5 +25,18 @@
       "Read(./.env)",
       "Read(./**/appsettings.Production.json)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash tools/hooks/validate-content.sh"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -6,7 +6,7 @@ Cliente **Godot 4 (GDScript)** · Servidor **.NET 10** autoritativo · **Postgre
 ## Empezar
 1. Instala las herramientas de `docs/prompts/README.md` §1.
 2. Abre Claude Code en esta carpeta y sigue `docs/prompts/01-arranque.md` (P0 → P6).
-3. Antes de tocar `content/`: `dotnet run --project tools/ContentCheck -- content/` (validador base; el definitivo llega con HU-003).
+3. Antes de tocar `content/`: `dotnet run --project server/tools/ContentValidator -- content/`.
 
 ## Mapa de la documentación
 | Documento | Contenido |
@@ -17,7 +17,7 @@ Cliente **Godot 4 (GDScript)** · Servidor **.NET 10** autoritativo · **Postgre
 | `docs/database.md` | modelo de datos |
 | `docs/decisions.md` | decisiones de arquitectura (ADR) |
 | `docs/design/gdd.md` · `combat.md` · `class-kits.md` · `balance-report.md` | diseño de juego, fórmulas, pentagrama, hechizos por clase e informe de balance |
-| `tools/balance/` · `tools/ContentCheck/` | modelo de balance en Python (pentagrama, solitario, jefe) · validador base de `content/` (schemas + referencias) |
+| `tools/balance/` · `server/tools/ContentValidator/` | modelo de balance en Python (pentagrama, solitario, jefe) · validador de `content/` (schemas + referencias) |
 | `docs/backlog/` | épicas e historias de usuario con criterios de aceptación |
 | `docs/prompts/` | prompts listos para Claude Code |
 | `content/` | clases, hechizos, auras, items, monstruos, botín y vendedores (JSON + schemas) |
