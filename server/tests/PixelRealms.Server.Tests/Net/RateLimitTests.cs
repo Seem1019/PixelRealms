@@ -11,6 +11,7 @@ using Xunit;
 namespace PixelRealms.Server.Tests.Net;
 
 /// <summary>HU-071: token bucket por conexión y tipo, desconexión por excesos, tope por IP y fuzzing.</summary>
+[Collection(nameof(TickTimingIsolation))]
 public sealed class RateLimitTests
 {
     [Fact]
@@ -188,3 +189,7 @@ public sealed class RateLimitTests
         }
     }
 }
+
+/// <summary>Tests que miden el tick en tiempo real (p99 de `/health`, ticks por segundo): con otros servidores de test en paralelo la máquina compartida los dispara.</summary>
+[CollectionDefinition(nameof(TickTimingIsolation), DisableParallelization = true)]
+public sealed class TickTimingIsolation;

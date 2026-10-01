@@ -4,11 +4,13 @@ using PixelRealms.Game.Core;
 using PixelRealms.Game.Map;
 using PixelRealms.Server.Hosting;
 using PixelRealms.Server.Tests.Helpers;
+using PixelRealms.Server.Tests.Net;
 using Shouldly;
 using Xunit;
 
 namespace PixelRealms.Server.Tests.Hosting;
 
+[Collection(nameof(TickTimingIsolation))]
 public sealed class GameLoopServiceTests
 {
     private static Simulation NewSimulation()
@@ -25,10 +27,15 @@ public sealed class GameLoopServiceTests
         var sim = NewSimulation();
         using var loop = new GameLoopService(sim, NullLogger<GameLoopService>.Instance);
         await loop.StartAsync(CancellationToken.None);
+        // Se mide desde el primer tick y contra el tiempo real transcurrido: ni el arranque del hilo ni lo que se pase el Delay cuentan.
+        while (loop.TicksRun == 0) await Task.Delay(5, TestContext.Current.CancellationToken);
+        var startTicks = loop.TicksRun;
+        var sw = Stopwatch.StartNew();
         await Task.Delay(2000, TestContext.Current.CancellationToken);
-        var ticks = loop.TicksRun;
+        var ticks = loop.TicksRun - startTicks;
+        var expected = (long)Math.Round(sw.Elapsed.TotalSeconds * 20);
         await loop.StopAsync(CancellationToken.None);
-        ticks.ShouldBeInRange(38, 42);
+        ticks.ShouldBeInRange(expected - 2, expected + 2);
         loop.Stats.Count.ShouldBeGreaterThan(30);
     }
 
