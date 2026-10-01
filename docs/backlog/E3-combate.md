@@ -205,7 +205,7 @@
 1. **Dado** `targeting: ground_aoe_all` **entonces**, dentro del área, los efectos positivos (cura, escudo, beneficios) se aplican a los aliados (incluido el lanzador) y los negativos (daño, controles, perjuicios) a los enemigos; ningún objetivo recibe ambos. Lo usan Pulso sagrado y Sendero de luz.
 2. **Dado** Pulso sagrado (`docs/design/class-kits.md`) **entonces** es el hechizo de nivel 5 del Sacerdote (`priest_holy_pulse`; sustituyó a Rezo de sanación en el contenido el 2026-09-30, ADR-020), se desbloquea a nivel 5, ralentiza a los enemigos alcanzados y su daño a enemigos es mucho menor que su curación (test que compara ambos valores a igual `spellPower`).
 3. **Dado** un rival de duelo dentro del área **entonces** recibe la parte de daño solo si `PvpService.CanAttack` lo permite.
-4. **Dado** el validador **entonces** acepta `ground_aoe_all` y exige que el hechizo tenga al menos un efecto `heal` y uno `damage`.
+4. **Dado** el validador **entonces** acepta `ground_aoe_all` y exige que el hechizo tenga al menos un efecto positivo (`heal` o aura beneficiosa) y uno negativo (`damage` o aura perjudicial): Pulso sagrado cura y daña; Sendero de luz cura y ralentiza sin dañar.
 
 **Notas técnicas**
 - Nombre, radio y números en el rediseño de kits. Usar un `id` nuevo (los ids de contenido no se reutilizan).

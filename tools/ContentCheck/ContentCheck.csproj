@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Validador base de content/ (punto de partida de HU-003). Sin paquetes NuGet: solo System.Text.Json. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>PixelRealms.Tools.ContentCheck</RootNamespace>
+    <AssemblyName>ContentCheck</AssemblyName>
+  </PropertyGroup>
+
+</Project>
