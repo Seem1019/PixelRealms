@@ -29,7 +29,7 @@
 | 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | M2 hecho (HU-088 parcial) | 104 tests de dominio nuevos; HUD por código sin arte |
 | 10 | HU-050 → HU-059 | M3 | | Hechas | ventanas por código sin arte |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Hechas (HU-063 parcial: lista como texto) | invitación de grupo reutiliza PartyUpdate |
-| 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | Pendiente | HU-084 y las validaciones jugando quedan fuera |
+| 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | HU-070/071/072/080 hechas; HU-073/074/075/083/088/089 parciales; HU-081/082/084 fuera | despliegue escrito sin VPS; mapas generados con `tools/maps/gen_tier1_maps.py`; LoadBot en proceso |
 
 ## Decisiones provisionales (revisar)
 - **HU-003 · validación de schemas sin JsonSchema.Net.** Se eligió portar el `SchemaValidator` de `tools/ContentCheck`
@@ -94,7 +94,20 @@
   Descartado: tabla nueva `gold_audit_log` (migración extra para un comando de administración).
 - **HU-071 · límites de rate en `appsettings` (`Net:RateLimits`), no en `rules.json`**: son técnicos, no de balance (ADR-008 habla
   de constantes de juego). Descartado: `rules.limits.*` (mezclaría red con gameplay). Detrás de Caddy hará falta `ForwardedHeaders`
-  para que el tope por IP vea la IP real (pendiente HU-073).
+  para que el tope por IP vea la IP real (hecho en HU-073: `UseForwardedHeaders` solo en Producción).
+- **HU-080 · mapas generados por script (`tools/maps/gen_tier1_maps.py`) con el tileset placeholder**, no dibujados en Tiled.
+  Descartado: editar a mano 27 500 casillas. Reversible: abrir el `.tmj` en Tiled y retocarlo (el script es solo para
+  regenerar); los nombres de landmark que no están en el GDD ("Roble centenario") y la forma de los campamentos son
+  decisiones del generador.
+- **HU-083 · el "puzle de palancas" de la Sala 2 se deja como pilares sin mecánica.** Descartado: inventar un sistema de
+  palancas/puertas (ningún ADR ni skill lo define). Si se quiere, es una HU nueva (objeto `switch` en `maps/` + estado en
+  `MapInstance`).
+- **HU-089 · prueba de carga en proceso (dominio puro) en vez de bots por WebSocket.** Descartado: un `LoadBot` de red (no
+  hay servidor ni Postgres levantados en el sandbox y lo que la HU mide es el coste del tick). La salida p95 por cliente y los
+  FPS del cliente web quedan para la medición real. Los ~200 auras se rellenan con sangrados porque los kits del Tier 1 no
+  llegan solos; las "40 áreas duraderas" no existen en la Fase 1 (áreas instantáneas).
+- **HU-074 · enlace de actualización = `<servidor>/play/`** (la build web siempre es la última), configurable en
+  `settings.cfg`. Descartado: una URL fija de itch.io en el código.
 
 ## Sin compilar / sin ejecutar en esta sesión
 - `server/src/PixelRealms.Persistence/Ef/*` (GameDbContext, EfAccountRepository, EfCharacterRepository, EfPersistence) y
@@ -107,6 +120,10 @@
   `dotnet package search <id>` y ajustar.
 
 ## Bloqueos
+- Sin Docker ni VPS: `server/Dockerfile`, `docker-compose.prod.yml`, `deploy/*` y los workflows de GitHub están escritos pero
+  sin ejecutar (HU-073/074/075). Sin plantillas de exportación de Godot: `export_presets.cfg` sin probar (HU-074).
+- El dispositivo de Diego estuvo desconectado toda la sesión: el bundle `fase-1.bundle` (rama completa) queda en la
+  conversación; en el PC: `git fetch <ruta>/fase-1.bundle fase-1:fase-1`.
 - YATI (importador Tiled del cliente): `github.com/Skoti/YATI` no se pudo clonar desde el sandbox (repo no accesible); el
   cliente deja el hueco (`addons/yati/`) y el import de mapas se prueba en el PC.
 
@@ -117,5 +134,14 @@ _(contradicciones o huecos descubiertos al implementar; cambios mínimos hechos 
 - **M2:** `docs/protocol.md` no dice qué pasa con `CastStarted` en hechizos instantáneos ni define los bits de
   `EntitySpawn.flags` (se usa 2 = muerto, 4 = evadiendo, documentado en `Actor.Flags`). `combat.md` no da la esquiva de los
   monstruos ni la regeneración de vida resulta modesta: `spi·0.5 + sta·0.2` por segundo cura a un Sacerdote nv 3 ~10 HP/s.
+- **HU-080:** la skill `world-maps` y el GDD piden "~100×100 casillas útiles por zona" **y** "60–90 s para cruzarla": a
+  `baseSpeedTilesPerSec = 4`, 100 casillas son 25 s; para 60–90 s harían falta ~240–360 casillas o caminos muy sinuosos. Se
+  siguió el tamaño (100×100) y se deja la contradicción para que Diego decida (tamaño, velocidad o tiempo objetivo).
+- **HU-070:** `item_audit_log` no tiene columna para oro; `/gold` se audita con `item_id = Guid.Empty` y `template_id = "gold"`.
+- **HU-071:** `docs/architecture.md` §4 fija los límites de rate pero `rules.json`/ADR-008 solo hablan de constantes de juego;
+  quedaron en `appsettings` (`Net:RateLimits`). Conviene decir en architecture.md dónde viven.
+- **HU-072:** el CA3 pide "memoria asignada por segundo por instancia": .NET solo da la asignación del proceso.
+- **HU-089:** el CA1 pide 40 áreas duraderas superpuestas y ~200 auras; con el contenido de la Fase 1 no existen áreas
+  duraderas y los kits generan < 40 auras: el escenario de la HU describe el Tier 3, no el 1.
 - **HU-026:** el intervalo de autosave (60 s) se trató como infraestructura (`appsettings` → `Persistence:AutosaveSec`),
   no como regla de juego; si se prefiere en `rules.json`, es un cambio de una línea en `WorldSession`.
