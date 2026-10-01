@@ -6,6 +6,7 @@ namespace PixelRealms.Game.Tests.Combat;
 
 /// <summary>HU-089: el escenario "Mina llena" corre en proceso; aquí solo 10 s simulados y las métricas deterministas (asignación, Gen2).
 /// Los tiempos (p99/máx) se evalúan con `dotnet run -c Release --project server/tools/LoadBot`, no en el test (máquina compartida).</summary>
+[Collection(nameof(LoadScenarioIsolation))]
 public sealed class LoadScenarioTests
 {
     [Fact]
@@ -20,3 +21,7 @@ public sealed class LoadScenarioTests
         result.Gen2.ShouldBe(0);
     }
 }
+
+/// <summary>La asignación y el conteo de Gen2 son de todo el proceso: el escenario no puede correr en paralelo con otros tests.</summary>
+[CollectionDefinition(nameof(LoadScenarioIsolation), DisableParallelization = true)]
+public sealed class LoadScenarioIsolation;
