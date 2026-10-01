@@ -72,7 +72,34 @@ docker compose -f docker-compose.prod.yml ps
 curl -s https://juego.midominio.com/health      # {"status":"ok","players":0,"tickP99Ms":...,"uptime":...}
 ```
 Las migraciones de EF Core se aplican solas al arrancar el servidor (`MigrateAsync`), así que la base queda lista en el primer
-arranque. Para el primer administrador: `docker compose -f docker-compose.prod.yml exec server dotnet PixelRealms.Server.dll make-admin <usuario>`
+arranque.
+
+**El despliegue parte de una base de datos vacía.** La primera migración (`InitialCreate`) crea todo el esquema, incluida
+la collation `case_insensitive`. Si el volumen `pgdata` ya tiene tablas creadas sin migraciones (sin
+`__EFMigrationsHistory`), el servidor no arranca: falla con `relation "accounts" already exists`. Hay dos salidas:
+
+- **Recrear la base** (si sus datos no importan; borra todo lo que hay en ella):
+  ```bash
+  docker compose -f docker-compose.prod.yml stop server
+  docker compose -f docker-compose.prod.yml exec postgres sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+  docker compose -f docker-compose.prod.yml start server
+  ```
+- **Baseline** (conservar los datos): solo si el esquema existente ya es **idéntico** al de `InitialCreate`, collation e
+  índices `ix_*_ci` incluidos (compáralo con `dotnet ef migrations script 0 InitialCreate`). Haz una copia antes (§9).
+  Comprueba que no hay nombres repetidos sin distinguir mayúsculas, porque el índice único los rechazaría:
+  ```sql
+  SELECT lower(username), count(*) FROM accounts GROUP BY 1 HAVING count(*) > 1;
+  SELECT lower(name), count(*) FROM characters GROUP BY 1 HAVING count(*) > 1;
+  ```
+  y marca la migración como aplicada para que el servidor no intente crearla otra vez:
+  ```sql
+  CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+      migration_id varchar(150) PRIMARY KEY,
+      product_version varchar(32) NOT NULL);
+  INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+  VALUES ('20261001173627_InitialCreate', '10.0.1');
+  ```
+  Si el esquema no coincide, el baseline dejaría la base a medias: exporta los datos, recrea la base y vuelve a importarlos. Para el primer administrador: `docker compose -f docker-compose.prod.yml exec server dotnet PixelRealms.Server.dll make-admin <usuario>`
 (la cuenta debe existir: regístrala desde el cliente antes).
 
 ## 6. Cliente web y de escritorio (HU-074)

@@ -13,7 +13,7 @@
 4. **Dado** la pantalla Login del cliente **cuando** pulso "Crear cuenta" y relleno el formulario **entonces** veo errores en español junto al campo y, si va bien, se inicia sesión automáticamente.
 
 **Notas técnicas**
-- `PasswordHasher<Account>` de ASP.NET Core Identity (sin el resto de Identity). Índice único sobre `lower(username)`.
+- `PasswordHasher<Account>` de ASP.NET Core Identity (sin el resto de Identity). Índice único `ix_accounts_username_ci` sobre `username`, que usa la collation ICU no determinista `case_insensitive` (ver `docs/database.md` → *Nombres únicos*).
 - Rate limit: 5 registros/hora por IP.
 - Cliente: `HTTPRequest` en `scripts/net/api_client.gd` (async con `await`), URL base desde `Settings`.
 
