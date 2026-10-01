@@ -32,8 +32,8 @@ func _draw() -> void:
 	for name: String in layer_names:
 		if not map.layers.has(name):
 			continue
-		for y in map.height:
-			for x in map.width:
+		for y: int in map.height:
+			for x: int in map.width:
 				var gid := map.gid_at(name, x, y)
 				if gid == 0:
 					continue

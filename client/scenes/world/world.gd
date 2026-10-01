@@ -1,6 +1,10 @@
 extends Node2D
-## Escena del mundo (HU-014 CA2, HU-020 CA3 provisional): conecta con el ticket, envía Hello, carga el mapa del Welcome y
-## coloca al jugador. El movimiento, la predicción y los demás jugadores llegan en HU-021/022/023.
+## Escena del mundo (HU-014, HU-020..HU-024): conecta con el ticket, envía Hello, carga el mapa del Welcome, mueve al
+## jugador con predicción + reconciliación (MoveInput cada 200 ms / al cambiar / 0,0 al soltar), dibuja las entidades de la
+## AOI con interpolación y muestra el nombre de la zona al entrar. El cliente nunca decide resultados: solo refleja.
+
+const MOVE_RESEND_MS := 200
+const ZONE_FADE_SEC := 2.0
 
 @onready var _ground: PlaceholderMapRenderer = %Ground
 @onready var _above: PlaceholderMapRenderer = %Above
@@ -9,15 +13,31 @@ extends Node2D
 @onready var _player_name: Label = %PlayerName
 @onready var _camera: Camera2D = %Camera
 @onready var _hud_status: Label = %HudStatus
+@onready var _zone_label: Label = %ZoneName
+@onready var _overlay: DebugOverlay = $DebugOverlay
 
 var map: TmjMap
+var prediction: Prediction = Prediction.new()
+var in_world: bool = false
+
+var _seq: int = 0
+var _last_dx: int = 0
+var _last_dy: int = 0
+var _last_sent_ms: int = 0
+var _remotes: Dictionary = {}  # id → RemoteEntity
+var _current_zone: String = ""
+var _zone_fade_left: float = 0.0
 
 
 func _ready() -> void:
 	Net.register_handler("Welcome", _on_welcome)
+	Net.register_handler("EntitySpawn", _on_entity_spawn)
+	Net.register_handler("EntityDespawn", _on_entity_despawn)
+	Net.snapshot.connect(_on_snapshot)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
 	_player.visible = false
+	_zone_label.modulate.a = 0.0
 	_hud_status.text = "Conectando…"
 	var ticket := GameState.pending_ticket
 	GameState.pending_ticket = ""
@@ -33,12 +53,21 @@ func _on_connected(ticket: String) -> void:
 func _on_welcome(d: Dictionary) -> void:
 	GameState._on_welcome(d)
 	_hud_status.text = ""
+	_clear_remotes()
 	_load_map(GameState.map_id)
 	var self_state: Dictionary = d.get("self", {})
-	_player.position = Vector2(float(self_state.get("x", 0)), float(self_state.get("y", 0)))
+	var start := Vector2(float(self_state.get("x", 0)), float(self_state.get("y", 0)))
+	var grid: CollisionGrid = map.collision if map != null else CollisionGrid.new()
+	prediction.setup(grid, start, float(Content.rule("movement", "baseSpeedTilesPerSec", 4.0)))
+	_player.position = start
 	_player_name.text = GameState.character_name
 	_player.visible = true
-	_camera.position = _player.position
+	_camera.position = Vector2.ZERO
+	_camera.reset_smoothing()
+	in_world = true
+	_seq = 0
+	_last_dx = 0
+	_last_dy = 0
 
 
 func _load_map(map_id: String) -> void:
@@ -55,7 +84,105 @@ func _load_map(map_id: String) -> void:
 	_camera.limit_bottom = map.height * ts
 
 
+# --- Movimiento propio (HU-021 CA1, HU-022) -------------------------------------------------------------------------
+
+func _physics_process(_delta: float) -> void:
+	if not in_world or not Net.is_connected:
+		return
+	var dx := int(Input.is_action_pressed("move_right")) - int(Input.is_action_pressed("move_left"))
+	var dy := int(Input.is_action_pressed("move_down")) - int(Input.is_action_pressed("move_up"))
+	var now := Time.get_ticks_msec()
+	var changed := dx != _last_dx or dy != _last_dy
+	var moving := dx != 0 or dy != 0
+	if changed or (moving and now - _last_sent_ms >= MOVE_RESEND_MS):
+		_seq += 1
+		Net.send("MoveInput", {"seq": _seq, "dx": dx, "dy": dy})
+		_last_sent_ms = now
+		_last_dx = dx
+		_last_dy = dy
+	if moving:
+		# Un tick de simulación por frame físico (50 ms = 20 Hz, igual que el servidor).
+		prediction.apply_input(_seq, dx, dy)
+
+
+func _process(delta: float) -> void:
+	if in_world:
+		prediction.update_render(delta)
+		_player.position = prediction.render_position
+		_update_zone(delta)
+		_overlay.pending_inputs = prediction.pending.size()
+		_overlay.reconcile_error_px = prediction.last_error_px
+
+
+func _on_snapshot(d: Dictionary) -> void:
+	if not in_world:
+		return
+	var self_state: Dictionary = d.get("self", {})
+	var ack := int(d.get("ackSeq", 0))
+	prediction.reconcile(
+		Vector2(float(self_state.get("x", prediction.position.x)), float(self_state.get("y", prediction.position.y))),
+		ack, float(self_state.get("speed", prediction.speed_tiles_per_sec)))
+	_overlay.ack_seq = ack
+	var now := float(Time.get_ticks_msec())
+	for e: Variant in d.get("ents", []):
+		var ed: Dictionary = e
+		var id := int(ed.get("id", -1))
+		if _remotes.has(id):
+			var r: RemoteEntity = _remotes[id]
+			r.apply_state(ed, now)
+
+
+# --- Entidades remotas (HU-023, HU-024) -----------------------------------------------------------------------------
+
+func _on_entity_spawn(d: Dictionary) -> void:
+	var id := int(d.get("id", -1))
+	if id < 0 or id == GameState.self_id:
+		return
+	var r: RemoteEntity
+	if _remotes.has(id):
+		r = _remotes[id]
+	else:
+		r = RemoteEntity.new()
+		_entities.add_child(r)
+		_remotes[id] = r
+	r.setup(d)
+
+
+func _on_entity_despawn(d: Dictionary) -> void:
+	var id := int(d.get("id", -1))
+	if _remotes.has(id):
+		var r: RemoteEntity = _remotes[id]
+		_remotes.erase(id)
+		r.queue_free()
+
+
+func _clear_remotes() -> void:
+	for r: RemoteEntity in _remotes.values():
+		r.queue_free()
+	_remotes.clear()
+
+
+# --- Zonas (HU-024 CA4) -----------------------------------------------------------------------------------------------
+
+func _update_zone(delta: float) -> void:
+	if map != null:
+		var zone := map.zone_at(prediction.position / float(map.tile_size))
+		var zone_name := str(zone.get("name", ""))
+		if zone_name != _current_zone:
+			_current_zone = zone_name
+			if not zone_name.is_empty():
+				_zone_label.text = zone_name
+				_zone_label.modulate.a = 1.0
+				_zone_fade_left = ZONE_FADE_SEC
+	if _zone_fade_left > 0.0:
+		_zone_fade_left -= delta
+		_zone_label.modulate.a = clampf(_zone_fade_left / ZONE_FADE_SEC, 0.0, 1.0)
+
+
+# --- Conexión -----------------------------------------------------------------------------------------------------------
+
 func _on_disconnected(reason: String) -> void:
+	in_world = false
 	_hud_status.text = "Reconectando… (intento %d/%d)" % [Net.reconnect_attempt(), Net.MAX_ATTEMPTS] if Net.reconnect_attempt() > 0 else "Desconectado: %s" % reason
 
 

@@ -25,6 +25,8 @@ var _reconnect_at_msec: int = -1
 var _ping_timer: float = 0.0
 var _next_req_id: int = 1
 var _auto_reconnect: bool = false
+var _delayed_out: Array[Dictionary] = []  # [{at, text}] con simulated_latency_ms
+var _delayed_in: Array[Dictionary] = []  # [{at, text}]
 
 
 func _ready() -> void:
@@ -57,6 +59,9 @@ func send(type: String, data: Dictionary = {}) -> bool:
 	if text.length() > Protocol.MAX_MESSAGE_BYTES:
 		push_error("Mensaje %s demasiado grande (%d bytes)" % [type, text.length()])
 		return false
+	if simulated_latency_ms > 0:
+		_delayed_out.append({"at": Time.get_ticks_msec() + simulated_latency_ms / 2, "text": text})
+		return true
 	var err := _peer.send_text(text)
 	return err == OK
 
@@ -83,7 +88,12 @@ func _process(delta: float) -> void:
 				connected.emit()
 				EventBus.connection_changed.emit(true)
 			while _peer.get_available_packet_count() > 0:
-				_dispatch(_peer.get_packet().get_string_from_utf8())
+				var text := _peer.get_packet().get_string_from_utf8()
+				if simulated_latency_ms > 0:
+					_delayed_in.append({"at": Time.get_ticks_msec() + simulated_latency_ms / 2, "text": text})
+				else:
+					_dispatch(text)
+			_flush_delayed()
 			_ping_timer += delta
 			if _ping_timer >= Protocol.PING_INTERVAL_SEC:
 				_ping_timer = 0.0
@@ -101,6 +111,17 @@ func _process(delta: float) -> void:
 				_open()
 		_:
 			pass
+
+
+## Latencia simulada (HU-022 CA2): la mitad al enviar y la mitad al recibir.
+func _flush_delayed() -> void:
+	var now := Time.get_ticks_msec()
+	while not _delayed_out.is_empty() and int(_delayed_out[0]["at"]) <= now:
+		var item: Dictionary = _delayed_out.pop_front()
+		_peer.send_text(str(item["text"]))
+	while not _delayed_in.is_empty() and int(_delayed_in[0]["at"]) <= now:
+		var item_in: Dictionary = _delayed_in.pop_front()
+		_dispatch(str(item_in["text"]))
 
 
 func _open() -> void:

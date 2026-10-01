@@ -63,7 +63,7 @@ func _parse(path: String) -> bool:
 			var raw: Array = l.get("data", [])
 			var data := PackedInt32Array()
 			data.resize(raw.size())
-			for i in raw.size():
+			for i: int in raw.size():
 				var gid := int(raw[i]) & GID_MASK
 				data[i] = gid
 				if (name == "walls" or name == "collision") and gid != 0 and _tile_props.has(gid):

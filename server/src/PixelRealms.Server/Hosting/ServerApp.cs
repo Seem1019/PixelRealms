@@ -1,5 +1,7 @@
 using PixelRealms.Content;
 using PixelRealms.Game.Core;
+using PixelRealms.Game.Interest;
+using PixelRealms.Game.Movement;
 using PixelRealms.Persistence;
 using PixelRealms.Protocol.Messages;
 using PixelRealms.Server.Api;
@@ -79,6 +81,10 @@ public static class ServerApp
         builder.Services.AddSingleton<IHelloGate, HelloGate>();
         builder.Services.AddSingleton<WorldSession>();
         builder.Services.AddSingleton<SaveService>();
+        builder.Services.AddSingleton<MovementSystem>();
+        builder.Services.AddSingleton<InterestSystem>();
+        builder.Services.AddSingleton<SnapshotBuilder>();
+        builder.Services.AddSingleton<EventDispatcher>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SaveService>());
         builder.Services.AddSingleton<GameLoopService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
@@ -91,7 +97,13 @@ public static class ServerApp
         app.Services.GetRequiredService<PlayerMapper>().MapIdOf = worldSession.MapIdOf;
         router.AddObserver(worldSession);
         router.Register(new PingHandler());
-        simulation.OnPreTick(router.Drain);
+        router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
+        // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
+        simulation.OnPreTick(router.Drain)
+            .AddSystem(app.Services.GetRequiredService<MovementSystem>())
+            .AddSystem(app.Services.GetRequiredService<InterestSystem>())
+            .OnPostTick(app.Services.GetRequiredService<EventDispatcher>().OnPostTick)
+            .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick);
         // Al apagar (Ctrl+C): guardar a todos los jugadores conectados antes de salir (HU-026 CA2), en el hilo del tick.
         app.Services.GetRequiredService<GameLoopService>().OnStopping = () =>
         {

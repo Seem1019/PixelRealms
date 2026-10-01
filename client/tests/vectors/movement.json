@@ -1,0 +1,54 @@
+{
+  "description": "Vectores de prueba de movimiento. DEBEN pasar idénticos en servidor (xUnit: MovementVectorTests) y cliente (GUT: test_movement_vectors.gd). Algoritmo en docs/architecture.md §4 y skill net-protocol.",
+  "algorithm": {
+    "tileSize": 16,
+    "dtSeconds": 0.05,
+    "colliderHalfExtents": { "x": 5, "y": 3 },
+    "steps": [
+      "dir = (dx, dy) con dx,dy en {-1,0,1}; si ambos != 0 se normaliza (x 0.7071067811865476)",
+      "stepPx = speedTilesPerSec * tileSize * dt",
+      "mover X: nx = x + dir.x * stepPx; si el AABB en (nx, y) toca un tile sólido -> nx = borde del tile (derecha: col*16 - hx; izquierda: (col+1)*16 + hx)",
+      "mover Y igual con el x ya resuelto (abajo: row*16 - hy; arriba: (row+1)*16 + hy)",
+      "tiles cubiertos por un rango [min,max): desde floor(min/16) hasta ceil(max/16)-1 (el borde exacto NO colisiona)",
+      "redondear x e y a 2 decimales (half away from zero) al final de cada tick",
+      "fuera del mapa cuenta como sólido"
+    ]
+  },
+  "cases": [
+    {
+      "name": "open_east_10_ticks",
+      "grid": ["..........", "..........", "..........", "..........", "..........", ".........."],
+      "start": { "x": 40, "y": 40 }, "speed": 4,
+      "inputs": [{ "dx": 1, "dy": 0, "ticks": 10 }],
+      "expected": { "x": 72.0, "y": 40.0 }
+    },
+    {
+      "name": "open_diagonal_ne_10_ticks",
+      "grid": ["..........", "..........", "..........", "..........", "..........", ".........."],
+      "start": { "x": 40, "y": 40 }, "speed": 4,
+      "inputs": [{ "dx": 1, "dy": -1, "ticks": 10 }],
+      "expected": { "x": 62.6, "y": 17.4 }
+    },
+    {
+      "name": "wall_blocks_east",
+      "grid": ["##########", "#....#...#", "#....#...#", "#....#...#", "#........#", "##########"],
+      "start": { "x": 40, "y": 40 }, "speed": 4,
+      "inputs": [{ "dx": 1, "dy": 0, "ticks": 20 }],
+      "expected": { "x": 75.0, "y": 40.0 }
+    },
+    {
+      "name": "slide_along_wall_se",
+      "grid": ["##########", "#....#...#", "#....#...#", "#....#...#", "#........#", "##########"],
+      "start": { "x": 70, "y": 40 }, "speed": 4,
+      "inputs": [{ "dx": 1, "dy": 1, "ticks": 10 }],
+      "expected": { "x": 75.0, "y": 62.6 }
+    },
+    {
+      "name": "no_input_no_move",
+      "grid": ["..........", "..........", "..........", "..........", "..........", ".........."],
+      "start": { "x": 40, "y": 40 }, "speed": 4,
+      "inputs": [{ "dx": 0, "dy": 0, "ticks": 10 }],
+      "expected": { "x": 40.0, "y": 40.0 }
+    }
+  ]
+}
