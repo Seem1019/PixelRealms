@@ -28,6 +28,9 @@ public sealed class CombatServices(Func<ContentDb> content)
     /// <summary>¿Puede `a` atacar al jugador `b`? Lo rellena PvpService (duelos, HU-064). Por defecto, nunca.</summary>
     public Func<Player, Player, bool> PvpCanAttack { get; set; } = static (_, _) => false;
 
+    /// <summary>¿Está en un duelo activo? Los duelistas no atacan monstruos ni terceros y los monstruos los ignoran (HU-064 CA5).</summary>
+    public Func<Player, bool> InDuel { get; set; } = static _ => false;
+
     public DerivedStats StatsOf(Actor actor)
     {
         if (actor.Combat.Stats is { } cached) return cached;
@@ -92,6 +95,8 @@ public sealed class CombatServices(Func<ContentDb> content)
     {
         if (ReferenceEquals(a, b)) return false;
         if (a is Player pa && b is Player pb) return PvpCanAttack(pa, pb);
+        if (a is Player da && InDuel(da)) return false;
+        if (b is Player db2 && InDuel(db2)) return false;
         return a.Kind != b.Kind && (a is Player || b is Player);
     }
 

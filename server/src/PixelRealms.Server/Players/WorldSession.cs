@@ -19,6 +19,9 @@ namespace PixelRealms.Server.Players;
 public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapper mapper, ReloadableContent content, SaveService saver, InterestSystem interest,
     Microsoft.Extensions.Options.IOptions<PersistenceOptions> persistence, ILogger<WorldSession> logger) : IConnectionObserver
 {
+    /// <summary>Lo fija la composición: grupos/duelos/intercambios reaccionan a entradas y salidas (HU-061 CA5, HU-064 CA4, HU-059 CA4).</summary>
+    public Game.Combat.CombatModule? Combat { get; set; }
+
     private readonly long _autosaveMs = (long)(persistence.Value.AutosaveSec * 1000);
 
     /// <summary>Motivo de cierre que registra WebSocketSession cuando el cliente envía el frame Close (HU-025 CA4).</summary>
@@ -64,6 +67,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         player.Dirty = false;
         ctx.Send(mapper.ToWelcome(player, mapId, ctx.Tick.Tick));
         logger.LogInformation("{Name} entró en {Map} (conexión {Conn})", player.Name, mapId, connectionId);
+        if (Combat?.Parties.SetOnline(player.CharacterId, true, ctx.Tick.NowMs) is { } party) ctx.Tick.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "online"));
         PlayerEntered?.Invoke(player, new MapInstanceRef(instance));
     }
 
@@ -92,12 +96,27 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         }
         players.Detach(connectionId);
         LinkdeadPolicy.MarkLinkdead(player, ctx.Tick.NowMs);
+        if (world.GetInstance(player.MapInstanceId) is { } ldMap && Combat is not null)
+        {
+            Combat.Pvp.Abandon(player, "disconnected", ldMap, ctx.Tick);
+            Combat.Trades.CancelBy(player, "disconnected", ldMap, ctx.Tick);
+        }
         logger.LogInformation("{Name} quedó linkdead ({Reason}); sale en {Sec} s salvo combate", player.Name, reason, rules.Combat.LinkdeadSec);
     }
 
     /// <summary>Gancho post-tick (HU-025 CA1 + HU-026 CA3): saca a los linkdead vencidos y encola el autosave de los `Dirty`.</summary>
+    private TickContext? _sweepCtx;
+
     public void SweepLinkdead(TickContext ctx)
     {
+        _sweepCtx = ctx;
+        // HU-061 CA5: invitaciones caducadas y desconectados fuera tras offlineGraceSec.
+        if (Combat is not null)
+            foreach (var (party, _, disbanded, last) in Combat.Parties.Tick(ctx.NowMs, ctx.Rules.Group))
+            {
+                if (party is not null) ctx.Emit(new Game.Social.PartyChangedEvent(0, party, "timeout"));
+                if (disbanded && last is { } l) ctx.Emit(new Game.Social.PartyDisbandedEvent(0, l));
+            }
         List<Player>? expired = null;
         foreach (var p in players.All)
         {
@@ -121,6 +140,12 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
     public void Leave(Player player, string reason)
     {
         var instance = world.GetInstance(player.MapInstanceId);
+        if (instance is not null && Combat is not null && _sweepCtx is not null)
+        {
+            Combat.Pvp.Abandon(player, reason, instance, _sweepCtx);
+            Combat.Trades.CancelBy(player, reason, instance, _sweepCtx);
+            if (Combat.Parties.SetOnline(player.CharacterId, false, _sweepCtx.NowMs) is { } party) _sweepCtx.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
+        }
         saver.Enqueue(mapper.ToSave(player));
         player.Dirty = false;
         players.Remove(player);

@@ -123,6 +123,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
             if (spell.IsInstant) combat.AbilityLockEndsAtMs = now + rules.AbilityLockMs;
         }
 
+        if (caster is Player actedPlayer) actedPlayer.LastActionAtMs = now;
         if (spell.IsInstant)
         {
             // Instantáneo: CastStarted{durationMs:0} + CastEnded{done} para que el cliente dibuje el efecto (misma secuencia que un casteo).

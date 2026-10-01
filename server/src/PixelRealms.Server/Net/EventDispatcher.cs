@@ -6,6 +6,7 @@ using PixelRealms.Game.Interest;
 using PixelRealms.Game.Items;
 using PixelRealms.Game.Map;
 using PixelRealms.Game.Progression;
+using PixelRealms.Game.Social;
 using PixelRealms.Protocol.Messages;
 using PixelRealms.Server.Players;
 
@@ -16,9 +17,12 @@ namespace PixelRealms.Server.Net;
 /// los sistemas). Los resultados de combate se agrupan en un `CombatEvents{tick, e}` por observador y tick (máx. 64
 /// entradas por mensaje, ADR-018) y solo van a quien ve al atacante o al objetivo.
 /// </summary>
-public sealed class EventDispatcher(ConnectionManager connections, World world, InterestSystem interest, PlayerMapper mapper, WorldSession session, LootSystem loot)
+public sealed class EventDispatcher(ConnectionManager connections, World world, InterestSystem interest, PlayerMapper mapper, WorldSession session, LootSystem loot, PlayerRegistry players, PartyService parties)
 {
     public const int MaxCombatEntries = 64;
+
+    /// <summary>HU-062 CA1: marcos de grupo ≥ 2 veces/s aunque el compañero esté fuera de la AOI.</summary>
+    public const int PartyFrameEveryTicks = 10;
 
     private readonly Dictionary<int, List<CombatEventDto>> _batches = new();
     private readonly HashSet<int> _recipients = new();
@@ -88,11 +92,80 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                 case StatsChangedEvent sc when sc.Player.ConnectionId >= 0:
                     connections.Send(sc.Player.ConnectionId, mapper.ToStatsUpdate(sc.Player));
                     break;
+                case ChatDeliveredEvent chat:
+                {
+                    var msg = new ChatMessage(chat.Channel, chat.From, chat.Text, ctx.NowMs);
+                    foreach (var r in chat.Recipients) if (r.ConnectionId >= 0) connections.Send(r.ConnectionId, msg);
+                    break;
+                }
+                case PartyInvitedEvent inv when inv.Target.ConnectionId >= 0:
+                    // Sin mensaje propio en el protocolo: la invitación viaja como PartyUpdate{leader: quien invita, members: []} (el cliente muestra Aceptar/Rechazar).
+                    connections.Send(inv.Target.ConnectionId, new PartyUpdate(inv.Invite.FromName, []));
+                    break;
+                case PartyChangedEvent pc:
+                    SendPartyUpdate(pc.Party);
+                    break;
+                case PartyDisbandedEvent pd when players.ByCharacter(pd.LastMember) is { ConnectionId: >= 0 } lastP:
+                    connections.Send(lastP.ConnectionId, new PartyUpdate("", []));
+                    break;
+                case DuelChangedEvent duel:
+                {
+                    foreach (var p in new[] { duel.Duel.A, duel.Duel.B })
+                    {
+                        if (p.ConnectionId < 0) continue;
+                        var startsIn = duel.State == "countdown" ? (int?)Math.Max(0, duel.Duel.StartsAtMs - ctx.NowMs) : null;
+                        connections.Send(p.ConnectionId, new DuelUpdate(duel.State, duel.Duel.Opponent(p).Id.Value, duel.Duel.Winner?.Id.Value, startsIn));
+                    }
+                    if (duel.State == "ended" && duel.Duel.Winner is { } winner && world.GetInstance(duel.MapInstanceId) is { } dmap)
+                    {
+                        // HU-064 CA3: se anuncia en `say` (alcance sayRangeTiles alrededor del ganador).
+                        var text = $"{winner.Name} ha ganado el duelo contra {duel.Duel.Opponent(winner).Name}";
+                        var range = ctx.Rules.Movement.SayRangeTiles;
+                        foreach (var p in dmap.Players.Values)
+                            if (p.ConnectionId >= 0 && Vec2.Distance(p.Position, winner.Position) <= range) connections.Send(p.ConnectionId, new ChatMessage("system", "", text, ctx.NowMs));
+                    }
+                    break;
+                }
+                case TradeChangedEvent tr:
+                {
+                    foreach (var p in new[] { tr.Trade.A, tr.Trade.B })
+                    {
+                        if (p.ConnectionId < 0) continue;
+                        var mine = tr.Trade.OfferOf(p); var theirs = tr.Trade.OfferOf(tr.Trade.Partner(p));
+                        connections.Send(p.ConnectionId, new TradeUpdate(tr.State, tr.Trade.Partner(p).Id.Value, tr.Trade.Version, ToOffer(mine), ToOffer(theirs),
+                            tr.Trade.ConfirmedBy(p), tr.Trade.ConfirmedBy(tr.Trade.Partner(p)), tr.Reason));
+                    }
+                    break;
+                }
+                case ClassChangedEvent cc when cc.Player.ConnectionId >= 0:
+                    // El cliente necesita hechizos y barra nuevos: Welcome renovado es lo más simple y completo.
+                    connections.Send(cc.Player.ConnectionId, mapper.ToWelcome(cc.Player, session.MapIdOf(cc.Player), ctx.Tick));
+                    Broadcast(cc.MapInstanceId, cc.Player, SnapshotBuilder.ToSpawn(cc.Player));
+                    break;
                 default:
                     break;
             }
         }
         FlushBatches(ctx.Tick);
+        if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
+    }
+
+    private static OfferDto ToOffer(TradeOfferState o) => new(o.Items.Select(i => new TradeItemDto(i.ItemId.ToString(), i.Qty)).ToList(), o.Gold);
+
+    private void SendPartyUpdate(Party party)
+    {
+        var leaderName = players.ByCharacter(party.Leader)?.Name ?? party.Members.FirstOrDefault(m => m.CharacterId == party.Leader)?.Name ?? "";
+        var members = new List<PartyMemberDto>(party.Members.Count);
+        foreach (var m in party.Members)
+        {
+            var p = players.ByCharacter(m.CharacterId);
+            var online = p is { ConnectionId: >= 0 };
+            var hpPct = p is null || p.MaxHp <= 0 ? 0 : (int)Math.Round(100.0 * p.Hp / p.MaxHp);
+            members.Add(new PartyMemberDto(m.Name, p?.Id.Value, p?.ClassId ?? m.ClassId, p?.Level ?? 0, hpPct, online, p is null ? null : session.MapIdOf(p)));
+        }
+        var msg = new PartyUpdate(leaderName, members);
+        foreach (var m in party.Members)
+            if (players.ByCharacter(m.CharacterId) is { ConnectionId: >= 0 } p) connections.Send(p.ConnectionId, msg);
     }
 
     private static Vec2Dto? ToPx(Vec2? p) => p is { } v ? new Vec2Dto(SnapshotBuilder.Px(v.X), SnapshotBuilder.Px(v.Y)) : null;

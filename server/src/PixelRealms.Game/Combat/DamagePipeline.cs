@@ -62,6 +62,7 @@ public sealed class DamagePipeline(CombatServices services)
         target.Hp += effective;
         ctx.Emit(new CombatHitEvent(map.Id, source, target, spellId, HitKinds.Heal, effective, crit, School.Magic));
         if (target is Player tp) tp.Dirty = true;
+        if (source is Player healer) healer.LastActionAtMs = ctx.NowMs;
         if (effective > 0 && source is not Monster)
         {
             var threat = effective * ctx.Rules.Combat.ThreatPerHeal;

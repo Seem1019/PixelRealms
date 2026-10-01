@@ -53,6 +53,11 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
         Dirty = true;
     }
 
+    /// <summary>Última acción de combate (daño hecho/recibido, cura o habilidad) para la XP de grupo (HU-062: activos en 90 s).</summary>
+    public long LastActionAtMs { get; set; } = long.MinValue;
+
+    public bool IsActive(long nowMs, double windowSec) => Math.Max(LastActionAtMs, LastCombatAtMs) != long.MinValue && nowMs - Math.Max(LastActionAtMs, LastCombatAtMs) <= windowSec * 1000;
+
     /// <summary>Cooldown compartido por plantilla de consumible (HU-054): templateId → fin en ms.</summary>
     public Dictionary<string, long> ItemCooldownEndsAtMs { get; } = new(StringComparer.Ordinal);
 

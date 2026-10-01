@@ -91,6 +91,7 @@ public static class ServerApp
         builder.Services.AddSingleton(simulation);
         builder.Services.AddSingleton(combat);
         builder.Services.AddSingleton(combat.Loot);
+        builder.Services.AddSingleton(combat.Parties);
         builder.Services.AddSingleton(movementSystem);
         builder.Services.AddSingleton(interestSystem);
         builder.Services.AddSingleton<CombatHandlerDeps>();
@@ -115,6 +116,7 @@ public static class ServerApp
         var router = app.Services.GetRequiredService<MessageRouter>();
         var worldSession = app.Services.GetRequiredService<WorldSession>();
         app.Services.GetRequiredService<PlayerMapper>().MapIdOf = worldSession.MapIdOf;
+        worldSession.Combat = app.Services.GetRequiredService<CombatModule>();
         router.AddObserver(worldSession);
         router.Register(new PingHandler());
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
@@ -135,6 +137,21 @@ public static class ServerApp
         router.Register(new VendorOpenHandler(combatDeps, content));
         router.Register(new VendorBuyHandler(combatDeps));
         router.Register(new VendorSellHandler(combatDeps));
+        var registry0 = app.Services.GetRequiredService<PlayerRegistry>();
+        router.Register(new ChatSendHandler(combatDeps, registry0, worldSession));
+        router.Register(new PartyInviteHandler(combatDeps, registry0));
+        router.Register(new PartyRespondHandler(combatDeps, registry0));
+        router.Register(new PartyLeaveHandler(combatDeps));
+        router.Register(new PartyKickHandler(combatDeps));
+        router.Register(new DuelRequestHandler(combatDeps, registry0));
+        router.Register(new DuelRespondHandler(combatDeps));
+        router.Register(new DuelForfeitHandler(combatDeps));
+        router.Register(new TradeRequestHandler(combatDeps, registry0));
+        router.Register(new TradeRespondHandler(combatDeps));
+        router.Register(new TradeOfferHandler(combatDeps));
+        router.Register(new TradeConfirmHandler(combatDeps));
+        router.Register(new TradeCancelHandler(combatDeps));
+        router.Register(new ChangeClassHandler(combatDeps, worldSession));
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
         simulation.OnPreTick(router.Drain);
         app.Services.GetRequiredService<CombatModule>().Register(simulation, app.Services.GetRequiredService<PortalSystem>());

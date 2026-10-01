@@ -25,9 +25,9 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
 {
     public string Name => "progression";
 
-    /// <summary>XP compartida en grupo (HU-062): dado el jugador que taggeó, devuelve los receptores y su reparto. Por defecto, solo él.</summary>
-    public Func<Player, Monster, MapInstance, IReadOnlyList<(Player Player, double Share)>> XpRecipients { get; set; } =
-        static (tagger, _, _) => [(tagger, 1.0)];
+    /// <summary>XP por receptor (HU-062 reparte en grupo). Por defecto: solo quien taggeó, con la XP en solitario.</summary>
+    public Func<Player, Monster, MapInstance, IRules, List<(Player Player, int Xp)>> XpRecipients { get; set; } =
+        static (tagger, monster, _, rules) => [(tagger, XpCurve.SoloKillXp(rules.Progression, monster.Template, tagger.Level))];
 
     public void Tick(MapInstance map, TickContext ctx)
     {
@@ -37,11 +37,8 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
             if (ctx.Events[i] is not ActorDiedEvent { Victim: Monster monster } died || died.MapInstanceId != map.Id) continue;
             var taggerId = monster.TaggedBy ?? died.Killer?.Id;
             if (taggerId is null || map.Find(taggerId.Value) is not Player tagger) continue;
-            foreach (var (player, share) in XpRecipients(tagger, monster, map))
-            {
-                var xp = (int)Math.Round(XpCurve.SoloKillXp(ctx.Rules.Progression, monster.Template, player.Level) * share, MidpointRounding.AwayFromZero);
+            foreach (var (player, xp) in XpRecipients(tagger, monster, map, ctx.Rules))
                 GrantXp(player, xp, monster.Id, map, ctx);
-            }
         }
     }
 
