@@ -15,23 +15,25 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Nombres únicos sin distinguir mayúsculas: ICU nivel 2 ignora mayúsculas (no acentos); no determinista => "Bob" = "bob".
+        modelBuilder.HasCollation("case_insensitive", locale: "und-u-ks-level2", provider: "icu", deterministic: false);
         modelBuilder.Entity<Account>(e =>
         {
             e.ToTable("accounts");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Username).IsRequired().HasMaxLength(20);
+            e.Property(x => x.Username).IsRequired().HasMaxLength(20).UseCollation("case_insensitive");
             e.Property(x => x.PasswordHash).IsRequired();
-            e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("ix_accounts_username_lower").HasMethod("btree");
+            e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("ix_accounts_username_ci");
             e.HasMany(x => x.Characters).WithOne(c => c.Account).HasForeignKey(c => c.AccountId);
         });
         modelBuilder.Entity<Character>(e =>
         {
             e.ToTable("characters", t => t.HasCheckConstraint("ck_characters_level", "level BETWEEN 1 AND 15"));
             e.HasKey(x => x.Id);
-            e.Property(x => x.Name).IsRequired().HasMaxLength(64);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(64).UseCollation("case_insensitive");
             e.Property(x => x.ClassId).IsRequired().HasMaxLength(16);
             e.Property(x => x.MapId).IsRequired().HasMaxLength(32);
-            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ix_characters_name_lower");
+            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ix_characters_name_ci");
             e.HasIndex(x => x.AccountId);
             e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Hotbar).WithOne().HasForeignKey(h => h.CharacterId).OnDelete(DeleteBehavior.Cascade);

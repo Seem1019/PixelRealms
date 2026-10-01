@@ -9,4 +9,11 @@
     <ProjectReference Include="../PixelRealms.Game/PixelRealms.Game.csproj" />
     <ProjectReference Include="../PixelRealms.Persistence/PixelRealms.Persistence.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Solo para `dotnet ef` (migraciones); no se publica. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>

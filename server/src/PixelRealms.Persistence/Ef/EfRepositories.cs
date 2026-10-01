@@ -10,8 +10,8 @@ public sealed class EfAccountRepository(IDbContextFactory<GameDbContext> factory
     public async Task<AccountRecord?> FindByUsernameAsync(string username, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        var lower = username.ToLowerInvariant();
-        var a = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(x => x.Username.Equals(lower, StringComparison.CurrentCultureIgnoreCase), ct);
+        // La columna usa la collation case_insensitive: "=" ya ignora mayúsculas y usa el índice único.
+        var a = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(x => x.Username == username, ct);
         return a is null ? null : Map(a);
     }
 
@@ -25,8 +25,7 @@ public sealed class EfAccountRepository(IDbContextFactory<GameDbContext> factory
     public async Task<AccountRecord?> CreateAsync(string username, string passwordHash, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        var lower = username.ToLowerInvariant();
-        if (await db.Accounts.AnyAsync(x => x.Username.Equals(lower, StringComparison.CurrentCultureIgnoreCase), ct)) return null;
+        if (await db.Accounts.AnyAsync(x => x.Username == username, ct)) return null;
         var a = new Account { Id = Guid.CreateVersion7(), Username = username, PasswordHash = passwordHash, CreatedAt = DateTime.UtcNow };
         db.Accounts.Add(a);
         try { await db.SaveChangesAsync(ct); }
@@ -67,8 +66,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
     public async Task<bool> NameExistsAsync(string name, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        var lower = name.ToLowerInvariant();
-        return await db.Characters.AnyAsync(c => c.DeletedAt == null && c.Name.Equals(lower, StringComparison.CurrentCultureIgnoreCase), ct);
+        return await db.Characters.AnyAsync(c => c.DeletedAt == null && c.Name == name, ct);
     }
 
     public async Task<CharacterSaveDto?> CreateAsync(NewCharacter character, CancellationToken ct = default)

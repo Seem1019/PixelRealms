@@ -41,3 +41,7 @@ dotnet_diagnostic.CA1822.severity = suggestion
 dotnet_diagnostic.IDE0058.severity = none
 dotnet_diagnostic.CA1720.severity = none   # Int/Single son nombres de stats y puntas del pentagrama (rules.json)
 dotnet_diagnostic.CA1873.severity = none   # argumentos de log: las rutas calientes no loguean
+
+# Migraciones de EF Core: código generado por `dotnet ef`, los analizadores no lo revisan.
+[server/src/PixelRealms.Persistence/Migrations/*.cs]
+generated_code = true
