@@ -200,6 +200,8 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
 ### Triángulo de ventajas (PvP 1 vs 1, nivel y equipo equivalentes)
 **Mago > Guerrero > Pícaro > Mago.** Significativa, no absoluta: la habilidad y el equipo pueden revertirla.
 Objetivo provisional (HU-084): con nivel y equipo iguales, el favorito gana entre el 60 % y el 75 % de los duelos.
+> *Desactualizado:* los cooldowns y duraciones citados abajo son anteriores al balance de la Fase 1 (hoy Carga 16 s, Nova 18 s,
+> Gubia 2 s; `content/spells.json` manda). El triángulo se mide jugando en HU-084 (`balance-notes.md` §6).
 - *Mago > Guerrero:* Escarcha (ralentiza) y Nova (raíz) mantienen al Guerrero lejos; Carga tiene 15 s de CD frente a
   Nova 20 s, así que el Guerrero llega una vez y luego vuelve a quedarse atrás.
 - *Guerrero > Pícaro:* más vida, armadura y Bloqueo; el Pícaro no puede alejarse sin dejar de pegar, y su Gubia se
