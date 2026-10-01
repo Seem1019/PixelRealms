@@ -1,7 +1,13 @@
 using PixelRealms.Content;
+using PixelRealms.Content.Defs;
+using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Entities;
+using PixelRealms.Game.Interest;
+using PixelRealms.Game.Items;
 using PixelRealms.Game.Map;
+using PixelRealms.Game.Movement;
+using PixelRealms.Game.Progression;
 
 namespace PixelRealms.Game.Tests.Helpers;
 
@@ -48,14 +54,29 @@ public sealed class WorldBuilder
         return this;
     }
 
-    public WorldBuilder WithPlayer(string name, string classId, int level = 1, (float x, float y) at = default)
+    /// <summary>
+    /// Jugador con los items iniciales de su clase equipados (o `equip` explícito: ids de items a equipar en su slot), vida al
+    /// máximo, maná al máximo y ira/energía como un personaje nuevo (0 / máximo) y los hechizos conocidos a su nivel.
+    /// </summary>
+    public WorldBuilder WithPlayer(string name, string classId, int level = 1, (float x, float y) at = default, IReadOnlyList<string>? equip = null)
     {
         _spawns.Add(inst =>
         {
-            var p = new Player(_world.EntityIds.Next(), name, classId) { CharacterId = Guid.NewGuid(), Level = level, Position = new Vec2(at.x, at.y) };
             var cls = _content.Class(classId);
-            p.MaxHp = cls.BaseHp; p.Hp = p.MaxHp;
+            var p = new Player(_world.EntityIds.Next(), name, classId) { CharacterId = Guid.NewGuid(), AccountId = Guid.NewGuid(), Level = level, Position = new Vec2(at.x, at.y) };
+            var itemIds = equip ?? cls.StartingItems.Where(i => i.Equip).Select(i => i.ItemId).ToList();
+            foreach (var id in itemIds)
+            {
+                var tpl = _content.Item(id);
+                if (tpl.Slot is { } slot) p.Equipment.Slots[(int)slot] = ItemInstance.New(id);
+            }
+            var equipped = p.Equipment.Slots.Where(s => s is not null).Select(s => _content.Item(s!.TemplateId)).ToList();
+            var d = StatCalculator.Derive(cls, level, _content.Rules, equipped);
+            p.MaxHp = d.MaxHp; p.Hp = p.MaxHp;
+            p.MaxResource = StatCalculator.MaxResource(cls, d, _content.Rules);
+            p.Resource = cls.Resource == Resource.Rage ? 0 : p.MaxResource;
             p.BaseSpeed = (float)_content.Rules.Movement.BaseSpeedTilesPerSec;
+            p.KnownSpells.AddRange(_content.KnownSpells(classId, level).Select(sp => sp.Id));
             inst.Add(p);
         });
         return this;
@@ -67,11 +88,13 @@ public sealed class WorldBuilder
         {
             var t = _content.Monster(templateId);
             var m = new Monster(_world.EntityIds.Next(), t, new Vec2(at.x, at.y), wanderRadius) { Level = t.Level, Position = new Vec2(at.x, at.y), Hp = t.Hp, MaxHp = t.Hp, BaseSpeed = (float)t.Speed };
+            m.Brain.Spawn = new SpawnDef(templateId, templateId, 1, wanderRadius, new Vec2(at.x, at.y), Vec2.Zero);
             inst.Add(m);
         });
         return this;
     }
 
+    /// <summary>Mundo sin sistemas registrados (cada test añade los suyos); `Combat` queda disponible para usarlo a mano.</summary>
     public TestWorld Build()
     {
         _map ??= new WorldBuilder().WithMap()._map!;
@@ -80,12 +103,30 @@ public sealed class WorldBuilder
         foreach (var s in _spawns) s(inst);
         var clock = new TickClock();
         var sim = new Simulation(_world, _content.Rules, _rng ?? new SeededRng(_seed), clock);
-        return new TestWorld(_world, inst, sim, clock, _content);
+        var combat = CombatModule.Create(() => _content, _world, new MovementSystem(), new InterestSystem());
+        return new TestWorld(_world, inst, sim, clock, _content, combat);
+    }
+
+    /// <summary>Mundo con todos los sistemas de combate registrados en el orden del tick (M2).</summary>
+    public TestWorld BuildWithCombat()
+    {
+        var w = Build();
+        w.Combat.Register(w.Simulation);
+        return w;
     }
 }
 
-public sealed record TestWorld(World World, MapInstance Map, Simulation Simulation, TickClock Clock, ContentDb Content)
+public sealed record TestWorld(World World, MapInstance Map, Simulation Simulation, TickClock Clock, ContentDb Content, CombatModule Combat)
 {
+    public TickContext Ctx => Simulation.Context;
+
+    /// <summary>Prepara el contexto para llamar a los sistemas a mano sin correr un tick (NowMs del reloj).</summary>
+    public TickContext Begin()
+    {
+        Simulation.Context.BeginTick(Simulation.Tick, Clock.NowMs);
+        return Simulation.Context;
+    }
+
     public Player Player(string name) => Map.Players.Values.First(p => p.Name == name);
 
     public Monster Monster(string templateId) => Map.Monsters.Values.First(m => m.TemplateId == templateId);

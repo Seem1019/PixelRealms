@@ -17,4 +17,10 @@ public sealed class Monster(EntityId id, MonsterTemplate template, Vec2 spawnPos
     public string TemplateId => Template.Id;
 
     public bool IsBoss => Template.Boss;
+
+    /// <summary>Tabla de amenaza (HU-036).</summary>
+    public Combat.ThreatTable Threat { get; } = new();
+
+    /// <summary>Estado de IA (HU-031/HU-036); lo crea y gestiona MonsterAiSystem.</summary>
+    public Ai.MonsterBrain Brain { get; } = new();
 }

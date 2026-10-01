@@ -1,3 +1,4 @@
+using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 
 namespace PixelRealms.Game.Entities;
@@ -37,6 +38,18 @@ public abstract class Actor(EntityId id, string name)
     public bool IsInCombat(long nowMs, double inCombatWindowSec) => LastCombatAtMs != long.MinValue && nowMs - LastCombatAtMs < (long)(inCombatWindowSec * 1000);
 
     public void EnterCombat(long nowMs) => LastCombatAtMs = nowMs;
+
+    /// <summary>Objetivo, básico, casteo, cooldowns, bloqueos (M2). Transitorio: no se guarda.</summary>
+    public CombatState Combat { get; } = new();
+
+    /// <summary>Auras activas (HU-035).</summary>
+    public AuraSet Auras { get; } = new();
+
+    /// <summary>Invalida la caché de stats derivados (equipo, nivel o aura stat_mod cambiaron).</summary>
+    public void MarkStatsDirty() => Combat.Stats = null;
+
+    /// <summary>Flags del protocolo (EntitySpawn.flags): bit 1 = muerto, bit 2 = evadiendo.</summary>
+    public int Flags => (IsDead ? 2 : 0) | (Combat.Evading ? 4 : 0);
 
     /// <summary>Velocidad base en casillas/s antes de modificadores (rules.movement.baseSpeedTilesPerSec).</summary>
     public float BaseSpeed { get; set; }
