@@ -149,7 +149,7 @@ se midieron están en [balance-report.md](balance-report.md).
   varita (sin maná y recuperando maná), descansa menos porque se cura, y suma Castigo (nv 2) y Pulso sagrado (nv 5).
 - El modelo suma aportes y no ve las parejas que se potencian (ralentizar + área, aturdir + golpe fuerte).
 - La identidad del Pícaro en la Fase 1 depende del salto (HU-087).
-- En la Fase 1 el Mago tiene mono y control igual de altos (45) y menos área (35); su área madura en la Fase 2.
+- En la Fase 1 el Mago tiene mono y control igual de altos (objetivo 45 / 45, medido 41 / 45) y menos área (objetivo 35, medido 34); su área madura en la Fase 2.
 - 16 hechizos nuevos necesitan íconos, efectos visuales y marcas de área (3 de ellos en la Fase 1).
 - Los valores de referencia se calibran una sola vez: cambiarlos después reescala todas las clases.
 - Castear moviéndose da a los casteos largos un valor (alejarse, esquivar) que el pentagrama no mide; primera palanca si

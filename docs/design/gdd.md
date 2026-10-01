@@ -148,7 +148,7 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
 - **Balance por pentagrama y grupos de hechizos:** `docs/design/class-kits.md` (ADR-020). Cada clase tiene 8 hechizos que
   se desbloquean en los niveles 1, 2, 3, 5, 7, 9, 11 y 13 (`rules.progression.spellUnlockLevels`): en la Fase 1 tiene 4
   (todos equipados) y la elección libre empieza en el nivel 7. Pulso sagrado (nv 5) reemplaza a Rezo de sanación.
-  Cuándo se pueden cambiar los hechizos equipados está por definir.
+  Cuándo se pueden cambiar los hechizos equipados se decide en la Fase 2; en la Fase 1 la barra (HU-043) solo ordena los 4.
 
 ### Ataque básico (todas las clases)
 - **El ataque básico lo da el arma equipada, no la clase, y no ocupa ninguna de las 4 casillas de hechizo.** Cada tipo de
@@ -169,8 +169,8 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   objetivo: ningún arma da área, control ni movilidad.
 - **Convivencia con los hechizos:** el básico sigue solo mientras haya objetivo en alcance y no se esté casteando. Un
   hechizo instantáneo no reinicia su temporizador, pero tiene un bloqueo de animación de 250 ms (`abilityLockMs`) en el que
-  no sale el básico ni otro hechizo (si tocaba, sale al terminar). Todos los hechizos de clase tienen cooldown global de 1 s;
-  el básico y los usables no. Ningún hechizo instantáneo de clase tiene menos de 2 s de cooldown
+  no sale el básico ni otro hechizo (si tocaba, sale al terminar). Los hechizos de clase tienen cooldown global de 1 s salvo los
+  marcados `triggersGcd: false` (Provocar, Carga, Carrera, Bloqueo con escudo, Parpadeo); el básico y los usables no. Ningún hechizo instantáneo de clase tiene menos de 2 s de cooldown
   (`minInstantSpellCooldownMs`): Golpe siniestro y Golpe heroico quedan en ~3 s y no llegan a ser un segundo básico.
 - Toda arma tiene un ataque básico que **no consume recurso**. Su único límite es la velocidad de ataque:
   `swingMs = arma.speedMs / clase.haste` (`rules.classScaling.<clase>.haste`).

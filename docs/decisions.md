@@ -230,6 +230,8 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   cada rango añade **+15 % sobre el valor base** del hechizo (`rules.progression.spellRankBonusPct`). En la Fase 1 (tope de
   nivel 6) solo se alcanza la subida del nivel 4. Los rangos suben solos (ADR-014) y `LevelUp{rankUps}` lo informa (HU-041).
   Las mejoras 1-de-2 por rango son de la Fase 2 y se diseñan entonces (`docs/backlog/README.md` §Pendiente de diseño).
-- **Consecuencias:** con los desbloqueos (1, 2, 3, 5, 7, 9, 11, 13) hay algo nuevo en 11 de los 15 niveles. Queda por precisar
-  en HU-084 qué campos numéricos exactos escala el +15 % (base y coeficientes; costes, cooldowns y duraciones no) y si los
-  rangos se acumulan de forma lineal (+15 / +30 / +45 %); el modelo de `tools/balance/` lo incorporará entonces.
+- **Consecuencias:** con los desbloqueos (1, 2, 3, 5, 7, 9, 11, 13) hay algo nuevo en 11 de los 15 niveles. En la Fase 1
+  (HU-041) el +15 % se aplica al `base` de los efectos numéricos del hechizo (daño, cura, escudo, cantidad de aura); costes,
+  cooldowns y duraciones no cambian. Como en la Fase 1 solo existe un rango, queda para antes de la Fase 2 decidir si escala
+  también los coeficientes y si los rangos se acumulan de forma lineal (+15 / +30 / +45 %) o compuesta; el modelo de
+  `tools/balance/` lo incorporará entonces.

@@ -79,7 +79,7 @@
 2. **Dado** cada `targeting` (`self`, `enemy`, `ally`, `self_aoe_enemies`, `self_aoe_allies`; las áreas `ground_*` van en HU-086) **entonces** hay test con posiciones concretas (dentro/fuera de radio, `maxTargets` respetado, más cercanos primero).
 3. **Dado** `StatCalculator` **entonces** calcula todos los derivados de `docs/design/combat.md` leyendo `rules.classScaling` y `rules.affinity` (afinidad multiplica daño, armadura, spellPower y stats de cada item) con tests exactos para las 4 clases a nivel 1, 5 y 15, incluido un Mago con espada y placas.
 3b. **Dado** las 4 clases con el mismo equipo (`iron_sword` + `recruit_mail_shirt`) **entonces** el DPS básico del Sacerdote está entre el 55 % y el 65 % del Pícaro, y el aguante del Mago entre el 50 % y el 60 % del Guerrero (márgenes provisionales de `rules.balanceTargets`; tests de balance con los valores de `combat.md` §Referencia).
-4. **Dado** los 32 hechizos de clase del contenido (8 por clase, `docs/design/class-kits.md`) **entonces** un test paramétrico los lanza todos sobre un maniquí y verifica que no lanzan excepción y producen al menos un evento.
+4. **Dado** los 32 hechizos de clase del contenido (8 por clase, `docs/design/class-kits.md`) **entonces** un test paramétrico lanza sobre un maniquí todos los que el validador marca como disponibles (ADR-023: en esta HU, los de un objetivo y `self_aoe_*`) y verifica que no lanzan excepción y producen al menos un evento; los no disponibles (`ground_*`, `leap`, cono, línea) se comprueba que no se aprenden ni se equipan. HU-086 y HU-087 amplían el test hasta cubrir los 32.
 
 ---
 
@@ -134,7 +134,7 @@
 
 **Criterios de aceptación**
 1. **Dado** que mi vida llega a 0 **entonces** mi personaje muestra la animación `death`, pierdo mis auras, los monstruos me olvidan y recibo `Died`.
-2. **Dado** la pantalla "Has muerto" **cuando** pulso "Reaparecer" **entonces** aparezco en el punto seguro más cercano del mapa actual (capa `graveyards`) con `rules.combat.respawnHpPct` de vida y recurso.
+2. **Dado** la pantalla "Has muerto" **cuando** pulso "Reaparecer" **entonces** aparezco en el punto seguro más cercano del mapa actual (capa `graveyards`) con `rules.combat.respawnHpPct` de vida y `respawnResourcePct` de recurso.
 3. **Dado** que estoy muerto **entonces** no puedo moverme, castear, usar items ni lootear (errores `is_dead`).
 4. **Dado** un monstruo muerto **entonces** su cadáver permanece `rules.combat.corpseLifetimeSec` (o hasta ser saqueado) y luego desaparece.
 
@@ -164,7 +164,7 @@
 - Skills: `combat-system`
 
 **Criterios de aceptación**
-1. **Dado** un personaje con maná (Mago, Sacerdote) **entonces** regenera maná según `spi`/`int` cada 1 s, reducido al 30 % durante 5 s tras gastar maná, y además recupera maná con cada básico que impacta (HU-032 CA5).
+1. **Dado** un personaje con maná (Mago, Sacerdote) **entonces** regenera maná según `spi`/`int` cada 1 s, reducido a `manaRegenCastingPenalty` (30 %) durante `manaRegenPenaltyDurationSec` (5 s) tras gastar maná, y además recupera maná con cada básico que impacta (HU-032 CA5).
 2. **Dado** un guerrero **entonces** gana `ragePerHitDealt` (6) por golpe o habilidad que impacta y `ragePerHitTaken` (4) por golpe recibido, y pierde `rageDecayPerSecOutOfCombat` fuera de combate; empieza en 0 al entrar. Carga no cuesta ira y, al impactar su aturdimiento, cuenta como golpe (+6).
 3. **Dado** un pícaro **entonces** gana 10 de energía/s hasta 100.
 4. **Dado** fuera de combate 6 s **entonces** todos regeneran vida según `spi` y `sta`.
@@ -181,7 +181,7 @@
 **Criterios de aceptación**
 1. **Dado** un hechizo `ground_aoe_*` **cuando** pulso su tecla **entonces** el cliente muestra el círculo de `aoeRadius` bajo el cursor (en rojo si está fuera de alcance) y al hacer clic envía `CastSpell{spellId, targetPos}` sin necesidad de objetivo seleccionado.
 2. **Dado** un `targetPos` a más de `range + castRangeToleranceTiles` del lanzador o sin línea de visión **entonces** `Error{out_of_range|no_los}`; un `targetPos` con NaN o fuera del mapa devuelve `invalid_payload`.
-3. **Dado** un casteo de área aceptado **entonces** todos en la AOI reciben `CastStarted{targetPos}` (forma y tamaño salen del contenido del cliente; `radius` solo viaja si algo lo modifica, ADR-018) y ven la marca en el suelo durante el casteo; el punto no cambia aunque el objetivo se mueva.
+3. **Dado** un casteo de área aceptado **entonces** todos en la AOI reciben `CastStarted{targetPos}` (forma y tamaño salen del contenido del cliente, ADR-018; `radius` es opcional y solo viaja si algo lo modifica, `docs/protocol.md`) y ven la marca en el suelo durante el casteo; el punto no cambia aunque el objetivo se mueva.
 4. **Dado** el fin del casteo **entonces** el área afecta solo a quien está dentro de `aoeRadius` en ese tick (hasta `maxTargets`, los más cercanos al centro); quien salió de la marca no recibe nada (test con posiciones concretas).
 5. **Dado** un monstruo con hechizo de área (Golpe de pico del Capataz) **entonces** usa la misma marca: apunta a la posición de su objetivo al empezar el casteo y los jugadores pueden esquivarlo.
 6. **Dado** el contenido **entonces** `target_aoe_enemies` ya no existe en el schema y Estallido de llamas y Golpe de pico usan `ground_aoe_enemies` (hecho en el contenido el 2026-09-30); el validador lo comprueba.
@@ -208,7 +208,7 @@
 4. **Dado** el validador **entonces** acepta `ground_aoe_all` y exige que el hechizo tenga al menos un efecto positivo (`heal` o aura beneficiosa) y uno negativo (`damage` o aura perjudicial): Pulso sagrado cura y daña; Sendero de luz cura y ralentiza sin dañar.
 
 **Notas técnicas**
-- Nombre, radio y números en el rediseño de kits. Usar un `id` nuevo (los ids de contenido no se reutilizan).
+- El contenido ya existe (`priest_holy_pulse`, `priest_path_of_light` en `spells.json`; números en `balance-report.md`): esta HU implementa el targeting en el motor. Los ids de contenido no se reutilizan (`priest_prayer_of_healing` no vuelve).
 
 ---
 

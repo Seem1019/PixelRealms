@@ -55,7 +55,7 @@ Fuentes: `baseStats` de clase + `statsPerLevel · (nivel − 1)` + equipo **× a
 | `dodgeChance` | `3 % + agi · 0.2 %`; tope 25 % (solo contra físico) |
 | `armor` | `Σ item.armor · afinidad · armorMult + agi · 1` |
 | `haste` | multiplicador de velocidad de ataque de la clase (Pícaro 1.15, Guerrero 1.0, Mago/Sacerdote 0.9) |
-| `manaRegen` (por 5 s) | `spi · 1 + int · 0.1`; ×0.3 durante 5 s tras gastar maná |
+| `manaRegen` (por 5 s) | `spi · 1 + int · 0.1`; × `manaRegenCastingPenalty` (0.3) durante `manaRegenPenaltyDurationSec` (5 s) tras gastar maná |
 | `hpRegen` fuera de combate | `spi · 0.5 + sta · 0.2` por segundo tras 6 s sin combate |
 
 Tabla de conversión por defecto:
@@ -80,7 +80,8 @@ proyectil por tipo en `rules.weapons` (daga 1,25 · espada/maza/hacha 1,5 · var
 cada item; las armas a distancia tienen un 20 % menos de presupuesto de daño (`rangedDpsMult`). Solo hace daño a un objetivo.
 - **Convivencia con los hechizos:** el básico sigue solo mientras haya objetivo en alcance y no se castee. Un hechizo
   instantáneo **no reinicia** el temporizador, pero abre un bloqueo de `abilityLockMs` (250) en el que no sale el básico ni
-  otro hechizo; si el básico tocaba dentro del bloqueo, sale al terminar. GCD de `gcdMs` (1000) en los hechizos de clase; el
+  otro hechizo; si el básico tocaba dentro del bloqueo, sale al terminar. GCD de `gcdMs` (1000) en los hechizos de clase con
+  `triggersGcd: true` (por defecto; Provocar, Carga, Carrera, Bloqueo con escudo y Parpadeo lo tienen en `false`); el
   básico y los usables no lo activan. Todo hechizo instantáneo de clase tiene `cooldownMs ≥ minInstantSpellCooldownMs` (2000).
 ```
 swingMs  = weapon.speedMs / haste

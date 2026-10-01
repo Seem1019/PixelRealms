@@ -90,11 +90,11 @@ línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado; l
 - **PvP:** la clase favorecida del triángulo (Mago > Guerrero > Pícaro > Mago) gana el 60–75 % de duelos simulados con equipo igual (`duelFavoriteWinRate`); si supera el 75 % hay que bajar la palanca (hechizo o `classAdvantage`).
 Pide al subagente `content-designer` una revisión de balance cuando agregues más de 3 entradas.
 
-## Ejemplo: nuevo hechizo con DoT
+## Ejemplo: nuevo hechizo con DoT (solo ilustra el formato; el grupo de 8 del Sacerdote ya está completo, ADR-020)
 ```json
 // spells.json
 { "id": "priest_shadow_word_pain", "name": "Palabra de las sombras: Dolor", "source": "class", "classId": "priest",
-  "levelReq": 6, "school": "magic", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 25 },
+  "levelReq": 7, "school": "magic", "castMs": 0, "cooldownMs": 6000, "cost": { "resource": "mana", "amount": 8 },
   "range": 8, "targeting": "enemy", "effects": [{ "type": "apply_aura", "auraId": "priest_swp_dot" }],
   "icon": "spells/shadow_word_pain", "description": "Daño de sombras durante 18 s." }
 // auras.json
