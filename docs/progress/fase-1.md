@@ -27,7 +27,7 @@
 | 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Hechas | JWT HS256 propio (provisional); pantallas sin comprobar en el editor |
 | 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | Hechas (M1 completo salvo validaciones visuales) | cliente dibuja el mapa con colores placeholder (sin YATI/tiles); CA4b/CA5 de HU-022 y CA4/CA5 de HU-023 se cierran en M2/M5 |
 | 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | M2 hecho (HU-088 parcial) | 104 tests de dominio nuevos; HUD por código sin arte |
-| 10 | HU-050 → HU-059 | M3 | | Pendiente | |
+| 10 | HU-050 → HU-059 | M3 | | HU-050..058 hechas; HU-059 (intercambio) pendiente (depende de HU-060) | ventanas por código sin arte |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Pendiente | |
 | 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | Pendiente | HU-084 y las validaciones jugando quedan fuera |
 
@@ -69,6 +69,10 @@
   (vienen de la skill/HU, no hay sección `rules.ai`; `TODO(balance)` en el código).
 - **HU-031/HU-037 · respawn independiente del cadáver.** `respawnSec` (30 s en slime) es menor que `corpseLifetimeSec` (60 s):
   el monstruo nuevo aparece mientras el cadáver sigue visible. Descartado: esperar al cadáver (contradiría CA3 de HU-031).
+- **HU-050 · "el cadáver brilla" = bit 8 de `EntitySpawn.flags`** reenviado solo a los ganadores (el protocolo no tiene mensaje
+  para ello). Descartado: mensaje nuevo `LootAvailable`. Reversible: añadirlo y quitar el bit.
+- **HU-050 · oro del cadáver:** la parte de cada elegible se cobra al abrir (`LootOpen`), el resto de la división al primero
+  que abre; el oro no espera a `exclusiveSec`.
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 

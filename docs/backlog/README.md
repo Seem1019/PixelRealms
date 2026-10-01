@@ -49,15 +49,15 @@
 | HU-042 | Panel de personaje (stats) | E4 | Should | M | Pendiente |
 | HU-043 | Libro de hechizos y barra (4 hechizos + 4 utilizables) | E4 | Must | M | Pendiente |
 | HU-044 | Cambio de clase en NPC (Fases 1–2) | E4 | Must | M | Pendiente |
-| HU-050 | Botín de monstruos | E5 | Must | L | Pendiente |
-| HU-051 | Inventario (bolsa de 24) | E5 | Must | L | Pendiente |
-| HU-052 | Equipar y desequipar (equipo libre con afinidad) | E5 | Must | M | Pendiente |
-| HU-053 | Tooltips y comparación | E5 | Must | M | Pendiente |
-| HU-054 | Usar consumibles | E5 | Must | M | Pendiente |
-| HU-055 | Oro y vendedor NPC | E5 | Must | M | Pendiente |
-| HU-056 | Dividir, fusionar y destruir stacks | E5 | Should | S | Pendiente |
-| HU-057 | Persistencia de inventario y auditoría | E5 | Must | M | Pendiente |
-| HU-058 | Equipo inicial por clase | E5 | Must | S | Pendiente |
+| HU-050 | Botín de monstruos | E5 | Must | L | Hecha |
+| HU-051 | Inventario (bolsa de 24) | E5 | Must | L | Hecha |
+| HU-052 | Equipar y desequipar (equipo libre con afinidad) | E5 | Must | M | Hecha |
+| HU-053 | Tooltips y comparación | E5 | Must | M | Hecha |
+| HU-054 | Usar consumibles | E5 | Must | M | Hecha |
+| HU-055 | Oro y vendedor NPC | E5 | Must | M | Hecha |
+| HU-056 | Dividir, fusionar y destruir stacks | E5 | Should | S | Hecha |
+| HU-057 | Persistencia de inventario y auditoría | E5 | Must | M | Hecha |
+| HU-058 | Equipo inicial por clase | E5 | Must | S | Hecha |
 | HU-059 | Intercambio entre jugadores | E5 | Must | M | Pendiente |
 | HU-060 | Chat (decir, global, susurro) | E6 | Must | M | Pendiente |
 | HU-061 | Grupos (invitar, aceptar, salir, expulsar) | E6 | Must | M | Pendiente |
