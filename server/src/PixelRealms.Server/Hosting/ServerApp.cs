@@ -185,8 +185,14 @@ public static class ServerApp
                 http.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
+            var ip = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (!cm.TryReserveIp(ip))
+            {
+                http.Response.StatusCode = StatusCodes.Status429TooManyRequests; // HU-071 CA3
+                return;
+            }
             using var socket = await http.WebSockets.AcceptWebSocketAsync();
-            await cm.HandleAsync(socket, TimeSpan.FromSeconds(net.IdleTimeoutSec), lifetime.ApplicationStopping);
+            await cm.HandleAsync(socket, TimeSpan.FromSeconds(net.IdleTimeoutSec), lifetime.ApplicationStopping, ip);
         });
         _ = typeof(Error); // el protocolo se referencia desde aquí para que el registro estático se inicialice al arrancar
         return app;

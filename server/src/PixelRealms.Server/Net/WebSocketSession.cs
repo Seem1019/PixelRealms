@@ -30,8 +30,13 @@ public sealed class WebSocketSession : IDisposable
     public bool Joined { get; private set; }
     private long _lastTrafficTicks;
 
-    public WebSocketSession(int id, WebSocket socket, ChannelWriter<InboundMessage> inbound, TimeSpan idleTimeout, ILogger logger, IHelloGate? helloGate = null)
+    private readonly MessageRateLimiter _rateLimiter;
+
+    public string RemoteIp { get; init; } = "";
+
+    public WebSocketSession(int id, WebSocket socket, ChannelWriter<InboundMessage> inbound, TimeSpan idleTimeout, ILogger logger, IHelloGate? helloGate = null, RateLimitOptions? rateLimits = null)
     {
+        _rateLimiter = new MessageRateLimiter(rateLimits ?? new RateLimitOptions());
         _helloGate = helloGate;
         Id = id;
         _socket = socket;
@@ -154,6 +159,23 @@ public sealed class WebSocketSession : IDisposable
                     Joined = true;
                     _inbound.TryWrite(new InboundMessage(Id, "Hello", default, InboundKind.PlayerJoin, gate.JoinAttachment));
                     continue;
+                }
+
+                // HU-071: token bucket por tipo; 3 excesos en 10 s → desconexión con rate_limited (log con IP y cuenta).
+                switch (_rateLimiter.Check(decoded.Type!, Environment.TickCount64))
+                {
+                    case RateDecision.Limited:
+                        await _outbound.Writer.WriteAsync(MessageRegistry.Encode(new Error(ErrorCodes.RateLimited, null, null)), ct);
+                        continue;
+                    case RateDecision.Disconnect:
+                        _logger.LogWarning("Conexión {Conn} desconectada por rate limit (IP {Ip}, cuenta {Account})", Id, RemoteIp, AccountId);
+                        await _outbound.Writer.WriteAsync(MessageRegistry.Encode(new Error(ErrorCodes.RateLimited, null, null)), ct);
+                        CloseReason = ErrorCodes.RateLimited;
+                        await Task.Delay(20, ct);
+                        await CloseOutputAsync();
+                        continue;
+                    default:
+                        break;
                 }
 
                 // El payload viaja como JsonElement clonado: el tick lo deserializa al tipo concreto (MessageRouter).

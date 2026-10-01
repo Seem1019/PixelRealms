@@ -10,6 +10,9 @@ public sealed class NetOptions
 
     /// <summary>Flag de desarrollo: hasta HU-014 se permite conectar a /ws sin ticket.</summary>
     public bool RequireTicket { get; set; }
+
+    /// <summary>HU-071: límites por conexión y por IP.</summary>
+    public Net.RateLimitOptions RateLimits { get; set; } = new();
 }
 
 /// <summary>Opciones técnicas de persistencia (appsettings `Persistence`).</summary>

@@ -16,7 +16,7 @@
 
 ### HU-071 · Rate limiting y protección de mensajes
 **Como** administrador **quiero** que el servidor se proteja de clientes abusivos **para** que un tramposo no arruine la partida.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-033, HU-051
 - Skills: `net-protocol`, `dotnet-server`
 
@@ -26,8 +26,13 @@
 3. **Dado** 10 conexiones WebSocket simultáneas desde la misma IP **entonces** la 11.ª se rechaza.
 4. **Dado** un test de fuzzing (1 000 mensajes aleatorios/malformados) **entonces** el servidor no lanza excepciones no controladas y el tick sigue en < 50 ms.
 
----
+**Notas de implementación**
+- Token bucket por conexión y tipo en `Net/MessageRateLimiter.cs` (MoveInput 30/s, CastSpell 10/s, Chat 5 por 5 s, resto 20/s); límites configurables en `appsettings.json` → `Net:RateLimits` (son técnicos, no de balance, por eso no van en rules.json).
+- Exceso → `Error{rate_limited}` y se descarta el mensaje; 3 excesos en 10 s (contados por conexión, no por tipo) → cierre `rate_limited` con `warn` que incluye IP y cuenta.
+- Tope de 10 conexiones por IP en `ConnectionManager.TryReserveIp`; la 11.ª recibe HTTP 429 en `/ws`. Ojo detrás de Caddy: la IP vista es la del proxy salvo que se configure `ForwardedHeaders` (pendiente para HU-073).
+- Tests: `RateLimitTests` (buckets, caducidad de excesos, cierre por flood, 11.ª conexión, fuzz de 1 000 mensajes malformados con reconexión; el servidor responde `/health` con p99 < 50 ms y sigue atendiendo Ping).
 
+---
 ### HU-072 · Métricas y logs del servidor
 **Como** administrador **quiero** ver el estado del servidor **para** detectar problemas de rendimiento.
 - Prioridad: Should · Estimación: S · Estado: Pendiente
