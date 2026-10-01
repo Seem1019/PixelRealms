@@ -28,8 +28,8 @@ public sealed class InMemoryRepositoryTests
         var repo = new InMemoryCharacterRepository(store);
         var acc = Guid.CreateVersion7();
         var sword = new SavedItem(Guid.CreateVersion7(), "worn_sword", 1, 1, 7);
-        var c = (await repo.CreateAsync(new NewCharacter(acc, "Ana", "warrior", "meadow", 10, 12, 60, 0, [sword], []), TestContext.Current.CancellationToken)).ShouldNotBeNull();
-        (await repo.CreateAsync(new NewCharacter(acc, "ANA", "mage", "meadow", 0, 0, 40, 60, [], []), TestContext.Current.CancellationToken)).ShouldBeNull();
+        var c = (await repo.CreateAsync(new NewCharacter(acc, "Ana", "warrior", "meadow", 10, 12, 60, 0, [sword], []), 4, TestContext.Current.CancellationToken)).Character.ShouldNotBeNull();
+        (await repo.CreateAsync(new NewCharacter(acc, "ANA", "mage", "meadow", 0, 0, 40, 60, [], []), 4, TestContext.Current.CancellationToken)).Status.ShouldBe(CreateCharacterStatus.NameTaken);
         (await repo.CountByAccountAsync(acc, TestContext.Current.CancellationToken)).ShouldBe(1);
         await repo.SaveAsync(c with { Level = 2, Gold = 7, Items = [sword, new SavedItem(Guid.CreateVersion7(), "bread", 3, 0, 0)], Audit = [new AuditEntry(sword.Id, "loot", "worn_sword", 1)] }, TestContext.Current.CancellationToken);
         var loaded = (await repo.LoadAsync(c.Id, TestContext.Current.CancellationToken)).ShouldNotBeNull();
