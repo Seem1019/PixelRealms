@@ -45,7 +45,7 @@ public sealed class ProtocolBaseTests
     {
         await using var server = await TestServer.StartAsync();
         using var http = new HttpClient();
-        var health = await http.GetFromJsonAsync<System.Text.Json.JsonElement>(server.BaseUrl + "/health");
+        var health = await http.GetFromJsonAsync<System.Text.Json.JsonElement>(server.BaseUrl + "/health", cancellationToken: TestContext.Current.CancellationToken);
         health.GetProperty("status").GetString().ShouldBe("ok");
         health.GetProperty("players").GetInt32().ShouldBe(0);
     }

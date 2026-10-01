@@ -36,7 +36,7 @@ public sealed class MetricsTests
     {
         await using var server = await TestServer.StartAsync();
         using var http = new HttpClient();
-        var health = await http.GetFromJsonAsync<JsonElement>(server.BaseUrl + "/health");
+        var health = await http.GetFromJsonAsync<JsonElement>(server.BaseUrl + "/health", cancellationToken: TestContext.Current.CancellationToken);
         health.GetProperty("status").GetString().ShouldBe("ok");
         health.GetProperty("players").GetInt32().ShouldBe(0);
         health.GetProperty("tickP99Ms").GetDouble().ShouldBeGreaterThanOrEqualTo(0);
@@ -49,11 +49,11 @@ public sealed class MetricsTests
         await using var server = await TestServer.StartAsync();
         using var api = await new ApiClient(server).RegisterAndLogin("ana");
         using var anon = new HttpClient();
-        (await anon.GetAsync(server.BaseUrl + "/admin/stats")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        (await api.Http.GetAsync("/admin/stats")).StatusCode.ShouldBe(HttpStatusCode.Forbidden); // JWT válido pero sin admin
+        (await anon.GetAsync(server.BaseUrl + "/admin/stats", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await api.Http.GetAsync("/admin/stats", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Forbidden); // JWT válido pero sin admin
 
         var accounts = server.Services.GetRequiredService<IAccountRepository>();
-        await accounts.SetAdminAsync((await accounts.FindByUsernameAsync("ana"))!.Id, true);
+        await accounts.SetAdminAsync((await accounts.FindByUsernameAsync("ana", TestContext.Current.CancellationToken))!.Id, true, TestContext.Current.CancellationToken);
         await api.Login("ana", "segura123");
         var id = await api.CreateCharacterId("Ana", "warrior");
         await using var client = await TestGameClient.ConnectAsync(server.WsUrl);
@@ -65,8 +65,8 @@ public sealed class MetricsTests
         JsonElement stats = default;
         for (var attempt = 0; attempt < 12; attempt++)
         {
-            await Task.Delay(500);
-            stats = await api.Http.GetFromJsonAsync<JsonElement>("/admin/stats");
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            stats = await api.Http.GetFromJsonAsync<JsonElement>("/admin/stats", cancellationToken: TestContext.Current.CancellationToken);
             if (stats.GetProperty("messagesOutPerSec").GetDouble() > 0) break;
         }
         stats.GetProperty("players").GetInt32().ShouldBe(1);

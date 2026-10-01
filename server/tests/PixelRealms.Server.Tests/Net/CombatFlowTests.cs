@@ -110,7 +110,7 @@ public sealed class CombatFlowTests
         await ana.SendAsync("CastSpell", $$"""{"spellId":"mage_fireball","targetId":{{boarId}}}""");
         (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("is_dead");
         await ana.SendAsync("Respawn");
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
         var after = await ana.LatestAsync("Snapshot");
         var rules = TestContent.Load().Rules.Combat;
         var expectedHp = (int)Math.Round(player.MaxHp * rules.RespawnHpPct);

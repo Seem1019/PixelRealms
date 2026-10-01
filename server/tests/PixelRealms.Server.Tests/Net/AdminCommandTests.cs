@@ -119,7 +119,7 @@ public sealed class AdminCommandTests
             self.Position.ShouldBe(target.Position);
 
             await ana.SendAsync("SelectTarget", $$"""{"targetId":{{bobId}}}""");
-            await Task.Delay(150);
+            await Task.Delay(150, TestContext.Current.CancellationToken);
             await ana.SendAsync("AdminCommand", """{"text":"/kill"}""");
             (await System(ana)).GetProperty("text").GetString()!.ShouldContain("eliminado");
             (await bob.ExpectAsync("Died")).ValueKind.ShouldBe(JsonValueKind.Object);

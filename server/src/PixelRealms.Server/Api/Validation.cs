@@ -15,10 +15,11 @@ public static partial class Validation
     public static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
         { "admin", "gm", "system", "server", "pixelrealms", "moderador", "mod", "soporte", "marta", "grask" };
 
-    [GeneratedRegex("^[A-Za-z0-9_]+$")]
+    // \A…\z y no ^…$: en .NET `$` también acepta un "\n" final ("Bob\n" se haría pasar por "Bob").
+    [GeneratedRegex(@"\A[A-Za-z0-9_]+\z")]
     private static partial Regex UsernameRegex();
 
-    [GeneratedRegex("^[A-Za-z][A-Za-z0-9]+$")]
+    [GeneratedRegex(@"\A[A-Za-z][A-Za-z0-9]+\z")]
     private static partial Regex CharacterNameRegex();
 
     public static FieldError? Username(string? username)

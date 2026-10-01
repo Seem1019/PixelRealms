@@ -104,20 +104,20 @@ public sealed class RateLimitTests
                     await client.DisposeAsync();
                     client = await TestGameClient.ConnectAsync(server.WsUrl);
                     reconnects++;
-                    if (i % 50 == 0) await Task.Delay(60); // deja respirar a los buckets de vez en cuando
+                    if (i % 50 == 0) await Task.Delay(60, TestContext.Current.CancellationToken); // deja respirar a los buckets de vez en cuando
                 }
                 var msg = RandomMessage(rng, types);
                 try { await client.SendRawAsync(msg); }
-                catch (WebSocketException) { /* cerrada por el servidor: la siguiente iteración reconecta */ }
-                catch (InvalidOperationException) { }
-                if (i % 100 == 99) await Task.Delay(20);
+                catch (WebSocketException ex) { _ = ex; /* cerrada por el servidor: la siguiente iteración reconecta */ }
+                catch (InvalidOperationException ex) { _ = ex; }
+                if (i % 100 == 99) await Task.Delay(20, TestContext.Current.CancellationToken);
             }
         }
         finally { await client.DisposeAsync(); }
 
         // El servidor sigue vivo y el tick no se ha disparado.
         using var http = new HttpClient();
-        var health = await http.GetFromJsonAsync<System.Text.Json.JsonElement>(server.BaseUrl + "/health");
+        var health = await http.GetFromJsonAsync<System.Text.Json.JsonElement>(server.BaseUrl + "/health", cancellationToken: TestContext.Current.CancellationToken);
         health.GetProperty("status").GetString().ShouldBe("ok");
         health.GetProperty("tickP99Ms").GetDouble().ShouldBeLessThan(50);
         await using var fresh = await TestGameClient.ConnectAsync(server.WsUrl);

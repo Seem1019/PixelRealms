@@ -45,7 +45,7 @@ public sealed class EnterWorldTests
             w.GetProperty("hotbar")[0].GetProperty("ref").GetString().ShouldBe("warrior_heroic_strike");
             w.GetProperty("rulesHash").GetString()!.Length.ShouldBe(16);
             var registry = (PlayerRegistry)server.Services.GetService(typeof(PlayerRegistry))!;
-            await Task.Delay(100);
+            await Task.Delay(100, TestContext.Current.CancellationToken);
             registry.ByCharacter(id).ShouldNotBeNull();
         }
     }
@@ -96,7 +96,7 @@ public sealed class EnterWorldTests
             (await first.ExpectCloseAsync()).ShouldBe("replaced");
 
             var saver = (PixelRealms.Server.Hosting.SaveService)server.Services.GetService(typeof(PixelRealms.Server.Hosting.SaveService))!;
-            await Task.Delay(200);
+            await Task.Delay(200, TestContext.Current.CancellationToken);
             saver.Saved.ShouldBeGreaterThanOrEqualTo(1);
             var store = (InMemoryStore)server.Services.GetService(typeof(InMemoryStore))!;
             store.Characters[id].UpdatedAt.ShouldBeGreaterThan(store.Characters[id].CreatedAt);
@@ -116,7 +116,7 @@ public sealed class EnterWorldTests
             await client.DisposeAsync();
             var registry = (PlayerRegistry)server.Services.GetService(typeof(PlayerRegistry))!;
             var saver = (PixelRealms.Server.Hosting.SaveService)server.Services.GetService(typeof(PixelRealms.Server.Hosting.SaveService))!;
-            for (var i = 0; i < 20 && saver.Saved == 0; i++) await Task.Delay(50);
+            for (var i = 0; i < 20 && saver.Saved == 0; i++) await Task.Delay(50, TestContext.Current.CancellationToken);
             saver.Saved.ShouldBe(1);
             registry.ByCharacter(id).ShouldBeNull();
         }

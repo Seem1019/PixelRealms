@@ -41,7 +41,7 @@ public sealed class LinkdeadTests
             await bob.ExpectForIdAsync("EntitySpawn", anaId);
 
             ana.Abort(); // corte sin Close
-            await Task.Delay(400);
+            await Task.Delay(400, TestContext.Current.CancellationToken);
             server.Services.GetRequiredService<WorldSession>().LinkdeadCount.ShouldBe(1);
             // Sigue en el mundo: Bob no recibe su despawn todavía.
             (await bob.ArrivesAsync("EntityDespawn", m => m.GetProperty("id").GetInt32() == anaId, 300)).ShouldBeFalse();
@@ -69,11 +69,11 @@ public sealed class LinkdeadTests
             var bobId = (await bob.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
             await ana.ExpectForIdAsync("EntitySpawn", bobId);
             await ana.SendAsync("MoveInput", """{"seq":1,"dx":1,"dy":0}""");
-            await Task.Delay(200);
+            await Task.Delay(200, TestContext.Current.CancellationToken);
             var before = (await ana.LatestAsync("Snapshot")).GetProperty("self").GetProperty("x").GetSingle();
 
             ana.Abort();
-            await Task.Delay(300);
+            await Task.Delay(300, TestContext.Current.CancellationToken);
 
             await using var ana2 = await Connect(server, anaApi, anaId);
             var welcome2 = await ana2.ExpectAsync("Welcome");

@@ -31,7 +31,7 @@ public sealed class AuthEndpointsTests
         (await api.Register("Ana", "segura123")).StatusCode.ShouldBe(HttpStatusCode.Created);
         var r = await api.Register("ana", "otraclave1");
         r.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().ShouldBe("username_taken");
+        (await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken)).GetProperty("code").GetString().ShouldBe("username_taken");
     }
 
     [Theory] // HU-010 CA3
@@ -45,7 +45,7 @@ public sealed class AuthEndpointsTests
         using var api = new ApiClient(server);
         var r = await api.Register(username, password);
         r.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var body = await r.Content.ReadFromJsonAsync<JsonElement>();
+        var body = await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
         body.GetProperty("errors")[0].GetProperty("field").GetString().ShouldBe(field);
     }
 
@@ -57,7 +57,7 @@ public sealed class AuthEndpointsTests
         await api.Register("ana", "segura123");
         var r = await api.Login("ana", "segura123");
         r.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await r.Content.ReadFromJsonAsync<JsonElement>();
+        var body = await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
         var exp = body.GetProperty("expiresAt").GetDateTimeOffset();
         (exp - DateTimeOffset.UtcNow).TotalMinutes.ShouldBeInRange(14, 15.1);
         var jwt = (JwtService)server.Services.GetService(typeof(JwtService))!;
@@ -76,7 +76,7 @@ public sealed class AuthEndpointsTests
         var unknownUser = await api.Login("nadie", "segura123");
         wrongPassword.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         unknownUser.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        (await wrongPassword.Content.ReadAsStringAsync()).ShouldBe(await unknownUser.Content.ReadAsStringAsync());
+        (await wrongPassword.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldBe(await unknownUser.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]

@@ -29,10 +29,10 @@ public sealed class MovementAndAoiTests
         for (var seq = 1; seq <= 4; seq++)
         {
             await ana.SendAsync("MoveInput", $$"""{"seq":{{seq}},"dx":1,"dy":0}""");
-            await Task.Delay(120);
+            await Task.Delay(120, TestContext.Current.CancellationToken);
         }
         await ana.SendAsync("MoveInput", """{"seq":5,"dx":0,"dy":0}""");
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         var snap = await ana.LatestAsync("Snapshot");
         snap.GetProperty("ackSeq").GetInt32().ShouldBe(5);
         var x1 = snap.GetProperty("self").GetProperty("x").GetSingle();
@@ -47,9 +47,9 @@ public sealed class MovementAndAoiTests
         await using var server = await TestServer.StartAsync();
         await using var ana = await Enter(server, "ana", "Ana", "warrior");
         await ana.SendAsync("MoveInput", """{"seq":10,"dx":5,"dy":0}"""); // se recorta a 1
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
         await ana.SendAsync("MoveInput", """{"seq":3,"dx":0,"dy":0}""");  // seq decreciente: ignorado → sigue moviéndose
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         var snap = await ana.LatestAsync("Snapshot");
         snap.GetProperty("ackSeq").GetInt32().ShouldBe(10);
     }

@@ -31,9 +31,9 @@ public sealed class PersistenceFlowTests
         var hp = w1.GetProperty("self").GetProperty("hp").GetInt32();
         var res = w1.GetProperty("self").GetProperty("res").GetInt32();
         await ana.SendAsync("MoveInput", """{"seq":1,"dx":1,"dy":1}""");
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
         await ana.SendAsync("MoveInput", """{"seq":2,"dx":0,"dy":0}""");
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         var snap = await ana.LatestAsync("Snapshot");
         var x = snap.GetProperty("self").GetProperty("x").GetSingle();
         var y = snap.GetProperty("self").GetProperty("y").GetSingle();
@@ -79,17 +79,17 @@ public sealed class PersistenceFlowTests
         await ana.ExpectAsync("Welcome");
         var saver = server.Services.GetRequiredService<SaveService>();
 
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
         saver.Saved.ShouldBe(0); // sin cambios: no se guarda
 
         await ana.SendAsync("MoveInput", """{"seq":1,"dx":1,"dy":0}""");
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
         await ana.SendAsync("MoveInput", """{"seq":2,"dx":0,"dy":0}""");
         await WaitUntil(() => saver.Saved >= 1, 1500);
-        await Task.Delay(600); // puede caer un segundo guardado con el movimiento posterior al primero
+        await Task.Delay(600, TestContext.Current.CancellationToken); // puede caer un segundo guardado con el movimiento posterior al primero
         var afterMove = saver.Saved;
         afterMove.ShouldBeInRange(1, 2);
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
         saver.Saved.ShouldBe(afterMove); // ya no está Dirty: no se repite
     }
 
@@ -99,7 +99,7 @@ public sealed class PersistenceFlowTests
         while (!cond())
         {
             if (DateTime.UtcNow > deadline) throw new TimeoutException("condición no cumplida");
-            await Task.Delay(25);
+            await Task.Delay(25, TestContext.Current.CancellationToken);
         }
     }
 }

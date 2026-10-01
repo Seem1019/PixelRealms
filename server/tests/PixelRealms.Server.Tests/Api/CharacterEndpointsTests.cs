@@ -17,7 +17,7 @@ public sealed class CharacterEndpointsTests
         using var api = await new ApiClient(server).RegisterAndLogin();
         var r = await api.CreateCharacter("Ana", "warrior");
         r.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var body = await r.Content.ReadFromJsonAsync<JsonElement>();
+        var body = await r.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken);
         body.GetProperty("level").GetInt32().ShouldBe(1);
         body.GetProperty("mapId").GetString().ShouldBe("meadow");
         var store = (InMemoryStore)server.Services.GetService(typeof(InMemoryStore))!;
@@ -69,7 +69,7 @@ public sealed class CharacterEndpointsTests
         await api.CreateCharacterId("Dani", "priest");
         var fifth = await api.CreateCharacter("Eva", "priest");
         fifth.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await fifth.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().ShouldBe("max_characters");
+        (await fifth.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken)).GetProperty("code").GetString().ShouldBe("max_characters");
     }
 
     [Fact]
@@ -78,11 +78,11 @@ public sealed class CharacterEndpointsTests
         await using var server = await TestServer.StartAsync();
         using var api = await new ApiClient(server).RegisterAndLogin();
         var id = await api.CreateCharacterId("Ana", "warrior");
-        var list = await api.Http.GetFromJsonAsync<JsonElement>("/api/characters");
+        var list = await api.Http.GetFromJsonAsync<JsonElement>("/api/characters", cancellationToken: TestContext.Current.CancellationToken);
         list.GetArrayLength().ShouldBe(1);
         list[0].GetProperty("name").GetString().ShouldBe("Ana");
-        (await api.Http.DeleteAsync($"/api/characters/{id}")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await api.Http.GetFromJsonAsync<JsonElement>("/api/characters")).GetArrayLength().ShouldBe(0);
+        (await api.Http.DeleteAsync($"/api/characters/{id}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await api.Http.GetFromJsonAsync<JsonElement>("/api/characters", cancellationToken: TestContext.Current.CancellationToken)).GetArrayLength().ShouldBe(0);
         (await api.CreateCharacter("Ana", "mage")).StatusCode.ShouldBe(HttpStatusCode.Created); // nombre libre (CA4, MVP)
     }
 
@@ -93,8 +93,8 @@ public sealed class CharacterEndpointsTests
         using var ana = await new ApiClient(server).RegisterAndLogin("ana");
         using var bob = await new ApiClient(server).RegisterAndLogin("bob");
         var id = await ana.CreateCharacterId("Ana", "warrior");
-        (await bob.Http.DeleteAsync($"/api/characters/{id}")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await bob.Http.DeleteAsync($"/api/characters/{Guid.NewGuid()}")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await bob.Http.DeleteAsync($"/api/characters/{id}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await bob.Http.DeleteAsync($"/api/characters/{Guid.NewGuid()}", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -102,9 +102,9 @@ public sealed class CharacterEndpointsTests
     {
         await using var server = await TestServer.StartAsync();
         using var http = new HttpClient { BaseAddress = new Uri(server.BaseUrl) };
-        (await http.GetAsync("/api/characters")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await http.GetAsync("/api/characters", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         http.DefaultRequestHeaders.Authorization = new("Bearer", "a.b.c");
-        (await http.GetAsync("/api/characters")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await http.GetAsync("/api/characters", cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -116,6 +116,6 @@ public sealed class CharacterEndpointsTests
         var id = await ana.CreateCharacterId("Ana", "warrior");
         var ticket = await ana.Ticket(id);
         ticket.Length.ShouldBeGreaterThan(40);
-        (await bob.Http.PostAsJsonAsync("/api/game/ticket", new { characterId = id })).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await bob.Http.PostAsJsonAsync("/api/game/ticket", new { characterId = id }, cancellationToken: TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 }

@@ -91,7 +91,7 @@ public sealed class InventoryFlowTests
             await ana.DisposeAsync();
             var saver = server.Services.GetRequiredService<SaveService>();
             var deadline = DateTime.UtcNow.AddSeconds(3);
-            while (saver.Saved < 1 && DateTime.UtcNow < deadline) await Task.Delay(25);
+            while (saver.Saved < 1 && DateTime.UtcNow < deadline) await Task.Delay(25, TestContext.Current.CancellationToken);
             var store = server.Services.GetRequiredService<InMemoryStore>();
             store.Audit.Count(a => a.CharacterId == charId && a.Action == "buy").ShouldBe(1);
             store.Audit.Count(a => a.CharacterId == charId && a.Action == "sell").ShouldBe(1);

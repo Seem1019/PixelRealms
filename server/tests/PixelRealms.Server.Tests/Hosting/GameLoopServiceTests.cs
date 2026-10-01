@@ -25,7 +25,7 @@ public sealed class GameLoopServiceTests
         var sim = NewSimulation();
         using var loop = new GameLoopService(sim, NullLogger<GameLoopService>.Instance);
         await loop.StartAsync(CancellationToken.None);
-        await Task.Delay(2000);
+        await Task.Delay(2000, TestContext.Current.CancellationToken);
         var ticks = loop.TicksRun;
         await loop.StopAsync(CancellationToken.None);
         ticks.ShouldBeInRange(38, 42);
@@ -40,13 +40,13 @@ public sealed class GameLoopServiceTests
         var stopped = false;
         loop.OnStopping = () => stopped = true;
         await loop.StartAsync(CancellationToken.None);
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         var sw = Stopwatch.StartNew();
         await loop.StopAsync(CancellationToken.None);
         sw.ElapsedMilliseconds.ShouldBeLessThan(1000);
         stopped.ShouldBeTrue();
         var after = loop.TicksRun;
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
         loop.TicksRun.ShouldBe(after); // ya no avanza
     }
 
@@ -57,7 +57,7 @@ public sealed class GameLoopServiceTests
         sim.AddSystem(new ThrowingSystem());
         using var loop = new GameLoopService(sim, NullLogger<GameLoopService>.Instance);
         await loop.StartAsync(CancellationToken.None);
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
         await loop.StopAsync(CancellationToken.None);
         loop.TicksRun.ShouldBeGreaterThan(3);
     }
