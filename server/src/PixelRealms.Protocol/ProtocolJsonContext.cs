@@ -1,0 +1,74 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using PixelRealms.Protocol.Messages;
+
+namespace PixelRealms.Protocol;
+
+/// <summary>Contexto de System.Text.Json generado en compilación (ADR-002): camelCase, opcionales omitidos (no null).</summary>
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    NumberHandling = JsonNumberHandling.Strict,
+    RespectNullableAnnotations = true,
+    RespectRequiredConstructorParameters = true,
+    WriteIndented = false)]
+[JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(Hello))]
+[JsonSerializable(typeof(Ping))]
+[JsonSerializable(typeof(MoveInput))]
+[JsonSerializable(typeof(SelectTarget))]
+[JsonSerializable(typeof(CastSpell))]
+[JsonSerializable(typeof(CancelCast))]
+[JsonSerializable(typeof(AutoAttack))]
+[JsonSerializable(typeof(InventoryMove))]
+[JsonSerializable(typeof(UseItem))]
+[JsonSerializable(typeof(DestroyItem))]
+[JsonSerializable(typeof(LootOpen))]
+[JsonSerializable(typeof(LootTake))]
+[JsonSerializable(typeof(LootTakeAll))]
+[JsonSerializable(typeof(VendorOpen))]
+[JsonSerializable(typeof(VendorBuy))]
+[JsonSerializable(typeof(VendorSell))]
+[JsonSerializable(typeof(ChatSend))]
+[JsonSerializable(typeof(PartyInvite))]
+[JsonSerializable(typeof(PartyRespond))]
+[JsonSerializable(typeof(PartyLeave))]
+[JsonSerializable(typeof(PartyKick))]
+[JsonSerializable(typeof(SetHotbar))]
+[JsonSerializable(typeof(Respawn))]
+[JsonSerializable(typeof(UsePortal))]
+[JsonSerializable(typeof(DuelRequest))]
+[JsonSerializable(typeof(DuelRespond))]
+[JsonSerializable(typeof(DuelForfeit))]
+[JsonSerializable(typeof(TradeRequest))]
+[JsonSerializable(typeof(TradeRespond))]
+[JsonSerializable(typeof(TradeOffer))]
+[JsonSerializable(typeof(TradeConfirm))]
+[JsonSerializable(typeof(TradeCancel))]
+[JsonSerializable(typeof(AdminCommand))]
+[JsonSerializable(typeof(ChangeClass))]
+[JsonSerializable(typeof(Welcome))]
+[JsonSerializable(typeof(Snapshot))]
+[JsonSerializable(typeof(EntitySpawn))]
+[JsonSerializable(typeof(EntityDespawn))]
+[JsonSerializable(typeof(CastStarted))]
+[JsonSerializable(typeof(CastEnded))]
+[JsonSerializable(typeof(CombatEvents))]
+[JsonSerializable(typeof(AuraApplied))]
+[JsonSerializable(typeof(AuraRemoved))]
+[JsonSerializable(typeof(Cooldown))]
+[JsonSerializable(typeof(StatsUpdate))]
+[JsonSerializable(typeof(XpGain))]
+[JsonSerializable(typeof(LevelUp))]
+[JsonSerializable(typeof(InventoryUpdate))]
+[JsonSerializable(typeof(LootWindow))]
+[JsonSerializable(typeof(ChangeMap))]
+[JsonSerializable(typeof(DuelUpdate))]
+[JsonSerializable(typeof(TradeUpdate))]
+[JsonSerializable(typeof(VendorWindow))]
+[JsonSerializable(typeof(ChatMessage))]
+[JsonSerializable(typeof(PartyUpdate))]
+[JsonSerializable(typeof(Died))]
+[JsonSerializable(typeof(Error))]
+[JsonSerializable(typeof(Pong))]
+public sealed partial class ProtocolJsonContext : JsonSerializerContext;
