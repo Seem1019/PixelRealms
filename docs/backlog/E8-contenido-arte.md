@@ -65,6 +65,8 @@
 3. **Dado** una sesión de juego con amigos **entonces** se cronometra, para un jugador nuevo, el tiempo desde abrir el enlace hasta la primera pelea en grupo con un amigo (objetivo ≤ 5 min), se recogen sensaciones en `docs/design/playtest-notes.md` y se crean HUs para lo que requiera código.
 4. **Dado** los pendientes del modelo de la Fase 1 (`balance-report.md`, 2026-09-30) **entonces** se contrastan jugando y se cierran o se abren HUs, sin cambiar sus números antes:
    - El **triángulo de duelos** y la **tabla del Sacerdote** de `balance-notes.md` §6 (y los cooldowns citados en `gdd.md` §Triángulo) usan números anteriores al balance de la Fase 1; se miden con duelos reales o simulados con movimiento.
-   - El **Mago solo con básicos** pierde el 65 % de la vida contra el Kóbold minero (piso: 50 %); el modelo no cuenta que se aleje mientras castea. Siguiente palanca si se confirma: +10 de vida base del Mago.
+   - El **Mago solo con básicos** pierde el 65 % de la vida contra el Kóbold minero (piso: 50 %); el modelo no cuenta que se aleje mientras castea. **Primera palanca:** +10 de vida base del Mago (`classes.json`), que también
+     sube su aguante fuera de rol (hoy 49 % del Guerrero con placas y escudo, bajo el piso del 50 % de `offRoleSurvivalPct`) y su
+     punta de armadura en el pentagrama (medida 23, objetivo 25).
    - El **Capataz con Guerrero + Sacerdote de nivel 6** dura ~101 s (objetivo 60–100 s) y **3 de nivel 4 sin sanador** ~54 s; ver si la vida de 1 400 se queda.
    - Confirmar que el **ciclo real por monstruo** es de ~36 s (`killCycleSecTarget`); si no, se cambia ese valor y la curva de XP se recalcula sola (ADR-017).

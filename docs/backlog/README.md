@@ -88,6 +88,9 @@
 - **Implementar ADR-022 y ADR-023** (acumulación, inmunidad tras control y contenido no disponible) dentro de HU-035 y HU-003.
 - **Fase 2:** mejoras 1-de-2 al subir de rango y cuándo se pueden cambiar los hechizos equipados. No aplica en la Fase 1:
   cada clase tiene 4 hechizos y van todos equipados (la barra de HU-043 solo los ordena y asigna los utilizables).
+- **Fase 2 (balance):** Tajo amplio, Cuchillas arrojadizas y Cono de frío son áreas apuntadas de daño sin casteo, contra la regla
+  de ADR-015 ("las áreas apuntadas de daño llevan casteo"); se decide en su pasada de balance si llevan casteo/retardo o si el
+  cono queda exento. Hasta entonces `tools/ContentCheck` lo avisa.
 - *Decididos:* rangos en los niveles 4, 8 y 12 con +15 % por rango (ADR-024; en la Fase 1 solo el del nivel 4) e inmunidad
   de 1,5 s tras un control (ADR-022).
 

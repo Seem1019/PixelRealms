@@ -146,8 +146,8 @@ antiguas, se marcan como "Reemplazada por ADR-N".
     repartidas entre ticks. **Las áreas solo interactúan con entidades, nunca entre sí.**
   - **Límites (`rules.limits`):** 1 casteo por lanzador; 2 áreas duraderas por lanzador (la tercera reemplaza a la más
     antigua); 128 áreas por instancia (al tope, el jugador recibe `area_limit` y el monstruo elige otra acción); 256 impactos
-    pendientes por instancia; tope global de 10 objetivos por área. El tope de auras por entidad lo fija ADR-021 (16 beneficiosas y
-    16 perjudiciales, `rules.limits.maxBuffsPerEntity` / `maxDebuffsPerEntity`).
+    pendientes por instancia; tope global de 10 objetivos por área. **El tope de auras por entidad está pendiente de revisión.**
+    *Nota 2026-09-30: lo fija ADR-021 — 16 beneficiosas y 16 perjudiciales (`rules.limits.maxBuffsPerEntity` / `maxDebuffsPerEntity`).*
   - **Memoria y tick:** reservas de capacidad fija para áreas, impactos y auras; eventos del tick como estructuras en un buffer
     circular; listas de resultados reutilizadas (256 ids); sin LINQ ni closures en los sistemas. Presupuesto: tick p99 ≤ 10 ms;
     combate (casteo, auras, áreas, IA) ≤ 4 ms p99 por instancia; aviso > 25 ms; fallo si algún tick > 50 ms. Memoria nueva
@@ -202,7 +202,7 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   suman: manda la ralentización más fuerte y el aturdimiento (o raíz) más largo.
 - **Consecuencias:** en el peor caso realista una entidad lleva ~9 beneficiosas y ~1–3 perjudiciales que cuentan, así que los
   topes son una red de seguridad. Cambian HU-035 y HU-088. Se eliminan las auras huérfanas Desgarro y Escudo de maná y se
-  crean las 13 del kit nuevo (lista en `docs/design/class-kits.md` §Auras del kit).
+  crean las 14 del kit nuevo. *Nota 2026-09-30: son 13 (lista en `docs/design/class-kits.md` §Auras del kit).*
 
 ## ADR-022 · Acumulación de efectos e inmunidad tras un control
 - **Decisión:**
