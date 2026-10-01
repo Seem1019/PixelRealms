@@ -145,7 +145,7 @@
 ---
 ### HU-027 · Portales y cambio de mapa
 **Como** jugador **quiero** entrar a la Mina Abandonada por su portal **para** llegar a la mazmorra y su jefe.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-020, HU-023, HU-026
 - Skills: `world-maps`, `dotnet-server`, `net-protocol`, `godot-client`
 
@@ -160,3 +160,10 @@
 **Notas técnicas**
 - ADR-007. `MapData` inmutable y compartido; `MapInstance` con su propio `InterestSystem`, monstruos, loot y tabla de amenaza.
 - `MapInstance.Id` ≠ `mapId` desde el día uno (permite N instancias del mismo mapa en el futuro sin tocar el protocolo: el cliente solo conoce `mapId`).
+
+**Notas de implementación**
+- Game: `Portals/PortalSystem` (tras el movimiento) detecta al jugador dentro del rectángulo del portal o con `UsePortal` pendiente a ≤ 1 casilla; `PortalPolicy.Check` → `is_dead` / `in_combat` / `level_too_low`; el rechazo se emite una sola vez hasta salir del portal. Eventos `PortalUsed`/`PortalRejected`.
+- Server: `Players/MapTransferService` (post-tick, antes del EventDispatcher): `InterestSystem.ForgetEntity` → `EntityDespawn{left}` a quienes lo veían, cambio de `MapInstance`, `ChangeMap{mapId,x,y}` en px, guardado inmediato (`WorldSession.Save`, HU-026 CA6); los `EntitySpawn` de la nueva AOI salen en el tick siguiente. `Error{level_too_low, "Necesitas nivel 4"}` con el nivel del portal (CA4).
+- Cliente: `world.gd._on_change_map`: fundido a negro 0,25 s, carga `res://maps/<mapId>.tmj` (no hay escenas .tscn por mapa: el mapa se dibuja desde el .tmj con el renderer placeholder), recoloca al jugador y reinicia la predicción; el HUD no se reinicia. El texto del `Error` del servidor se muestra 3 s.
+- Tests: `PortalSystemTests` (6) y `PortalTests` (integración: cruzar al entrar, volver con `UsePortal`, despawn para el otro, `mapId` guardado y reconexión en el mapa nuevo; `level_too_low` una sola vez; `out_of_range`/`not_found`).
+- **Pendiente:** CA5 (`say` por mapa, `party`/`global` y nombre del mapa en los marcos de grupo) se cierra con las HUs de chat y grupo (HU-060/HU-061).

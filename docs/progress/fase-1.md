@@ -25,7 +25,7 @@
 | 5 | HU-005 Proyecto Godot base | M1 | 001 | Hecha (parcial) | fuente pixel y YATI pendientes; escalado sin verificar visualmente |
 | 6 | HU-006 Protocolo base | M1 | 004, 005 | Hecha | integración sin Mvc.Testing (WebApplication en puerto libre) |
 | 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Hechas | JWT HS256 propio (provisional); pantallas sin comprobar en el editor |
-| 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | HU-020..026 hechas; 027 pendiente | cliente dibuja el mapa con colores placeholder (sin YATI/tiles); CA4b/CA5 de HU-022 y CA4/CA5 de HU-023 se cierran en M2/M5 |
+| 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | Hechas (M1 completo salvo validaciones visuales) | cliente dibuja el mapa con colores placeholder (sin YATI/tiles); CA4b/CA5 de HU-022 y CA4/CA5 de HU-023 se cierran en M2/M5 |
 | 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | Pendiente | dominio puro con tests primero |
 | 10 | HU-050 → HU-059 | M3 | | Pendiente | |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Pendiente | |
@@ -53,6 +53,9 @@
 - **HU-023 · entidades remotas sin sprites.** `RemoteEntity` dibuja un rectángulo de color por tipo (jugador/monstruo/NPC) y
   el nombre; los sprites y `walk_<dir>`/`idle_<dir>` llegan con HU-070. Reversible: sustituir el `ColorRect` por un
   `AnimatedSprite2D` sin tocar la red.
+- **HU-027 · mapas en el cliente sin escenas .tscn.** La HU habla de `res://maps/<mapId>.tscn`; como no hay YATI ni tiles,
+  el cliente carga el `.tmj` directamente (`TmjMap` + renderer placeholder). Descartado: generar `.tscn` vacíos. Reversible:
+  cuando exista el import de Tiled, `_load_map` cambia a `change_scene`/instanciar la escena del mapa.
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 

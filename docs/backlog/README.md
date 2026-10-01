@@ -33,7 +33,7 @@
 | HU-024 | Cámara, capas y nombres sobre personajes | E2 | Must | S | Hecha |
 | HU-025 | Desconexión, linkdead y reconexión | E2 | Must | M | Hecha |
 | HU-026 | Guardado de posición y estado | E2 | Must | M | Hecha |
-| HU-027 | Portales y cambio de mapa | E2 | Must | M | Pendiente |
+| HU-027 | Portales y cambio de mapa | E2 | Must | M | Hecha |
 | HU-030 | Seleccionar objetivo | E3 | Must | S | Pendiente |
 | HU-031 | Monstruos: spawn, patrulla y respawn | E3 | Must | M | Pendiente |
 | HU-032 | Ataque básico (todas las clases, melee y varita) | E3 | Must | M | Pendiente |
