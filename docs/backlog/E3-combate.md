@@ -286,4 +286,5 @@
 
 **Notas de implementación (parcial, 2026-10-01)**
 - Hecho con el dominio de M2: \`CombatEvents\` agrupado por observador y tick (máx. 64 entradas, CA4); topes de `rules.limits` para objetivos por área, impactos pendientes por instancia y auras 16/16 sin controles (CA2 en parte); listas reutilizadas en `TargetResolver`/`CastSystem`/`AutoAttackSystem`.
+- 2026-10-01 (HU-089): sin asignaciones por tick en `Pathfinder` (buffers `[ThreadStatic]`), `ThreatTable.Reevaluate<TState>` sin closure e `InterestSystem` con listas reutilizadas; medición por sistema en `Simulation.SystemTimings/SystemAllocs` (LoadBot).
 - Pendiente: reservas de capacidad fija y buffer circular de eventos (CA1), áreas duraderas (no hay hechizos con área persistente en la Fase 1; CA2/CA3), búsqueda de objetivos con la rejilla AOI (hoy recorre los actores de la instancia), microbenchmarks y la medición p99 del escenario de HU-089 (CA5). Se cierra junto con HU-089.

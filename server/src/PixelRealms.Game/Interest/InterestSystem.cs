@@ -20,6 +20,8 @@ public sealed class InterestSystem : IMapSystem
     private readonly Dictionary<(int Map, int Player), HashSet<int>> _visible = new();
     private readonly Dictionary<(int, int), List<Actor>> _cells = new();
     private readonly HashSet<int> _scratch = new();
+    private readonly List<int> _gone = new();
+    private readonly List<(int Map, int Player)> _staleKeys = new();
 
     public string Name => "interest";
 
@@ -35,11 +37,12 @@ public sealed class InterestSystem : IMapSystem
     public void Tick(MapInstance map, TickContext ctx)
     {
         var cellTiles = ctx.Rules.Movement.AoiCellTiles;
-        _cells.Clear();
+        // Las listas por celda se reutilizan entre ticks (HU-088 CA1: sin asignar por tick); se vacían en vez de recrearse.
+        foreach (var list in _cells.Values) list.Clear();
         foreach (var actor in map.Actors.Values)
         {
             var cell = CellOf(actor.Position, cellTiles);
-            if (!_cells.TryGetValue(cell, out var list)) _cells[cell] = list = new List<Actor>();
+            if (!_cells.TryGetValue(cell, out var list)) _cells[cell] = list = new List<Actor>(8);
             list.Add(actor);
         }
 
@@ -59,8 +62,9 @@ public sealed class InterestSystem : IMapSystem
                 if (seen.Add(id)) ctx.Emit(new EntityEnteredView(map.Id, player, map.Actors[id]));
             if (seen.Count > _scratch.Count || !seen.SetEquals(_scratch))
             {
-                var gone = seen.Where(id => !_scratch.Contains(id)).ToList();
-                foreach (var id in gone)
+                _gone.Clear();
+                foreach (var id in seen) if (!_scratch.Contains(id)) _gone.Add(id);
+                foreach (var id in _gone)
                 {
                     seen.Remove(id);
                     var reason = map.Actors.TryGetValue(id, out var a) ? (a.IsDead && a is Player ? ReasonDied : ReasonLeft) : ReasonLeft;
@@ -71,8 +75,11 @@ public sealed class InterestSystem : IMapSystem
 
         // Jugadores que ya no están en la instancia: olvidar su conjunto.
         if (_visible.Count > map.Players.Count)
-            foreach (var key in _visible.Keys.Where(k => k.Map == map.Id && !map.Players.ContainsKey(k.Player)).ToList())
-                _visible.Remove(key);
+        {
+            _staleKeys.Clear();
+            foreach (var k in _visible.Keys) if (k.Map == map.Id && !map.Players.ContainsKey(k.Player)) _staleKeys.Add(k);
+            foreach (var key in _staleKeys) _visible.Remove(key);
+        }
     }
 
     /// <summary>Reconexión (HU-025 CA2): olvida lo que veía el jugador para que el siguiente tick reenvíe todos los EntitySpawn.</summary>

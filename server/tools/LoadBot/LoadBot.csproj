@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- HU-089: prueba de carga del combate "Mina llena" en proceso (sin red). dotnet run -c Release -p server/tools/LoadBot - -duration 300 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PixelRealms.Tools.LoadBot</RootNamespace>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PixelRealms.Game/PixelRealms.Game.csproj" />
+    <ProjectReference Include="../../src/PixelRealms.Content/PixelRealms.Content.csproj" />
+  </ItemGroup>
+</Project>

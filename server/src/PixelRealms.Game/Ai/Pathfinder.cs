@@ -17,6 +17,11 @@ public static class Pathfinder
         (1, 1, 1.41421356f), (-1, 1, 1.41421356f), (1, -1, 1.41421356f), (-1, -1, 1.41421356f),
     ];
 
+    // Buffers reutilizados por hilo (HU-088 CA1): el tick es un solo hilo; los tests en paralelo tienen cada uno el suyo.
+    [ThreadStatic] private static PriorityQueue<(int X, int Y), float>? _open;
+    [ThreadStatic] private static Dictionary<(int, int), (int, int)>? _cameFrom;
+    [ThreadStatic] private static Dictionary<(int, int), float>? _gScore;
+
     public static bool FindPath(CollisionGrid grid, Vec2 from, Vec2 to, List<Vec2> path, int maxNodes = DefaultMaxNodes)
     {
         path.Clear();
@@ -25,9 +30,11 @@ public static class Pathfinder
         if (start == goal) return true;
         if (grid.IsSolid(goal.Item1, goal.Item2)) goal = NearestFree(grid, goal, start);
 
-        var open = new PriorityQueue<(int X, int Y), float>();
-        var cameFrom = new Dictionary<(int, int), (int, int)>();
-        var gScore = new Dictionary<(int, int), float> { [start] = 0 };
+        var open = _open ??= new PriorityQueue<(int X, int Y), float>(256);
+        var cameFrom = _cameFrom ??= new Dictionary<(int, int), (int, int)>(256);
+        var gScore = _gScore ??= new Dictionary<(int, int), float>(256);
+        open.Clear(); cameFrom.Clear(); gScore.Clear();
+        gScore[start] = 0;
         open.Enqueue(start, Heuristic(start, goal));
         var expanded = 0;
         while (open.Count > 0)

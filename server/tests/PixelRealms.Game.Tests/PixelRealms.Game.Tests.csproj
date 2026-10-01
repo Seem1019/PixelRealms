@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../../src/PixelRealms.Game/PixelRealms.Game.csproj" />
+    <ProjectReference Include="../../tools/LoadBot/LoadBot.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />

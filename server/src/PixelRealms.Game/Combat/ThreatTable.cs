@@ -65,6 +65,18 @@ public sealed class ThreatTable
     public EntityId? Reevaluate(long nowMs, double switchMultiplier, Func<EntityId, bool> isValid)
     {
         if (Current is { } cur && !isValid(cur)) { Remove(cur); }
+        return ReevaluateCore(nowMs, switchMultiplier);
+    }
+
+    /// <summary>Variante sin closure (HU-088 CA1): el estado viaja como argumento para no asignar un delegado por monstruo y tick.</summary>
+    public EntityId? Reevaluate<TState>(long nowMs, double switchMultiplier, TState state, Func<EntityId, TState, bool> isValid)
+    {
+        if (Current is { } cur && !isValid(cur, state)) { Remove(cur); }
+        return ReevaluateCore(nowMs, switchMultiplier);
+    }
+
+    private EntityId? ReevaluateCore(long nowMs, double switchMultiplier)
+    {
         if (nowMs < TauntedUntilMs && Current is not null) return Current;
         var top = Top();
         if (top is null) { Current = null; return null; }

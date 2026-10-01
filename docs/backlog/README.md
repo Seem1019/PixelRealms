@@ -78,8 +78,8 @@
 | HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Hecha |
 | HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Hecha |
 | HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Hecha |
-| HU-088 | Rendimiento del combate | E3 | Must | L | Pendiente |
-| HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Pendiente |
+| HU-088 | Rendimiento del combate | E3 | Must | L | Parcial |
+| HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Parcial |
 
 ## Pendiente de diseño
 - **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).

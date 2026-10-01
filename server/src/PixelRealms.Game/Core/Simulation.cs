@@ -65,6 +65,8 @@ public sealed class Simulation
             foreach (var system in _systems)
             {
                 var isCombat = CombatSystemNames.Contains(system.Name);
+                var sysStart = System.Diagnostics.Stopwatch.GetTimestamp();
+                var allocStart = SystemAllocs is null ? 0 : GC.GetAllocatedBytesForCurrentThread();
                 for (var i = 0; i < instances.Count; i++)
                 {
                     if (!isCombat) { system.Tick(instances[i], Context); continue; }
@@ -72,6 +74,12 @@ public sealed class Simulation
                     system.Tick(instances[i], Context);
                     _combatMsThisTick[instances[i].Id] += System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
                 }
+                if (SystemTimings is not null)
+                {
+                    if (!SystemTimings.TryGetValue(system.Name, out var st)) SystemTimings[system.Name] = st = new TickStats();
+                    st.Record(System.Diagnostics.Stopwatch.GetElapsedTime(sysStart).TotalMilliseconds);
+                }
+                if (SystemAllocs is not null) SystemAllocs[system.Name] = SystemAllocs.GetValueOrDefault(system.Name) + GC.GetAllocatedBytesForCurrentThread() - allocStart;
             }
             for (var i = 0; i < instances.Count; i++)
             {
@@ -89,6 +97,12 @@ public sealed class Simulation
 
     /// <summary>Activa la medición por instancia (null = sin medir, el valor por defecto en tests).</summary>
     public Dictionary<int, TickStats>? CombatTimings { get; set; }
+
+    /// <summary>Tiempo por sistema (todas las instancias) y tick; solo se rellena si `CombatTimings` está activo. Para perfilar (LoadBot).</summary>
+    public Dictionary<string, TickStats>? SystemTimings { get; set; }
+
+    /// <summary>Bytes asignados por sistema (acumulado, hilo del tick); solo para perfilar.</summary>
+    public Dictionary<string, long>? SystemAllocs { get; set; }
 
     public int EntityCount()
     {

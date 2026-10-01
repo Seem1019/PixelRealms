@@ -124,7 +124,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         if (Vec2.Distance(m.Position, m.SpawnPosition) > m.Template.LeashRange) { BeginEvade(m, map, ctx); return; }
 
         var switchMult = m.Template.AttackRange > RangedAttackRangeThreshold ? rules.ThreatSwitchRanged : rules.ThreatSwitchMelee;
-        var targetId = m.Threat.Reevaluate(ctx.NowMs, switchMult, id => map.Find(id) is Player p && p.IsAlive && CanBeAggroed(p) && Vec2.Distance(p.Position, m.Position) <= m.Template.LeashRange * 2);
+        var targetId = m.Threat.Reevaluate(ctx.NowMs, switchMult, (this, m, map), static (id, s) => s.map.Find(id) is Player p && p.IsAlive && s.Item1.CanBeAggroed(p) && Vec2.Distance(p.Position, s.m.Position) <= s.m.Template.LeashRange * 2);
         var target = targetId is { } tid ? map.Find(tid) : null;
         if (target is null)
         {
