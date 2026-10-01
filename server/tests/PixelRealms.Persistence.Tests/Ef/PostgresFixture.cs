@@ -10,7 +10,8 @@ namespace PixelRealms.Persistence.Tests.Ef;
 /// <summary>PostgreSQL 17 efímero por clase de tests (HU-002 CA4: nunca la BD local).</summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder().Build();
+    // Misma imagen que producción (docker-compose): la collation ICU debe probarse sobre el mismo Postgres y el mismo ICU.
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder().WithImage("postgres:17-alpine").Build();
 
     public IDbContextFactory<GameDbContext> Factory { get; private set; } = null!;
 
