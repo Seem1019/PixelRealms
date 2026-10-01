@@ -26,8 +26,8 @@
 1. **Dado** que alcanzo la XP necesaria (curva por tiempo, ADR-017: `round(minutesPerLevel[L] · (60 / killCycleSecTarget) · xpMonstruoNormal(L))`, todo de `rules.progression`) **entonces** subo de nivel (el sobrante se conserva; puede subir varios niveles de golpe), stats +`statsPerLevel`, vida y recurso llenos.
 2. **Dado** un nivel que desbloquea hechizos **entonces** `LevelUp{newSpells}` y el cliente los coloca en la primera casilla libre de la hotbar con un aviso.
 3. **Dado** la subida **entonces** los demás en la AOI ven un efecto visual y el nivel actualizado sobre mi nombre.
-3b. **Dado** un nivel en el que un hechizo sube de rango (tabla de rangos del rediseño de kits) **entonces** en la Fase 1 el rango sube solo, `LevelUp{rankUps}` lo informa y el cliente muestra un aviso.
-4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (100, 367, 933 … 24 850; si cambia `killCycleSecTarget` o `minutesPerLevel`, la tabla cambia sin tocar código) y los niveles de desbloqueo 1, 2, 3, 5, 7, 9, 11, 13 (`rules.progression.spellUnlockLevels`).
+3b. **Dado** un nivel de `rules.progression.spellRankLevels` (4, 8 y 12; ADR-024) **entonces** todos los hechizos de clase conocidos suben un rango y cada rango añade `spellRankBonusPct` (+15 %) sobre el valor base del hechizo; en la Fase 1 el rango sube solo, `LevelUp{rankUps}` lo informa y el cliente muestra un aviso. En la Fase 1 (tope 6) solo se alcanza el rango del nivel 4 (test: nivel 4 → `rankUps` con los 4 hechizos; nivel 5 → sin `rankUps`).
+4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (100, 367, 933 … 24 850; si cambia `killCycleSecTarget` o `minutesPerLevel`, la tabla cambia sin tocar código) y los niveles de desbloqueo 1, 2, 3, 5, 7, 9, 11, 13 (`rules.progression.spellUnlockLevels`) y de rango 4, 8, 12 (`spellRankLevels`).
 
 ---
 

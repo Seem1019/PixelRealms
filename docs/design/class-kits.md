@@ -71,7 +71,7 @@ jugadores es la inmunidad de 1,5 s tras un control (ADR-022).
 
 ## Grupos de hechizos
 8 por clase; se equipan 4 libremente. Desbloqueo en los niveles **1, 2, 3, 5, 7, 9, 11 y 13**
-(`rules.progression.spellUnlockLevels`); con los rangos pendientes (4, 8, 12) hay algo nuevo en 11 de los 15 niveles.
+(`rules.progression.spellUnlockLevels`); con los rangos en 4, 8 y 12 (+15 % por rango, ADR-024) hay algo nuevo en 11 de los 15 niveles.
 En la Fase 1 cada clase tiene 4 hechizos (todos equipados); la elección libre empieza en el nivel 7.
 
 Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntada · [alrededor] área alrededor del lanzador ·

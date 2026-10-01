@@ -141,7 +141,8 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   **Fase 1:** los rangos suben solos. **Fase 2:** al subir un rango se elige **1 de 2 mejoras**; las builds salen de qué
   4 hechizos llevas equipados y qué mejoras eliges. Antes de cerrar el MVP (Fase 2 o 3) debe existir una forma de
   **reiniciar las mejoras**.
-- **Pendiente de confirmar:** rangos en los niveles 4, 8 y 12 con +15 % de valor base por rango.
+- **Rangos (ADR-024, confirmado):** los hechizos suben de rango en los niveles **4, 8 y 12** (`rules.progression.spellRankLevels`)
+  con **+15 %** sobre el valor base por rango (`spellRankBonusPct`). En la Fase 1 (tope 6) solo se alcanza la subida del nivel 4.
 - **Controles y acumulación (ADR-022):** tras un aturdimiento, raíz o silencio, 1,5 s de inmunidad a los tres; efectos del
   mismo tipo no se suman (manda el más fuerte) y la ralentización máxima es del 40 % (`combat.md` §Auras).
 - **Balance por pentagrama y grupos de hechizos:** `docs/design/class-kits.md` (ADR-020). Cada clase tiene 8 hechizos que
