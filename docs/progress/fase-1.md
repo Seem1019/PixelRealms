@@ -24,8 +24,8 @@
 | 4 | HU-004 Game loop 20 Hz | M1 | 001, 003 | Hecha | |
 | 5 | HU-005 Proyecto Godot base | M1 | 001 | Hecha (parcial) | fuente pixel y YATI pendientes; escalado sin verificar visualmente |
 | 6 | HU-006 Protocolo base | M1 | 004, 005 | Hecha | integración sin Mvc.Testing (WebApplication en puerto libre) |
-| 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Pendiente | |
-| 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | Pendiente | |
+| 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Servidor hecho (010–013); pantallas del cliente y HU-014 en curso | JWT HS256 propio (provisional) |
+| 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | HU-020 hecha (servidor); resto pendiente | cliente sin YATI: no dibuja el mapa |
 | 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | Pendiente | dominio puro con tests primero |
 | 10 | HU-050 → HU-059 | M3 | | Pendiente | |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Pendiente | |
@@ -43,6 +43,12 @@
   WebSocket real es lo que importa probar). Reversible: añadir el paquete y envolver `ServerApp.Build`.
 - **HU-005 · fuente pixel.** No se eligió fuente (el prompt P4 pide proponer 2 y que Diego elija); se usa la de Godot con
   tamaño 8/32. Candidatas libres: m5x7 y m6x11 (Daniel Linssen, CC0) → `client/assets/fonts/` + `CREDITS.md`.
+
+- **HU-011 · JWT HS256 a mano (`Auth/JwtService`)** en lugar de `Microsoft.AspNetCore.Authentication.JwtBearer`. Descartado el
+  paquete por NuGet; la validación es un filtro de endpoint (`RequireJwt`). Reversible: sustituir el filtro por
+  `AddAuthentication().AddJwtBearer` con la misma clave.
+- **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
+  `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 
 ## Sin compilar / sin ejecutar en esta sesión
 - `server/src/PixelRealms.Persistence/Ef/*` (GameDbContext, EfAccountRepository, EfCharacterRepository, EfPersistence) y

@@ -50,6 +50,24 @@ public static class ServerApp
         AuthEndpoints.AddRateLimiting(builder.Services);
 
         var world = new World();
+        // HU-020 CA1/CA2: un MapData por .tmj y una MapInstance de cada uno; un mapa inválido impide arrancar.
+        var mapsDir = builder.Configuration["Maps:Dir"] ?? Path.Combine(Path.GetDirectoryName(contentDir.TrimEnd(Path.DirectorySeparatorChar))!, "maps");
+        try
+        {
+            var db = content.Current;
+            foreach (var map in Game.Map.TiledMapLoader.LoadAll(mapsDir, new Game.Map.TiledMapLoader.ContentCheck(id => db.TryGetMonster(id, out _), db.HasVendor)))
+            {
+                world.RegisterMap(map);
+                world.CreateInstance(map.MapId);
+                Console.WriteLine($"Mapa {map.MapId}: {map.Width}×{map.Height}, {map.Spawns.Count} spawns ({map.Spawns.Sum(s => s.Count)} monstruos), {map.Graveyards.Count} puntos seguros, {map.Portals.Count} portales");
+            }
+        }
+        catch (Game.Map.MapLoadException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Console.Error.WriteLine("maps/ inválido: el servidor no arranca.");
+            return null;
+        }
         var simulation = new Simulation(world, content.Rules, new SeededRng(Environment.TickCount), new TickClock());
         builder.Services.AddSingleton(world);
         builder.Services.AddSingleton(simulation);

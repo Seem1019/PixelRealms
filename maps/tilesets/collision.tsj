@@ -1,0 +1,32 @@
+{
+ "columns": 1,
+ "image": "../../client/assets/tiles/collision.png",
+ "imageheight": 16,
+ "imagewidth": 16,
+ "margin": 0,
+ "name": "collision",
+ "spacing": 0,
+ "tilecount": 1,
+ "tiledversion": "1.11.2",
+ "tileheight": 16,
+ "tilewidth": 16,
+ "type": "tileset",
+ "version": "1.10",
+ "tiles": [
+  {
+   "id": 0,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "blocksSight",
+     "type": "bool",
+     "value": false
+    }
+   ]
+  }
+ ]
+}

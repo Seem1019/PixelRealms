@@ -2,7 +2,7 @@
 
 ### HU-020 · Cargar mapa Tiled en servidor y cliente
 **Como** jugador **quiero** ver el mundo con su terreno y obstáculos **para** explorarlo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-005, HU-004
 - Skills: `world-maps`, `godot-client`, `dotnet-server`
 
@@ -12,8 +12,13 @@
 3. **Dado** el cliente en la escena `World` **entonces** se ve el mapa con capas `ground`, `detail`, `walls` y `above` por encima de las entidades.
 4. **Dado** `maps/test_small.tmj` **entonces** `TiledMapLoaderTests` cubre: CSV, flags de flip, `solid`, `blocksSight`, objetos de cada tipo.
 
----
+**Notas de implementación**
+- `maps/meadow.tmj` (64×64: Aldea Robledal `safe`, Campos, camino, muro de prueba, arbustos, agua, 4 spawns, Marta, 2 cementerios, portal a `mine` con minLevel 4), `maps/mine.tmj` mínimo (destino del portal; HU-083 lo completa), `maps/test_small.tmj` (10×10) y tilesets `placeholder.tsj` / `collision.tsj` con `solid`/`blocksSight`. Generados como JSON de Tiled válido (CSV sin compresión), sin imágenes todavía.
+- `Game/Map/TiledMapLoader`: lee capas `walls` + `collision` (GID & 0x1FFFFFFF), tilesets externos, objetos `spawns`/`npcs`/`graveyards`/`zones`/`portals`; valida monsterId/vendorId, spawns en sólido, cementerio obligatorio y portales a mapas existentes (`MapLoadException`). `ServerApp` carga `maps/`, registra `MapData`, crea una `MapInstance` por mapa y loguea tamaño/spawns/puntos seguros.
+- 5 tests `TiledMapLoaderTests` (CSV, flip, solid, blocksSight, cada objeto, meadow+mine, errores).
+- **Pendiente cliente (CA3):** sin YATI ni tileset PNG no se dibuja el mapa; el cliente leerá el .tmj para su CollisionGrid en HU-022.
 
+---
 ### HU-021 · Movimiento autoritativo con colisión
 **Como** jugador **quiero** moverme con WASD sin atravesar paredes **para** recorrer el mundo.
 - Prioridad: Must · Estimación: L · Estado: Pendiente

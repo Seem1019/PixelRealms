@@ -26,7 +26,7 @@
 | HU-012 | Crear personaje | E1 | Must | M | Pendiente |
 | HU-013 | Listar y borrar personajes | E1 | Must | S | Pendiente |
 | HU-014 | Entrar al mundo (ticket + Hello/Welcome) | E1 | Must | M | Pendiente |
-| HU-020 | Cargar mapa Tiled en servidor y cliente | E2 | Must | M | Pendiente |
+| HU-020 | Cargar mapa Tiled en servidor y cliente | E2 | Must | M | Hecha |
 | HU-021 | Movimiento autoritativo con colisión | E2 | Must | L | Pendiente |
 | HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Pendiente |
 | HU-023 | Ver a otros jugadores (AOI + interpolación) | E2 | Must | L | Pendiente |
