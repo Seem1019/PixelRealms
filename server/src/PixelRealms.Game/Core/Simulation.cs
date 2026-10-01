@@ -52,11 +52,43 @@ public sealed class Simulation
         Context.BeginTick(Tick, Clock.NowMs);
         foreach (var hook in _preTick) hook(Context);
         var instances = World.Instances;
-        foreach (var system in _systems)
+        if (CombatTimings is null)
+        {
+            foreach (var system in _systems)
+                for (var i = 0; i < instances.Count; i++)
+                    system.Tick(instances[i], Context);
+        }
+        else
+        {
+            // HU-072: tiempo de los sistemas de combate por instancia y tick (p99 en /admin/stats).
+            for (var i = 0; i < instances.Count; i++) _combatMsThisTick[instances[i].Id] = 0;
+            foreach (var system in _systems)
+            {
+                var isCombat = CombatSystemNames.Contains(system.Name);
+                for (var i = 0; i < instances.Count; i++)
+                {
+                    if (!isCombat) { system.Tick(instances[i], Context); continue; }
+                    var start = System.Diagnostics.Stopwatch.GetTimestamp();
+                    system.Tick(instances[i], Context);
+                    _combatMsThisTick[instances[i].Id] += System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+                }
+            }
             for (var i = 0; i < instances.Count; i++)
-                system.Tick(instances[i], Context);
+            {
+                if (!CombatTimings.TryGetValue(instances[i].Id, out var stats)) CombatTimings[instances[i].Id] = stats = new TickStats();
+                stats.Record(_combatMsThisTick[instances[i].Id]);
+            }
+        }
         foreach (var hook in _postTick) hook(Context);
     }
+
+    /// <summary>Sistemas cuyo tiempo cuenta como "combate" (docs/architecture.md §8: ≤ 4 ms p99 por instancia).</summary>
+    public static readonly HashSet<string> CombatSystemNames = new(StringComparer.Ordinal) { "casts", "auras", "monster_ai", "auto_attack", "resources", "death" };
+
+    private readonly Dictionary<int, double> _combatMsThisTick = new();
+
+    /// <summary>Activa la medición por instancia (null = sin medir, el valor por defecto en tests).</summary>
+    public Dictionary<int, TickStats>? CombatTimings { get; set; }
 
     public int EntityCount()
     {

@@ -68,3 +68,21 @@ public sealed class AdminToolsTests
         w.Combat.Spawns.PendingCount(w.Map).ShouldBe(0); // sin punto de spawn no reaparece
     }
 }
+
+/// <summary>HU-072: tiempo de los sistemas de combate por instancia (p99 en /admin/stats).</summary>
+public sealed class CombatTimingTests
+{
+    [Fact]
+    public void Simulation_RecordsCombatTime_PerInstance_WhenEnabled()
+    {
+        var w = new WorldBuilder().WithMap(20, 20).WithPlayer("Ana", "mage", 1, (5, 5)).WithMonster("slime", (6, 5), wanderRadius: 0).BuildWithCombat();
+        w.Simulation.CombatTimings.ShouldBeNull(); // por defecto no mide (tests deterministas y sin coste)
+        w.Simulation.CombatTimings = new Dictionary<int, TickStats>();
+        TickRunner.Run(w, 40);
+        var stats = w.Simulation.CombatTimings[w.Map.Id];
+        stats.Count.ShouldBe(40);
+        stats.Percentiles().P99.ShouldBeGreaterThanOrEqualTo(0);
+        var names = w.Simulation.Systems.Select(s => s.Name).ToHashSet();
+        Simulation.CombatSystemNames.All(names.Contains).ShouldBeTrue(); // los nombres medidos existen de verdad
+    }
+}

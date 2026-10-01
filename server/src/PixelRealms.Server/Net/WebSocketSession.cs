@@ -34,6 +34,9 @@ public sealed class WebSocketSession : IDisposable
 
     public string RemoteIp { get; init; } = "";
 
+    /// <summary>Contadores compartidos de red (HU-072); opcional en tests.</summary>
+    public Hosting.NetMetrics? Metrics { get; init; }
+
     public WebSocketSession(int id, WebSocket socket, ChannelWriter<InboundMessage> inbound, TimeSpan idleTimeout, ILogger logger, IHelloGate? helloGate = null, RateLimitOptions? rateLimits = null)
     {
         _rateLimiter = new MessageRateLimiter(rateLimits ?? new RateLimitOptions());
@@ -141,6 +144,7 @@ public sealed class WebSocketSession : IDisposable
                 while (!result.EndOfMessage);
 
                 _lastTrafficTicks = Environment.TickCount64;
+                Metrics?.RecordIn(total);
                 if (tooLarge || result.MessageType != WebSocketMessageType.Text) { if (await RejectAsync(ct)) return; continue; }
 
                 var decoded = MessageRegistry.Decode(buffer.AsSpan(0, total));
@@ -212,6 +216,7 @@ public sealed class WebSocketSession : IDisposable
             {
                 if (_socket.State != WebSocketState.Open) return;
                 await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
+                Metrics?.RecordOut(bytes.Length);
             }
         }
         catch (OperationCanceledException) { }

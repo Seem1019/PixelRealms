@@ -8,7 +8,7 @@ namespace PixelRealms.Server.Hosting;
 /// Acumulador + Stopwatch para no derivar; recupera como mucho <see cref="GameConstants.MaxCatchUpTicks"/> ticks atrasados;
 /// loguea `warn` en ticks &gt; 50 ms y `tick p50/p99` + entidades cada 30 s; se detiene limpio en &lt; 1 s.
 /// </summary>
-public sealed class GameLoopService(Simulation simulation, ILogger<GameLoopService> logger) : IHostedService, IDisposable
+public sealed class GameLoopService(Simulation simulation, ILogger<GameLoopService> logger, NetMetrics? metrics = null) : IHostedService, IDisposable
 {
     private readonly ManualResetEventSlim _stopped = new(false);
     private readonly CancellationTokenSource _cts = new();
@@ -51,6 +51,7 @@ public sealed class GameLoopService(Simulation simulation, ILogger<GameLoopServi
         var sw = Stopwatch.StartNew();
         var lastMs = 0L;
         var lastReport = 0L;
+        var lastSample = 0L;
         try
         {
             while (!_cts.IsCancellationRequested)
@@ -75,6 +76,7 @@ public sealed class GameLoopService(Simulation simulation, ILogger<GameLoopServi
                     if (ms > GameConstants.SlowTickWarnMs)
                         logger.LogWarning("Tick {Tick} lento: {Ms:F1} ms", Simulation.Tick, ms);
                 }
+                if (metrics is not null && now - lastSample >= 1000) { lastSample = now; metrics.Sample(now); } // HU-072
                 if (now - lastReport >= 30_000)
                 {
                     lastReport = now;

@@ -40,7 +40,7 @@
 ---
 ### HU-072 · Métricas y logs del servidor
 **Como** administrador **quiero** ver el estado del servidor **para** detectar problemas de rendimiento.
-- Prioridad: Should · Estimación: S · Estado: Pendiente
+- Prioridad: Should · Estimación: S · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `dotnet-server`
 
@@ -49,8 +49,13 @@
 2. **Dado** Serilog **entonces** en producción escribe JSON a consola con `CharacterName`, `AccountId`, `ConnId` como propiedades cuando aplique.
 3. **Dado** `GET /admin/stats` (JWT admin) **entonces** muestra jugadores, monstruos, mensajes/s entrantes y salientes, bytes/s y, por instancia, tiempo de combate p99, áreas y auras activas y memoria asignada por segundo.
 
----
+**Notas de implementación**
+- `/health` → `{status, players, tickP99Ms, uptime, tick}`.
+- `GET /admin/stats` (JWT con claim admin; 401 sin token, 403 sin admin): uptime, tick p50/p99/max, conexiones, jugadores, monstruos, mensajes/s y bytes/s dentro/fuera (`NetMetrics`, muestra cada segundo desde el GameLoop), `allocBytesPerSec` del proceso, Gen2, working set y por instancia: jugadores, monstruos, `combatP50Ms`/`combatP99Ms` (sistemas casts/auras/monster_ai/auto_attack/resources/death, `Simulation.CombatTimings`), `areasActive` (impactos de área pendientes) y `aurasActive`.
+- CA2 **parcial**: sin NuGet no se puede añadir Serilog; en Producción se usa `AddJsonConsole` con scopes y el router abre un scope `ConnId`/`CharacterName`/`AccountId` por mensaje (decisión provisional en docs/progress/fase-1.md). Para pasar a Serilog: `Serilog.AspNetCore` + `UseSerilog` en `ServerApp.Build`.
+- Tests: `MetricsTests` (3) y `CombatTimingTests` (1).
 
+---
 ### HU-073 · Despliegue en VPS con TLS (wss)
 **Como** anfitrión **quiero** subir el servidor a un VPS **para** que mis amigos jueguen desde sus casas.
 - Prioridad: Must · Estimación: M · Estado: Pendiente

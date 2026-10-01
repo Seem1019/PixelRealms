@@ -84,6 +84,9 @@ public sealed class MessageRouter(ConnectionManager connections, PixelRealms.Ser
         {
             n++;
             var ctx = new HandlerContext(connections, tick, inbound.ConnectionId, players);
+            // HU-072 CA2: ConnId / CharacterName / AccountId como propiedades del log mientras se procesa el mensaje.
+            var scopePlayer = players.ByConnection(inbound.ConnectionId);
+            using var scope = logger.BeginScope(new LogScope(inbound.ConnectionId, scopePlayer?.Name, scopePlayer?.AccountId));
             try
             {
                 switch (inbound.Kind)
@@ -111,4 +114,27 @@ public sealed class MessageRouter(ConnectionManager connections, PixelRealms.Ser
             }
         }
     }
+}
+
+/// <summary>Scope de log sin diccionario: se enumera como pares clave/valor (lo entienden JsonConsole y Serilog).</summary>
+internal sealed class LogScope(int connId, string? characterName, Guid? accountId) : IReadOnlyList<KeyValuePair<string, object?>>
+{
+    public int Count => 3;
+
+    public KeyValuePair<string, object?> this[int index] => index switch
+    {
+        0 => new("ConnId", connId),
+        1 => new("CharacterName", characterName),
+        2 => new("AccountId", accountId),
+        _ => throw new ArgumentOutOfRangeException(nameof(index)),
+    };
+
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+    {
+        for (var i = 0; i < Count; i++) yield return this[i];
+    }
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+    public override string ToString() => $"conn {connId} {characterName}";
 }

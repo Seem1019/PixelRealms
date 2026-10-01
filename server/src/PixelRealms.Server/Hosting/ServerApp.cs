@@ -23,6 +23,13 @@ public static class ServerApp
     public static WebApplication? Build(string[] args, Action<WebApplicationBuilder>? configure = null)
     {
         var builder = WebApplication.CreateBuilder(args);
+        if (builder.Environment.IsProduction())
+        {
+            // HU-072 CA2: en producción, JSON por consola con los scopes (ConnId, CharacterName, AccountId) como propiedades.
+            // Decisión provisional: JsonConsole de Microsoft.Extensions.Logging en lugar de Serilog (ver docs/progress/fase-1.md).
+            builder.Logging.ClearProviders();
+            builder.Logging.AddJsonConsole(o => { o.IncludeScopes = true; o.UseUtcTimestamp = true; o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ"; });
+        }
         builder.Configuration.AddInMemoryCollection(DotEnv.Load()); // .env de la raíz (POSTGRES_*, JWT_SIGNING_KEY)
         configure?.Invoke(builder);
 
@@ -75,7 +82,7 @@ public static class ServerApp
             return null;
         }
         var rng = new SeededRng(Environment.TickCount);
-        var simulation = new Simulation(world, content.Rules, rng, new TickClock());
+        var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>() }; // HU-072
         var movementSystem = new MovementSystem();
         var interestSystem = new InterestSystem();
         var combat = CombatModule.Create(() => content.Current, world, movementSystem, interestSystem);
@@ -95,6 +102,7 @@ public static class ServerApp
         builder.Services.AddSingleton(movementSystem);
         builder.Services.AddSingleton(interestSystem);
         builder.Services.AddSingleton<CombatHandlerDeps>();
+        builder.Services.AddSingleton<NetMetrics>();
         builder.Services.AddSingleton<ConnectionManager>();
         builder.Services.AddSingleton<MessageRouter>();
         builder.Services.AddSingleton<PlayerRegistry>();
@@ -173,11 +181,42 @@ public static class ServerApp
         AuthEndpoints.Map(app);
         CharacterEndpoints.Map(app);
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
-        app.MapGet("/health", (GameLoopService loop, ConnectionManager cm) =>
+        app.MapGet("/health", (GameLoopService loop, ConnectionManager cm, NetMetrics metrics) =>
         {
             var (_, p99) = loop.Stats.Percentiles();
-            return Results.Ok(new { status = "ok", players = cm.Count, tickP99Ms = Math.Round(p99, 2), tick = loop.TicksRun });
+            return Results.Ok(new { status = "ok", players = cm.Count, tickP99Ms = Math.Round(p99, 2), uptime = Math.Round(metrics.UptimeSec, 1), tick = loop.TicksRun });
         });
+        // HU-072 CA3: estadísticas para administradores (JWT con claim admin).
+        app.MapGet("/admin/stats", (HttpContext http, GameLoopService loop, ConnectionManager cm, NetMetrics metrics, PlayerRegistry players, World w, CombatModule cmb) =>
+        {
+            if (JwtAuth.ClaimsOf(http) is not { Admin: true }) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            var (p50, p99) = loop.Stats.Percentiles();
+            var instances = new List<object>();
+            foreach (var inst in w.Instances)
+            {
+                var auras = 0;
+                foreach (var a in inst.Actors.Values) auras += a.Auras.Count;
+                var (cp50, cp99) = loop.Simulation.CombatTimings is { } ct && ct.TryGetValue(inst.Id, out var cs) ? cs.Percentiles() : (0, 0);
+                instances.Add(new
+                {
+                    id = inst.Id, mapId = inst.MapId, players = inst.Players.Count, monsters = inst.Monsters.Count,
+                    combatP50Ms = Math.Round(cp50, 3), combatP99Ms = Math.Round(cp99, 3),
+                    areasActive = cmb.Casts.PendingImpacts(inst), aurasActive = auras,
+                });
+            }
+            var monsters = 0;
+            foreach (var inst in w.Instances) monsters += inst.Monsters.Count;
+            return Results.Ok(new
+            {
+                uptime = Math.Round(metrics.UptimeSec, 1), tick = loop.TicksRun, tickP50Ms = Math.Round(p50, 2), tickP99Ms = Math.Round(p99, 2), tickMaxMs = Math.Round(loop.Stats.MaxMs, 2),
+                connections = cm.Count, players = players.Count, monsters,
+                messagesInPerSec = Math.Round(metrics.MessagesInPerSec, 1), messagesOutPerSec = Math.Round(metrics.MessagesOutPerSec, 1),
+                bytesInPerSec = Math.Round(metrics.BytesInPerSec), bytesOutPerSec = Math.Round(metrics.BytesOutPerSec),
+                allocBytesPerSec = Math.Round(metrics.AllocBytesPerSec), // proceso completo: no se puede desglosar por instancia
+                gcGen2 = GC.CollectionCount(2), workingSetBytes = Environment.WorkingSet,
+                instances,
+            });
+        }).RequireJwt();
         app.Map("/ws", async (HttpContext http, ConnectionManager cm, IHostApplicationLifetime lifetime) =>
         {
             if (!http.WebSockets.IsWebSocketRequest) { http.Response.StatusCode = StatusCodes.Status400BadRequest; return; }

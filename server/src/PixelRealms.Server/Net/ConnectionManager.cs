@@ -7,7 +7,7 @@ using PixelRealms.Server.Hosting;
 namespace PixelRealms.Server.Net;
 
 /// <summary>Sesiones vivas por id de conexión. El tick la consulta para enviar; las sesiones se registran desde el endpoint /ws.</summary>
-public sealed class ConnectionManager(ILogger<ConnectionManager> logger, IHelloGate helloGate, Microsoft.Extensions.Options.IOptions<NetOptions> netOptions)
+public sealed class ConnectionManager(ILogger<ConnectionManager> logger, IHelloGate helloGate, Microsoft.Extensions.Options.IOptions<NetOptions> netOptions, NetMetrics metrics)
 {
     private readonly ConcurrentDictionary<int, WebSocketSession> _sessions = new();
     private readonly ConcurrentDictionary<string, int> _perIp = new();
@@ -41,7 +41,7 @@ public sealed class ConnectionManager(ILogger<ConnectionManager> logger, IHelloG
     public async Task HandleAsync(WebSocket socket, TimeSpan idleTimeout, CancellationToken serverStopping, string remoteIp = "")
     {
         var id = Interlocked.Increment(ref _nextId);
-        using var session = new WebSocketSession(id, socket, Inbound.Writer, idleTimeout, logger, helloGate, netOptions.Value.RateLimits) { RemoteIp = remoteIp };
+        using var session = new WebSocketSession(id, socket, Inbound.Writer, idleTimeout, logger, helloGate, netOptions.Value.RateLimits) { RemoteIp = remoteIp, Metrics = metrics };
         _sessions[id] = session;
         logger.LogDebug("Conexión {Conn} abierta desde {Ip}", id, remoteIp);
         try

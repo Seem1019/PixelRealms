@@ -83,6 +83,18 @@
 - **HU-064 · pierde por distancia quien está más lejos del punto medio inicial del duelo.**
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
+- **HU-072 · JSON por consola con `AddJsonConsole` (Producción) + scope `ConnId`/`CharacterName`/`AccountId` en el router**,
+  en lugar de Serilog (sin acceso a NuGet aquí). Descartado: dejar el CA2 sin cubrir. Cambiar a Serilog es sustituir el bloque
+  `builder.Logging.*` de `ServerApp.Build` por `UseSerilog`; los scopes salen igual.
+- **HU-072 · `allocBytesPerSec` es del proceso entero** (`GC.GetTotalAllocatedBytes`): .NET no permite medir asignaciones por
+  instancia de mapa sin instrumentar cada sistema. Descartado: estimar por proporción de entidades (inventaría un número).
+- **HU-072 · "áreas activas" = impactos de área pendientes** (`CastSystem.PendingImpacts`): las áreas de Fase 1 son instantáneas
+  tras el casteo (ADR-015/023), no hay zonas persistentes todavía.
+- **HU-070 · `/gold` audita con `item_id = Guid.Empty` y `template_id = "gold"`**: `item_audit_log` no tiene columna de oro.
+  Descartado: tabla nueva `gold_audit_log` (migración extra para un comando de administración).
+- **HU-071 · límites de rate en `appsettings` (`Net:RateLimits`), no en `rules.json`**: son técnicos, no de balance (ADR-008 habla
+  de constantes de juego). Descartado: `rules.limits.*` (mezclaría red con gameplay). Detrás de Caddy hará falta `ForwardedHeaders`
+  para que el tope por IP vea la IP real (pendiente HU-073).
 
 ## Sin compilar / sin ejecutar en esta sesión
 - `server/src/PixelRealms.Persistence/Ef/*` (GameDbContext, EfAccountRepository, EfCharacterRepository, EfPersistence) y
