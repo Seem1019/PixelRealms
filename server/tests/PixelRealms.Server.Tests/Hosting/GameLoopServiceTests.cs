@@ -58,6 +58,44 @@ public sealed class GameLoopServiceTests
     }
 
     [Fact]
+    public async Task Stop_WaitsForSlowOnStopping_SoShutdownSavesAreEnqueuedBeforeSaveServiceDrains() // HU-026 CA2
+    {
+        var sim = NewSimulation();
+        using var loop = new GameLoopService(sim, NullLogger<GameLoopService>.Instance);
+        var finished = false;
+        loop.OnStopping = () => { Thread.Sleep(1500); finished = true; }; // muchos jugadores que guardar
+        await loop.StartAsync(CancellationToken.None);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        await loop.StopAsync(CancellationToken.None);
+        finished.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Stop_ReturnsAtHostDeadline_EvenIfOnStoppingIsStillRunning()
+    {
+        var sim = NewSimulation();
+        using var loop = new GameLoopService(sim, NullLogger<GameLoopService>.Instance);
+        using var release = new ManualResetEventSlim(false);
+        loop.OnStopping = () => release.Wait(TimeSpan.FromSeconds(10));
+        await loop.StartAsync(CancellationToken.None);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        using var host = new CancellationTokenSource(TimeSpan.FromMilliseconds(1300));
+        var sw = Stopwatch.StartNew();
+        await Should.NotThrowAsync(() => loop.StopAsync(host.Token));
+        sw.ElapsedMilliseconds.ShouldBeLessThan(3000);
+        release.Set();
+    }
+
+    [Fact]
+    public async Task Stop_WithoutStart_ReturnsImmediately()
+    {
+        using var loop = new GameLoopService(NewSimulation(), NullLogger<GameLoopService>.Instance);
+        var sw = Stopwatch.StartNew();
+        await loop.StopAsync(CancellationToken.None);
+        sw.ElapsedMilliseconds.ShouldBeLessThan(500);
+    }
+
+    [Fact]
     public async Task Loop_SurvivesExceptionInSystem()
     {
         var sim = NewSimulation();

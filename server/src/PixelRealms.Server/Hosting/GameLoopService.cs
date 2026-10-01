@@ -34,8 +34,12 @@ public sealed class GameLoopService(Simulation simulation, ILogger<GameLoopServi
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _cts.Cancel();
-        var ok = _stopped.Wait(TimeSpan.FromSeconds(1), CancellationToken.None);
-        if (!ok) logger.LogWarning("GameLoop no se detuvo en 1 s");
+        if (_thread is null) return Task.CompletedTask; // nunca arrancó: _stopped no se va a activar
+        if (_stopped.Wait(TimeSpan.FromSeconds(1), CancellationToken.None)) return Task.CompletedTask;
+        // OnStopping encola los guardados de apagado: si se vuelve antes, SaveService vacía la cola sin ellos (HU-026 CA2).
+        logger.LogWarning("GameLoop no se detuvo en 1 s; se espera hasta el plazo de apagado del host");
+        try { _stopped.Wait(cancellationToken); }
+        catch (OperationCanceledException) { logger.LogError("GameLoop no se detuvo antes del plazo de apagado del host: los guardados de apagado pueden perderse"); }
         return Task.CompletedTask;
     }
 
