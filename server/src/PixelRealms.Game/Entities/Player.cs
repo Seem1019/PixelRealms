@@ -43,6 +43,14 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
     /// <summary>Marca de "hay cambios sin guardar" para el autosave (HU-026).</summary>
     public bool Dirty { get; set; }
 
+    /// <summary>Instante (ms de reloj de juego) del último guardado encolado; el autosave cuenta desde aquí.</summary>
+    public long LastSaveAtMs { get; set; }
+
     /// <summary>Id de conexión que controla a este jugador; −1 si está linkdead (HU-025).</summary>
     public int ConnectionId { get; set; } = -1;
+
+    /// <summary>Instante (ms de reloj de juego) en que perdió la conexión; −1 si está conectado (HU-025).</summary>
+    public long LinkdeadSinceMs { get; set; } = -1;
+
+    public bool IsLinkdead => LinkdeadSinceMs >= 0;
 }

@@ -27,6 +27,7 @@ var _last_sent_ms: int = 0
 var _remotes: Dictionary = {}  # id → RemoteEntity
 var _current_zone: String = ""
 var _zone_fade_left: float = 0.0
+var _character_id: String = ""
 
 
 func _ready() -> void:
@@ -41,13 +42,26 @@ func _ready() -> void:
 	_hud_status.text = "Conectando…"
 	var ticket := GameState.pending_ticket
 	GameState.pending_ticket = ""
+	_character_id = GameState.pending_character_id
+	Net.ticket_refresher = _refresh_ticket
 	Net.connect_to(Settings.ws_url(), ticket)
 	if not Net.connected.is_connected(_on_connected):
 		Net.connected.connect(_on_connected.bind(ticket))
 
 
-func _on_connected(ticket: String) -> void:
-	Net.send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": ticket})
+func _on_connected(_ticket: String) -> void:
+	Net.send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": Net.current_ticket()})
+
+
+## HU-025 CA2: ticket nuevo con el JWT guardado para retomar el mismo personaje sin pasar por la selección.
+func _refresh_ticket() -> String:
+	var api := get_node("/root/Api") as ApiClient
+	if api == null or _character_id.is_empty():
+		return ""
+	var r := await api.game_ticket(_character_id)
+	if not r.ok():
+		return ""
+	return str((r.data as Dictionary).get("ticket", ""))
 
 
 func _on_welcome(d: Dictionary) -> void:

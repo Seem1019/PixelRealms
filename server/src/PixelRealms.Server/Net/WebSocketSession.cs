@@ -90,7 +90,7 @@ public sealed class WebSocketSession : IDisposable
         }
         await _cts.CancelAsync();
         try { await Task.WhenAll(read, write, idle); } catch (OperationCanceledException) { }
-        _inbound.TryWrite(new InboundMessage(Id, "", default, InboundKind.Disconnected));
+        _inbound.TryWrite(new InboundMessage(Id, "", default, InboundKind.Disconnected, CloseReason));
         if (_socket.State == WebSocketState.CloseReceived)
         {
             using var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));

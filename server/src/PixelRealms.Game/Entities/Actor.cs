@@ -30,6 +30,14 @@ public abstract class Actor(EntityId id, string name)
 
     public bool IsAlive => Hp > 0;
 
+    /// <summary>Último instante (ms de reloj de juego) en que hizo o recibió daño; long.MinValue = nunca.</summary>
+    public long LastCombatAtMs { get; set; } = long.MinValue;
+
+    /// <summary>"En combate": hizo o recibió daño en los últimos `rules.combat.inCombatWindowSec` (docs/design/combat.md).</summary>
+    public bool IsInCombat(long nowMs, double inCombatWindowSec) => LastCombatAtMs != long.MinValue && nowMs - LastCombatAtMs < (long)(inCombatWindowSec * 1000);
+
+    public void EnterCombat(long nowMs) => LastCombatAtMs = nowMs;
+
     /// <summary>Velocidad base en casillas/s antes de modificadores (rules.movement.baseSpeedTilesPerSec).</summary>
     public float BaseSpeed { get; set; }
 

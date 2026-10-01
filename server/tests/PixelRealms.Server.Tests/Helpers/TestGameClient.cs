@@ -116,6 +116,9 @@ public sealed class TestGameClient : IAsyncDisposable
         }
     }
 
+    /// <summary>Simula un corte de red: aborta el socket sin frame Close (el servidor lo ve como socket_error).</summary>
+    public void Abort() => _ws.Abort();
+
     public async ValueTask DisposeAsync()
     {
         if (_ws.State == WebSocketState.Open)

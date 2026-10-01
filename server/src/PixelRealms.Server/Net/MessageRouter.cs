@@ -39,7 +39,8 @@ public interface IConnectionObserver
 {
     void OnConnected(int connectionId, HandlerContext ctx);
 
-    void OnDisconnected(int connectionId, HandlerContext ctx);
+    /// <summary>La conexión terminó; `reason` es el motivo de cierre ("client_close" = cierre normal del cliente).</summary>
+    void OnDisconnected(int connectionId, string reason, HandlerContext ctx);
 
     /// <summary>Hello aceptado: el adjunto es el personaje ya leído de BD (HU-014).</summary>
     void OnPlayerJoin(int connectionId, object? attachment, HandlerContext ctx);
@@ -91,7 +92,7 @@ public sealed class MessageRouter(ConnectionManager connections, PixelRealms.Ser
                         foreach (var o in _observers) o.OnConnected(inbound.ConnectionId, ctx);
                         break;
                     case InboundKind.Disconnected:
-                        foreach (var o in _observers) o.OnDisconnected(inbound.ConnectionId, ctx);
+                        foreach (var o in _observers) o.OnDisconnected(inbound.ConnectionId, inbound.Attachment as string ?? "", ctx);
                         break;
                     case InboundKind.PlayerJoin:
                         foreach (var o in _observers) o.OnPlayerJoin(inbound.ConnectionId, inbound.Attachment, ctx);

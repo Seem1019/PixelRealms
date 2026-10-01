@@ -67,6 +67,7 @@
     "interruptLockoutMs": 1500,
     "abilityLockMs": 250,
     "minInstantSpellCooldownMs": 2000,
+    "linkdeadSec": 10,
     "linkdeadInCombatMaxSec": 30,
     "ragePerHitDealt": 6,
     "ragePerHitTaken": 4,

@@ -177,6 +177,7 @@ func _on_play() -> void:
 		return
 	var ticket := str((r.data as Dictionary).get("ticket", ""))
 	GameState.pending_ticket = ticket
+	GameState.pending_character_id = str(c.get("id", ""))
 	get_tree().change_scene_to_file("res://scenes/world/world.tscn")
 
 

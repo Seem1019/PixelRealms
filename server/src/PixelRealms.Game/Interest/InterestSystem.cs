@@ -75,6 +75,9 @@ public sealed class InterestSystem : IMapSystem
                 _visible.Remove(key);
     }
 
+    /// <summary>Reconexión (HU-025 CA2): olvida lo que veía el jugador para que el siguiente tick reenvíe todos los EntitySpawn.</summary>
+    public void ResetObserver(MapInstance map, Player p) => _visible.Remove((map.Id, p.Id.Value));
+
     /// <summary>Despawn explícito (muerte de monstruo, salida de mapa) para quienes lo veían, con el motivo dado.</summary>
     public void ForgetEntity(MapInstance map, EntityId id, string reason, TickContext ctx)
     {

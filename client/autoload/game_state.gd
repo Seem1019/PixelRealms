@@ -22,6 +22,8 @@ var cooldowns: Dictionary = {}  # spellId → msec de fin (predicho)
 var rules_hash: String = ""
 ## Ticket obtenido en la selección de personaje; lo consume la escena World al conectar (HU-014).
 var pending_ticket: String = ""
+## Id del personaje elegido; la escena World lo usa para pedir tickets nuevos al reconectar (HU-025).
+var pending_character_id: String = ""
 
 
 func _ready() -> void:

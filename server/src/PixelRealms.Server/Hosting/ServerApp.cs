@@ -36,6 +36,7 @@ public static class ServerApp
         var content = new ReloadableContent(load.Content, contentDir);
         builder.Services.AddSingleton(content);
         builder.Services.Configure<NetOptions>(builder.Configuration.GetSection(NetOptions.Section));
+        builder.Services.Configure<PersistenceOptions>(builder.Configuration.GetSection(PersistenceOptions.Section));
         builder.Services.AddPersistence(builder.Configuration); // HU-002: Postgres (EF Core) o InMemory según Persistence:Provider
 
         // HU-010/011/014: auth REST, JWT de 15 min y tickets de 30 s.
@@ -102,6 +103,7 @@ public static class ServerApp
         simulation.OnPreTick(router.Drain)
             .AddSystem(app.Services.GetRequiredService<MovementSystem>())
             .AddSystem(app.Services.GetRequiredService<InterestSystem>())
+            .OnPostTick(worldSession.SweepLinkdead)
             .OnPostTick(app.Services.GetRequiredService<EventDispatcher>().OnPostTick)
             .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick);
         // Al apagar (Ctrl+C): guardar a todos los jugadores conectados antes de salir (HU-026 CA2), en el hilo del tick.

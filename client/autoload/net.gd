@@ -27,9 +27,13 @@ var _next_req_id: int = 1
 var _auto_reconnect: bool = false
 var _delayed_out: Array[Dictionary] = []  # [{at, text}] con simulated_latency_ms
 var _delayed_in: Array[Dictionary] = []  # [{at, text}]
+## HU-025 CA2: antes de cada reintento se pide un ticket nuevo (el anterior es de un solo uso). Devuelve "" si falla.
+var ticket_refresher: Callable = Callable()
+var _refreshing: bool = false
 
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
 	_handlers["Pong"] = _on_pong
 	_handlers["Error"] = _on_error
 	_handlers["Snapshot"] = func(d: Dictionary) -> void: snapshot.emit(d)
@@ -106,11 +110,40 @@ func _process(delta: float) -> void:
 				disconnected.emit(reason)
 				EventBus.connection_changed.emit(false)
 				_schedule_reconnect()
-			elif Time.get_ticks_msec() >= _reconnect_at_msec:
+			elif Time.get_ticks_msec() >= _reconnect_at_msec and not _refreshing:
 				_reconnect_at_msec = -1
-				_open()
+				_reopen_with_fresh_ticket()
 		_:
 			pass
+
+
+func _reopen_with_fresh_ticket() -> void:
+	if not ticket_refresher.is_valid():
+		_open()
+		return
+	_refreshing = true
+	var fresh: Variant = await ticket_refresher.call()
+	_refreshing = false
+	if not _auto_reconnect:
+		return
+	if fresh is String and not (fresh as String).is_empty():
+		_ticket = fresh
+		_open()
+	else:
+		_schedule_reconnect()
+
+
+## HU-025 CA4: al cerrar con la X se envía un Close normal antes de salir (el servidor guarda de inmediato).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if _peer.get_ready_state() == WebSocketPeer.STATE_OPEN:
+			_auto_reconnect = false
+			_peer.close(1000, "bye")
+			var until := Time.get_ticks_msec() + 300
+			while Time.get_ticks_msec() < until and _peer.get_ready_state() != WebSocketPeer.STATE_CLOSED:
+				_peer.poll()
+				OS.delay_msec(10)
+		get_tree().quit()
 
 
 ## Latencia simulada (HU-022 CA2): la mitad al enviar y la mitad al recibir.
@@ -146,6 +179,11 @@ func _schedule_reconnect() -> void:
 	var wait := BACKOFF_SEC[mini(_attempt, BACKOFF_SEC.size() - 1)]
 	_attempt += 1
 	_reconnect_at_msec = Time.get_ticks_msec() + int(wait * 1000.0)
+
+
+## Ticket con el que se abrió (o reabrirá) la conexión; Hello lo repite en el sobre.
+func current_ticket() -> String:
+	return _ticket
 
 
 ## Intento actual de reconexión (1..5) para "Reconectando… (intento 2/5)".

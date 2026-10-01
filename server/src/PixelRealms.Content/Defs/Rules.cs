@@ -136,6 +136,7 @@ public sealed record CombatRules
     public required int InterruptLockoutMs { get; init; }
     public required int AbilityLockMs { get; init; }
     public required int MinInstantSpellCooldownMs { get; init; }
+    public required double LinkdeadSec { get; init; }
     public required double LinkdeadInCombatMaxSec { get; init; }
     public required double ManaPerBasicHitPctPerSec { get; init; }
     public required double RagePerHitDealt { get; init; }

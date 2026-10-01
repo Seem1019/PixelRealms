@@ -11,3 +11,12 @@ public sealed class NetOptions
     /// <summary>Flag de desarrollo: hasta HU-014 se permite conectar a /ws sin ticket.</summary>
     public bool RequireTicket { get; set; }
 }
+
+/// <summary>Opciones técnicas de persistencia (appsettings `Persistence`).</summary>
+public sealed class PersistenceOptions
+{
+    public const string Section = "Persistence";
+
+    /// <summary>Cada cuánto se guarda un jugador con cambios (`Dirty`), HU-026 CA3. Infraestructura, no regla de juego.</summary>
+    public double AutosaveSec { get; set; } = 60;
+}
