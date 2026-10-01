@@ -35,6 +35,8 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             {
                 await SaveWithRetryAsync(dto, CancellationToken.None);
                 Interlocked.Decrement(ref _pending);
+                // ReadAllAsync no mira el token entre elementos ya encolados: al apagar, el resto lo vacía StopAsync.
+                if (stoppingToken.IsCancellationRequested) break;
             }
         }
         catch (OperationCanceledException) { }
@@ -42,6 +44,14 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        // Primero se detiene ExecuteAsync: la cola es de un solo lector y dos lectores a la vez pueden entregar un DTO nulo.
+        await base.StopAsync(cancellationToken);
+        if (ExecuteTask is { IsCompleted: false })
+        {
+            // El host agotó su plazo con un guardado aún en curso: vaciar ahora volvería a tener dos lectores.
+            logger.LogError("El guardado en segundo plano no terminó al apagar: {Pending} guardados pendientes sin escribir", _pending);
+            return;
+        }
         // Vacía la cola antes de salir: lo que el tick encoló al apagar debe llegar a la BD.
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var drained = 0;
@@ -52,7 +62,6 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             drained++;
         }
         if (drained > 0) logger.LogInformation("Guardados {Count} personajes al apagar", drained);
-        await base.StopAsync(cancellationToken);
     }
 
     /// <summary>Guarda de inmediato (uso en tests y en el apagado).</summary>
