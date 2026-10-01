@@ -1,5 +1,6 @@
 using PixelRealms.Content;
 using PixelRealms.Game.Core;
+using PixelRealms.Persistence;
 using PixelRealms.Protocol.Messages;
 using PixelRealms.Server.Net;
 using PixelRealms.Server.Net.Handlers;
@@ -15,6 +16,7 @@ public static class ServerApp
     public static WebApplication? Build(string[] args, Action<WebApplicationBuilder>? configure = null)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Configuration.AddInMemoryCollection(DotEnv.Load()); // .env de la raíz (POSTGRES_*, JWT_SIGNING_KEY)
         configure?.Invoke(builder);
 
         var contentDir = builder.Configuration["Content:Dir"] ?? FindContentDir();
@@ -29,6 +31,7 @@ public static class ServerApp
         var content = new ReloadableContent(load.Content, contentDir);
         builder.Services.AddSingleton(content);
         builder.Services.Configure<NetOptions>(builder.Configuration.GetSection(NetOptions.Section));
+        builder.Services.AddPersistence(builder.Configuration); // HU-002: Postgres (EF Core) o InMemory según Persistence:Provider
 
         var world = new World();
         var simulation = new Simulation(world, content.Rules, new SeededRng(Environment.TickCount), new TickClock());
@@ -40,6 +43,8 @@ public static class ServerApp
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
 
         var app = builder.Build();
+        // HU-002 CA3: migraciones automáticas al arrancar (Development y producción, con log de cuáles).
+        PersistenceModule.MigrateAsync(app.Services, app.Configuration).GetAwaiter().GetResult();
         var router = app.Services.GetRequiredService<MessageRouter>();
         router.Register(new PingHandler());
         simulation.OnPreTick(router.Drain);

@@ -19,7 +19,7 @@
 | # | HU | Hito | Depende de | Estado | Notas |
 |---|---|---|---|---|---|
 | 1 | HU-001 Monorepo, solución .NET y CI | M1 | — | Hecha | commit `feat(infra)` |
-| 2 | HU-002 Infra local con Docker | M1 | 001 | Pendiente | compose + .env.example + migración `Initial` |
+| 2 | HU-002 Infra local con Docker | M1 | 001 | Hecha (EF sin compilar) | migración `Initial` por generar en el PC |
 | 3 | HU-003 Carga y validación de contenido | M1 | 001 | Hecha | validador propio en vez de JsonSchema.Net (provisional) |
 | 4 | HU-004 Game loop 20 Hz | M1 | 001, 003 | Hecha | |
 | 5 | HU-005 Proyecto Godot base | M1 | 001 | Hecha (parcial) | fuente pixel y YATI pendientes; escalado sin verificar visualmente |
@@ -45,7 +45,14 @@
   tamaño 8/32. Candidatas libres: m5x7 y m6x11 (Daniel Linssen, CC0) → `client/assets/fonts/` + `CREDITS.md`.
 
 ## Sin compilar / sin ejecutar en esta sesión
-_(código escrito que requiere NuGet, Docker o el editor de Godot)_
+- `server/src/PixelRealms.Persistence/Ef/*` (GameDbContext, EfAccountRepository, EfCharacterRepository, EfPersistence) y
+  `server/tests/PixelRealms.Persistence.Tests/Ef/*` (PostgresFixture con Testcontainers, CharacterRepositoryTests). Pasos en el
+  PC: `dotnet build server/PixelRealms.sln` → corregir lo que marque → `dotnet ef migrations add Initial -p
+  server/src/PixelRealms.Persistence -s server/src/PixelRealms.Server` → `docker compose up -d postgres` → `dotnet test`.
+- La versión de los paquetes en `Directory.Packages.props` se fijó de memoria (xunit.v3 3.1.0, Shouldly 4.3.0,
+  Npgsql.EntityFrameworkCore.PostgreSQL 10.0.0, EFCore.NamingConventions 10.0.0, Testcontainers.PostgreSql 4.6.0,
+  Microsoft.NET.Test.Sdk 17.14.1, xunit.runner.visualstudio 3.1.4): si `dotnet restore` falla por una versión inexistente,
+  `dotnet package search <id>` y ajustar.
 
 ## Bloqueos
 - YATI (importador Tiled del cliente): `github.com/Skoti/YATI` no se pudo clonar desde el sandbox (repo no accesible); el

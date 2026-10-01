@@ -1,0 +1,61 @@
+// NO COMPILADO EN LA SESIÓN DE LA FASE 1 (NuGet bloqueado): revisar con `dotnet build` antes de confiar en él.
+using Microsoft.EntityFrameworkCore;
+using PixelRealms.Persistence.Entities;
+
+namespace PixelRealms.Persistence.Ef;
+
+/// <summary>Modelo de docs/database.md. Tablas y columnas en snake_case (UseSnakeCaseNamingConvention en el registro).</summary>
+public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbContext(options)
+{
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<Character> Characters => Set<Character>();
+    public DbSet<CharacterItem> CharacterItems => Set<CharacterItem>();
+    public DbSet<CharacterHotbarSlot> CharacterHotbar => Set<CharacterHotbarSlot>();
+    public DbSet<ItemAuditLog> ItemAuditLog => Set<ItemAuditLog>();
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        b.Entity<Account>(e =>
+        {
+            e.ToTable("accounts");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Username).IsRequired().HasMaxLength(20);
+            e.Property(x => x.PasswordHash).IsRequired();
+            e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("ix_accounts_username_lower").HasMethod("btree");
+            e.HasMany(x => x.Characters).WithOne(c => c.Account).HasForeignKey(c => c.AccountId);
+        });
+        b.Entity<Character>(e =>
+        {
+            e.ToTable("characters", t => t.HasCheckConstraint("ck_characters_level", "level BETWEEN 1 AND 15"));
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(64);
+            e.Property(x => x.ClassId).IsRequired().HasMaxLength(16);
+            e.Property(x => x.MapId).IsRequired().HasMaxLength(32);
+            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ix_characters_name_lower");
+            e.HasIndex(x => x.AccountId);
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Hotbar).WithOne().HasForeignKey(h => h.CharacterId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<CharacterItem>(e =>
+        {
+            e.ToTable("character_items", t => t.HasCheckConstraint("ck_character_items_quantity", "quantity >= 1"));
+            e.HasKey(x => x.Id);
+            e.Property(x => x.TemplateId).IsRequired().HasMaxLength(48);
+            e.HasIndex(x => new { x.CharacterId, x.Container, x.Slot }).IsUnique();
+        });
+        b.Entity<CharacterHotbarSlot>(e =>
+        {
+            e.ToTable("character_hotbar");
+            e.HasKey(x => new { x.CharacterId, x.Slot });
+            e.Property(x => x.Ref).IsRequired().HasMaxLength(48);
+        });
+        b.Entity<ItemAuditLog>(e =>
+        {
+            e.ToTable("item_audit_log");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.Property(x => x.Action).IsRequired().HasMaxLength(16);
+            e.HasIndex(x => x.CharacterId);
+        });
+    }
+}

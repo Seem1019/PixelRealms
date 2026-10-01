@@ -29,6 +29,7 @@ public sealed class TestServer : IAsyncDisposable
                 ["Urls"] = "http://127.0.0.1:0",
                 ["Content:Dir"] = TestContent.ContentDir,
                 ["Net:RequireTicket"] = "false",
+                ["Persistence:Provider"] = "InMemory",
             });
             if (settings is not null) b.Configuration.AddInMemoryCollection(settings);
             b.Logging.ClearProviders();

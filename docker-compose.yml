@@ -1,0 +1,29 @@
+# Infra local (HU-002): PostgreSQL 17 con volumen persistente. Uso: docker compose up -d postgres
+# Variables en .env (copiar de .env.example). El servicio `server` se habilita en HU-073 (despliegue).
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: pixelrealms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pixelrealms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pixelrealms}
+      POSTGRES_DB: ${POSTGRES_DB:-pixelrealms}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pixelrealms} -d ${POSTGRES_DB:-pixelrealms}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # server:
+  #   build: { context: ., dockerfile: server/Dockerfile }   # HU-073
+  #   depends_on: { postgres: { condition: service_healthy } }
+  #   env_file: .env
+  #   ports: ["5080:5080"]
+
+volumes:
+  pgdata:

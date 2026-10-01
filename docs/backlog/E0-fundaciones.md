@@ -29,7 +29,7 @@ cambio compile y se pruebe automáticamente desde el primer día.
 ---
 ### HU-002 · Infra local con Docker (PostgreSQL)
 **Como** desarrollador **quiero** levantar la base de datos con un comando **para** no instalar Postgres a mano.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `dotnet-server`
 
@@ -44,8 +44,13 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - Cadena de conexión en `appsettings.Development.json` leyendo variables de entorno; secretos con `dotnet user-secrets`.
 - Primera migración `Initial` con `accounts` y `characters` (ver `docs/database.md`).
 
----
+**Notas de implementación**
+- `docker-compose.yml` (postgres:17-alpine, volumen `pgdata`, healthcheck `pg_isready`, servicio `server` comentado para HU-073) y `.env.example` (POSTGRES_USER/PASSWORD/DB, JWT_SIGNING_KEY); el servidor carga `.env` de la raíz (`Hosting/DotEnv`).
+- `PixelRealms.Persistence`: entidades de `docs/database.md`, DTOs inmutables (`CharacterSaveDto`…), `IAccountRepository`/`ICharacterRepository`, proveedor `InMemory` (tests, `Persistence:Provider=InMemory`) y proveedor EF Core + Npgsql en `Ef/` (`GameDbContext` con snake_case, índices únicos, checks; repositorios; `MigrateAsync` al arrancar con log).
+- **Sin compilar ni ejecutar:** todo `Ef/` y `Persistence.Tests/Ef/` (Testcontainers) requieren NuGet y Docker. Pendiente en el PC: `dotnet build`, generar la migración `Initial` (`dotnet ef migrations add Initial -p server/src/PixelRealms.Persistence -s server/src/PixelRealms.Server`) y `docker compose up -d postgres`.
+- Tests: 2 del contrato de repositorios sobre InMemory (compilan y pasan); 2 EF (round-trip y nombres únicos) escritos para Testcontainers.
 
+---
 ### HU-003 · Carga y validación de contenido (ContentValidator)
 **Como** diseñador **quiero** que el contenido JSON se valide automáticamente **para** detectar errores antes de ejecutar el juego.
 - Prioridad: Must · Estimación: M · Estado: Hecha
