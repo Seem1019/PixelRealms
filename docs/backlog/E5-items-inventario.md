@@ -159,7 +159,7 @@
 ---
 ### HU-059 · Intercambio entre jugadores
 **Como** jugador **quiero** intercambiar items y oro con un amigo **para** darle el botín que me cayó y a él le sirve.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-051, HU-057, HU-060
 - Skills: `inventory-items`, `net-protocol`, `godot-client`
 
@@ -174,3 +174,7 @@
 **Notas técnicas**
 - `TradeSession { A, B, offerA, offerB, confirmedA, confirmedB, version }`; toda `TradeConfirm` lleva `version` y se ignora si no coincide (evita confirmar una oferta cambiada en el mismo tick).
 - Los items ofrecidos se marcan `locked` en la bolsa: no se pueden mover, usar, vender ni destruir mientras dura el intercambio.
+
+**Notas de implementación**
+- `Social/TradeService`: solicitud ≤ 3 casillas (caduca 30 s), ofertas en vivo (≤ 6 items + oro) que desmarcan ambas confirmaciones y suben `version`, `TradeConfirm{version}` (`trade_version` si no coincide), commit atómico con simulación de espacio en ambas bolsas (nadie pierde nada si falla: `bag_full`), items bloqueados (`trade_busy` al mover/usar/vender/destruir), cancelación por distancia, muerte, desconexión o cancelar; auditoría `trade_out`/`trade_in` con la contraparte. Cliente: clic derecho en jugador → Intercambiar (o `/trade`), ventana con ofertas, oro y Confirmar; clic derecho en la bolsa ofrece.
+- Tests: `SocialTests.Trade_*` (conservación de cantidades y oro, ids únicos, versión, bag_full sin pérdidas, cancelación).

@@ -39,7 +39,7 @@
 ---
 ### HU-042 · Panel de personaje
 **Como** jugador **quiero** ver mis estadísticas y equipo **para** entender cómo mejora mi personaje.
-- Prioridad: Should · Estimación: M · Estado: Pendiente
+- Prioridad: Should · Estimación: M · Estado: Hecha
 - Dependencias: HU-041, HU-052
 - Skills: `godot-client`
 
@@ -48,11 +48,13 @@
 2. **Dado** un stat **cuando** paso el ratón **entonces** un tooltip explica de dónde viene ("Base 14 + Equipo 3 (afinidad media ×0.85) + Auras 0").
 3. **Dado** un cambio de equipo o aura **entonces** el panel se actualiza en vivo con `StatsUpdate`.
 
----
+**Notas de implementación**
+- `client/scripts/ui/character_panel.gd` (tecla C): muñeco de 9 slots (arrastrar desde la bolsa equipa, clic derecho desequipa), stats primarios y derivados de `StatsUpdate` (vida, recurso, poder de ataque/hechizo, crítico, esquiva, armadura y mitigación contra un nivel igual, velocidad de ataque) con tooltip "Base + Equipo×afinidad + Auras"; se refresca con cada StatsUpdate/InventoryUpdate. Sin arte (texto).
 
+---
 ### HU-043 · Libro de hechizos y barra (4 hechizos + 4 utilizables)
 **Como** jugador **quiero** ver mis hechizos y elegir cuáles llevo en la barra **para** armar mi build.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-041
 - Skills: `godot-client`, `net-protocol`
 
@@ -63,11 +65,13 @@
 4. **Dado** Shift + arrastrar fuera de la barra **entonces** se quita.
 5. **Dado** un hechizo en una casilla de utilizables o un consumible en una de hechizo **entonces** el servidor lo rechaza (`invalid_payload`).
 
----
+**Notas de implementación**
+- `client/scripts/ui/spellbook_window.gd` (tecla P): hechizos de la clase, no aprendidos en gris con "Nivel X", arrastrar a casillas 1–4 → `SetHotbar`; consumibles de la bolsa a 5–8 con la cantidad total en bolsa; Shift+arrastrar fuera quita. Servidor `SetHotbarHandler` rechaza hechizo en casilla de utilizables o consumible en casilla de hechizo (`invalid_payload`); persiste en `character_hotbar`.
 
+---
 ### HU-044 · Cambio de clase en NPC (Fases 1–2)
 **Como** jugador **quiero** cambiar la clase de mi personaje en la Aldea **para** probar otra clase sin empezar de cero.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-041, HU-043, HU-052
 - Skills: `dotnet-server`, `net-protocol`, `godot-client`, `world-maps`
 
@@ -80,3 +84,7 @@
 
 **Notas técnicas**
 - Mensaje nuevo C→S para pedir el cambio (skill `net-protocol`) y un tipo de NPC nuevo en la capa `npcs` (skill `world-maps`).
+
+**Notas de implementación**
+- NPC `class_change` ("Maestro Aldo", añadido a `maps/meadow.tmj` junto a Marta) y mensaje `ChangeClass{npcId, classId, reqId}`; `Social/ClassChangeService`: ≤ 3 casillas, vivo, fuera de combate, sin duelo/intercambio, solo mientras `world.currentPhase ≤ progression.classChange.npcUntilPhase`; conserva nivel/XP/items/equipo/oro, cambia clase, stats (afinidad nueva), recurso lleno, hechizos y barra; guardado inmediato y log. El cliente recibe un `Welcome` renovado. Cliente: ventana con las otras 3 clases (rol, recurso, descripción).
+- Tests: `SocialTests.ClassChange_*`, `SocialFlowTests.ChangeClass_AtNpc_NewWelcome_AndSaved`. Nota: la skill `world-maps` solo documenta `vendorId`; el objeto de la capa `npcs` lleva `kind: class_change` (ya previsto en `NpcDef.Kind`).

@@ -27,8 +27,8 @@
 | 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Hechas | JWT HS256 propio (provisional); pantallas sin comprobar en el editor |
 | 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | Hechas (M1 completo salvo validaciones visuales) | cliente dibuja el mapa con colores placeholder (sin YATI/tiles); CA4b/CA5 de HU-022 y CA4/CA5 de HU-023 se cierran en M2/M5 |
 | 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | M2 hecho (HU-088 parcial) | 104 tests de dominio nuevos; HUD por código sin arte |
-| 10 | HU-050 → HU-059 | M3 | | HU-050..058 hechas; HU-059 (intercambio) pendiente (depende de HU-060) | ventanas por código sin arte |
-| 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Pendiente | |
+| 10 | HU-050 → HU-059 | M3 | | Hechas | ventanas por código sin arte |
+| 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Hechas (HU-063 parcial: lista como texto) | invitación de grupo reutiliza PartyUpdate |
 | 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | Pendiente | HU-084 y las validaciones jugando quedan fuera |
 
 ## Decisiones provisionales (revisar)
@@ -73,6 +73,14 @@
   para ello). Descartado: mensaje nuevo `LootAvailable`. Reversible: añadirlo y quitar el bit.
 - **HU-050 · oro del cadáver:** la parte de cada elegible se cobra al abrir (`LootOpen`), el resto de la división al primero
   que abre; el oro no espera a `exclusiveSec`.
+- **HU-061 · invitación de grupo sin mensaje propio.** El protocolo no define la invitación; viaja como
+  `PartyUpdate{leader: <quien invita>, members: []}` y el cliente la interpreta como "Aceptar/Rechazar". Descartado: mensaje
+  nuevo `PartyInvited` (cambio de protocolo). Reversible: añadirlo y mantener el handler.
+- **HU-064/HU-059 · quién solicitó.** `DuelUpdate{requested}` y `TradeUpdate{requested}` no dicen quién pidió; el cliente marca
+  sus propias solicitudes salientes para no mostrarse el diálogo a sí mismo. Reversible con un campo `requesterId`.
+- **HU-044 · tras el cambio de clase el servidor reenvía `Welcome`** (hechizos, barra, recurso, equipo). Descartado: tres
+  mensajes separados (StatsUpdate + InventoryUpdate + uno nuevo para hechizos conocidos).
+- **HU-064 · pierde por distancia quien está más lejos del punto medio inicial del duelo.**
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 

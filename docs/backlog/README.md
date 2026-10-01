@@ -46,9 +46,9 @@
 | HU-039 | Recursos: maná, ira, energía y regeneración | E3 | Must | M | Hecha |
 | HU-040 | Ganar experiencia | E4 | Must | S | Hecha |
 | HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Hecha |
-| HU-042 | Panel de personaje (stats) | E4 | Should | M | Pendiente |
-| HU-043 | Libro de hechizos y barra (4 hechizos + 4 utilizables) | E4 | Must | M | Pendiente |
-| HU-044 | Cambio de clase en NPC (Fases 1–2) | E4 | Must | M | Pendiente |
+| HU-042 | Panel de personaje (stats) | E4 | Should | M | Hecha |
+| HU-043 | Libro de hechizos y barra (4 hechizos + 4 utilizables) | E4 | Must | M | Hecha |
+| HU-044 | Cambio de clase en NPC (Fases 1–2) | E4 | Must | M | Hecha |
 | HU-050 | Botín de monstruos | E5 | Must | L | Hecha |
 | HU-051 | Inventario (bolsa de 24) | E5 | Must | L | Hecha |
 | HU-052 | Equipar y desequipar (equipo libre con afinidad) | E5 | Must | M | Hecha |
@@ -58,12 +58,12 @@
 | HU-056 | Dividir, fusionar y destruir stacks | E5 | Should | S | Hecha |
 | HU-057 | Persistencia de inventario y auditoría | E5 | Must | M | Hecha |
 | HU-058 | Equipo inicial por clase | E5 | Must | S | Hecha |
-| HU-059 | Intercambio entre jugadores | E5 | Must | M | Pendiente |
-| HU-060 | Chat (decir, global, susurro) | E6 | Must | M | Pendiente |
-| HU-061 | Grupos (invitar, aceptar, salir, expulsar) | E6 | Must | M | Pendiente |
-| HU-062 | Marcos de grupo y XP/oro compartidos | E6 | Must | M | Pendiente |
-| HU-063 | Lista de jugadores en línea | E6 | Should | S | Pendiente |
-| HU-064 | Duelos (PvP amistoso) | E6 | Must | L | Pendiente |
+| HU-059 | Intercambio entre jugadores | E5 | Must | M | Hecha |
+| HU-060 | Chat (decir, global, susurro) | E6 | Must | M | Hecha |
+| HU-061 | Grupos (invitar, aceptar, salir, expulsar) | E6 | Must | M | Hecha |
+| HU-062 | Marcos de grupo y XP/oro compartidos | E6 | Must | M | Hecha |
+| HU-063 | Lista de jugadores en línea | E6 | Should | S | Hecha |
+| HU-064 | Duelos (PvP amistoso) | E6 | Must | L | Hecha |
 | HU-070 | Comandos de administrador | E7 | Should | M | Pendiente |
 | HU-071 | Rate limiting y protección de mensajes | E7 | Must | M | Pendiente |
 | HU-072 | Métricas y logs del servidor | E7 | Should | S | Pendiente |
