@@ -2,6 +2,8 @@ using PixelRealms.Content;
 using PixelRealms.Game.Core;
 using PixelRealms.Persistence;
 using PixelRealms.Protocol.Messages;
+using PixelRealms.Server.Api;
+using PixelRealms.Server.Auth;
 using PixelRealms.Server.Net;
 using PixelRealms.Server.Net.Handlers;
 
@@ -33,6 +35,20 @@ public static class ServerApp
         builder.Services.Configure<NetOptions>(builder.Configuration.GetSection(NetOptions.Section));
         builder.Services.AddPersistence(builder.Configuration); // HU-002: Postgres (EF Core) o InMemory según Persistence:Provider
 
+        // HU-010/011/014: auth REST, JWT de 15 min y tickets de 30 s.
+        var signingKey = builder.Configuration["JWT_SIGNING_KEY"];
+        if (string.IsNullOrEmpty(signingKey) || signingKey.Length < 32)
+        {
+            if (!builder.Environment.IsDevelopment()) throw new InvalidOperationException("Falta JWT_SIGNING_KEY (>= 32 caracteres) en .env o user-secrets");
+            signingKey = JwtService.GenerateRandomKey();
+            Console.WriteLine("AVISO  JWT_SIGNING_KEY no configurada: se usa una clave aleatoria por proceso (solo Development)");
+        }
+        builder.Services.AddSingleton(new JwtService(signingKey, TimeSpan.FromMinutes(15)));
+        builder.Services.AddSingleton(new TicketService(TimeSpan.FromSeconds(30)));
+        builder.Services.AddSingleton<Passwords>();
+        builder.Services.AddSingleton<CharacterFactory>();
+        AuthEndpoints.AddRateLimiting(builder.Services);
+
         var world = new World();
         var simulation = new Simulation(world, content.Rules, new SeededRng(Environment.TickCount), new TickClock());
         builder.Services.AddSingleton(world);
@@ -50,6 +66,9 @@ public static class ServerApp
         simulation.OnPreTick(router.Drain);
 
         var net = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<NetOptions>>().Value;
+        app.UseRateLimiter();
+        AuthEndpoints.Map(app);
+        CharacterEndpoints.Map(app);
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
         app.MapGet("/health", (GameLoopService loop, ConnectionManager cm) =>
         {
