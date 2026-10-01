@@ -45,7 +45,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: web, path: builds/web }
       - uses: actions/upload-artifact@v4
-        with: { name: windows, path: builds/PixelRealms-windows-${{ github.event.inputs.version }}.zip }
+        with:
+          name: windows
+          path: builds/PixelRealms-windows-${{ github.event.inputs.version }}.zip
 
   publish-web:
     name: Subir /play al VPS
