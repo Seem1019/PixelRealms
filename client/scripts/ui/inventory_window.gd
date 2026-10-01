@@ -5,6 +5,7 @@ extends PanelContainer
 ## clic derecho vende (HU-055 CA3). Redibuja entera con cada InventoryUpdate (barato).
 
 signal sell_requested(item: Dictionary)
+signal offer_requested(item: Dictionary)
 
 var vendor_mode: bool = false
 
@@ -83,6 +84,9 @@ func _on_right_click(slot: ItemSlot) -> void:
 	var tpl := Content.item(str(slot.item.get("templateId", "")))
 	if vendor_mode:
 		sell_requested.emit(slot.item)
+		return
+	if not GameState.trade.is_empty() and str(GameState.trade.get("state", "")) == "open":
+		offer_requested.emit(slot.item)  # HU-059 CA2
 		return
 	if tpl.has("slot"):
 		var idx := ItemSlot.slot_index(str(tpl["slot"]))

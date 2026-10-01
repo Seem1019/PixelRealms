@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://world000000001"]
+[gd_scene load_steps=15 format=3 uid="uid://world000000001"]
 
 [ext_resource type="Script" path="res://scenes/world/world.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world/placeholder_map_renderer.gd" id="2"]
@@ -10,6 +10,10 @@
 [ext_resource type="Script" path="res://scripts/ui/loot_window.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/ui/vendor_window.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/ui/drop_catcher.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/ui/chat_panel.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/ui/social_panels.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/ui/spellbook_window.gd" id="13"]
+[ext_resource type="Script" path="res://scripts/ui/character_panel.gd" id="14"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1")
@@ -96,6 +100,22 @@ script = ExtResource("10")
 [node name="CombatHud" type="Control" parent="HUD"]
 unique_name_in_owner = true
 script = ExtResource("4")
+
+[node name="SocialPanels" type="Control" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("12")
+
+[node name="ChatPanel" type="Control" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("11")
+
+[node name="SpellbookWindow" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("13")
+
+[node name="CharacterPanel" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("14")
 
 [node name="InventoryWindow" type="PanelContainer" parent="HUD"]
 unique_name_in_owner = true

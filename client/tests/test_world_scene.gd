@@ -111,6 +111,29 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	assert_true(_world._inventory.vendor_mode)
 	assert_eq(_world._vendor._title.text, "Marta la tendera")
 
+	# Social: chat, grupo, duelo, intercambio, cambio de clase, libro y panel.
+	_dispatch("ChatMessage", {"channel": "say", "from": "Bob", "text": "hola [b]x[/b]", "ts": 1})
+	assert_string_contains(_world._chat._log.text, "[lb]b]x[lb]/b]")
+	_dispatch("PartyUpdate", {"leader": "Bob", "members": []})
+	assert_true(_world._social._prompt.visible)
+	_world._social._prompt.hide()
+	_dispatch("PartyUpdate", {"leader": "Bob", "members": [{"name": "Ana", "entityId": 1, "classId": "mage", "level": 4, "hpPct": 100, "online": true, "mapId": "meadow"}, {"name": "Bob", "entityId": 8, "classId": "warrior", "level": 2, "hpPct": 55, "online": true, "mapId": "meadow"}]})
+	assert_true(GameState.in_party())
+	assert_eq(_world._social._frames.get_child_count(), 1)
+	_dispatch("DuelUpdate", {"state": "countdown", "opponentId": 8, "startsInMs": 3000})
+	assert_string_contains(_world._social._duel_label.text, "Duelo en")
+	_dispatch("TradeUpdate", {"state": "open", "partnerId": 8, "version": 1, "mine": {"items": [], "gold": 0}, "theirs": {"items": [], "gold": 5}, "confirmedMine": false, "confirmedTheirs": false})
+	assert_true(_world._social._trade.visible)
+	_dispatch("TradeUpdate", {"state": "cancelled", "partnerId": 8, "version": 2, "mine": {"items": [], "gold": 0}, "theirs": {"items": [], "gold": 0}, "confirmedMine": false, "confirmedTheirs": false, "reason": "distance"})
+	assert_false(_world._social._trade.visible)
+	_world._social.open_class_change(9)
+	assert_true(_world._social._class_window.visible)
+	_world._spellbook.toggle()
+	assert_gt(_world._spellbook._list.get_child_count(), 0)
+	_world._character.toggle()
+	assert_true(_world._character.visible)
+	assert_string_contains(_world._character._stats.text, "Vida")
+
 	# Muerte y pantalla.
 	_dispatch("Died", {"killerId": 7, "respawnInMs": 0})
 	await get_tree().process_frame

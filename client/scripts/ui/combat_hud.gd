@@ -124,12 +124,15 @@ func _build() -> void:
 	_hotbar.position = Vector2(240 - total * 13, 240)
 	add_child(_hotbar)
 	for i: int in total:
-		var b := Button.new()
+		var b := HotSlot.new()
+		b.slot = i
+		b.is_spell_slot = i < spell_slots
 		b.custom_minimum_size = Vector2(24, 24)
 		b.focus_mode = Control.FOCUS_NONE
 		b.add_theme_font_size_override("font_size", 8)
 		b.text = str(i + 1)
 		b.pressed.connect(_on_slot_pressed.bind(i))
+		b.assign_requested.connect(_assign_slot)
 		var sweep := ProgressBar.new()
 		sweep.show_percentage = false
 		sweep.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
@@ -339,8 +342,23 @@ func _refresh_hotbar() -> void:
 			b.modulate = Color(0.45, 0.45, 0.45) if lacks or out_of_range else Color.WHITE
 		else:
 			var item := Content.item(ref)
-			b.text = "%d\n%s" % [i + 1, _short(str(item.get("name", ref)))]
-			b.modulate = Color.WHITE
+			var count := GameState.bag_count(ref)  # HU-043 CA3: cantidad total en bolsa
+			b.text = "%d\n%s %d" % [i + 1, _short(str(item.get("name", ref))).substr(0, 4), count]
+			b.modulate = Color.WHITE if count > 0 else Color(0.45, 0.45, 0.45)
+
+
+## HU-043 CA2/CA4: asigna (SetHotbar) o vacía (kind vacío) una casilla; la copia local se corrige con el próximo Welcome.
+func _assign_slot(slot: int, kind: String, ref: String) -> void:
+	for i: int in range(GameState.hotbar.size() - 1, -1, -1):
+		var hd: Dictionary = GameState.hotbar[i]
+		if int(hd.get("slot", -1)) == slot or (not kind.is_empty() and str(hd.get("kind", "")) == kind and str(hd.get("ref", "")) == ref):
+			GameState.hotbar.remove_at(i)
+	if kind.is_empty():
+		Net.send("SetHotbar", {"slot": slot})
+	else:
+		GameState.hotbar.append({"slot": slot, "kind": kind, "ref": ref})
+		Net.send("SetHotbar", {"slot": slot, "kind": kind, "ref": ref})
+	_refresh_hotbar()
 
 
 func _slot_entry(slot: int) -> Dictionary:
@@ -464,3 +482,38 @@ func _on_died(killer_id: int) -> void:
 
 func _on_respawned() -> void:
 	_death_panel.visible = false
+
+
+## Casilla de la barra con arrastrar/soltar: hechizos (del libro) en 0–3, consumibles (de la bolsa) en 4–7; Shift+arrastrar fuera quita.
+class HotSlot extends Button:
+	signal assign_requested(slot: int, kind: String, ref: String)
+
+	var slot: int = 0
+	var is_spell_slot: bool = true
+
+	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+		if not (data is Dictionary):
+			return false
+		var d: Dictionary = data
+		if d.has("kind") and str(d["kind"]) == "spell":
+			return is_spell_slot
+		if d.has("itemId"):
+			var item := GameState.bag_item(str(d["itemId"]))
+			return not is_spell_slot and str(Content.item(str(item.get("templateId", ""))).get("type", "")) == "consumable"
+		return false
+
+	func _drop_data(_at: Vector2, data: Variant) -> void:
+		var d: Dictionary = data
+		if d.has("kind") and str(d["kind"]) == "spell":
+			assign_requested.emit(slot, "spell", str(d["ref"]))
+		elif d.has("itemId"):
+			var item := GameState.bag_item(str(d["itemId"]))
+			assign_requested.emit(slot, "item", str(item.get("templateId", "")))
+
+	func _get_drag_data(_at: Vector2) -> Variant:
+		if not Input.is_key_pressed(KEY_SHIFT):
+			return null
+		var preview := Label.new()
+		preview.text = text
+		set_drag_preview(preview)
+		return {"hotbarSlot": slot}

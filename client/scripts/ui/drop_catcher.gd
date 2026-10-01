@@ -3,6 +3,7 @@ extends Control
 ## Control a pantalla completa (deja pasar el ratón) que recibe los items soltados fuera de cualquier casilla (HU-056 CA2).
 
 signal item_dropped_outside(item_id: String)
+signal hotbar_slot_dropped_outside(slot: int)
 
 
 func _ready() -> void:
@@ -11,8 +12,12 @@ func _ready() -> void:
 
 
 func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-	return data is Dictionary and (data as Dictionary).has("itemId")
+	return data is Dictionary and ((data as Dictionary).has("itemId") or (data as Dictionary).has("hotbarSlot"))
 
 
 func _drop_data(_at: Vector2, data: Variant) -> void:
-	item_dropped_outside.emit(str((data as Dictionary).get("itemId", "")))
+	var d: Dictionary = data
+	if d.has("hotbarSlot"):
+		hotbar_slot_dropped_outside.emit(int(d["hotbarSlot"]))
+	elif d.has("itemId"):
+		item_dropped_outside.emit(str(d["itemId"]))

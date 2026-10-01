@@ -23,6 +23,10 @@ const ZONE_FADE_SEC := 2.0
 @onready var _loot: LootWindow = %LootWindow
 @onready var _vendor: VendorWindow = %VendorWindow
 @onready var _drop_catcher: DropCatcher = %DropCatcher
+@onready var _chat: ChatPanel = %ChatPanel
+@onready var _social: SocialPanels = %SocialPanels
+@onready var _spellbook: SpellbookWindow = %SpellbookWindow
+@onready var _character: CharacterPanel = %CharacterPanel
 
 var map: TmjMap
 var prediction: Prediction = Prediction.new()
@@ -59,6 +63,12 @@ func _ready() -> void:
 	_hud.in_range_check = _spell_in_range
 	_inventory.sell_requested.connect(_sell_item)
 	_drop_catcher.item_dropped_outside.connect(_on_item_dropped_outside)
+	_drop_catcher.hotbar_slot_dropped_outside.connect(func(slot: int) -> void: _hud._assign_slot(slot, "", ""))
+	_chat.bubble_requested.connect(_show_bubble)
+	_chat.command.connect(_on_chat_command)
+	_social.party_member_selected.connect(_select)
+	_inventory.offer_requested.connect(_social.offer_item)
+	GameState.duel_changed.connect(_on_duel_changed)
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
@@ -131,7 +141,7 @@ func _physics_process(_delta: float) -> void:
 		return
 	var dx := int(Input.is_action_pressed("move_right")) - int(Input.is_action_pressed("move_left"))
 	var dy := int(Input.is_action_pressed("move_down")) - int(Input.is_action_pressed("move_up"))
-	if GameState.is_dead:
+	if GameState.is_dead or _chat.is_typing():
 		dx = 0
 		dy = 0
 	var now := Time.get_ticks_msec()
@@ -227,7 +237,7 @@ func _clear_remotes() -> void:
 # --- Objetivo y combate (HU-030, HU-032, HU-033, HU-086) -------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not in_world:
+	if not in_world or _chat.is_typing():
 		return
 	if event is InputEventMouseButton and event.is_pressed():
 		var mb := event as InputEventMouseButton
@@ -244,6 +254,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					Net.send("LootOpen", {"lootId": hit.entity_id})  # HU-050 CA2
 				elif hit.kind == "npc" and hit.template_id == "vendor":
 					Net.send("VendorOpen", {"npcId": hit.entity_id})  # HU-055 CA1
+				elif hit.kind == "npc" and hit.template_id == "class_change":
+					_social.open_class_change(hit.entity_id)  # HU-044 CA1
 			else:
 				_select(-1)  # clic en el suelo: deseleccionar (CA3)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -254,8 +266,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			if hit != null and hit.hostile:
 				_select(hit.entity_id)
 				Net.send("AutoAttack", {"on": true})  # HU-032 CA1
+			elif hit != null and hit.kind == "player":
+				_select(hit.entity_id)
+				_open_player_menu(hit)
 	elif event.is_action_pressed("toggle_inventory"):
 		_inventory.toggle()
+	elif event.is_action_pressed("toggle_spellbook"):
+		_spellbook.toggle()
+	elif event.is_action_pressed("toggle_character"):
+		_character.toggle()
 	elif event.is_action_pressed("ui_cancel"):
 		if not _aiming_spell.is_empty():
 			_stop_aiming()
@@ -436,6 +455,71 @@ func _on_combat_events(d: Dictionary) -> void:
 		if pos == Vector2.INF:
 			continue
 		_floating.show_event(dst, str(ed.get("kind", "")), int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
+
+
+## Clic derecho sobre otro jugador: Invitar / Retar a duelo / Intercambiar (HU-061, HU-064, HU-059).
+func _open_player_menu(target: RemoteEntity) -> void:
+	var menu := PopupMenu.new()
+	menu.add_item("Invitar al grupo", 0)
+	menu.add_item("Retar a duelo", 1)
+	menu.add_item("Intercambiar", 2)
+	menu.add_item("Susurrar", 3)
+	menu.id_pressed.connect(func(id: int) -> void:
+		match id:
+			0: Net.send("PartyInvite", {"name": target.display_name})
+			1:
+				_social.mark_outgoing("duel")
+				Net.send("DuelRequest", {"name": target.display_name})
+			2:
+				_social.mark_outgoing("trade")
+				Net.send("TradeRequest", {"name": target.display_name})
+			3: _chat._input.text = "/w %s " % target.display_name; _chat._input.grab_focus()
+		menu.queue_free())
+	add_child(menu)
+	menu.position = Vector2i(get_viewport().get_mouse_position())
+	menu.popup()
+
+
+func _on_chat_command(name: String, args: String) -> void:
+	match name:
+		"invite": Net.send("PartyInvite", {"name": args})
+		"leave": Net.send("PartyLeave")
+		"kick": Net.send("PartyKick", {"name": args})
+		"duel":
+			_social.mark_outgoing("duel")
+			Net.send("DuelRequest", {"name": args})
+		"rendirse": Net.send("DuelForfeit")
+		"trade":
+			_social.mark_outgoing("trade")
+			Net.send("TradeRequest", {"name": args})
+		_: GameState.notice.emit("Comando desconocido: /%s" % name)
+
+
+## Burbuja de chat 4 s sobre la cabeza (HU-060 CA2).
+func _show_bubble(from: String, text: String) -> void:
+	var anchor: Node2D = _player if from == GameState.character_name else null
+	if anchor == null:
+		for r: RemoteEntity in _remotes.values():
+			if r.display_name == from:
+				anchor = r
+				break
+	if anchor == null:
+		return
+	var label := Label.new()
+	label.text = text.substr(0, 60)
+	label.add_theme_font_size_override("font_size", 7)
+	label.position = Vector2(-40, -40)
+	label.custom_minimum_size = Vector2(80, 10)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.z_index = 60
+	anchor.add_child(label)
+	get_tree().create_timer(4.0).timeout.connect(label.queue_free)
+
+
+## HU-064: marco del rival en naranja durante el duelo.
+func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
+	for r: RemoteEntity in _remotes.values():
+		r.set_name_color(Color(1, 0.6, 0.2) if r.entity_id == opponent_id and state in ["countdown", "active"] else Color.WHITE)
 
 
 func _sell_item(item: Dictionary) -> void:

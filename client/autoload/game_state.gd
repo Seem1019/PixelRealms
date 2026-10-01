@@ -14,6 +14,11 @@ signal respawned
 signal xp_changed
 signal leveled_up(level: int, new_spells: Array, rank_ups: Array)
 signal notice(text: String)  ## avisos cortos para el HUD ("Nuevo hechizo: …")
+signal chat_received(channel: String, from: String, text: String)
+signal party_changed
+signal party_invited(leader: String)
+signal duel_changed(state: String, opponent_id: int, winner_id: int, starts_in_ms: int)
+signal trade_changed(d: Dictionary)
 
 var self_id: int = -1
 var character_name: String = ""
@@ -26,7 +31,10 @@ var equipment: Array = []
 var hotbar: Array = []
 var known_spells: Array[String] = []
 var target_id: int = -1
-var party: Dictionary = {}
+var party: Dictionary = {}  # {leader, members: [{name, entityId, classId, level, hpPct, online, mapId}]}
+var duel_opponent_id: int = -1
+var duel_state: String = ""
+var trade: Dictionary = {}  # último TradeUpdate o vacío
 var cooldowns: Dictionary = {}  # spellId → msec de fin (predicho por el cliente, corregido por `Cooldown`)
 var gcd_end_ms: int = 0
 var rules_hash: String = ""
@@ -63,6 +71,10 @@ func _ready() -> void:
 	Net.register_handler("Died", _on_died)
 	Net.register_handler("XpGain", _on_xp_gain)
 	Net.register_handler("LevelUp", _on_level_up)
+	Net.register_handler("ChatMessage", _on_chat_message)
+	Net.register_handler("PartyUpdate", _on_party_update)
+	Net.register_handler("DuelUpdate", _on_duel_update)
+	Net.register_handler("TradeUpdate", _on_trade_update)
 	Net.snapshot.connect(_on_snapshot)
 
 
@@ -311,3 +323,40 @@ func _first_free_slot(spell_slots: int) -> int:
 		if not taken:
 			return slot
 	return -1
+
+
+func _on_chat_message(d: Dictionary) -> void:
+	chat_received.emit(str(d.get("channel", "say")), str(d.get("from", "")), str(d.get("text", "")))
+
+
+## PartyUpdate con members vacío y leader ≠ "" = invitación pendiente (HU-061 CA1); vacío del todo = sin grupo.
+func _on_party_update(d: Dictionary) -> void:
+	var members: Array = d.get("members", [])
+	var leader := str(d.get("leader", ""))
+	if members.is_empty() and not leader.is_empty():
+		party_invited.emit(leader)
+		return
+	party = {"leader": leader, "members": members}
+	party_changed.emit()
+
+
+func in_party() -> bool:
+	return not party.is_empty() and (party.get("members", []) as Array).size() > 1
+
+
+func party_member_names() -> Array[String]:
+	var out: Array[String] = []
+	for m: Variant in party.get("members", []):
+		out.append(str((m as Dictionary).get("name", "")))
+	return out
+
+
+func _on_duel_update(d: Dictionary) -> void:
+	duel_state = str(d.get("state", ""))
+	duel_opponent_id = int(d.get("opponentId", -1)) if duel_state in ["requested", "countdown", "active"] else -1
+	duel_changed.emit(duel_state, int(d.get("opponentId", -1)), int(d.get("winnerId", -1)) if d.get("winnerId") != null else -1, int(d.get("startsInMs", 0)) if d.get("startsInMs") != null else 0)
+
+
+func _on_trade_update(d: Dictionary) -> void:
+	trade = d if str(d.get("state", "")) in ["requested", "open"] else {}
+	trade_changed.emit(d)
