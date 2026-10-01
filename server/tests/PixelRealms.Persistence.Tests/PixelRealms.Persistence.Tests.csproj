@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Usa Testcontainers (PostgreSQL 17), nunca la BD local (HU-002 CA4). Con OfflineBuild=true no compila ningún test. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/PixelRealms.Persistence/PixelRealms.Persistence.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OfflineBuild)' != 'true'">
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OfflineBuild)' == 'true'">
+    <Compile Remove="Ef/**" />
+  </ItemGroup>
+</Project>

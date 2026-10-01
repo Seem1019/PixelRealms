@@ -15,7 +15,7 @@
 ## Índice
 | ID | Título | Épica | Prioridad | Est. | Estado |
 |---|---|---|---|---|---|
-| HU-001 | Monorepo, solución .NET y CI | E0 | Must | M | Pendiente |
+| HU-001 | Monorepo, solución .NET y CI | E0 | Must | M | Hecha |
 | HU-002 | Infra local con Docker (PostgreSQL) | E0 | Must | S | Pendiente |
 | HU-003 | Carga y validación de contenido (ContentValidator) | E0 | Must | M | Pendiente |
 | HU-004 | Esqueleto del game loop de 20 Hz | E0 | Must | M | Pendiente |

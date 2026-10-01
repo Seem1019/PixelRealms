@@ -3,14 +3,14 @@
 ### HU-001 · Monorepo, solución .NET y CI
 **Como** desarrollador **quiero** la estructura del monorepo, la solución .NET y un pipeline de CI **para** que cada
 cambio compile y se pruebe automáticamente desde el primer día.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: —
 - Skills: `dotnet-server`, `hu-implementation`
 
 **Criterios de aceptación**
 1. **Dado** un clon limpio **cuando** ejecuto `dotnet build server/PixelRealms.sln -warnaserror` **entonces** compila sin errores ni warnings.
 2. **Dado** la solución **cuando** ejecuto `dotnet test server/PixelRealms.sln` **entonces** corre al menos un test de humo por proyecto de tests y pasa.
-3. **Dado** un push o PR a `main` **cuando** corre GitHub Actions **entonces** ejecuta build + tests .NET + tests GUT headless (job separado con Godot 4.5 headless) y falla si alguno falla.
+3. **Dado** un push o PR a `main` **cuando** corre GitHub Actions **entonces** ejecuta build + tests .NET + tests GUT headless (job separado con Godot 4.7.2 headless, la versión instalada en el PC de desarrollo) y falla si alguno falla.
 4. **Dado** el repo **entonces** existen `.gitignore` (bin/obj, .godot/, .env, *.user), `.gitattributes` (LF para `*.gd`, `*.cs`, `*.json`; LFS para `*.png`, `*.wav`, `*.ogg`), `.editorconfig`, `README.md`.
 
 **Notas técnicas**
@@ -20,8 +20,13 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - CI: `actions/setup-dotnet@v4` con `10.0.x`; Godot vía imagen `barichello/godot-ci` o descarga del binario headless.
 - Referencias entre proyectos según `docs/architecture.md` §2 (Game **no** referencia Server ni Persistence).
 
----
+**Notas de implementación**
+- Solución clásica `server/PixelRealms.sln` (formato .sln, no .slnx) con 5 proyectos `src/`, `tools/ContentValidator` y 4 de tests; `Directory.Build.props` (net10.0, Nullable, TreatWarningsAsErrors, AnalysisLevel latest-recommended) y `Directory.Packages.props` (CPM).
+- Propiedad `OfflineBuild=true` para compilar sin NuGet (excluye EF Core/Npgsql y Testcontainers); solo para entornos sin red, ver `docs/progress/fase-1.md`.
+- CI en `.github/workflows/ci.yml`: job .NET (restore, build -warnaserror, test, validador) y job GUT con Godot 4.7.2 headless que se omite si no existe `client/project.godot`.
+- `.editorconfig` en la raíz con las reglas CA desactivadas y su motivo; `.gitattributes` con LF para gd/cs/json y LFS para png/wav/ogg.
 
+---
 ### HU-002 · Infra local con Docker (PostgreSQL)
 **Como** desarrollador **quiero** levantar la base de datos con un comando **para** no instalar Postgres a mano.
 - Prioridad: Must · Estimación: S · Estado: Pendiente

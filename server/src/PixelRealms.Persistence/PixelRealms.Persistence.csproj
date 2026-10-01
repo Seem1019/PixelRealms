@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- EF Core + Npgsql, repositorios, migraciones. Con OfflineBuild=true solo compila la parte en memoria. -->
+  <ItemGroup>
+    <ProjectReference Include="../PixelRealms.Protocol/PixelRealms.Protocol.csproj" />
+    <ProjectReference Include="../PixelRealms.Content/PixelRealms.Content.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OfflineBuild)' != 'true'">
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(OfflineBuild)' == 'true'">
+    <Compile Remove="Ef/**" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CLI: `dotnet run --project server/tools/ContentValidator -- content/` (HU-003). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PixelRealms.Tools.ContentValidator</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PixelRealms.Content/PixelRealms.Content.csproj" />
+  </ItemGroup>
+</Project>
