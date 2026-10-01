@@ -26,7 +26,7 @@
 | 6 | HU-006 Protocolo base | M1 | 004, 005 | Hecha | integración sin Mvc.Testing (WebApplication en puerto libre) |
 | 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Hechas | JWT HS256 propio (provisional); pantallas sin comprobar en el editor |
 | 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | Hechas (M1 completo salvo validaciones visuales) | cliente dibuja el mapa con colores placeholder (sin YATI/tiles); CA4b/CA5 de HU-022 y CA4/CA5 de HU-023 se cierran en M2/M5 |
-| 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | Pendiente | dominio puro con tests primero |
+| 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | HU-030..039, 085, 086, 087 hechas; HU-088 parcial; HU-040/041 pendientes | 104 tests de dominio nuevos; HUD por código sin arte |
 | 10 | HU-050 → HU-059 | M3 | | Pendiente | |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Pendiente | |
 | 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | Pendiente | HU-084 y las validaciones jugando quedan fuera |
@@ -56,6 +56,19 @@
 - **HU-027 · mapas en el cliente sin escenas .tscn.** La HU habla de `res://maps/<mapId>.tscn`; como no hay YATI ni tiles,
   el cliente carga el `.tmj` directamente (`TmjMap` + renderer placeholder). Descartado: generar `.tscn` vacíos. Reversible:
   cuando exista el import de Tiled, `_load_map` cambia a `change_scene`/instanciar la escena del mapa.
+- **HU-032 · sin arma no hay ataque básico.** Un jugador sin arma en la mano principal no puede activar el básico
+  (`Error{invalid_target, "Necesitas un arma"}`). Descartado: daño desarmado inventado (no hay número documentado).
+  Reversible: añadir `rules.weapons.unarmed` y tratarlo como un tipo más.
+- **HU-033 · instantáneos emiten `CastStarted{durationMs: 0}` + `CastEnded{done}`.** El protocolo solo define CastStarted
+  para casteos; se emite también para instantáneos para que el cliente dibuje el efecto con la misma secuencia. Descartado: un
+  mensaje nuevo `SpellCast`. Reversible: filtrar `durationMs == 0` en el EventDispatcher.
+- **HU-034 · Carga (`dash`) coloca al lanzador adyacente en el mismo tick** (la HU dice "en ≤ 3 ticks"); el cliente lo suaviza
+  ~100 ms como un salto. Descartado: interpolar 3 ticks en servidor (más estado por nada visible).
+- **HU-036 · monstruos sin esquiva y con crítico fijo `critBase`** (combat.md solo fija el crítico: "5 % fijo"); ritmos de la
+  IA (percepción 250 ms, A* 500 ms / 2 casillas / 200 nodos, pausas de patrulla 2–6 s) como constantes de `MonsterAiSystem`
+  (vienen de la skill/HU, no hay sección `rules.ai`; `TODO(balance)` en el código).
+- **HU-031/HU-037 · respawn independiente del cadáver.** `respawnSec` (30 s en slime) es menor que `corpseLifetimeSec` (60 s):
+  el monstruo nuevo aparece mientras el cadáver sigue visible. Descartado: esperar al cadáver (contradiría CA3 de HU-031).
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 
@@ -77,5 +90,8 @@
 _(contradicciones o huecos descubiertos al implementar; cambios mínimos hechos en los docs se listan aquí)_
 - **HU-025:** el plazo de linkdead (10 s) solo existía en `docs/architecture.md` §4 y en el texto de la HU, no en
   `rules.json` (regla 4 / ADR-008). Añadido `rules.combat.linkdeadSec: 10` + schema; `linkdeadInCombatMaxSec` ya estaba.
+- **M2:** `docs/protocol.md` no dice qué pasa con `CastStarted` en hechizos instantáneos ni define los bits de
+  `EntitySpawn.flags` (se usa 2 = muerto, 4 = evadiendo, documentado en `Actor.Flags`). `combat.md` no da la esquiva de los
+  monstruos ni la regeneración de vida resulta modesta: `spi·0.5 + sta·0.2` por segundo cura a un Sacerdote nv 3 ~10 HP/s.
 - **HU-026:** el intervalo de autosave (60 s) se trató como infraestructura (`appsettings` → `Persistence:AutosaveSec`),
   no como regla de juego; si se prefiere en `rules.json`, es un cambio de una línea en `WorldSession`.

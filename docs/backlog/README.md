@@ -34,16 +34,16 @@
 | HU-025 | Desconexión, linkdead y reconexión | E2 | Must | M | Hecha |
 | HU-026 | Guardado de posición y estado | E2 | Must | M | Hecha |
 | HU-027 | Portales y cambio de mapa | E2 | Must | M | Hecha |
-| HU-030 | Seleccionar objetivo | E3 | Must | S | Pendiente |
-| HU-031 | Monstruos: spawn, patrulla y respawn | E3 | Must | M | Pendiente |
-| HU-032 | Ataque básico (todas las clases, melee y varita) | E3 | Must | M | Pendiente |
-| HU-033 | Lanzar hechizos (casteo, GCD, CD, recurso) | E3 | Must | L | Pendiente |
-| HU-034 | Resolución de efectos y fórmulas | E3 | Must | L | Pendiente |
-| HU-035 | Auras (DoT, HoT, stun, root, slow, shield, stat_mod) | E3 | Must | L | Pendiente |
-| HU-036 | IA de monstruos: aggro, persecución, amenaza, evadir | E3 | Must | L | Pendiente |
-| HU-037 | Muerte y reaparición | E3 | Must | M | Pendiente |
-| HU-038 | HUD de combate (marcos, cast bar, hotbar, textos) | E3 | Must | L | Pendiente |
-| HU-039 | Recursos: maná, ira, energía y regeneración | E3 | Must | M | Pendiente |
+| HU-030 | Seleccionar objetivo | E3 | Must | S | Hecha |
+| HU-031 | Monstruos: spawn, patrulla y respawn | E3 | Must | M | Hecha |
+| HU-032 | Ataque básico (todas las clases, melee y varita) | E3 | Must | M | Hecha |
+| HU-033 | Lanzar hechizos (casteo, GCD, CD, recurso) | E3 | Must | L | Hecha |
+| HU-034 | Resolución de efectos y fórmulas | E3 | Must | L | Hecha |
+| HU-035 | Auras (DoT, HoT, stun, root, slow, shield, stat_mod) | E3 | Must | L | Hecha |
+| HU-036 | IA de monstruos: aggro, persecución, amenaza, evadir | E3 | Must | L | Hecha |
+| HU-037 | Muerte y reaparición | E3 | Must | M | Hecha |
+| HU-038 | HUD de combate (marcos, cast bar, hotbar, textos) | E3 | Must | L | Hecha |
+| HU-039 | Recursos: maná, ira, energía y regeneración | E3 | Must | M | Hecha |
 | HU-040 | Ganar experiencia | E4 | Must | S | Pendiente |
 | HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Pendiente |
 | HU-042 | Panel de personaje (stats) | E4 | Should | M | Pendiente |
@@ -75,9 +75,9 @@
 | HU-082 | Íconos de items y hechizos | E8 | Must | M | Pendiente |
 | HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Pendiente |
 | HU-084 | Pasada de balance | E8 | Must | M | Pendiente |
-| HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Pendiente |
-| HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Pendiente |
-| HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Pendiente |
+| HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Hecha |
+| HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Hecha |
+| HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Hecha |
 | HU-088 | Rendimiento del combate | E3 | Must | L | Pendiente |
 | HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Pendiente |
 
