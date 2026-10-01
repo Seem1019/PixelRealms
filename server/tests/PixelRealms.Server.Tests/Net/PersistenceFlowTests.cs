@@ -82,8 +82,10 @@ public sealed class PersistenceFlowTests
         await Task.Delay(700, TestContext.Current.CancellationToken);
         saver.Saved.ShouldBe(0); // sin cambios: no se guarda
 
+        var startX = (await ana.LatestAsync("Snapshot")).GetProperty("self").GetProperty("x").GetSingle();
         await ana.SendAsync("MoveInput", """{"seq":1,"dx":1,"dy":0}""");
-        await Task.Delay(100, TestContext.Current.CancellationToken);
+        // Esperar a que el servidor mueva al jugador: con un Delay fijo, bajo carga ambos inputs caen en el mismo tick y no hay movimiento (ni Dirty).
+        await ana.ExpectAsync("Snapshot", s => s.GetProperty("self").GetProperty("x").GetSingle() != startX);
         await ana.SendAsync("MoveInput", """{"seq":2,"dx":0,"dy":0}""");
         await WaitUntil(() => saver.Saved >= 1, 1500);
         await Task.Delay(600, TestContext.Current.CancellationToken); // puede caer un segundo guardado con el movimiento posterior al primero
