@@ -106,7 +106,7 @@
 ---
 ### HU-025 · Desconexión, linkdead y reconexión
 **Como** jugador **quiero** que un corte breve de internet no me saque del juego **para** no perder el ritmo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `dotnet-server`, `godot-client`, `net-protocol`
 
@@ -116,11 +116,16 @@
 3. **Dado** el cliente sin conexión **entonces** muestra "Reconectando… (intento 2/5)" y tras 5 intentos vuelve al login.
 4. **Dado** que cierro el juego con la X **entonces** el cliente envía close normal y el servidor guarda de inmediato (sin esperar 10 s) salvo si estoy en combate.
 
----
+**Notas de implementación**
+- Servidor: `Actor.LastCombatAtMs`/`IsInCombat` (ventana `rules.combat.inCombatWindowSec`), `Game/Sessions/LinkdeadPolicy` (puro, 6 tests) y `WorldSession`: al perder la conexión el jugador queda linkdead quieto; sale a los `rules.combat.linkdeadSec` (10) salvo en combate (hasta salir de combate, tope `linkdeadInCombatMaxSec`); un cierre normal del cliente fuera de combate guarda y sale ya (CA4). Reconexión con el mismo personaje: `PlayerRegistry.Attach`, Welcome con el estado vivo y `InterestSystem.ResetObserver` para reenviar la AOI (CA2).
+- Cliente: `Net.ticket_refresher` pide un ticket nuevo con el JWT antes de cada reintento (backoff 1-2-4-8 s, 5 intentos, "Reconectando… (intento n/5)", luego login); `Net._notification(WM_CLOSE_REQUEST)` envía Close 1000 antes de salir.
+- Tests: `LinkdeadPolicyTests` (Game) y `LinkdeadTests` (integración: corte sin Close → sigue en el mundo → sale; reconexión retoma selfId/posición; cierre normal guarda al instante).
+- **Nota de contenido:** `rules.combat.linkdeadSec` (10) añadido a `rules.json` y su schema: el valor solo estaba en `docs/architecture.md` y en el texto de la HU (regla 4: toda constante en rules).
 
+---
 ### HU-026 · Guardado de posición y estado
 **Como** jugador **quiero** aparecer donde lo dejé **para** continuar mi partida.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-025
 - Skills: `dotnet-server`
 
@@ -132,8 +137,12 @@
 5. **Dado** los tests de Persistence **entonces** cubren guardar y cargar un personaje completo (Testcontainers).
 6. **Dado** el estado de combate **entonces** se guardan vida, recurso y posición al salir, cambiar de mapa, subir de nivel, completar un intercambio, cambiar de clase y morir (además del guardado cada 60 s); nunca en cada tick, y no se guardan cooldowns, auras ni casteos (ADR-018).
 
----
+**Notas de implementación**
+- `WorldSession.SweepLinkdead` (post-tick) encola el guardado de los jugadores `Dirty` cada `Persistence:AutosaveSec` (60 s, appsettings: es infraestructura, no regla de juego) y limpia `Dirty`; `WorldSession.Save(player, now, reason)` es el punto único de guardado por evento (salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir) que irán llamando las HUs de M2/M3.
+- `SaveService` (ya existente): cola fuera del tick, 3 intentos con backoff 200/400 ms, log `error` con el DTO al fallar; al apagar vacía la cola (máx. 10 s) y `GameLoopService.OnStopping` saca y guarda a todos en el hilo del tick.
+- Tests: `SaveServiceTests` (reintentos), `PersistenceFlowTests` (volver a la misma posición/vida/recurso, apagado guarda a todos, autosave solo si Dirty). CA5 (Testcontainers) está escrito en `Persistence.Tests/Ef` pero sin compilar (sin NuGet en el sandbox).
 
+---
 ### HU-027 · Portales y cambio de mapa
 **Como** jugador **quiero** entrar a la Mina Abandonada por su portal **para** llegar a la mazmorra y su jefe.
 - Prioridad: Must · Estimación: M · Estado: Pendiente

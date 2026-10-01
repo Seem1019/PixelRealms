@@ -31,8 +31,8 @@
 | HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Hecha |
 | HU-023 | Ver a otros jugadores (AOI + interpolación) | E2 | Must | L | Hecha |
 | HU-024 | Cámara, capas y nombres sobre personajes | E2 | Must | S | Hecha |
-| HU-025 | Desconexión, linkdead y reconexión | E2 | Must | M | Pendiente |
-| HU-026 | Guardado de posición y estado | E2 | Must | M | Pendiente |
+| HU-025 | Desconexión, linkdead y reconexión | E2 | Must | M | Hecha |
+| HU-026 | Guardado de posición y estado | E2 | Must | M | Hecha |
 | HU-027 | Portales y cambio de mapa | E2 | Must | M | Pendiente |
 | HU-030 | Seleccionar objetivo | E3 | Must | S | Pendiente |
 | HU-031 | Monstruos: spawn, patrulla y respawn | E3 | Must | M | Pendiente |
