@@ -13,7 +13,7 @@ public sealed class PortalTests
     private static PatchedContent PortalOverSpawn(bool keepMinLevel) => PatchedContent.WithMap("meadow", map =>
     {
         var portal = PatchedContent.FindObject(map, "portals", "to_mine");
-        portal["x"] = 176; portal["y"] = 112; portal["width"] = 32; portal["height"] = 32; // casillas 11..12 × 7..8 ⊇ gy_village (12, 8)
+        portal["x"] = 352; portal["y"] = 944; portal["width"] = 32; portal["height"] = 32; // casillas 22..23 × 59..60 ⊇ gy_village (23, 60)
         if (!keepMinLevel) PatchedContent.SetProperty(portal, "minLevel", null);
     });
 
@@ -46,8 +46,8 @@ public sealed class PortalTests
             var bobEnt = (await bob.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
             var change = await ana.ExpectAsync("ChangeMap");
             change.GetProperty("mapId").GetString().ShouldBe("mine");
-            change.GetProperty("x").GetSingle().ShouldBe(80f); // targetX 5 casillas → 80 px
-            change.GetProperty("y").GetSingle().ShouldBe(80f);
+            change.GetProperty("x").GetSingle().ShouldBe(11 * 16f); // targetX 11 casillas (entrada de la mina)
+            change.GetProperty("y").GetSingle().ShouldBe(28 * 16f);
             await bob.ExpectAsync("ChangeMap");
             // En la mina se ven entre sí (AOI nueva).
             (await ana.ExpectForIdAsync("EntitySpawn", bobEnt)).GetProperty("name").GetString().ShouldBe("Bob");
@@ -57,7 +57,7 @@ public sealed class PortalTests
             await ana.SendAsync("UsePortal", """{"portalId":"mine_to_meadow"}""");
             var back = await ana.ExpectAsync("ChangeMap");
             back.GetProperty("mapId").GetString().ShouldBe("meadow");
-            back.GetProperty("x").GetSingle().ShouldBe(58 * 16f);
+            back.GetProperty("x").GetSingle().ShouldBe(238 * 16f);
             var despawn = await bob.ExpectForIdAsync("EntityDespawn", anaEnt);
             despawn.GetProperty("reason").GetString().ShouldBe("left");
 
@@ -69,7 +69,7 @@ public sealed class PortalTests
             await using var ana2 = await Connect(server, anaApi, anaId);
             var w = await ana2.ExpectAsync("Welcome");
             w.GetProperty("mapId").GetString().ShouldBe("meadow");
-            w.GetProperty("self").GetProperty("x").GetSingle().ShouldBe(58 * 16f, 0.01f);
+            w.GetProperty("self").GetProperty("x").GetSingle().ShouldBe(238 * 16f, 0.01f);
             await using var bob2 = await Connect(server, bobApi, bobId);
             (await bob2.ExpectAsync("Welcome")).GetProperty("mapId").GetString().ShouldBe("mine");
         }

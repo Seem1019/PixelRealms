@@ -61,9 +61,14 @@ public sealed class MetricsTests
         await client.ExpectAsync("Welcome");
         for (var i = 0; i < 5; i++) await client.SendRawAsync("""{"t":"Ping","d":{"clientTime":1}}""");
         await client.ExpectAsync("Pong");
-        await Task.Delay(1300); // una muestra de métricas (1 s) y varios snapshots
-
-        var stats = await api.Http.GetFromJsonAsync<JsonElement>("/admin/stats");
+        // Espera a una muestra de métricas (1 s) con tráfico de snapshots dentro (bajo carga puede tardar más de un ciclo).
+        JsonElement stats = default;
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            await Task.Delay(500);
+            stats = await api.Http.GetFromJsonAsync<JsonElement>("/admin/stats");
+            if (stats.GetProperty("messagesOutPerSec").GetDouble() > 0) break;
+        }
         stats.GetProperty("players").GetInt32().ShouldBe(1);
         stats.GetProperty("connections").GetInt32().ShouldBe(1);
         stats.GetProperty("monsters").GetInt32().ShouldBeGreaterThan(0);

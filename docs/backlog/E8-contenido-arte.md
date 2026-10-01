@@ -2,7 +2,7 @@
 
 ### HU-080 · Mapa "meadow" completo (Tier 1)
 **Como** jugador **quiero** un mundo variado con zonas por nivel **para** explorar mientras progreso.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-031, HU-055
 - Skills: `world-maps`, `pixel-art-assets`
 
@@ -12,8 +12,13 @@
 3. **Dado** el mapa **entonces** hay un punto seguro (`graveyards`) por zona (aldea, campos, colinas), el vendedor en la aldea y el portal a `mine` al final de las Colinas (`minLevel: 4`).
 4. **Dado** un recorrido a pie **entonces** no hay zonas inaccesibles ni huecos en las colisiones (verificado con un test de flood-fill desde el pueblo).
 
----
+**Notas de implementación**
+- Mapa generado con `tools/maps/gen_tier1_maps.py` (determinista, seed fija): 250×110 casillas = Aldea Robledal 42×50 (`safe`, valla con puerta, pozo = landmark, Marta y Maestro Aldo, `gy_village`) + Campos 100×106 (nv 1–3, Molino, `gy_fields`) + Colinas 100×106 (nv 3–5, Roble centenario, `gy_hills`) separados por una cresta con paso de 4 casillas; sendero principal de 3 casillas con curvas y ramales de tierra a cada campamento y punto seguro; bosquecillos, arbustos, charcas y rocas aleatorios.
+- Spawns: 21 slimes (3 campamentos al oeste), 21 jabalíes, 20 bandidos (2 campamentos + escondite en rama lateral), 21 lobos, 20 goblins (2 + atalaya en rama lateral); subniveles de oeste a este. Portal `meadow_to_mine` (`minLevel: 4`) en la boca de mina al final de las Colinas.
+- CA4: el generador rellena cualquier bolsa inaccesible y `FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject` comprueba desde `gy_village` que toda casilla transitable, cada cementerio, NPC, portal y ≥ `count` casillas de cada spawn son alcanzables.
+- **Pendiente de validar en el editor**: la skill pide ~100×100 útiles por zona, que a 4 casillas/s se cruzan en ~25 s, no 60–90 s (contradicción documentada en el resumen). El arte sigue siendo el tileset placeholder (HU-082). El nombre del landmark de las Colinas ("Roble centenario") no está en el GDD: decisión provisional.
 
+---
 ### HU-081 · Arte de clases y monstruos
 **Como** jugador **quiero** personajes y monstruos con animaciones **para** que el juego se vea bien.
 - Prioridad: Must · Estimación: L · Estado: Pendiente
@@ -50,6 +55,12 @@
 2. **Dado** el jefe **entonces** usa Golpe de pico (área marcada en el suelo sobre la posición de su objetivo, esquivable; HU-086) cada 10 s, Latigazo (sangrado) sobre alguien que no sea el tanque cada 8 s, y ¡A trabajar! (+25 % daño) bajo el 50 %; es inmune a aturdir, raíz y ralentizar.
 3. **Dado** 3 jugadores de nivel 4 con equipo verde **entonces** el combate dura 60–100 s y lo ganan con un sanador o con pociones (el jefe tiene 1 400 de vida: con 2 000 el modelo de `tools/balance/` daba 117–137 s; ver `balance-notes.md` §4); 2 jugadores de nivel 6 también lo ganan (el caso de un nivel 7 con uno de 5 se valida al abrir la Fase 2, porque el tope de la Fase 1 es 6) (`rules.boss`; verificado por `content-designer` y una partida de prueba).
 4. **Dado** su muerte **entonces** suelta exactamente un raro de su `groups` (Pico, Peto o Amuleto), asignado al azar a un miembro, y se anuncia en el chat global con el nombre del ganador.
+
+**Notas de implementación (parcial)**
+- CA1 **parcial**: `maps/mine.tmj` regenerado (90×60, `tools/maps/gen_tier1_maps.py`): entrada (portal + `gy_entrance`) → Sala 1 (6 kóbolds) → Sala 2 (6 kóbolds + 4 pilares) → rama lateral sur: sala del Capataz (spawn fijo) · Sala 3 (gólem élite + 3 kóbolds) → hornacina cerrada hacia el Tier 2. El **puzle de palancas no existe** (no hay mecánica de palancas en el motor: decidir si se hace HU propia); recorrido/paleta sin validar jugando; tileset placeholder.
+- CA2: hechizos y objetivos del jefe (`foreman_slam` área marcada, `foreman_whip` a `random_not_top_threat`, `foreman_rally` bajo 50 %) e inmunidad a aturdir/raíz/ralentizar ya estaban en HU-036/HU-088 (`rules.boss.immuneToAuraKinds`).
+- CA3: **sin validar jugando** (HU-084/partida de prueba); el modelo de `tools/balance/` es la única referencia.
+- CA4: hecho con HU-062 CA4: `LootAnnouncedEvent` → `ChatMessage{global}` a todos los conectados cuando el monstruo es `boss` (test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`). El grupo de la tabla `lt_foreman` garantiza exactamente 1 raro (`Foreman_AlwaysDropsExactlyOneGroupItem`).
 
 ---
 

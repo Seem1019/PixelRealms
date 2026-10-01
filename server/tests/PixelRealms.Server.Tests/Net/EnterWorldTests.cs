@@ -37,7 +37,7 @@ public sealed class EnterWorldTests
             self.GetProperty("maxRes").GetInt32().ShouldBe(100);
             self.GetProperty("resource").GetString().ShouldBe("rage");
             self.GetProperty("xpNext").GetInt32().ShouldBe(100);
-            self.GetProperty("x").GetSingle().ShouldBe(12 * 16); // cementerio de la aldea (12, 8) en píxeles
+            self.GetProperty("x").GetSingle().ShouldBe(23 * 16); // cementerio de la aldea (23, 60) en píxeles
             w.GetProperty("knownSpells").EnumerateArray().Select(e => e.GetString()).ToArray().ShouldBe(new[] { "warrior_heroic_strike" });
             w.GetProperty("inventory").GetArrayLength().ShouldBe(24);
             w.GetProperty("equipment").GetArrayLength().ShouldBe(9);

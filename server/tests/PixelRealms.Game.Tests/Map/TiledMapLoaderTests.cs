@@ -53,21 +53,74 @@ public sealed class TiledMapLoaderTests
     }
 
     [Fact]
-    public void Meadow_And_Mine_Load_WithPortalsBetweenThem() // HU-020 CA1
+    public void Meadow_And_Mine_Load_WithPortalsBetweenThem() // HU-020 CA1, HU-080 CA1–CA3
     {
         var maps = TiledMapLoader.LoadAll(MapsDir, Check());
         maps.Select(m => m.MapId).ToArray().ShouldBe(new[] { "meadow", "mine", "test_small" });
         var meadow = maps.Single(m => m.MapId == "meadow");
-        meadow.Width.ShouldBe(64);
-        meadow.Spawns.Sum(s => s.Count).ShouldBeGreaterThanOrEqualTo(20);
+        meadow.Width.ShouldBe(250); meadow.Height.ShouldBe(110); // aldea 42 + Campos 100 + Colinas 100 (~100×100 útiles por zona)
         meadow.Portals.ShouldHaveSingleItem().TargetMapId.ShouldBe("mine");
         meadow.Portals[0].MinLevel.ShouldBe(4);
         meadow.Collision.IsSolid(0, 10).ShouldBeTrue();
-        meadow.Collision.IsSolid(30, 25).ShouldBeTrue();   // muro de prueba
-        meadow.Collision.IsSolid(30, 32).ShouldBeFalse();  // hueco
-        meadow.ZoneAt(new Vec2(10, 10))!.Safe.ShouldBeTrue();
-        meadow.ZoneAt(new Vec2(10, 30))!.Name.ShouldBe("Campos");
-        meadow.NearestGraveyard(new Vec2(24, 50)).Id.ShouldBe("gy_fields");
+        meadow.Collision.IsSolid(146, 20).ShouldBeTrue();   // cresta Campos/Colinas
+        meadow.Collision.IsSolid(146, 54).ShouldBeFalse();  // paso
+        meadow.ZoneAt(new Vec2(20, 50))!.Safe.ShouldBeTrue();
+        meadow.ZoneAt(new Vec2(80, 50))!.Name.ShouldBe("Campos");
+        meadow.ZoneAt(new Vec2(200, 50))!.Name.ShouldBe("Colinas");
+        meadow.Zones.Select(z => z.Name).ToArray().ShouldBe(new[] { "Aldea Robledal", "Campos", "Colinas" });
+        meadow.Zones.ShouldAllBe(z => !string.IsNullOrEmpty(z.Landmark));
+        meadow.NearestGraveyard(new Vec2(90, 50)).Id.ShouldBe("gy_fields");
+        meadow.NearestGraveyard(new Vec2(200, 50)).Id.ShouldBe("gy_hills");
+        meadow.Graveyards.Count.ShouldBe(3); // uno por zona (CA3)
+        meadow.Npcs.ShouldContain(n => n.VendorId == "robledal_general_goods" && meadow.ZoneAt(n.Position)!.Safe);
+        // CA2: monstruos suficientes para 5 jugadores.
+        int Count(string id) => meadow.Spawns.Where(s => s.MonsterId == id).Sum(s => s.Count);
+        Count("slime").ShouldBeGreaterThanOrEqualTo(20); Count("boar").ShouldBeGreaterThanOrEqualTo(20); Count("bandit").ShouldBeGreaterThanOrEqualTo(15);
+        Count("wolf").ShouldBeGreaterThanOrEqualTo(20); Count("goblin_archer").ShouldBeGreaterThanOrEqualTo(15);
+        // Subniveles: los campamentos de slimes están más cerca de la aldea que los de bandidos; lobos antes que goblins.
+        meadow.Spawns.Where(s => s.MonsterId == "slime").Max(s => s.Position.X).ShouldBeLessThan(meadow.Spawns.Where(s => s.MonsterId == "bandit").Min(s => s.Position.X));
+        meadow.Spawns.Where(s => s.MonsterId == "wolf").Max(s => s.Position.X).ShouldBeLessThan(meadow.Spawns.Where(s => s.MonsterId == "goblin_archer").Min(s => s.Position.X));
+        // El portal a la Mina está al final de las Colinas y la Mina devuelve al lado del portal.
+        meadow.ZoneAt(meadow.Portals[0].Position)!.Name.ShouldBe("Colinas");
+        var mine = maps.Single(m => m.MapId == "mine");
+        var back = mine.Portals.ShouldHaveSingleItem();
+        back.TargetMapId.ShouldBe("meadow");
+        Vec2.Distance(new Vec2(back.TargetX, back.TargetY), meadow.Portals[0].Position).ShouldBeLessThan(8);
+        meadow.Collision.IsSolidAt(back.TargetX, back.TargetY).ShouldBeFalse();
+        mine.Collision.IsSolidAt(meadow.Portals[0].TargetX, meadow.Portals[0].TargetY).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("meadow")]
+    [InlineData("mine")]
+    public void FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject(string mapId) // HU-080 CA4, HU-083 CA1
+    {
+        var map = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == mapId);
+        var grid = map.Collision;
+        var seen = new bool[map.Width, map.Height];
+        var queue = new Queue<(int X, int Y)>();
+        var start = ((int)map.DefaultGraveyard.Position.X, (int)map.DefaultGraveyard.Position.Y);
+        seen[start.Item1, start.Item2] = true; queue.Enqueue(start);
+        var reached = 0;
+        while (queue.Count > 0)
+        {
+            var (x, y) = queue.Dequeue(); reached++;
+            foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                if (nx >= 0 && ny >= 0 && nx < map.Width && ny < map.Height && !seen[nx, ny] && !grid.IsSolid(nx, ny)) { seen[nx, ny] = true; queue.Enqueue((nx, ny)); }
+        }
+        var walkable = 0;
+        for (var y = 0; y < map.Height; y++) for (var x = 0; x < map.Width; x++) if (!grid.IsSolid(x, y)) walkable++;
+        reached.ShouldBe(walkable); // ninguna bolsa inaccesible
+        foreach (var gy in map.Graveyards) seen[(int)gy.Position.X, (int)gy.Position.Y].ShouldBeTrue(gy.Id);
+        foreach (var npc in map.Npcs) seen[(int)npc.Position.X, (int)npc.Position.Y].ShouldBeTrue(npc.Name);
+        foreach (var p in map.Portals) seen[(int)p.Position.X, (int)p.Position.Y].ShouldBeTrue(p.PortalId);
+        foreach (var s in map.Spawns)
+        {
+            var w = Math.Max(1, (int)s.Size.X); var h = Math.Max(1, (int)s.Size.Y);
+            var free = 0;
+            for (var y = (int)s.Position.Y; y < (int)s.Position.Y + h; y++) for (var x = (int)s.Position.X; x < (int)s.Position.X + w; x++) if (seen[x, y]) free++;
+            free.ShouldBeGreaterThanOrEqualTo(s.Count, s.Id);
+        }
     }
 
     [Fact]

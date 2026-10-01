@@ -70,10 +70,10 @@
 | HU-073 | Despliegue en VPS con TLS (wss) | E7 | Must | M | Pendiente |
 | HU-074 | Build web y de escritorio del cliente | E7 | Must | M | Pendiente |
 | HU-075 | Backups automáticos | E7 | Must | S | Pendiente |
-| HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Pendiente |
+| HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Hecha |
 | HU-081 | Arte de clases y monstruos | E8 | Must | L | Pendiente |
 | HU-082 | Íconos de items y hechizos | E8 | Must | M | Pendiente |
-| HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Pendiente |
+| HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Parcial |
 | HU-084 | Pasada de balance | E8 | Must | M | Pendiente |
 | HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Hecha |
 | HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Hecha |
