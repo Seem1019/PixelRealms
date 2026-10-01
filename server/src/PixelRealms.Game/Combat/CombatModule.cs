@@ -26,6 +26,9 @@ public sealed class CombatModule
         Spawns = new SpawnSystem(content, world);
         Ai = new MonsterAiSystem(Services, Casts, Auras, movement);
         Progression = new Progression.ProgressionSystem(Services);
+        Loot = new Items.LootSystem(Services);
+        ItemUse = new Items.ItemUseService(Services, Casts);
+        Vendor = new Items.VendorService(Services);
         Movement = movement;
         Interest = interest;
 
@@ -34,6 +37,8 @@ public sealed class CombatModule
         Auras.Interrupter = Casts;
         Effects.Casts = Casts;
         Death.OnMonsterKilled = Spawns.ScheduleRespawn;
+        Death.IsLooted = Loot.IsLooted;
+        Death.OnCorpseRemoved = (m, map) => Loot.Forget(map, m.Id);
         movement.SpeedMultiplier = CombatMovementRules.SpeedMultiplier;
         movement.IsImmobilized = CombatMovementRules.IsImmobilized;
     }
@@ -50,6 +55,9 @@ public sealed class CombatModule
     public SpawnSystem Spawns { get; }
     public MonsterAiSystem Ai { get; }
     public Progression.ProgressionSystem Progression { get; }
+    public Items.LootSystem Loot { get; }
+    public Items.ItemUseService ItemUse { get; }
+    public Items.VendorService Vendor { get; }
     public MovementSystem Movement { get; }
     public InterestSystem Interest { get; }
 
@@ -58,7 +66,7 @@ public sealed class CombatModule
     /// <summary>Registra los sistemas en orden; `extraBeforeInterest` permite insertar portales u otros antes de la AOI.</summary>
     public Simulation Register(Simulation sim, params IMapSystem[] extraBeforeInterest)
     {
-        sim.AddSystem(Movement).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Spawns);
+        sim.AddSystem(Movement).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Loot).AddSystem(Spawns);
         foreach (var s in extraBeforeInterest) sim.AddSystem(s);
         return sim.AddSystem(Interest);
     }

@@ -34,9 +34,12 @@ public sealed class SnapshotBuilder(World world, PlayerRegistry players, Connect
 
     public static EntStateDto ToEntState(Actor a) => new(a.Id.Value, Px(a.Position.X), Px(a.Position.Y), a.Facing.ToWire(), HpPct(a), AnimOf(a), a.Combat.TargetId?.Value);
 
-    public static EntitySpawn ToSpawn(Actor a) => new(a.Id.Value, a.Kind switch { ActorKind.Player => "player", ActorKind.Monster => "monster", _ => "npc" },
-        a is Monster m ? m.TemplateId : a is Player p ? p.ClassId : a.Name, a.Name, Px(a.Position.X), Px(a.Position.Y), a.Facing.ToWire(), a.Level,
-        a is Player pl ? pl.ClassId : null, HpPct(a), a.Flags);
+    public static EntitySpawn ToSpawn(Actor a, int extraFlags = 0) => new(a.Id.Value, a.Kind switch { ActorKind.Player => "player", ActorKind.Monster => "monster", _ => "npc" },
+        a is Monster m ? m.TemplateId : a is Player p ? p.ClassId : a is Npc n ? n.NpcKind : a.Name, a.Name, Px(a.Position.X), Px(a.Position.Y), a.Facing.ToWire(), a.Level,
+        a is Player pl ? pl.ClassId : null, HpPct(a), a.Flags | extraFlags);
+
+    /// <summary>Bit de `flags`: el cadáver tiene botín para quien lo recibe (HU-050 CA1, el cadáver brilla).</summary>
+    public const int FlagLootable = 8;
 
     public static float Px(float tiles) => MathF.Round(tiles * GameConstants.PixelsPerTile, 2);
 

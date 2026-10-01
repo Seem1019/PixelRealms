@@ -3,6 +3,7 @@ using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Entities;
 using PixelRealms.Game.Interest;
+using PixelRealms.Game.Items;
 using PixelRealms.Game.Map;
 using PixelRealms.Game.Progression;
 using PixelRealms.Protocol.Messages;
@@ -15,7 +16,7 @@ namespace PixelRealms.Server.Net;
 /// los sistemas). Los resultados de combate se agrupan en un `CombatEvents{tick, e}` por observador y tick (máx. 64
 /// entradas por mensaje, ADR-018) y solo van a quien ve al atacante o al objetivo.
 /// </summary>
-public sealed class EventDispatcher(ConnectionManager connections, World world, InterestSystem interest, PlayerMapper mapper, WorldSession session)
+public sealed class EventDispatcher(ConnectionManager connections, World world, InterestSystem interest, PlayerMapper mapper, WorldSession session, LootSystem loot)
 {
     public const int MaxCombatEntries = 64;
 
@@ -32,7 +33,20 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
             switch (e)
             {
                 case EntityEnteredView v when v.Observer.ConnectionId >= 0:
-                    connections.Send(v.Observer.ConnectionId, SnapshotBuilder.ToSpawn(v.Entity));
+                {
+                    var lootable = v.Entity is Monster { IsDead: true } dead && world.GetInstance(v.MapInstanceId) is { } inst
+                                   && loot.Get(inst, dead.Id) is { } bag && bag.HasLootFor(v.Observer.CharacterId, ctx.NowMs);
+                    connections.Send(v.Observer.ConnectionId, SnapshotBuilder.ToSpawn(v.Entity, lootable ? SnapshotBuilder.FlagLootable : 0));
+                    break;
+                }
+                case LootAvailableEvent la:
+                    // El cadáver brilla solo para quienes ganaron algo: EntitySpawn renovado con el bit lootable.
+                    if (world.GetInstance(la.MapInstanceId) is { } lootMap && lootMap.Find(la.Bag.LootId) is { } corpse)
+                        foreach (var winner in la.Winners)
+                            if (winner.ConnectionId >= 0) connections.Send(winner.ConnectionId, SnapshotBuilder.ToSpawn(corpse, SnapshotBuilder.FlagLootable));
+                    break;
+                case InventoryChangedEvent inv when inv.Player.ConnectionId >= 0:
+                    connections.Send(inv.Player.ConnectionId, mapper.ToInventoryUpdate(inv.Player, inv.ReqId));
                     break;
                 case EntityLeftView l when l.Observer.ConnectionId >= 0:
                     connections.Send(l.Observer.ConnectionId, new EntityDespawn(l.EntityId.Value, l.Reason));

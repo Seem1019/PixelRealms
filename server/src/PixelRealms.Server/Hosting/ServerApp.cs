@@ -83,11 +83,14 @@ public static class ServerApp
         foreach (var instance in world.Instances)
         {
             var created = combat.Spawns.Populate(instance, rng);
-            Console.WriteLine($"Instancia {instance.MapId}: {created} monstruos creados");
+            foreach (var npcDef in instance.Data.Npcs)
+                instance.Add(new Game.Entities.Npc(world.EntityIds.Next(), npcDef) { Position = npcDef.Position, Hp = 1, MaxHp = 1 });
+            Console.WriteLine($"Instancia {instance.MapId}: {created} monstruos y {instance.Data.Npcs.Count} NPC creados");
         }
         builder.Services.AddSingleton(world);
         builder.Services.AddSingleton(simulation);
         builder.Services.AddSingleton(combat);
+        builder.Services.AddSingleton(combat.Loot);
         builder.Services.AddSingleton(movementSystem);
         builder.Services.AddSingleton(interestSystem);
         builder.Services.AddSingleton<CombatHandlerDeps>();
@@ -123,6 +126,15 @@ public static class ServerApp
         router.Register(new AutoAttackHandler(combatDeps));
         router.Register(new RespawnHandler(combatDeps));
         router.Register(new SetHotbarHandler(content));
+        router.Register(new InventoryMoveHandler(combatDeps, content));
+        router.Register(new UseItemHandler(combatDeps));
+        router.Register(new DestroyItemHandler(combatDeps, content));
+        router.Register(new LootOpenHandler(combatDeps));
+        router.Register(new LootTakeHandler(combatDeps));
+        router.Register(new LootTakeAllHandler(combatDeps));
+        router.Register(new VendorOpenHandler(combatDeps, content));
+        router.Register(new VendorBuyHandler(combatDeps));
+        router.Register(new VendorSellHandler(combatDeps));
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
         simulation.OnPreTick(router.Drain);
         app.Services.GetRequiredService<CombatModule>().Register(simulation, app.Services.GetRequiredService<PortalSystem>());

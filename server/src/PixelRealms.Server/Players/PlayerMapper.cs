@@ -23,6 +23,12 @@ public sealed class PlayerMapper(ReloadableContent content)
         };
         foreach (var item in dto.Items)
         {
+            if (!db.TryGetItem(item.TemplateId, out _))
+            {
+                // HU-057 CA4: plantilla que ya no existe → el personaje carga igual y se avisa.
+                Console.WriteLine($"WARN  {dto.Name}: item {item.Id} con plantilla desconocida '{item.TemplateId}' ignorado");
+                continue;
+            }
             var inst = new ItemInstance(item.Id, item.TemplateId, item.Quantity);
             if (item.Container == 1 && item.Slot >= 0 && item.Slot < Equipment.SlotCount) player.Equipment.Slots[item.Slot] = inst;
             else if (item.Container == 0 && item.Slot >= 0 && item.Slot < Inventory.BagSize) player.Inventory.Bag[item.Slot] = inst;
@@ -38,6 +44,12 @@ public sealed class PlayerMapper(ReloadableContent content)
 
     public CharacterSaveDto ToSave(Player p, IReadOnlyList<AuditEntry>? audit = null)
     {
+        // HU-057 CA3: la auditoría pendiente viaja en lote con el guardado y se vacía.
+        if (audit is null && p.PendingAudit.Count > 0)
+        {
+            audit = p.PendingAudit.Select(a => new AuditEntry(a.ItemId, a.Action, a.TemplateId, a.Quantity, a.CounterpartyCharacterId)).ToList();
+            p.PendingAudit.Clear();
+        }
         var items = new List<SavedItem>();
         for (var i = 0; i < p.Inventory.Bag.Length; i++)
             if (p.Inventory.Bag[i] is { } it) items.Add(new SavedItem(it.Id, it.TemplateId, it.Qty, 0, (short)i));
@@ -75,6 +87,9 @@ public sealed class PlayerMapper(ReloadableContent content)
             XpCurve.XpToNextLevel(db.Rules.Progression, p.Level), p.Hp, p.MaxHp, p.Resource, p.MaxResource, ContentJson.EnumName(cls.Resource), p.ClassId, p.Name);
         return new Welcome(p.Id.Value, tick, 1000 / GameConstants.TickMs, 1000 / (GameConstants.TickMs * GameConstants.SnapshotEveryTicks), mapId, self, bag, equip, hotbar, p.KnownSpells.ToList(), db.Rules.Hash);
     }
+
+    public InventoryUpdate ToInventoryUpdate(Player p, int? reqId) =>
+        new(p.Inventory.Bag.Select(ToDto).ToList(), p.Equipment.Slots.Select(ToDto).ToList(), p.Inventory.Gold, reqId);
 
     /// <summary>StatsUpdate (docs/protocol.md): nivel, XP, stats primarios redondeados, derivados y oro.</summary>
     public StatsUpdate ToStatsUpdate(Player p)

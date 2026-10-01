@@ -44,7 +44,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     public int PendingImpacts(MapInstance map) => _impacts.TryGetValue(map.Id, out var l) ? l.Count : 0;
 
     /// <summary>Intenta lanzar; devuelve el código de error o null si el hechizo empezó (o se resolvió si es instantáneo).</summary>
-    public string? TryBeginCast(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, MapInstance map, TickContext ctx)
+    public string? TryBeginCast(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, MapInstance map, TickContext ctx, bool cancelCurrent = true)
     {
         var rules = ctx.Rules.Combat;
         var now = ctx.NowMs;
@@ -61,7 +61,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         if (spell.School == School.Magic && caster.Auras.IsSilenced) return CastErrors.Silenced;
         if (combat.IsLockedOut(now)) return CastErrors.LockedOut;
         if (combat.IsOnCooldown(spell.Id, now)) return CastErrors.OnCooldown;
-        if (caster is Player && ((combat.IsOnGcd(now) && spell.TriggersGcd) || combat.IsAbilityLocked(now))) return CastErrors.OnGcd;
+        if (caster is Player && spell.Source != SpellSource.Item && ((combat.IsOnGcd(now) && spell.TriggersGcd) || combat.IsAbilityLocked(now))) return CastErrors.OnGcd;
         var hasLeap = false; EffectDef? dash = null;
         foreach (var e in spell.Effects) { if (e.Type == EffectType.Leap) hasLeap = true; if (e.Type == EffectType.Dash) dash = e; }
         if (hasLeap && caster.Auras.IsRooted) return CastErrors.Rooted;
@@ -114,10 +114,10 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                 break;
         }
 
-        // Otro hechizo durante un casteo lo cancela sin coste (ADR-019).
-        if (combat.Cast is { } current) EndCast(caster, current, CastResults.Cancelled, null, map, ctx);
+        // Otro hechizo durante un casteo lo cancela sin coste (ADR-019); los usables (pociones) no.
+        if (cancelCurrent && combat.Cast is { } current) EndCast(caster, current, CastResults.Cancelled, null, map, ctx);
 
-        if (caster is Player)
+        if (caster is Player && spell.Source != SpellSource.Item)
         {
             if (spell.TriggersGcd) { combat.GcdEndsAtMs = now + rules.GcdMs; ctx.Emit(new CooldownEvent(map.Id, caster, null, null, rules.GcdMs)); }
             if (spell.IsInstant) combat.AbilityLockEndsAtMs = now + rules.AbilityLockMs;

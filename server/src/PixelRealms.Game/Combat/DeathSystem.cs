@@ -21,6 +21,9 @@ public sealed class DeathSystem(CombatServices services, AuraSystem auras, Inter
     /// <summary>¿El cadáver ya fue saqueado del todo? (HU-050). Por defecto nunca: solo expira por tiempo.</summary>
     public Func<Monster, bool> IsLooted { get; set; } = static _ => false;
 
+    /// <summary>El cadáver desapareció (LootSystem olvida su bolsa).</summary>
+    public Action<Monster, MapInstance>? OnCorpseRemoved { get; set; }
+
     public void Kill(Actor victim, Actor? killer, MapInstance map, TickContext ctx)
     {
         if (victim.Combat.DiedAtMs != long.MinValue) return; // ya muerto
@@ -68,6 +71,7 @@ public sealed class DeathSystem(CombatServices services, AuraSystem auras, Inter
         {
             interest.ForgetEntity(map, m.Id, InterestSystem.ReasonDespawn, ctx);
             map.Remove(m.Id);
+            OnCorpseRemoved?.Invoke(m, map);
         }
     }
 }

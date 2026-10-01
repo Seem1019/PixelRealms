@@ -14,7 +14,8 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
 
     public int Xp { get; set; }
 
-    public long Gold { get; set; }
+    /// <summary>Oro en cobre (vive en la bolsa; aquí solo como acceso directo).</summary>
+    public long Gold { get => Inventory.Gold; set => Inventory.Gold = value; }
 
     public int Resource { get; set; }
 
@@ -42,6 +43,18 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
 
     /// <summary>Marca de "hay cambios sin guardar" para el autosave (HU-026).</summary>
     public bool Dirty { get; set; }
+
+    /// <summary>Entradas de auditoría de items pendientes de guardar en lote (HU-057 CA3).</summary>
+    public List<PendingAudit> PendingAudit { get; } = new();
+
+    public void Audit(PendingAudit entry)
+    {
+        PendingAudit.Add(entry);
+        Dirty = true;
+    }
+
+    /// <summary>Cooldown compartido por plantilla de consumible (HU-054): templateId → fin en ms.</summary>
+    public Dictionary<string, long> ItemCooldownEndsAtMs { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Instante (ms de reloj de juego) del último guardado encolado; el autosave cuenta desde aquí.</summary>
     public long LastSaveAtMs { get; set; }
