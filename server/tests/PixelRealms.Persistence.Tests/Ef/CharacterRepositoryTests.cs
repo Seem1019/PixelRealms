@@ -1,4 +1,5 @@
 // NO COMPILADO EN LA SESIÓN DE LA FASE 1 (NuGet bloqueado). Excluido con OfflineBuild=true.
+using Microsoft.EntityFrameworkCore;
 using PixelRealms.Persistence.Ef;
 using PixelRealms.Persistence.Repositories;
 using Shouldly;
@@ -53,6 +54,27 @@ public sealed class CharacterRepositoryTests(PostgresFixture pg) : IClassFixture
         (await chars.NameExistsAsync("Zed", ct)).ShouldBeFalse();
         (await chars.CreateAsync(New("zed"), Max, ct)).Status.ShouldBe(CreateCharacterStatus.Created);
         (await chars.CreateAsync(New("ZED"), Max, ct)).Status.ShouldBe(CreateCharacterStatus.NameTaken);
+    }
+
+    [Fact]
+    public async Task AccountCreate_NonUniquenessFailure_Propagates()
+    {
+        var accounts = new EfAccountRepository(pg.Factory);
+        // varchar(20) excedido (22001): no es "usuario en uso", no debe disfrazarse de null.
+        await Should.ThrowAsync<DbUpdateException>(() => accounts.CreateAsync(new string('x', 21), "h", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task CharacterCreate_NonUniquenessFailure_Propagates()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var accounts = new EfAccountRepository(pg.Factory);
+        var chars = new EfCharacterRepository(pg.Factory);
+        var acc = (await accounts.CreateAsync("slot_clash", "h", ct)).ShouldNotBeNull();
+        // Dos items en la misma casilla violan otro índice único (character_items), no el del nombre.
+        SavedItem[] clash = [new(Guid.CreateVersion7(), "bread", 1, 0, 0), new(Guid.CreateVersion7(), "bread", 1, 0, 0)];
+        await Should.ThrowAsync<DbUpdateException>(() => chars.CreateAsync(new NewCharacter(acc.Id, "Clash", "warrior", "meadow", 0, 0, 60, 0, clash, []), Max, ct));
+        (await chars.NameExistsAsync("Clash", ct)).ShouldBeFalse(); // la transacción se revirtió entera
     }
 
     [Fact]

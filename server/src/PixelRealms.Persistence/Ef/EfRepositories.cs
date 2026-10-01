@@ -1,9 +1,17 @@
 // NO COMPILADO EN LA SESIÓN DE LA FASE 1 (NuGet bloqueado): revisar con `dotnet build` antes de confiar en él.
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using PixelRealms.Persistence.Entities;
 using PixelRealms.Persistence.Repositories;
 
 namespace PixelRealms.Persistence.Ef;
+
+/// <summary>Solo una violación de unicidad (23505) del índice indicado es "nombre en uso"; cualquier otro fallo se propaga.</summary>
+internal static class UniqueViolation
+{
+    public static bool Of(DbUpdateException ex, string indexName) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg && pg.ConstraintName == indexName;
+}
 
 public sealed class EfAccountRepository(IDbContextFactory<GameDbContext> factory) : IAccountRepository
 {
@@ -29,7 +37,7 @@ public sealed class EfAccountRepository(IDbContextFactory<GameDbContext> factory
         var a = new Account { Id = Guid.CreateVersion7(), Username = username, PasswordHash = passwordHash, CreatedAt = DateTime.UtcNow };
         db.Accounts.Add(a);
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { return null; } // carrera con el índice único
+        catch (DbUpdateException ex) when (UniqueViolation.Of(ex, GameDbContext.AccountsUsernameIndex)) { return null; } // carrera con el índice único
         return Map(a);
     }
 
@@ -88,7 +96,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
         c.Hotbar = character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = c.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }).ToList();
         db.Characters.Add(c);
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { return new CreateCharacterResult(CreateCharacterStatus.NameTaken); }
+        catch (DbUpdateException ex) when (UniqueViolation.Of(ex, GameDbContext.CharactersNameIndex)) { return new CreateCharacterResult(CreateCharacterStatus.NameTaken); }
         await tx.CommitAsync(ct);
         return new CreateCharacterResult(CreateCharacterStatus.Created, Map(c));
     }

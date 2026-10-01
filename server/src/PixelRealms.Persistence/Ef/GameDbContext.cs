@@ -13,6 +13,10 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<CharacterHotbarSlot> CharacterHotbar => Set<CharacterHotbarSlot>();
     public DbSet<ItemAuditLog> ItemAuditLog => Set<ItemAuditLog>();
 
+    /// <summary>Índices de unicidad; los repositorios traducen su violación (23505) a "nombre en uso".</summary>
+    public const string AccountsUsernameIndex = "ix_accounts_username_ci";
+    public const string CharactersNameIndex = "ix_characters_name_ci";
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Nombres únicos sin distinguir mayúsculas: ICU nivel 2 ignora mayúsculas (no acentos); no determinista => "Bob" = "bob".
@@ -23,7 +27,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.HasKey(x => x.Id);
             e.Property(x => x.Username).IsRequired().HasMaxLength(20).UseCollation("case_insensitive");
             e.Property(x => x.PasswordHash).IsRequired();
-            e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("ix_accounts_username_ci");
+            e.HasIndex(x => x.Username).IsUnique().HasDatabaseName(AccountsUsernameIndex);
             e.HasMany(x => x.Characters).WithOne(c => c.Account).HasForeignKey(c => c.AccountId);
         });
         modelBuilder.Entity<Character>(e =>
@@ -33,7 +37,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.Property(x => x.Name).IsRequired().HasMaxLength(64).UseCollation("case_insensitive");
             e.Property(x => x.ClassId).IsRequired().HasMaxLength(16);
             e.Property(x => x.MapId).IsRequired().HasMaxLength(32);
-            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ix_characters_name_ci");
+            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName(CharactersNameIndex);
             e.HasIndex(x => x.AccountId);
             e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Hotbar).WithOne().HasForeignKey(h => h.CharacterId).OnDelete(DeleteBehavior.Cascade);
