@@ -96,6 +96,21 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	assert_true(placed)
 	assert_ne(_world._hud._notice_label.text, "")
 
+	# Inventario, botín y vendedor.
+	_dispatch("InventoryUpdate", {"bag": [{"id": "i1", "templateId": "bread", "qty": 3}, null], "equipment": [], "gold": 12345, "reqId": null})
+	assert_eq(GameState.gold, 12345)
+	_world._inventory.toggle()
+	assert_true(_world._inventory.visible)
+	assert_eq(_world._inventory._slots[0].item.get("templateId"), "bread")
+	_dispatch("LootWindow", {"lootId": 7, "gold": 5, "items": [{"index": 0, "templateId": "slime_goo", "qty": 2, "ownerId": 1, "freeInMs": 30000}, {"index": 1, "templateId": "bread", "qty": 1, "ownerId": 8, "freeInMs": 30000}]})
+	assert_true(_world._loot.visible)
+	assert_eq(_world._loot._list.get_child_count(), 2)
+	_dispatch("EntitySpawn", {"id": 9, "kind": "npc", "templateId": "vendor", "name": "Marta la tendera", "x": 100.0, "y": 110.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	_dispatch("VendorWindow", {"npcId": 9, "items": [{"templateId": "bread", "price": 4}, {"templateId": "minor_healing_potion", "price": 20}]})
+	assert_true(_world._vendor.visible)
+	assert_true(_world._inventory.vendor_mode)
+	assert_eq(_world._vendor._title.text, "Marta la tendera")
+
 	# Muerte y pantalla.
 	_dispatch("Died", {"killerId": 7, "respawnInMs": 0})
 	await get_tree().process_frame

@@ -125,7 +125,25 @@ func _on_stats_update(d: Dictionary) -> void:
 func _on_inventory_update(d: Dictionary) -> void:
 	inventory = d.get("bag", inventory)
 	equipment = d.get("equipment", equipment)
+	gold = int(d.get("gold", gold))
 	inventory_changed.emit()
+
+
+## Item de la bolsa por id (o vacío).
+func bag_item(item_id: String) -> Dictionary:
+	for it: Variant in inventory:
+		if it is Dictionary and str((it as Dictionary).get("id", "")) == item_id:
+			return it
+	return {}
+
+
+## Cantidad total de una plantilla en la bolsa (casillas de utilizables, HU-043 CA3).
+func bag_count(template_id: String) -> int:
+	var n := 0
+	for it: Variant in inventory:
+		if it is Dictionary and str((it as Dictionary).get("templateId", "")) == template_id:
+			n += int((it as Dictionary).get("qty", 0))
+	return n
 
 
 func _on_change_map(d: Dictionary) -> void:

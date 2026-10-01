@@ -19,6 +19,10 @@ const ZONE_FADE_SEC := 2.0
 @onready var _hud: CombatHud = %CombatHud
 @onready var _floating: FloatingText = %FloatingText
 @onready var _reticle: AoeReticle = %AoeReticle
+@onready var _inventory: InventoryWindow = %InventoryWindow
+@onready var _loot: LootWindow = %LootWindow
+@onready var _vendor: VendorWindow = %VendorWindow
+@onready var _drop_catcher: DropCatcher = %DropCatcher
 
 var map: TmjMap
 var prediction: Prediction = Prediction.new()
@@ -53,6 +57,9 @@ func _ready() -> void:
 	_hud.respawn_requested.connect(func() -> void: Net.send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
+	_inventory.sell_requested.connect(_sell_item)
+	_drop_catcher.item_dropped_outside.connect(_on_item_dropped_outside)
+	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
 	_player.visible = false
@@ -153,6 +160,12 @@ func _process(delta: float) -> void:
 			_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
 		_overlay.pending_inputs = prediction.pending.size()
 		_overlay.reconcile_error_px = prediction.last_error_px
+	if _vendor.visible and _vendor.npc_id > 0:
+		var range_tiles := float(Content.rule("economy", "vendorRangeTiles", 3.0))
+		var npc: RemoteEntity = _remotes.get(_vendor.npc_id)
+		if npc == null or npc.position.distance_to(_player.position) > range_tiles * 16.0:
+			_vendor.close_window()
+			_inventory.vendor_mode = false
 	if _status_clear_at >= 0 and Time.get_ticks_msec() >= _status_clear_at:
 		_status_clear_at = -1
 		_hud_status.text = ""
@@ -227,6 +240,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			var hit := _entity_at(world_pos)
 			if hit != null:
 				_select(hit.entity_id)
+				if hit.kind == "monster" and hit.anim == "dead":
+					Net.send("LootOpen", {"lootId": hit.entity_id})  # HU-050 CA2
+				elif hit.kind == "npc" and hit.template_id == "vendor":
+					Net.send("VendorOpen", {"npcId": hit.entity_id})  # HU-055 CA1
 			else:
 				_select(-1)  # clic en el suelo: deseleccionar (CA3)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -237,9 +254,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			if hit != null and hit.hostile:
 				_select(hit.entity_id)
 				Net.send("AutoAttack", {"on": true})  # HU-032 CA1
+	elif event.is_action_pressed("toggle_inventory"):
+		_inventory.toggle()
 	elif event.is_action_pressed("ui_cancel"):
 		if not _aiming_spell.is_empty():
 			_stop_aiming()
+		elif _loot.visible or _vendor.visible or _inventory.visible:
+			_loot.visible = false
+			_vendor.close_window()
+			_inventory.visible = false
+			_inventory.vendor_mode = false
 		elif not GameState.own_cast.is_empty():
 			Net.send("CancelCast")
 		else:
@@ -382,6 +406,19 @@ func _on_message(type: String, d: Dictionary) -> void:
 				_hud.show_cast_result(str(d.get("result", "")), str(d.get("reason", "")))
 			elif _remotes.has(caster):
 				(_remotes[caster] as RemoteEntity).end_cast(str(d.get("result", "")))
+		"LootWindow":
+			var names := {}
+			for r: RemoteEntity in _remotes.values():
+				names[r.entity_id] = r.display_name
+			names[GameState.self_id] = GameState.character_name
+			_loot.show_window(d, names)
+		"VendorWindow":
+			var npc_id := int(d.get("npcId", -1))
+			var vendor_name: String = (_remotes[npc_id] as RemoteEntity).display_name if _remotes.has(npc_id) else "Vendedor"
+			_vendor.show_window(d, vendor_name)
+			_inventory.vendor_mode = true
+			_inventory.visible = true
+			_inventory.refresh()
 		"Error":
 			var code := str(d.get("code", ""))
 			if code in ["on_cooldown", "on_gcd", "not_enough_resource", "out_of_range", "no_los", "invalid_target", "stunned", "silenced", "rooted", "locked_out", "is_dead", "area_limit"]:
@@ -399,6 +436,19 @@ func _on_combat_events(d: Dictionary) -> void:
 		if pos == Vector2.INF:
 			continue
 		_floating.show_event(dst, str(ed.get("kind", "")), int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
+
+
+func _sell_item(item: Dictionary) -> void:
+	if _vendor.npc_id <= 0:
+		return
+	Net.send("VendorSell", {"npcId": _vendor.npc_id, "itemId": str(item.get("id", "")), "qty": int(item.get("qty", 1))})
+
+
+## Soltar un item de la bolsa fuera de cualquier casilla → confirmar destrucción (HU-056 CA2).
+func _on_item_dropped_outside(item_id: String) -> void:
+	var item := GameState.bag_item(item_id)
+	if not item.is_empty():
+		_inventory.request_destroy(item)
 
 
 # --- Cambio de mapa (HU-027 CA2) ---------------------------------------------------------------------------------------

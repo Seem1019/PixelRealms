@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://world000000001"]
+[gd_scene load_steps=11 format=3 uid="uid://world000000001"]
 
 [ext_resource type="Script" path="res://scenes/world/world.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world/placeholder_map_renderer.gd" id="2"]
@@ -6,6 +6,10 @@
 [ext_resource type="Script" path="res://scripts/ui/combat_hud.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/world/floating_text.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/world/aoe_reticle.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/ui/inventory_window.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/ui/loot_window.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/ui/vendor_window.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/ui/drop_catcher.gd" id="10"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1")
@@ -85,9 +89,25 @@ theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
 theme_override_font_sizes/font_size = 8
 horizontal_alignment = 1
 
+[node name="DropCatcher" type="Control" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("10")
+
 [node name="CombatHud" type="Control" parent="HUD"]
 unique_name_in_owner = true
 script = ExtResource("4")
+
+[node name="InventoryWindow" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("7")
+
+[node name="LootWindow" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("8")
+
+[node name="VendorWindow" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("9")
 
 [node name="ZoneName" type="Label" parent="HUD"]
 unique_name_in_owner = true
