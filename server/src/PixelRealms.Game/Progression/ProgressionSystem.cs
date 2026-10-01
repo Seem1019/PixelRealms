@@ -64,6 +64,28 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
         if (leveled) ctx.Emit(new StatsChangedEvent(map.Id, player));
     }
 
+    /// <summary>HU-070 `/level n`: fija el nivel (acotado a [1, tope de fase]); subir pasa por LevelUp (hechizos/rangos), bajar quita los hechizos que ya no se cumplen.</summary>
+    public int SetLevel(Player player, int level, MapInstance map, TickContext ctx)
+    {
+        var target = Math.Clamp(level, 1, ctx.Rules.CurrentLevelCap);
+        while (player.Level < target) LevelUp(player, map, ctx);
+        if (player.Level > target)
+        {
+            player.Level = target;
+            var db = services.Content;
+            player.KnownSpells.RemoveAll(id => db.TryGetSpell(id, out var s) && s is not null && s.LevelReq > target);
+            for (var i = 0; i < player.Hotbar.Length; i++)
+                if (player.Hotbar[i] is { Kind: "spell" } slot && !player.KnownSpells.Contains(slot.Ref)) player.Hotbar[i] = null;
+            services.Recalculate(player);
+            player.Hp = player.MaxHp;
+            player.Resource = player.MaxResource;
+        }
+        player.Xp = 0;
+        player.Dirty = true;
+        ctx.Emit(new StatsChangedEvent(map.Id, player));
+        return player.Level;
+    }
+
     private void LevelUp(Player player, MapInstance map, TickContext ctx)
     {
         var p = ctx.Rules.Progression;

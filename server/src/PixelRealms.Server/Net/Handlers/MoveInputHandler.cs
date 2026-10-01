@@ -21,5 +21,10 @@ public sealed class MoveInputHandler(ILogger<MoveInputHandler> logger) : IMessag
         player.MoveDx = dx;
         player.MoveDy = dy;
         player.LastInputAtMs = ctx.Tick.NowMs;
+        if (player.DebugMove)
+        {
+            logger.LogInformation("[debug move] {Name} seq {Seq} input ({Dx},{Dy}) pos ({X:F2},{Y:F2}) tick {Tick}", player.Name, msg.Seq, dx, dy, player.Position.X, player.Position.Y, ctx.Tick.Tick);
+            ctx.Send(new Protocol.Messages.ChatMessage("system", "", $"[move] seq {msg.Seq} ({dx},{dy}) pos ({player.Position.X:F2},{player.Position.Y:F2})", ctx.Tick.NowMs));
+        }
     }
 }

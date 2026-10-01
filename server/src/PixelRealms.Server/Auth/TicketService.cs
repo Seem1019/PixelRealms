@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace PixelRealms.Server.Auth;
 
-public sealed record GameTicket(Guid AccountId, Guid CharacterId, DateTimeOffset ExpiresAt);
+public sealed record GameTicket(Guid AccountId, Guid CharacterId, DateTimeOffset ExpiresAt, bool Admin = false);
 
 /// <summary>Tickets de un solo uso para /ws?ticket= (HU-014): 32 bytes aleatorios en base64url, 30 s de vida.</summary>
 public sealed class TicketService(TimeSpan lifetime)
@@ -12,11 +12,11 @@ public sealed class TicketService(TimeSpan lifetime)
 
     public TimeSpan Lifetime { get; } = lifetime;
 
-    public string Issue(Guid accountId, Guid characterId, DateTimeOffset now)
+    public string Issue(Guid accountId, Guid characterId, DateTimeOffset now, bool admin = false)
     {
         Sweep(now);
         var ticket = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        _tickets[ticket] = new GameTicket(accountId, characterId, now + Lifetime);
+        _tickets[ticket] = new GameTicket(accountId, characterId, now + Lifetime, admin);
         return ticket;
     }
 

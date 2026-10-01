@@ -30,6 +30,7 @@ public sealed class DamagePipeline(CombatServices services)
         var absorbed = Auras?.Absorb(target, scaled, map, ctx) ?? 0;
         var toHp = scaled - absorbed;
         toHp = DuelClamp(source, target, toHp, map, ctx);
+        if (target is Player { GodMode: true }) toHp = 0; // HU-070 /god
         if (absorbed > 0) ctx.Emit(new CombatHitEvent(map.Id, source, target, spellId, HitKinds.Absorb, absorbed, false, school));
         ctx.Emit(new CombatHitEvent(map.Id, source, target, spellId, HitKinds.Damage, toHp, crit, school));
 

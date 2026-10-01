@@ -492,6 +492,9 @@ func _on_chat_command(name: String, args: String) -> void:
 		"trade":
 			_social.mark_outgoing("trade")
 			Net.send("TradeRequest", {"name": args})
+		"tp", "tpto", "spawn", "give", "level", "heal", "kill", "gold", "god", "debug", "announce":
+			# HU-070: comandos de administrador; el servidor responde forbidden si la cuenta no lo es.
+			Net.send("AdminCommand", {"text": ("/%s %s" % [name, args]).strip_edges()})
 		_: GameState.notice.emit("Comando desconocido: /%s" % name)
 
 

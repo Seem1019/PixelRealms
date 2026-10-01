@@ -46,6 +46,22 @@ public sealed class SpawnSystem(Func<ContentDb> content, World world) : IMapSyst
         return m;
     }
 
+    /// <summary>HU-070 `/spawn`: crea `count` monstruos alrededor de `pos` sin punto de spawn (no reaparecen). Devuelve cuántos creó (0 si el id no existe).</summary>
+    public int SpawnAt(string monsterId, Vec2 pos, int count, MapInstance map, IRng rng)
+    {
+        if (!content().TryGetMonster(monsterId, out var template) || template is null) return 0;
+        var adHoc = new SpawnDef("admin", monsterId, count, 2, pos, new Vec2(0, 0));
+        var created = 0;
+        for (var i = 0; i < count; i++)
+        {
+            var monster = Create(template, adHoc, PickPosition(adHoc, map.Data.Collision, rng));
+            monster.Brain.Spawn = null; // sin reaparición
+            map.Add(monster);
+            created++;
+        }
+        return created;
+    }
+
     /// <summary>Casilla libre dentro del rectángulo del spawn (o alrededor del punto, en `wanderRadius`); centro de la casilla.</summary>
     public static Vec2 PickPosition(SpawnDef spawn, CollisionGrid grid, IRng rng)
     {

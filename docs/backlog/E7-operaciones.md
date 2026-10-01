@@ -2,7 +2,7 @@
 
 ### HU-070 · Comandos de administrador
 **Como** administrador **quiero** comandos de juego **para** probar contenido y resolver problemas.
-- Prioridad: Should · Estimación: M · Estado: Pendiente
+- Prioridad: Should · Estimación: M · Estado: Hecha
 - Dependencias: HU-060, HU-051
 - Skills: `dotnet-server`, `net-protocol`
 
@@ -12,8 +12,13 @@
 3. **Dado** cada comando **entonces** se registra en el log con el autor; `/give` y `/gold` en `item_audit_log` como `admin_give`.
 4. **Dado** `dotnet run --project server/src/PixelRealms.Server -- make-admin <usuario>` **entonces** se marca la cuenta como admin.
 
----
+**Notas de implementación**
+- `AdminCommandHandler` (server/Net/Handlers): el cliente manda `AdminCommand{text}` cuando el chat recibe `/tp`, `/tpto`, `/spawn`, `/give`, `/level`, `/heal`, `/kill`, `/gold`, `/god`, `/debug move`, `/announce`; la respuesta vuelve como `ChatMessage{system}`. Coordenadas de `/tp` en casillas.
+- El flag admin viaja en el ticket (`GameTicket.Admin` desde el claim del JWT) y queda en `WebSocketSession.IsAdmin`; con `dev:<id>` se consulta la cuenta. Cuentas normales → `Error{forbidden}` + `warn` con nombre y cuenta; cada comando se loguea en `info` con el autor.
+- `/give` y `/gold` auditan `admin_give` (el oro con `item_id = 00000000-…` y `template_id = gold`, decisión provisional: la tabla no tiene columna de oro). `/god` y `/debug move` son flags de sesión en `Player` (no se persisten). `/spawn` crea monstruos sin punto de spawn (no reaparecen). `/level` baja también (quita hechizos y casillas de barra que ya no cumplen el nivel).
+- `make-admin <usuario>` en `Program.cs` (construye el host, `IAccountRepository.SetAdminAsync`, sale). Tests: `AdminCommandTests` (3, WebSocket) y `AdminToolsTests` (3, dominio).
 
+---
 ### HU-071 · Rate limiting y protección de mensajes
 **Como** administrador **quiero** que el servidor se proteja de clientes abusivos **para** que un tramposo no arruine la partida.
 - Prioridad: Must · Estimación: M · Estado: Hecha

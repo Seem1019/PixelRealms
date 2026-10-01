@@ -64,7 +64,7 @@
 | HU-062 | Marcos de grupo y XP/oro compartidos | E6 | Must | M | Hecha |
 | HU-063 | Lista de jugadores en línea | E6 | Should | S | Hecha |
 | HU-064 | Duelos (PvP amistoso) | E6 | Must | L | Hecha |
-| HU-070 | Comandos de administrador | E7 | Should | M | Pendiente |
+| HU-070 | Comandos de administrador | E7 | Should | M | Hecha |
 | HU-071 | Rate limiting y protección de mensajes | E7 | Must | M | Hecha |
 | HU-072 | Métricas y logs del servidor | E7 | Should | S | Pendiente |
 | HU-073 | Despliegue en VPS con TLS (wss) | E7 | Must | M | Pendiente |

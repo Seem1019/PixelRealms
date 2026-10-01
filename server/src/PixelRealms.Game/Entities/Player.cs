@@ -56,6 +56,12 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
     /// <summary>Última acción de combate (daño hecho/recibido, cura o habilidad) para la XP de grupo (HU-062: activos en 90 s).</summary>
     public long LastActionAtMs { get; set; } = long.MinValue;
 
+    /// <summary>HU-070 `/god`: no recibe daño (sesión, no se persiste).</summary>
+    public bool GodMode { get; set; }
+
+    /// <summary>HU-070 `/debug move on|off`: el servidor traza cada MoveInput de este jugador (sesión).</summary>
+    public bool DebugMove { get; set; }
+
     public bool IsActive(long nowMs, double windowSec) => Math.Max(LastActionAtMs, LastCombatAtMs) != long.MinValue && nowMs - Math.Max(LastActionAtMs, LastCombatAtMs) <= windowSec * 1000;
 
     /// <summary>Cooldown compartido por plantilla de consumible (HU-054): templateId → fin en ms.</summary>

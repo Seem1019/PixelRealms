@@ -46,7 +46,7 @@ public static class CharacterEndpoints
             var claims = JwtAuth.ClaimsOf(http)!;
             var list = await repo.ListByAccountAsync(claims.AccountId, ct);
             if (!list.Any(c => c.Id == req.CharacterId)) return Results.NotFound(new ApiError("not_found", "Personaje no encontrado"));
-            var ticket = tickets.Issue(claims.AccountId, req.CharacterId, DateTimeOffset.UtcNow);
+            var ticket = tickets.Issue(claims.AccountId, req.CharacterId, DateTimeOffset.UtcNow, claims.Admin);
             return Results.Ok(new TicketResponse(ticket, (int)tickets.Lifetime.TotalSeconds));
         }).RequireJwt();
     }

@@ -53,6 +53,9 @@ public sealed class WebSocketSession : IDisposable
 
     public Guid? AccountId { get; set; }
 
+    /// <summary>`accounts.is_admin` del dueño del ticket (HU-070); lo fija HelloGate.</summary>
+    public bool IsAdmin { get; set; }
+
     public bool IsOpen => _socket.State == WebSocketState.Open;
 
     public string CloseReason { get; private set; } = "";
