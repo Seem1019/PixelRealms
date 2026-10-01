@@ -44,6 +44,9 @@ public sealed class LootBag(EntityId lootId, Vec2 position, long expiresAtMs)
 /// <summary>Evento: hay botín nuevo para estos jugadores (el cadáver brilla, HU-050 CA1).</summary>
 public sealed record LootAvailableEvent(int MapInstanceId, LootBag Bag, IReadOnlyList<Player> Winners) : IGameEvent;
 
+/// <summary>HU-062 CA4 / HU-083 CA4: un item uncommon+ cayó para `Winner`; `Global` si lo soltó un jefe (si no, chat de grupo).</summary>
+public sealed record LootAnnouncedEvent(int MapInstanceId, Player Winner, string TemplateId, Rarity Rarity, bool Global) : IGameEvent;
+
 /// <summary>El inventario de un jugador cambió (botín, uso, compra, venta…): el servidor envía InventoryUpdate.</summary>
 public sealed record InventoryChangedEvent(int MapInstanceId, Player Player, int? ReqId) : IGameEvent;
 
@@ -137,6 +140,8 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
             var owner = eligible[ctx.Rng.Next(0, eligible.Count)];
             bag.Entries.Add(new LootEntryState(index++, templateId, qty, owner.CharacterId, ctx.NowMs + (long)(rules.Loot.ExclusiveSec * 1000)));
             winners.Add(owner);
+            var rarity = db.Item(templateId).Rarity;
+            if (rarity >= Rarity.Uncommon) ctx.Emit(new LootAnnouncedEvent(map.Id, owner, templateId, rarity, monster.Template.Type == MonsterType.Boss));
         }
         bag.HadLoot = items.Count > 0 || gold > 0;
         _bags[(map.Id, monster.Id.Value)] = bag;

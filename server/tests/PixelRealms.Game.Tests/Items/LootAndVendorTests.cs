@@ -234,4 +234,36 @@ public sealed class LootAndVendorTests
         w.Combat.Vendor.Buy(ana, npc.Id, "bread", 1, w.Map, ctx, 4).ShouldBe("out_of_range");
         _ = free;
     }
+
+    [Fact]
+    public void UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise() // HU-062 CA4, HU-083 CA4
+    {
+        var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "warrior", 5, (10, 10)).WithMonster("slime", (12, 10), wanderRadius: 0)
+            .WithMonster("foreman_grask", (20, 20), wanderRadius: 0).WithMonster("wolf", (14, 10), wanderRadius: 0).BuildWithCombat();
+        var ana = w.Player("Ana");
+        var ctx = w.Begin();
+        var rareIds = new HashSet<string> { "foreman_pick", "foreman_breastplate", "lantern_amulet" };
+        w.Combat.Loot.CreateBag(w.Monster("foreman_grask"), ana, w.Map, ctx);
+        var boss = ctx.Events.OfType<LootAnnouncedEvent>().Single(e => rareIds.Contains(e.TemplateId));
+        boss.Global.ShouldBeTrue();
+        boss.Winner.ShouldBe(ana);
+        boss.Rarity.ShouldBe(Rarity.Rare);
+
+        // Un slime (junk/common) nunca anuncia; un lobo anuncia (grupo, no global) cuando cae la daga/collar uncommon.
+        ctx.Events.Clear();
+        w.Combat.Loot.CreateBag(w.Monster("slime"), ana, w.Map, ctx);
+        ctx.Events.OfType<LootAnnouncedEvent>().ShouldBeEmpty();
+        var wolf = w.Monster("wolf");
+        LootAnnouncedEvent? ann = null;
+        for (var i = 0; i < 400 && ann is null; i++)
+        {
+            ctx.Events.Clear();
+            w.Combat.Loot.Forget(w.Map, wolf.Id);
+            w.Combat.Loot.CreateBag(wolf, ana, w.Map, ctx);
+            ann = ctx.Events.OfType<LootAnnouncedEvent>().FirstOrDefault();
+        }
+        ann.ShouldNotBeNull();
+        ann.Global.ShouldBeFalse();
+        ((int)ann.Rarity).ShouldBeGreaterThanOrEqualTo((int)Rarity.Uncommon);
+    }
 }

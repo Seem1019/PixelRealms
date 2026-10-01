@@ -49,6 +49,24 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                         foreach (var winner in la.Winners)
                             if (winner.ConnectionId >= 0) connections.Send(winner.ConnectionId, SnapshotBuilder.ToSpawn(corpse, SnapshotBuilder.FlagLootable));
                     break;
+                case LootAnnouncedEvent ann:
+                {
+                    // HU-062 CA4: uncommon+ al chat de grupo del ganador; HU-083 CA4: lo del jefe, al global.
+                    var itemName = mapper.ItemName(ann.TemplateId);
+                    var text = $"{ann.Winner.Name} ha conseguido [{itemName}] ({RarityName(ann.Rarity)})";
+                    if (ann.Global)
+                    {
+                        var msg = new ChatMessage("global", "", text, ctx.NowMs);
+                        foreach (var p in players.All) if (p.ConnectionId >= 0) connections.Send(p.ConnectionId, msg);
+                    }
+                    else if (parties.PartyOf(ann.Winner.CharacterId) is { } party)
+                    {
+                        var msg = new ChatMessage("party", "", text, ctx.NowMs);
+                        foreach (var m in party.Members)
+                            if (players.ByCharacter(m.CharacterId) is { ConnectionId: >= 0 } member) connections.Send(member.ConnectionId, msg);
+                    }
+                    break;
+                }
                 case InventoryChangedEvent inv when inv.Player.ConnectionId >= 0:
                     connections.Send(inv.Player.ConnectionId, mapper.ToInventoryUpdate(inv.Player, inv.ReqId));
                     break;
@@ -202,4 +220,12 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                 connections.Send(conn, new CombatEvents(tick, list.GetRange(i, Math.Min(MaxCombatEntries, list.Count - i))));
         }
     }
+
+    private static string RarityName(Content.Defs.Rarity r) => r switch
+    {
+        Content.Defs.Rarity.Uncommon => "poco común",
+        Content.Defs.Rarity.Rare => "raro",
+        Content.Defs.Rarity.Epic => "épico",
+        _ => r.ToString().ToLowerInvariant(),
+    };
 }

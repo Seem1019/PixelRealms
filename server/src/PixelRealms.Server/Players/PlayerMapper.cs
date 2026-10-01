@@ -12,6 +12,9 @@ namespace PixelRealms.Server.Players;
 /// <summary>Convierte entre el personaje guardado (DTO inmutable) y la entidad viva del mundo, y construye los DTOs del protocolo.</summary>
 public sealed class PlayerMapper(ReloadableContent content)
 {
+    /// <summary>Nombre visible de una plantilla (o el id si no existe).</summary>
+    public string ItemName(string templateId) => content.Current.TryGetItem(templateId, out var tpl) && tpl is not null ? tpl.Name : templateId;
+
     public Player ToPlayer(CharacterSaveDto dto, EntityId id)
     {
         var db = content.Current;

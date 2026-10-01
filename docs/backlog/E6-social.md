@@ -53,7 +53,7 @@
 
 **Notas de implementación**
 - Marcos de grupo (`social_panels.gd`) con nombre, clase, nivel, vida y estado, actualizados con `PartyUpdate` cada 500 ms (`EventDispatcher.PartyFrameEveryTicks`) aunque estén fuera de la AOI; clic o F1–F5 seleccionan. XP de grupo con la fórmula del GDD (`GroupXp.Split`: activos vivos a ≤ `xpRangeTiles` con acción en `activeWindowSec`, referencia nivel máximo, pesos `0.75^max(0, brecha−2)` mín. 0.10, `bonusBySize`); oro y botín para los miembros elegibles del grupo (`LootSystem.EligibleFor`).
-- Tests: `GroupXp_Example_10_8_5_vs_Normal9` (26.5 / 26.5 / 11.2), `GroupXp_InWorld_DeadOrFarMembersExcluded`. CA4 (anuncio de uncommon+ en el chat de grupo) pendiente.
+- Tests: `GroupXp_Example_10_8_5_vs_Normal9` (26.5 / 26.5 / 11.2), `GroupXp_InWorld_DeadOrFarMembersExcluded`. CA4: `LootAnnouncedEvent` al crear la bolsa → `ChatMessage{party}` a los miembros conectados del grupo del ganador (`EventDispatcher`); si el monstruo es jefe va al `global` (HU-083 CA4). Test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`.
 
 ---
 ### HU-063 · Lista de jugadores en línea
