@@ -68,6 +68,12 @@
 3. **Dado** `docs/deploy.md` **entonces** explica paso a paso: comprar VPS/dominio, DNS, firewall (solo 22, 80, 443), variables de entorno, primer despliegue, actualizar, ver logs.
 4. **Dado** un GitHub Action manual (`workflow_dispatch`) **entonces** construye la imagen, la sube a GHCR y despliega por SSH.
 
+**Notas de implementación (parcial, sin probar en un VPS)**
+- `server/Dockerfile` multi-stage (`sdk:10.0` → `aspnet:10.0-alpine`, usuario `pixelrealms`, `InvariantGlobalization`, content/ y maps/ dentro, healthcheck); el Action falla si la imagen supera 150 MB. **Sin construir aquí** (sin Docker).
+- `docker-compose.prod.yml` con `postgres`, `server`, `caddy` (TLS automático, `/play` estático con COOP/COEP, `/ws` `/api` `/health` `/admin` al servidor) y `backup`; `deploy/Caddyfile`. El servidor honra `X-Forwarded-For/Proto` en Producción (`UseForwardedHeaders`) para que el tope por IP vea la IP real.
+- `docs/deploy.md`: VPS/dominio, DNS, firewall (22/80/443), variables, primer despliegue, actualizar, logs, backups y restauración.
+- `.github/workflows/deploy.yml` (`workflow_dispatch`): build+push a GHCR y despliegue por SSH (`appleboy/scp-action` + `ssh-action`); secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_PATH?`. **Pendiente**: ejecutarlo de verdad y corregir lo que falle.
+
 ---
 
 ### HU-074 · Build web y de escritorio del cliente
@@ -81,6 +87,10 @@
 2. **Dado** el export Windows **entonces** se publica un `.zip` en itch.io (página privada con contraseña) vía `butler` desde CI.
 3. **Dado** una versión de cliente desactualizada **entonces** el servidor responde `bad_version` y el cliente muestra un enlace para actualizar.
 
+**Notas de implementación (parcial, sin probar en un VPS)**
+- `client/export_presets.cfg` (Web con hilos; Windows x86_64 con pck embebido) y `.github/workflows/release-client.yml` (`workflow_dispatch`): sync de contenido, fija `DEFAULT_SERVER_URL`, exporta, sube la web a `deploy/play` del VPS y el `.zip` a itch.io con `butler` (secrets `BUTLER_API_KEY`, `ITCH_TARGET`). **Sin ejecutar**: no hay plantillas de exportación ni Docker aquí; probar en Chrome y Firefox queda para Diego.
+- CA3: con `bad_version` el login muestra el aviso y un `LinkButton` "Descargar la versión actual" → `Settings.update_url()` (por defecto `<servidor>/play/`, configurable en `settings.cfg` → `[net] update_url`).
+
 ---
 
 ### HU-075 · Backups automáticos
@@ -92,6 +102,10 @@
 **Criterios de aceptación**
 1. **Dado** un contenedor/cron diario **entonces** ejecuta `pg_dump -Fc` y conserva los últimos 7.
 2. **Dado** `docs/deploy.md` **entonces** documenta cómo restaurar un backup y se ha probado una restauración.
+
+**Notas de implementación (parcial, sin probar en un VPS)**
+- Servicio `backup` en `docker-compose.prod.yml`: `deploy/backup.sh loop` hace `pg_dump -Fc` diario (04:00 UTC) en `./backups` y conserva los 7 últimos; `once` para una copia manual.
+- `deploy/restore.sh <dump>` (`pg_restore --clean --if-exists`) documentado en `docs/deploy.md` §9. **Pendiente CA2**: ensayar una restauración real y anotarla.
 
 ---
 

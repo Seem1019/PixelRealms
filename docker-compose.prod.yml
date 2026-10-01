@@ -1,0 +1,73 @@
+# HU-073 CA2 / HU-075 CA1: producción en el VPS. `docker compose -f docker-compose.prod.yml up -d`
+# Variables en .env (ver .env.example): DOMAIN, POSTGRES_*, JWT_SIGNING_KEY, SERVER_IMAGE.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pixelrealms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pixelrealms}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pixelrealms} -d ${POSTGRES_DB:-pixelrealms}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    image: ${SERVER_IMAGE:-ghcr.io/OWNER/pixelrealms-server:latest}
+    build: { context: ., dockerfile: server/Dockerfile }
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-pixelrealms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pixelrealms}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?define JWT_SIGNING_KEY en .env}
+      Persistence__Provider: Postgres
+    expose: ["5080"]
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [server]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMAIN: ${DOMAIN:?define DOMAIN en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/play:/srv/play:ro          # export Web del cliente (HU-074 CA1)
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    # HU-075 CA1: pg_dump -Fc diario, conserva los últimos 7 (deploy/backup.sh).
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-pixelrealms}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      PGDATABASE: ${POSTGRES_DB:-pixelrealms}
+      BACKUP_KEEP: "7"
+      BACKUP_HOUR_UTC: "04"
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    entrypoint: ["sh", "/backup.sh", "loop"]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

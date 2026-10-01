@@ -1,0 +1,37 @@
+# HU-073 CA2: TLS automático (Let's Encrypt) para https://{$DOMAIN} y wss://{$DOMAIN}/ws; HU-074 CA1: cliente web en /play.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Cliente web (export Godot) con las cabeceras que exige SharedArrayBuffer (hilos de Godot Web).
+	handle_path /play* {
+		root * /srv/play
+		header Cross-Origin-Opener-Policy same-origin
+		header Cross-Origin-Embedder-Policy require-corp
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	# API, WebSocket y salud → servidor .NET (Caddy pasa X-Forwarded-For/Proto; el servidor los honra en Producción).
+	handle /ws* {
+		reverse_proxy server:5080
+	}
+	handle /api/* {
+		reverse_proxy server:5080
+	}
+	handle /health {
+		reverse_proxy server:5080
+	}
+	handle /admin/* {
+		reverse_proxy server:5080
+	}
+
+	handle {
+		redir /play/ 302
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

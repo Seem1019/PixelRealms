@@ -592,6 +592,7 @@ func _on_ui_error(code: String, _req_id: int) -> void:
 	match code:
 		"bad_version", "bad_ticket", "disconnected":
 			get_tree().set_meta("login_notice", ApiMessages.text_for(code))
+			get_tree().set_meta("login_notice_code", code)
 			get_tree().change_scene_to_file("res://scenes/login/login.tscn")
 		_:
 			_hud_status.text = Net.last_error_message if not Net.last_error_message.is_empty() else ApiMessages.text_for(code)

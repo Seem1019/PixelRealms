@@ -67,9 +67,9 @@
 | HU-070 | Comandos de administrador | E7 | Should | M | Hecha |
 | HU-071 | Rate limiting y protección de mensajes | E7 | Must | M | Hecha |
 | HU-072 | Métricas y logs del servidor | E7 | Should | S | Hecha |
-| HU-073 | Despliegue en VPS con TLS (wss) | E7 | Must | M | Pendiente |
-| HU-074 | Build web y de escritorio del cliente | E7 | Must | M | Pendiente |
-| HU-075 | Backups automáticos | E7 | Must | S | Pendiente |
+| HU-073 | Despliegue en VPS con TLS (wss) | E7 | Must | M | Parcial |
+| HU-074 | Build web y de escritorio del cliente | E7 | Must | M | Parcial |
+| HU-075 | Backups automáticos | E7 | Must | S | Parcial |
 | HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Hecha |
 | HU-081 | Arte de clases y monstruos | E8 | Must | L | Pendiente |
 | HU-082 | Íconos de items y hechizos | E8 | Must | M | Pendiente |

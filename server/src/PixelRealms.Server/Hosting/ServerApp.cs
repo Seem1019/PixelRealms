@@ -181,6 +181,13 @@ public static class ServerApp
         AuthEndpoints.Map(app);
         CharacterEndpoints.Map(app);
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
+        if (app.Environment.IsProduction())
+        {
+            // HU-073: detrás de Caddy, la IP real llega en X-Forwarded-For (tope por IP de HU-071) y el esquema en X-Forwarded-Proto.
+            var fwd = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions { ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto };
+            fwd.KnownIPNetworks.Clear(); fwd.KnownProxies.Clear(); // el proxy es el contenedor `caddy` de la misma red de compose
+            app.UseForwardedHeaders(fwd);
+        }
         app.MapGet("/health", (GameLoopService loop, ConnectionManager cm, NetMetrics metrics) =>
         {
             var (_, p99) = loop.Stats.Percentiles();

@@ -25,6 +25,16 @@ func _ready() -> void:
 	if not notice.is_empty():
 		_status.text = notice
 		get_tree().remove_meta("login_notice")
+		# HU-074 CA3: versión de cliente desactualizada → enlace para actualizar (la build web siempre es la última).
+		if get_tree().has_meta("login_notice_code") and str(get_tree().get_meta("login_notice_code")) == "bad_version":
+			var link := LinkButton.new()
+			link.text = "Descargar la versión actual"
+			link.uri = Settings.update_url()
+			link.name = "UpdateLink"
+			_status.get_parent().add_child(link)
+			link.position = _status.position + Vector2(0, _status.size.y + 4)
+		if get_tree().has_meta("login_notice_code"):
+			get_tree().remove_meta("login_notice_code")
 
 
 func _clear_errors() -> void:

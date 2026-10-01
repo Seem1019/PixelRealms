@@ -27,6 +27,11 @@ func ws_url() -> String:
 	return "ws://" + base.trim_prefix("http://") + "/ws"
 
 
+## Dónde descargar/abrir la versión actual del cliente (HU-074 CA3): por defecto la build web del mismo servidor (`/play`).
+func update_url() -> String:
+	return str(_config.get_value("net", "update_url", server_url().trim_suffix("/") + "/play/"))
+
+
 func get_value(section: String, key: String, default: Variant) -> Variant:
 	return _config.get_value(section, key, default)
 
