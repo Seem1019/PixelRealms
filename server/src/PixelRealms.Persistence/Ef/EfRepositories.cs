@@ -11,7 +11,7 @@ public sealed class EfAccountRepository(IDbContextFactory<GameDbContext> factory
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var lower = username.ToLowerInvariant();
-        var a = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(x => x.Username.ToLower() == lower, ct);
+        var a = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(x => x.Username.Equals(lower, StringComparison.CurrentCultureIgnoreCase), ct);
         return a is null ? null : Map(a);
     }
 
@@ -26,7 +26,7 @@ public sealed class EfAccountRepository(IDbContextFactory<GameDbContext> factory
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var lower = username.ToLowerInvariant();
-        if (await db.Accounts.AnyAsync(x => x.Username.ToLower() == lower, ct)) return null;
+        if (await db.Accounts.AnyAsync(x => x.Username.Equals(lower, StringComparison.CurrentCultureIgnoreCase), ct)) return null;
         var a = new Account { Id = Guid.CreateVersion7(), Username = username, PasswordHash = passwordHash, CreatedAt = DateTime.UtcNow };
         db.Accounts.Add(a);
         try { await db.SaveChangesAsync(ct); }
@@ -68,7 +68,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var lower = name.ToLowerInvariant();
-        return await db.Characters.AnyAsync(c => c.DeletedAt == null && c.Name.ToLower() == lower, ct);
+        return await db.Characters.AnyAsync(c => c.DeletedAt == null && c.Name.Equals(lower, StringComparison.CurrentCultureIgnoreCase), ct);
     }
 
     public async Task<CharacterSaveDto?> CreateAsync(NewCharacter character, CancellationToken ct = default)

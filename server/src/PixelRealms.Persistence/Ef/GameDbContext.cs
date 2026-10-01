@@ -13,9 +13,9 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<CharacterHotbarSlot> CharacterHotbar => Set<CharacterHotbarSlot>();
     public DbSet<ItemAuditLog> ItemAuditLog => Set<ItemAuditLog>();
 
-    protected override void OnModelCreating(ModelBuilder b)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        b.Entity<Account>(e =>
+        modelBuilder.Entity<Account>(e =>
         {
             e.ToTable("accounts");
             e.HasKey(x => x.Id);
@@ -24,7 +24,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("ix_accounts_username_lower").HasMethod("btree");
             e.HasMany(x => x.Characters).WithOne(c => c.Account).HasForeignKey(c => c.AccountId);
         });
-        b.Entity<Character>(e =>
+        modelBuilder.Entity<Character>(e =>
         {
             e.ToTable("characters", t => t.HasCheckConstraint("ck_characters_level", "level BETWEEN 1 AND 15"));
             e.HasKey(x => x.Id);
@@ -36,20 +36,20 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Hotbar).WithOne().HasForeignKey(h => h.CharacterId).OnDelete(DeleteBehavior.Cascade);
         });
-        b.Entity<CharacterItem>(e =>
+        modelBuilder.Entity<CharacterItem>(e =>
         {
             e.ToTable("character_items", t => t.HasCheckConstraint("ck_character_items_quantity", "quantity >= 1"));
             e.HasKey(x => x.Id);
             e.Property(x => x.TemplateId).IsRequired().HasMaxLength(48);
             e.HasIndex(x => new { x.CharacterId, x.Container, x.Slot }).IsUnique();
         });
-        b.Entity<CharacterHotbarSlot>(e =>
+        modelBuilder.Entity<CharacterHotbarSlot>(e =>
         {
             e.ToTable("character_hotbar");
             e.HasKey(x => new { x.CharacterId, x.Slot });
             e.Property(x => x.Ref).IsRequired().HasMaxLength(48);
         });
-        b.Entity<ItemAuditLog>(e =>
+        modelBuilder.Entity<ItemAuditLog>(e =>
         {
             e.ToTable("item_audit_log");
             e.HasKey(x => x.Id);

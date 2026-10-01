@@ -239,6 +239,7 @@ public sealed class TargetingAndEffectsTests
         if (!spell.IsInstant) events.AddRange(TickRunner.RunMs(w, spell.CastMs + 50));
         if (spell.Projectile is not null) events.AddRange(TickRunner.RunMs(w, 1000));
         events.ShouldNotBeEmpty();
-        events.ShouldContain(e => e is CombatHitEvent or AuraAppliedEvent or ForcedMoveEvent or CastEndedEvent or CooldownEvent);
+        events.Any(e => e is CombatHitEvent or AuraAppliedEvent or ForcedMoveEvent or CastEndedEvent or CooldownEvent)
+      .ShouldBeTrue("Se esperaba al menos un evento de combate/aura/movimiento/cast/cooldown");
     }
 }
