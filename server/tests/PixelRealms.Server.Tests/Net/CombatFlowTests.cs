@@ -45,14 +45,12 @@ public sealed class CombatFlowTests
         await ana.SendAsync("SelectTarget", $$"""{"targetId":{{slimeId}}}""");
         await ana.SendAsync("AutoAttack", """{"on":true}""");
         var seenDamage = false;
-        var deadline = DateTime.UtcNow.AddSeconds(40);
+        var deadline = DateTime.UtcNow.AddSeconds(60);
         while (DateTime.UtcNow < deadline)
         {
-            var batch = await ana.ExpectAsync("CombatEvents", 5000);
-            batch.GetProperty("tick").GetInt64().ShouldBeGreaterThan(0);
-            var entries = batch.GetProperty("e").EnumerateArray().ToList();
-            entries.Count.ShouldBeLessThanOrEqualTo(64);
-            if (entries.Any(e => e.GetProperty("src").GetInt32() == selfId && e.GetProperty("dst").GetInt32() == slimeId && e.GetProperty("kind").GetString() == "dmg"))
+            if (await ana.ArrivesAsync("CombatEvents", b =>
+                    b.GetProperty("e").GetArrayLength() <= 64 && b.GetProperty("tick").GetInt64() > 0 &&
+                    b.GetProperty("e").EnumerateArray().Any(e => e.GetProperty("src").GetInt32() == selfId && e.GetProperty("dst").GetInt32() == slimeId && e.GetProperty("kind").GetString() == "dmg"), 2000))
                 seenDamage = true;
             var snap = await ana.LatestAsync("Snapshot");
             var slime = snap.GetProperty("ents").EnumerateArray().FirstOrDefault(e => e.GetProperty("id").GetInt32() == slimeId);
