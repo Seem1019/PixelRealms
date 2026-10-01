@@ -48,6 +48,7 @@ public sealed class CombatFlowTests
         var deadline = DateTime.UtcNow.AddSeconds(60);
         while (DateTime.UtcNow < deadline)
         {
+            await ana.SendAsync("Ping", """{"clientTime":0}"""); // como el cliente real: sin tráfico propio el servidor cierra por idle_timeout (15 s)
             if (await ana.ArrivesAsync("CombatEvents", b =>
                     b.GetProperty("e").GetArrayLength() <= 64 && b.GetProperty("tick").GetInt64() > 0 &&
                     b.GetProperty("e").EnumerateArray().Any(e => e.GetProperty("src").GetInt32() == selfId && e.GetProperty("dst").GetInt32() == slimeId && e.GetProperty("kind").GetString() == "dmg"), 2000))
