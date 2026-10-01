@@ -82,9 +82,11 @@ confirma jugando en HU-084 y, si no se cumple, se cambia `killCycleSecTarget` y 
 Reparto en grupo (niveles 10 / 8 / 5, monstruo normal nv 9 = 46 XP): referencia 10 → mod 0.9; bono(3) 1.55 → pool 64.2;
 pesos 1.00 / 1.00 / 0.42 → **26.5 / 26.5 / 11.2 XP**. Sin piso: la brecha penaliza a propósito.
 
-## 6. Posición del Sacerdote respecto al triángulo
-> **Pendiente:** esta tabla usa los números anteriores al balance de la Fase 1 (Sanar hoy cura ~12 por casteo, ~8 por
-> segundo, y Castigo ya no ralentiza). El triángulo necesita simular movimiento y se mide en HU-084.
+## 6. Triángulo de duelos y posición del Sacerdote
+> **Desactualizado (2026-09-30):** el triángulo de duelos y esta tabla usan los números anteriores al balance de la Fase 1
+> (Sanar hoy cura ~12 por casteo, ~8 por segundo; Castigo ya no ralentiza; Gubia aturde 2 s, no 3; Carga tiene 16 s de
+> cooldown y Nova 18 s). No se han recalculado a propósito: el triángulo necesita simular movimiento y se mide jugando en
+> **HU-084 (M5)**. Hasta entonces, los valores vigentes son los de `content/spells.json` y `balance-report.md`.
 
 | Contra | Resultado esperado | Por qué |
 |---|---|---|

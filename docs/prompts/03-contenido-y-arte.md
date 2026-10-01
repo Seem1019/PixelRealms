@@ -1,12 +1,12 @@
 # Prompts de contenido, mapas y arte
 
-## Nuevo hechizo
+## Nuevo hechizo (ejemplo; los 32 del MVP ya existen, ADR-020)
 ```
-Usando la skill game-content, diseña el hechizo de área nuevo del Sacerdote que reemplaza a Rezo de sanación
-(GDD §Hechizos): área pequeña apuntada (`ground_aoe_all`) que cura a los aliados y daña a los enemigos, con un daño
-mucho menor que la curación, desbloqueo a nivel ≤ 6. Antes de escribir JSON, dime qué falta en el motor para
-`ground_aoe_all` (ver HU-085 y HU-086) y muéstrame el cálculo de curación y daño a nivel 6 frente a Sanar y Castigo.
-Valida con ContentValidator y crea el ícono placeholder o lista el asset faltante.
+Usando la skill game-content, diseña un hechizo nuevo de <clase> para una fase futura (post-MVP: el grupo de 8 ya está
+completo, así que di cuál sustituiría y por qué). Antes de escribir JSON: comprueba contra docs/design/class-kits.md que
+respeta el pentagrama y la regla 40/75 (mídelo con tools/balance/), di qué falta en el motor si usa una forma, un targeting
+o un efecto no implementado (quedaría no disponible, ADR-023) y muéstrame el cálculo a nivel 6 frente a los hechizos de
+su clase. Valida con el validador de contenido y crea el ícono placeholder o lista el asset faltante.
 ```
 
 ## Lote de items

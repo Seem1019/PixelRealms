@@ -66,6 +66,11 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - Al terminar, añadir hook en `.claude/settings.json` (PostToolUse sobre `Write|Edit`) que ejecute el validador si el
   archivo editado está en `content/` (script `tools/hooks/validate-content.sh` que lee el JSON de stdin).
 - Tests: el contenido real del repo pasa; 1 test por regla con JSON inválido mínimo.
+- **Punto de partida:** `tools/ContentCheck/` (consola .NET 10 sin NuGet, `dotnet run --project tools/ContentCheck -- content/`) ya
+  valida los schemas (subconjunto de 2020-12) y todas las referencias cruzadas de la skill `game-content`, y emite los avisos de
+  ADR-023. Esta HU lo sustituye por `server/tools/ContentValidator` con JsonSchema.Net y `CrossRefValidator` en
+  `PixelRealms.Content`: porta sus reglas (y su lista de funciones del motor implementadas), añade los tests y el hook, y
+  después borra `tools/ContentCheck/`.
 
 ---
 

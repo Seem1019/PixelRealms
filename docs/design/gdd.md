@@ -141,13 +141,14 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   **Fase 1:** los rangos suben solos. **Fase 2:** al subir un rango se elige **1 de 2 mejoras**; las builds salen de qué
   4 hechizos llevas equipados y qué mejoras eliges. Antes de cerrar el MVP (Fase 2 o 3) debe existir una forma de
   **reiniciar las mejoras**.
-- **Pendiente de confirmar:** rangos en los niveles 4, 8 y 12 con +15 % de valor base por rango.
+- **Rangos (ADR-024, confirmado):** los hechizos suben de rango en los niveles **4, 8 y 12** (`rules.progression.spellRankLevels`)
+  con **+15 %** sobre el valor base por rango (`spellRankBonusPct`). En la Fase 1 (tope 6) solo se alcanza la subida del nivel 4.
 - **Controles y acumulación (ADR-022):** tras un aturdimiento, raíz o silencio, 1,5 s de inmunidad a los tres; efectos del
   mismo tipo no se suman (manda el más fuerte) y la ralentización máxima es del 40 % (`combat.md` §Auras).
 - **Balance por pentagrama y grupos de hechizos:** `docs/design/class-kits.md` (ADR-020). Cada clase tiene 8 hechizos que
   se desbloquean en los niveles 1, 2, 3, 5, 7, 9, 11 y 13 (`rules.progression.spellUnlockLevels`): en la Fase 1 tiene 4
   (todos equipados) y la elección libre empieza en el nivel 7. Pulso sagrado (nv 5) reemplaza a Rezo de sanación.
-  Cuándo se pueden cambiar los hechizos equipados está por definir.
+  Cuándo se pueden cambiar los hechizos equipados se decide en la Fase 2; en la Fase 1 la barra (HU-043) solo ordena los 4.
 
 ### Ataque básico (todas las clases)
 - **El ataque básico lo da el arma equipada, no la clase, y no ocupa ninguna de las 4 casillas de hechizo.** Cada tipo de
@@ -168,8 +169,8 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   objetivo: ningún arma da área, control ni movilidad.
 - **Convivencia con los hechizos:** el básico sigue solo mientras haya objetivo en alcance y no se esté casteando. Un
   hechizo instantáneo no reinicia su temporizador, pero tiene un bloqueo de animación de 250 ms (`abilityLockMs`) en el que
-  no sale el básico ni otro hechizo (si tocaba, sale al terminar). Todos los hechizos de clase tienen cooldown global de 1 s;
-  el básico y los usables no. Ningún hechizo instantáneo de clase tiene menos de 2 s de cooldown
+  no sale el básico ni otro hechizo (si tocaba, sale al terminar). Los hechizos de clase tienen cooldown global de 1 s salvo los
+  marcados `triggersGcd: false` (Provocar, Carga, Carrera, Bloqueo con escudo, Parpadeo); el básico y los usables no. Ningún hechizo instantáneo de clase tiene menos de 2 s de cooldown
   (`minInstantSpellCooldownMs`): Golpe siniestro y Golpe heroico quedan en ~3 s y no llegan a ser un segundo básico.
 - Toda arma tiene un ataque básico que **no consume recurso**. Su único límite es la velocidad de ataque:
   `swingMs = arma.speedMs / clase.haste` (`rules.classScaling.<clase>.haste`).
@@ -199,6 +200,8 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
 ### Triángulo de ventajas (PvP 1 vs 1, nivel y equipo equivalentes)
 **Mago > Guerrero > Pícaro > Mago.** Significativa, no absoluta: la habilidad y el equipo pueden revertirla.
 Objetivo provisional (HU-084): con nivel y equipo iguales, el favorito gana entre el 60 % y el 75 % de los duelos.
+> *Desactualizado:* los cooldowns y duraciones citados abajo son anteriores al balance de la Fase 1 (hoy Carga 16 s, Nova 18 s,
+> Gubia 2 s; `content/spells.json` manda). El triángulo se mide jugando en HU-084 (`balance-notes.md` §6).
 - *Mago > Guerrero:* Escarcha (ralentiza) y Nova (raíz) mantienen al Guerrero lejos; Carga tiene 15 s de CD frente a
   Nova 20 s, así que el Guerrero llega una vez y luego vuelve a quedarse atrás.
 - *Guerrero > Pícaro:* más vida, armadura y Bloqueo; el Pícaro no puede alejarse sin dejar de pegar, y su Gubia se

@@ -19,8 +19,9 @@ Eres el diseñador de sistemas de PixelRealms. Lee primero `.claude/skills/game-
 Calcula con un script (Python o `dotnet script`) y muestra tablas:
 1. Por clase y nivel (1, 5, 10) con el equipo inicial / equipo verde esperado: stats derivados, DPS sostenido
    (rotación simple: mejor hechizo disponible respetando GCD, CD y recurso), HPS del sacerdote, vida efectiva.
-2. Tiempo para matar cada monstruo de su nivel en solitario (objetivo 8–15 s con rotación; 18–30 s solo básicos) y daño recibido
-   (el jugador no debería bajar de 30 % de vida con rotación, ni de 50 % solo con básicos).
+2. Tiempo para matar cada monstruo de su nivel en solitario y vida perdida por kill, con rotación y solo con básicos, comparados
+   con los medidos en `docs/design/balance-report.md` §Solitario (modelo en `tools/balance/`). Sin rangos fijos: el piso es no
+   perder más del 50 % de vida solo con básicos y que el ciclo por monstruo siga en `rules.progression.killCycleSecTarget`.
 2b. Afinidad: tabla de `docs/design/combat.md` §Referencia recalculada (daño fuera de rol 55–65 %, aguante 50–60 %; márgenes en `rules.balanceTargets`).
 2b2. Pentagrama (ADR-020, `docs/design/class-kits.md`; modelo en `tools/balance/`, referencias fijas en
     `rules.balanceTargets.pentagram.references`, último informe en `docs/design/balance-report.md`): con el arma de referencia de cada clase, tabla de aportes por hechizo y

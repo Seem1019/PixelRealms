@@ -76,13 +76,13 @@ línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado; l
 - **Básico y armas (ADR-019):** el básico lo da el arma (`rules.weapons`), solo hace daño a un objetivo; mismo presupuesto de daño por
   nivel y rareza para todos los tipos, a distancia ×`rangedDpsMult` (0.8). Hechizos instantáneos de clase: `cooldownMs ≥ 2000`.
 - **Duración:** 20–30 h del 1 al 15 con una clase (`hoursToMaxLevel`).
-- **Tiempo para matar** un monstruo normal de su nivel en solitario con rotación completa: 8–15 s (solo básicos: 18–30 s).
+- **Números de hechizos y auras (daño, cura, coeficientes, maná, tiempo para matar):** no hay rangos fijos. Se miden con
+  `tools/balance/` (`python tools/balance/check.py`) contra el pentagrama de la clase (`rules.balanceTargets.pentagram`,
+  `docs/design/class-kits.md`) y se comparan con los valores medidos de la Fase 1 en `docs/design/balance-report.md` (la escala
+  de referencia). Límites: regla 40/75, piso de viabilidad, XP/hora ±15 % y, para el ciclo por monstruo, `killCycleSecTarget`.
 - **Jefes** (`rules.boss`): un jefe de nivel B lo matan 3 jugadores de nivel B−2 en 60–100 s; 2 de nivel B; 1 de B+1 + 1 de B−1.
   Vida del jefe ≈ `DPS(3 jugadores nivel B−2, contando el maná por golpe) × 80 s`; ningún caster debe quedarse sin maná antes del final si alterna básicos (pilar 4). Daño del jefe: el tanque de nivel
   B−2 debe morir en ~30 s sin curas (obliga a llevar sanador o pociones) y un dps de nivel B en ~25 s.
-- **DPS de hechizo** ≈ `(base + coef·poder) / max(castMs, 1000 GCD)`. Un hechizo de 2 s debe hacer ~1.8× uno instantáneo sin CD.
-- Coeficientes: instantáneo sin CD `spCoef` 0.4–0.5; 2 s `0.7–0.8`; 3 s `1.0`. AoE ×0.5–0.6 del single-target.
-- Curación por maná ≈ 1.0–1.3 vida por punto de maná; daño por maná ≈ 0.9–1.1.
 - Stats de item por nivel y rareza (presupuesto de puntos): `nivel × {common 0.5, uncommon 1, rare 1.5, epic 2}` redondeado.
 - Probabilidades: uncommon 3–5 %, rare 1–2 %, epic de jefe ~33 % cada uno (1 garantizado recomendable).
 - **XP de monstruo no se escribe:** `round((5·nivel + 1) · tipo)` con `type` normal 1.0 / hard 1.2 (a distancia o con mecánica) / elite 3 / boss 10.
@@ -90,11 +90,11 @@ línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado; l
 - **PvP:** la clase favorecida del triángulo (Mago > Guerrero > Pícaro > Mago) gana el 60–75 % de duelos simulados con equipo igual (`duelFavoriteWinRate`); si supera el 75 % hay que bajar la palanca (hechizo o `classAdvantage`).
 Pide al subagente `content-designer` una revisión de balance cuando agregues más de 3 entradas.
 
-## Ejemplo: nuevo hechizo con DoT
+## Ejemplo: nuevo hechizo con DoT (solo ilustra el formato; el grupo de 8 del Sacerdote ya está completo, ADR-020)
 ```json
 // spells.json
 { "id": "priest_shadow_word_pain", "name": "Palabra de las sombras: Dolor", "source": "class", "classId": "priest",
-  "levelReq": 6, "school": "magic", "castMs": 0, "cooldownMs": 0, "cost": { "resource": "mana", "amount": 25 },
+  "levelReq": 7, "school": "magic", "castMs": 0, "cooldownMs": 6000, "cost": { "resource": "mana", "amount": 8 },
   "range": 8, "targeting": "enemy", "effects": [{ "type": "apply_aura", "auraId": "priest_swp_dot" }],
   "icon": "spells/shadow_word_pain", "description": "Daño de sombras durante 18 s." }
 // auras.json

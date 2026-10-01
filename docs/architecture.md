@@ -125,4 +125,4 @@ sequenceDiagram
 ## 8. Límites conocidos (aceptados en MVP)
 - Un solo proceso; varias `MapInstance` (MVP: `meadow` y `mine`, una copia de cada); sin sharding. Objetivo: 50 jugadores y 300 monstruos a < 10 ms/tick; combate ≤ 4 ms p99 por instancia, límites de áreas en `rules.limits` y escenario de carga "Mina llena" (ADR-018, HU-089).
 - Una copia por mapa: el jefe de la Mina es compartido. Instancias por grupo = N `MapInstance` del mismo `MapData` (post-MVP, sin cambios de protocolo).
-- JSON en vez de binario (≈ 25 KB/s por cliente a 10 Hz). Optimización a MessagePack en backlog (HU-OPS-05).
+- JSON en vez de binario (≈ 25 KB/s por cliente a 10 Hz). Optimización a MessagePack post-MVP (ADR-002), sin HU todavía.

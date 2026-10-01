@@ -37,7 +37,7 @@ client/
 3. `Content` — carga `res://content/*.json` en diccionarios tipados por id (`Content.spell("mage_fireball")`).
 4. `Net` — `WebSocketPeer`; `connect_to(url, ticket)`; `send(t: String, d: Dictionary)`; en `_process` hace `poll()`,
    lee todos los paquetes, `JSON.parse_string`, y despacha a `_handlers[t]` → emite señal `message_received(t, d)`
-   y señales específicas (`snapshot(d)`, `combat_event(d)`…). Reconexión con backoff 1-2-4-8 s (máx 5 intentos).
+   y señales específicas (`snapshot(d)`, `combat_events(d)`…). Reconexión con backoff 1-2-4-8 s (máx 5 intentos).
 5. `GameState` — estado espejo: `self_id`, `stats`, `inventory`, `equipment`, `hotbar`, `known_spells`, `target_id`,
    `party`, `cooldowns` (predichos). Emite señales `inventory_changed`, `stats_changed`, etc. La UI **solo** escucha a GameState.
 
