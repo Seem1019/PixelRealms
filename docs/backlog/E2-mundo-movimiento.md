@@ -21,7 +21,7 @@
 ---
 ### HU-021 · Movimiento autoritativo con colisión
 **Como** jugador **quiero** moverme con WASD sin atravesar paredes **para** recorrer el mundo.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-014, HU-020
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -37,11 +37,15 @@
 - Algoritmo exacto en `docs/architecture.md` §4 y en el propio archivo de vectores.
 - Sin predicción todavía: el cliente dibuja la posición del snapshot (se verá con retraso; se resuelve en HU-022).
 
----
+**Notas de implementación**
+- Servidor: `Game/Movement/MovementStep` (algoritmo de `docs/architecture.md` §4 en px; pasa `shared/test-vectors/movement.json` en `MovementVectorTests`), `MovementSystem` (clamp de dx/dy, descarte de seq decreciente con log debug, parada a los 500 ms sin input, velocidad desde `rules.movement.baseSpeedTilesPerSec` × multiplicadores), `Net/Handlers/MoveInputHandler`, `Net/SnapshotBuilder` (10 Hz, `self{x,y,speed,hp,res}` + `ackSeq`).
+- Cliente: `world.gd` envía `MoveInput` al cambiar la dirección, cada 200 ms mientras se mantiene y `0,0` al soltar (CA1).
+- Tests: `MovementVectorTests`, `MovementSystemTests` (clamp, seq, timeout, deslizamiento) y `MovementAndAoiTests` (integración WebSocket).
 
+---
 ### HU-022 · Predicción y reconciliación del jugador propio
 **Como** jugador **quiero** que mi personaje responda al instante **para** que el juego no se sienta lento con latencia.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-021
 - Skills: `godot-client`, `net-protocol`
 
@@ -53,11 +57,16 @@
 4b. **Dado** que casteo moviéndome **entonces** el cliente aplica `castMoveSpeedMult` desde su propio `CastStarted` hasta `CastEnded`, y `shared/test-vectors/movement.json` incluye casos a velocidad reducida que pasan en ambos lados.
 5. **Dado** un desplazamiento por habilidad (Carga, salto a un punto) **entonces** el cliente no lo predice: aplica la posición del servidor con un suavizado de ~100 ms (ADR-016).
 
----
+**Notas de implementación**
+- `scripts/net/movement_step.gd` es traducción literal de `MovementStep.cs`; `tests/test_movement_vectors.gd` pasa los vectores (copiados a `client/tests/vectors/`).
+- `scripts/net/prediction.gd`: inputs pendientes, re-simulación con seq > ackSeq, corrección < 2 px suavizada en 100 ms y salto si es mayor (`test_prediction.gd`). Overlay F3 muestra inputs pendientes, ackSeq y error en px (CA4).
+- `Net.simulated_latency_ms` retrasa envío y recepción (mitad y mitad) para CA2; la comprobación visual "sin tirones" queda para probar jugando.
+- **Pendiente:** CA4b (`castMoveSpeedMult` en el cliente y vectores a velocidad reducida) y CA5 (desplazamientos por habilidad) dependen del casteo de M2 (HU-032/HU-087): se cierran allí.
 
+---
 ### HU-023 · Ver a otros jugadores (AOI + interpolación)
 **Como** jugador **quiero** ver a mis amigos moverse con fluidez **para** jugar juntos.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-021
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -72,11 +81,15 @@
 - `InterestSystem` con celdas de 16×16 tiles; recalcular pertenencia a celda solo cuando la entidad cambia de celda.
 - `tools/LoadBot`: consola .NET que crea N cuentas/personajes y los mueve aleatoriamente (útil para todo el proyecto).
 
----
+**Notas de implementación**
+- Servidor: `Game/Interest/InterestSystem` (celdas de 16 tiles, radio 1, recalculo solo al cambiar de celda) emite `EntityEnteredView`/`EntityLeftView`; `Net/EventDispatcher` los traduce a `EntitySpawn` (nombre, clase, nivel) y `EntityDespawn{reason:"left"}`. Tests `InterestSystemTests` + `MovementAndAoiTests` (dos clientes se ven, se alejan y dejan de verse).
+- Cliente: `scripts/net/interpolation_buffer.gd` (100 ms atrás, extrapola ≤ 100 ms y congela) y `scripts/world/remote_entity.gd` (placeholder de color por tipo + nombre); `world.gd` crea/borra remotos con spawn/despawn y les pasa el estado del snapshot.
+- **Pendiente:** CA4 (`tools/LoadBot`, 30 bots y medición p99/KB·s) se hace con HU-089; CA5 (animaciones `walk_<dir>`/`idle_<dir>`) necesita sprites (HU-070).
 
+---
 ### HU-024 · Cámara, capas y nombres sobre personajes
 **Como** jugador **quiero** una cámara que me siga y ver nombres **para** orientarme y reconocer a mis amigos.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -86,8 +99,11 @@
 3. **Dado** cualquier jugador **entonces** su nombre aparece encima (blanco; el propio en amarillo; miembros de grupo en azul — HU-061).
 4. **Dado** que entro en una zona de `zones` **entonces** aparece su nombre en el centro con fade de 2 s.
 
----
+**Notas de implementación**
+- Cámara hija de `PlayerSelf` con `position_smoothing` 8, límites al tamaño del mapa y `snap_2d_transforms_to_pixel` en `project.godot` (CA1); `Entities` con `y_sort_enabled`, capa `above` con z_index 10 (CA2); nombre propio en amarillo y remotos en blanco (`RemoteEntity.set_name_color` para el azul de HU-061) (CA3); etiqueta `ZoneName` con fade de 2 s al entrar en una zona de `zones` (CA4).
+- Sin verificar visualmente en el editor (sandbox headless): probar jugando.
 
+---
 ### HU-025 · Desconexión, linkdead y reconexión
 **Como** jugador **quiero** que un corte breve de internet no me saque del juego **para** no perder el ritmo.
 - Prioridad: Must · Estimación: M · Estado: Pendiente

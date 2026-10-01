@@ -27,10 +27,10 @@
 | HU-013 | Listar y borrar personajes | E1 | Must | S | Hecha |
 | HU-014 | Entrar al mundo (ticket + Hello/Welcome) | E1 | Must | M | Hecha |
 | HU-020 | Cargar mapa Tiled en servidor y cliente | E2 | Must | M | Hecha |
-| HU-021 | Movimiento autoritativo con colisión | E2 | Must | L | Pendiente |
-| HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Pendiente |
-| HU-023 | Ver a otros jugadores (AOI + interpolación) | E2 | Must | L | Pendiente |
-| HU-024 | Cámara, capas y nombres sobre personajes | E2 | Must | S | Pendiente |
+| HU-021 | Movimiento autoritativo con colisión | E2 | Must | L | Hecha |
+| HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Hecha |
+| HU-023 | Ver a otros jugadores (AOI + interpolación) | E2 | Must | L | Hecha |
+| HU-024 | Cámara, capas y nombres sobre personajes | E2 | Must | S | Hecha |
 | HU-025 | Desconexión, linkdead y reconexión | E2 | Must | M | Pendiente |
 | HU-026 | Guardado de posición y estado | E2 | Must | M | Pendiente |
 | HU-027 | Portales y cambio de mapa | E2 | Must | M | Pendiente |

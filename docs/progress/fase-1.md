@@ -25,7 +25,7 @@
 | 5 | HU-005 Proyecto Godot base | M1 | 001 | Hecha (parcial) | fuente pixel y YATI pendientes; escalado sin verificar visualmente |
 | 6 | HU-006 Protocolo base | M1 | 004, 005 | Hecha | integración sin Mvc.Testing (WebApplication en puerto libre) |
 | 7 | HU-010 Registro · HU-011 Login · HU-012 Crear personaje · HU-013 Listar/borrar · HU-014 Entrar al mundo | M1 | 002/003/006 | Hechas | JWT HS256 propio (provisional); pantallas sin comprobar en el editor |
-| 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | HU-020 hecha (servidor); resto pendiente | cliente sin YATI: no dibuja el mapa |
+| 8 | HU-020 Mapa Tiled · HU-021 Movimiento · HU-022 Predicción · HU-023 AOI · HU-024 Cámara · HU-025 Linkdead · HU-026 Guardado · HU-027 Portales | M1 | | HU-020..024 hechas; 025/026/027 pendientes | cliente dibuja el mapa con colores placeholder (sin YATI/tiles); CA4b/CA5 de HU-022 y CA4/CA5 de HU-023 se cierran en M2/M5 |
 | 9 | HU-030 → HU-039, HU-086, HU-085, HU-087, HU-088, HU-040, HU-041 | M2 | | Pendiente | dominio puro con tests primero |
 | 10 | HU-050 → HU-059 | M3 | | Pendiente | |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Pendiente | |
@@ -47,6 +47,12 @@
 - **HU-011 · JWT HS256 a mano (`Auth/JwtService`)** en lugar de `Microsoft.AspNetCore.Authentication.JwtBearer`. Descartado el
   paquete por NuGet; la validación es un filtro de endpoint (`RequireJwt`). Reversible: sustituir el filtro por
   `AddAuthentication().AddJwtBearer` con la misma clave.
+- **HU-022/023 · unidades del protocolo.** El dominio trabaja en tiles (`Vec2`) y el protocolo en píxeles con 2 decimales
+  (`docs/protocol.md`); la conversión vive solo en `SnapshotBuilder`/`PlayerMapper` y el cliente predice en píxeles con
+  `movement_step.gd`. Descartado: enviar tiles con decimales (rompería los vectores compartidos, que están en px).
+- **HU-023 · entidades remotas sin sprites.** `RemoteEntity` dibuja un rectángulo de color por tipo (jugador/monstruo/NPC) y
+  el nombre; los sprites y `walk_<dir>`/`idle_<dir>` llegan con HU-070. Reversible: sustituir el `ColorRect` por un
+  `AnimatedSprite2D` sin tocar la red.
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 
