@@ -232,6 +232,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
             m.Combat.Evading = false;
             m.Hp = m.MaxHp;
             m.Threat.Clear();
+            m.TaggedBy = null;
             auras.ClearAll(m, map, ctx);
             m.LastCombatAtMs = long.MinValue;
             m.Brain.State = AiState.Idle;

@@ -83,6 +83,19 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("Snapshot", {"tick": 14, "ackSeq": 0, "self": {"x": 100.0, "y": 100.0, "speed": 4.0, "hp": 70, "maxHp": 100, "res": 40, "maxRes": 60}, "ents": []})
 	assert_eq(GameState.target_id, -1)
 
+	# XP y subida de nivel: hechizo nuevo a la primera casilla libre (2) y aviso.
+	_dispatch("XpGain", {"amount": 6, "sourceId": 7})
+	assert_eq(GameState.xp, 6)
+	_dispatch("LevelUp", {"level": 4, "newSpells": ["mage_flame_burst"], "rankUps": [{"spellId": "mage_fireball", "rank": 1}]})
+	assert_eq(GameState.level, 4)
+	assert_true(GameState.known_spells.has("mage_flame_burst"))
+	var placed := false
+	for h: Variant in GameState.hotbar:
+		if str((h as Dictionary).get("ref", "")) == "mage_flame_burst" and int((h as Dictionary).get("slot", -1)) == 2:
+			placed = true
+	assert_true(placed)
+	assert_ne(_world._hud._notice_label.text, "")
+
 	# Muerte y pantalla.
 	_dispatch("Died", {"killerId": 7, "respawnInMs": 0})
 	await get_tree().process_frame

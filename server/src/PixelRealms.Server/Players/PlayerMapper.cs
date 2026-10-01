@@ -76,6 +76,17 @@ public sealed class PlayerMapper(ReloadableContent content)
         return new Welcome(p.Id.Value, tick, 1000 / GameConstants.TickMs, 1000 / (GameConstants.TickMs * GameConstants.SnapshotEveryTicks), mapId, self, bag, equip, hotbar, p.KnownSpells.ToList(), db.Rules.Hash);
     }
 
+    /// <summary>StatsUpdate (docs/protocol.md): nivel, XP, stats primarios redondeados, derivados y oro.</summary>
+    public StatsUpdate ToStatsUpdate(Player p)
+    {
+        var db = content.Current;
+        var d = Recalculate(p);
+        var pr = d.Primary;
+        var stats = new StatsDto((int)Math.Round(pr.Str), (int)Math.Round(pr.Agi), (int)Math.Round(pr.Int), (int)Math.Round(pr.Spi), (int)Math.Round(pr.Sta));
+        var derived = new DerivedStatsDto(d.MaxHp, p.MaxResource, (float)d.AttackPower, (float)d.SpellPower, (float)d.CritChancePhysical, (float)d.DodgeChance, (float)d.Armor, (float)d.Haste, (float)d.MitigationAgainst(p.Level, db.Rules.Combat));
+        return new StatsUpdate(p.Level, p.Xp, XpCurve.XpToNextLevel(db.Rules.Progression, p.Level), stats, derived, p.Gold);
+    }
+
     private static ItemStackDto? ToDto(ItemInstance? i) => i is null ? null : new ItemStackDto(i.Id.ToString(), i.TemplateId, i.Qty);
 
     /// <summary>MapId actual del jugador (su instancia); se rellena desde el mundo en WorldSession.</summary>

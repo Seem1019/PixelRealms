@@ -26,6 +26,9 @@ public interface IRules
 
     /// <summary>Hash estable del archivo cargado (Welcome.rulesHash): el cliente detecta un rules.json distinto.</summary>
     string Hash { get; }
+
+    /// <summary>Tope de nivel de la fase activa (ADR-013).</summary>
+    int CurrentLevelCap { get; }
 }
 
 public sealed record RulesDb : IRules

@@ -122,6 +122,7 @@ public static class ServerApp
         router.Register(new CancelCastHandler(combatDeps));
         router.Register(new AutoAttackHandler(combatDeps));
         router.Register(new RespawnHandler(combatDeps));
+        router.Register(new SetHotbarHandler(content));
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
         simulation.OnPreTick(router.Drain);
         app.Services.GetRequiredService<CombatModule>().Register(simulation, app.Services.GetRequiredService<PortalSystem>());

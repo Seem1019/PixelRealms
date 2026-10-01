@@ -11,6 +11,9 @@ signal cooldowns_changed
 signal cast_changed  ## casteo propio empezó/terminó
 signal died(killer_id: int)
 signal respawned
+signal xp_changed
+signal leveled_up(level: int, new_spells: Array, rank_ups: Array)
+signal notice(text: String)  ## avisos cortos para el HUD ("Nuevo hechizo: …")
 
 var self_id: int = -1
 var character_name: String = ""
@@ -34,6 +37,9 @@ var resource: int = 0
 var max_resource: int = 0
 var resource_kind: String = "mana"  # mana | rage | energy
 var is_dead: bool = false
+var xp: int = 0
+var xp_next: int = 0
+var gold: int = 0
 ## Casteo propio en curso: {spellId, startedMs, durationMs} o vacío.
 var own_cast: Dictionary = {}
 ## Auras por entidad: entity_id → Array de {auraId, casterId, stacks, endsMs}.
@@ -55,6 +61,8 @@ func _ready() -> void:
 	Net.register_handler("CastStarted", _on_cast_started)
 	Net.register_handler("CastEnded", _on_cast_ended)
 	Net.register_handler("Died", _on_died)
+	Net.register_handler("XpGain", _on_xp_gain)
+	Net.register_handler("LevelUp", _on_level_up)
 	Net.snapshot.connect(_on_snapshot)
 
 
@@ -73,6 +81,8 @@ func _on_welcome(d: Dictionary) -> void:
 	character_name = str(self_state.get("name", ""))
 	class_id = str(self_state.get("classId", ""))
 	level = int(self_state.get("level", 1))
+	xp = int(self_state.get("xp", 0))
+	xp_next = int(self_state.get("xpNext", 0))
 	hp = int(self_state.get("hp", 0))
 	max_hp = int(self_state.get("maxHp", 0))
 	resource = int(self_state.get("res", 0))
@@ -100,7 +110,16 @@ func _on_welcome(d: Dictionary) -> void:
 func _on_stats_update(d: Dictionary) -> void:
 	stats = d
 	level = int(d.get("level", level))
+	xp = int(d.get("xp", xp))
+	xp_next = int(d.get("xpNext", xp_next))
+	gold = int(d.get("gold", gold))
+	var derived: Dictionary = d.get("derived", {})
+	if not derived.is_empty():
+		max_hp = int(derived.get("maxHp", max_hp))
+		max_resource = int(derived.get("maxRes", max_resource))
 	stats_changed.emit()
+	xp_changed.emit()
+	vitals_changed.emit()
 
 
 func _on_inventory_update(d: Dictionary) -> void:
@@ -226,3 +245,51 @@ func _on_died(d: Dictionary) -> void:
 	auras.erase(self_id)
 	died.emit(int(d.get("killerId", -1)) if d.get("killerId") != null else -1)
 	vitals_changed.emit()
+
+
+## ¿Estoy en el tope de nivel de la fase? (rules.progression.levelCapByPhase[world.currentPhase − 1], HU-040 CA4)
+func at_level_cap() -> bool:
+	var caps: Variant = Content.rule("progression", "levelCapByPhase", [])
+	var phase := int(Content.rule("world", "currentPhase", 1))
+	if caps is Array and phase - 1 < (caps as Array).size():
+		return level >= int((caps as Array)[phase - 1])
+	return xp_next <= 0
+
+
+func _on_xp_gain(d: Dictionary) -> void:
+	xp += int(d.get("amount", 0))
+	xp_changed.emit()
+
+
+## HU-041 CA2: los hechizos nuevos van a la primera casilla libre de hechizos (SetHotbar) con aviso; CA3b: aviso de rangos.
+func _on_level_up(d: Dictionary) -> void:
+	level = int(d.get("level", level))
+	var new_spells: Array = d.get("newSpells", [])
+	var rank_ups: Array = d.get("rankUps", []) if d.get("rankUps") != null else []
+	var spell_slots := int(Content.rule("loadout", "spellSlots", 4))
+	for s: Variant in new_spells:
+		var spell_id := str(s)
+		if not known_spells.has(spell_id):
+			known_spells.append(spell_id)
+		var free := _first_free_slot(spell_slots)
+		if free >= 0:
+			hotbar.append({"slot": free, "kind": "spell", "ref": spell_id})
+			Net.send("SetHotbar", {"slot": free, "kind": "spell", "ref": spell_id})
+		notice.emit("Nuevo hechizo: %s" % str(Content.spell(spell_id).get("name", spell_id)))
+	if not rank_ups.is_empty():
+		notice.emit("Tus hechizos suben de rango (+%d %%)" % roundi(float(Content.rule("progression", "spellRankBonusPct", 0.15)) * 100.0))
+	notice.emit("¡Nivel %d!" % level)
+	stats_changed.emit()
+	leveled_up.emit(level, new_spells, rank_ups)
+
+
+func _first_free_slot(spell_slots: int) -> int:
+	for slot: int in spell_slots:
+		var taken := false
+		for h: Variant in hotbar:
+			if int((h as Dictionary).get("slot", -1)) == slot:
+				taken = true
+				break
+		if not taken:
+			return slot
+	return -1

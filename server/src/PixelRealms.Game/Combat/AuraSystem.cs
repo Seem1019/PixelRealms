@@ -41,6 +41,8 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
         var existing = target.Auras.Find(def.Id, casterId);
         var casterStats = caster is not null ? services.StatsOf(caster) : null;
         var amount = PerStackAmount(def, casterStats);
+        if (caster is Player rankPlayer && spellId is not null && services.Content.TryGetSpell(spellId, out var srcSpell) && srcSpell is { Source: SpellSource.Class })
+            amount = PerStackAmount(def with { Base = def.Base * Progression.SpellRanks.BaseMultiplier(ctx.Rules.Progression, rankPlayer.Level) }, casterStats);
         if (existing is not null)
         {
             // Mismo lanzador, misma aura: duración completa sin reiniciar el ritmo de ticks; cargas solo si maxStacks > 1.

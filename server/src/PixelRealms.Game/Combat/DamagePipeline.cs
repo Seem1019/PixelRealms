@@ -44,7 +44,11 @@ public sealed class DamagePipeline(CombatServices services)
         GrantRage(target, rules.RagePerHitTaken, ctx);
 
         // Amenaza: el monstruo golpeado suma threatPerDamage por punto (incluido lo absorbido: el golpe fue real).
-        if (target is Monster m && source is not Monster && !m.Combat.Evading) m.Threat.Add(source.Id, scaled * rules.ThreatPerDamage);
+        if (target is Monster m && source is Player && !m.Combat.Evading)
+        {
+            m.Threat.Add(source.Id, scaled * rules.ThreatPerDamage);
+            m.TaggedBy ??= source.Id;
+        }
 
         if (target.Hp <= 0) Death?.Kill(target, source, map, ctx);
         return toHp;

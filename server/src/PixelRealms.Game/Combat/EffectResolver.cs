@@ -98,6 +98,9 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
     private void ApplyEffect(EffectDef e, Actor caster, Actor target, SpellDef spell, Progression.DerivedStats casterStats, bool crit, MapInstance map, TickContext ctx)
     {
         var rules = ctx.Rules.Combat;
+        // Rangos (ADR-024): +spellRankBonusPct por rango sobre el `base` de los efectos numéricos de los hechizos de clase.
+        if (caster is Player rankPlayer && spell.Source == SpellSource.Class && e.Base != 0)
+            e = e with { Base = e.Base * Progression.SpellRanks.BaseMultiplier(ctx.Rules.Progression, rankPlayer.Level) };
         switch (e.Type)
         {
             case EffectType.Damage:

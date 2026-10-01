@@ -14,6 +14,9 @@ var _self_name: Label
 var _self_hp: ProgressBar
 var _self_res: ProgressBar
 var _self_auras: HBoxContainer
+var _xp_bar: ProgressBar
+var _notice_label: Label
+var _notice_until: float = 0.0
 var _target_frame: PanelContainer
 var _target_name: Label
 var _target_hp: ProgressBar
@@ -51,6 +54,9 @@ func _ready() -> void:
 	GameState.cooldowns_changed.connect(_refresh_hotbar)
 	GameState.died.connect(_on_died)
 	GameState.respawned.connect(_on_respawned)
+	GameState.xp_changed.connect(_refresh_xp)
+	GameState.notice.connect(show_notice)
+	GameState.leveled_up.connect(func(_l: int, _n: Array, _r: Array) -> void: _refresh_hotbar())
 	EventBus.ui_error.connect(_on_ui_error)
 	_refresh_self()
 	_refresh_hotbar()
@@ -72,6 +78,9 @@ func _build() -> void:
 	sv.add_child(_self_hp)
 	_self_res = _bar(RESOURCE_COLORS["mana"])
 	sv.add_child(_self_res)
+	_xp_bar = _bar(Color(0.6, 0.3, 0.9))
+	_xp_bar.custom_minimum_size = Vector2(0, 3)
+	sv.add_child(_xp_bar)
 	_self_auras = HBoxContainer.new()
 	_self_auras.add_theme_constant_override("separation", 1)
 	sv.add_child(_self_auras)
@@ -146,6 +155,14 @@ func _build() -> void:
 	_error_label.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
 	add_child(_error_label)
 
+	# Avisos (nivel, hechizo nuevo)
+	_notice_label = _label("", 10)
+	_notice_label.position = Vector2(120, 60)
+	_notice_label.custom_minimum_size = Vector2(240, 14)
+	_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_notice_label.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
+	add_child(_notice_label)
+
 	# Pantalla de muerte
 	_death_panel = PanelContainer.new()
 	_death_panel.position = Vector2(170, 100)
@@ -192,6 +209,9 @@ func _process(_delta: float) -> void:
 	if _error_until > 0.0 and now >= _error_until:
 		_error_until = 0.0
 		_error_label.text = ""
+	if _notice_until > 0.0 and now >= _notice_until:
+		_notice_until = 0.0
+		_notice_label.text = ""
 	if _cast_end_text_until > 0.0 and now >= _cast_end_text_until:
 		_cast_end_text_until = 0.0
 		_cast_label.visible = false
@@ -211,6 +231,7 @@ func _process(_delta: float) -> void:
 
 func _refresh_self() -> void:
 	_self_name.text = "%s  nv %d" % [GameState.character_name, GameState.level]
+	_refresh_xp()
 	_self_hp.max_value = maxi(1, GameState.max_hp)
 	_self_hp.value = GameState.hp
 	_self_res.max_value = maxi(1, GameState.max_resource)
@@ -218,6 +239,26 @@ func _refresh_self() -> void:
 	var style: StyleBoxFlat = _self_res.get_theme_stylebox("fill")
 	style.bg_color = RESOURCE_COLORS.get(GameState.resource_kind, RESOURCE_COLORS["mana"])
 	_refresh_hotbar()
+
+
+## HU-040 CA2: barra de XP con `xp / xpNext` y tooltip; "Nivel máximo" en el tope de la fase (CA4).
+func _refresh_xp() -> void:
+	if _xp_bar == null:
+		return
+	if GameState.at_level_cap():
+		_xp_bar.max_value = 1
+		_xp_bar.value = 1
+		_xp_bar.tooltip_text = "Nivel máximo"
+		_self_name.text = "%s  nv %d · Nivel máximo" % [GameState.character_name, GameState.level]
+	else:
+		_xp_bar.max_value = maxi(1, GameState.xp_next)
+		_xp_bar.value = GameState.xp
+		_xp_bar.tooltip_text = "XP %d / %d" % [GameState.xp, GameState.xp_next]
+
+
+func show_notice(text: String) -> void:
+	_notice_label.text = text
+	_notice_until = Time.get_ticks_msec() / 1000.0 + 3.0
 
 
 # --- Objetivo -------------------------------------------------------------------------------------------------------------

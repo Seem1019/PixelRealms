@@ -25,6 +25,7 @@ public sealed class CombatModule
         Death = new DeathSystem(Services, Auras, interest);
         Spawns = new SpawnSystem(content, world);
         Ai = new MonsterAiSystem(Services, Casts, Auras, movement);
+        Progression = new Progression.ProgressionSystem(Services);
         Movement = movement;
         Interest = interest;
 
@@ -48,6 +49,7 @@ public sealed class CombatModule
     public DeathSystem Death { get; }
     public SpawnSystem Spawns { get; }
     public MonsterAiSystem Ai { get; }
+    public Progression.ProgressionSystem Progression { get; }
     public MovementSystem Movement { get; }
     public InterestSystem Interest { get; }
 
@@ -56,7 +58,7 @@ public sealed class CombatModule
     /// <summary>Registra los sistemas en orden; `extraBeforeInterest` permite insertar portales u otros antes de la AOI.</summary>
     public Simulation Register(Simulation sim, params IMapSystem[] extraBeforeInterest)
     {
-        sim.AddSystem(Movement).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Spawns);
+        sim.AddSystem(Movement).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Spawns);
         foreach (var s in extraBeforeInterest) sim.AddSystem(s);
         return sim.AddSystem(Interest);
     }

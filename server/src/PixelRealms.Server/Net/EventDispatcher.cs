@@ -4,7 +4,9 @@ using PixelRealms.Game.Core;
 using PixelRealms.Game.Entities;
 using PixelRealms.Game.Interest;
 using PixelRealms.Game.Map;
+using PixelRealms.Game.Progression;
 using PixelRealms.Protocol.Messages;
+using PixelRealms.Server.Players;
 
 namespace PixelRealms.Server.Net;
 
@@ -13,7 +15,7 @@ namespace PixelRealms.Server.Net;
 /// los sistemas). Los resultados de combate se agrupan en un `CombatEvents{tick, e}` por observador y tick (máx. 64
 /// entradas por mensaje, ADR-018) y solo van a quien ve al atacante o al objetivo.
 /// </summary>
-public sealed class EventDispatcher(ConnectionManager connections, World world, InterestSystem interest)
+public sealed class EventDispatcher(ConnectionManager connections, World world, InterestSystem interest, PlayerMapper mapper, WorldSession session)
 {
     public const int MaxCombatEntries = 64;
 
@@ -58,6 +60,19 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     break;
                 case CombatErrorEvent err when err.Player.ConnectionId >= 0:
                     connections.Send(err.Player.ConnectionId, new Error(err.Code, err.Message, err.ReqId));
+                    break;
+                case XpGainedEvent xp when xp.Player.ConnectionId >= 0:
+                    connections.Send(xp.Player.ConnectionId, new XpGain(xp.Amount, xp.SourceId?.Value));
+                    break;
+                case LevelUpEvent lu:
+                    if (lu.Player.ConnectionId >= 0)
+                        connections.Send(lu.Player.ConnectionId, new LevelUp(lu.Level, lu.NewSpells.ToList(), lu.RankUps.Count == 0 ? null : lu.RankUps.Select(r => new RankUpDto(r.SpellId, r.Rank)).ToList()));
+                    // HU-041 CA3: los demás ven el nivel nuevo (EntitySpawn renovado) y HU-026 CA6: guardado al subir.
+                    Broadcast(lu.MapInstanceId, lu.Player, SnapshotBuilder.ToSpawn(lu.Player));
+                    session.Save(lu.Player, ctx.NowMs, "level_up");
+                    break;
+                case StatsChangedEvent sc when sc.Player.ConnectionId >= 0:
+                    connections.Send(sc.Player.ConnectionId, mapper.ToStatsUpdate(sc.Player));
                     break;
                 default:
                     break;
