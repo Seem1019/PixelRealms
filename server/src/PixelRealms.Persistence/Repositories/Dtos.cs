@@ -17,4 +17,9 @@ public sealed record CharacterSummary(Guid Id, string Name, string ClassId, int 
 
 public sealed record NewCharacter(Guid AccountId, string Name, string ClassId, string MapId, float X, float Y, int Hp, int Resource, IReadOnlyList<SavedItem> Items, IReadOnlyList<SavedHotbarSlot> Hotbar);
 
+public enum CreateCharacterStatus { Created, NameTaken, LimitReached }
+
+/// <summary>Resultado de crear un personaje; <see cref="Character"/> solo si <see cref="Status"/> es Created.</summary>
+public sealed record CreateCharacterResult(CreateCharacterStatus Status, CharacterSaveDto? Character = null);
+
 public sealed record AccountRecord(Guid Id, string Username, string PasswordHash, bool IsAdmin, DateTime CreatedAt, DateTime? LastLoginAt);

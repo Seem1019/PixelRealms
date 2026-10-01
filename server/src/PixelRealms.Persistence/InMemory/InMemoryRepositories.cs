@@ -74,11 +74,15 @@ public sealed class InMemoryCharacterRepository(InMemoryStore store) : ICharacte
     public Task<bool> NameExistsAsync(string name, CancellationToken ct = default) =>
         Task.FromResult(store.Characters.Values.Any(c => c.DeletedAt is null && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)));
 
-    public Task<CharacterSaveDto?> CreateAsync(NewCharacter character, CancellationToken ct = default)
+    public Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default)
     {
+        // El mismo lock cubre límite y nombre: contar e insertar es atómico, como el FOR UPDATE de EF.
         lock (_lock)
         {
-            if (store.Characters.Values.Any(c => c.DeletedAt is null && string.Equals(c.Name, character.Name, StringComparison.OrdinalIgnoreCase))) return Task.FromResult<CharacterSaveDto?>(null);
+            if (store.Characters.Values.Count(c => c.AccountId == character.AccountId && c.DeletedAt is null) >= maxPerAccount)
+                return Task.FromResult(new CreateCharacterResult(CreateCharacterStatus.LimitReached));
+            if (store.Characters.Values.Any(c => c.DeletedAt is null && string.Equals(c.Name, character.Name, StringComparison.OrdinalIgnoreCase)))
+                return Task.FromResult(new CreateCharacterResult(CreateCharacterStatus.NameTaken));
             var now = DateTime.UtcNow;
             var c = new Character
             {
@@ -89,7 +93,7 @@ public sealed class InMemoryCharacterRepository(InMemoryStore store) : ICharacte
             };
             foreach (var i in c.Items) i.CharacterId = c.Id;
             store.Characters[c.Id] = c;
-            return Task.FromResult<CharacterSaveDto?>(Map(c));
+            return Task.FromResult(new CreateCharacterResult(CreateCharacterStatus.Created, Map(c)));
         }
     }
 

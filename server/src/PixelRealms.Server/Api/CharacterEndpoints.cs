@@ -25,13 +25,15 @@ public static class CharacterEndpoints
                 return err.Code == "reserved" ? Results.BadRequest(new ApiError("reserved_name", err.Message)) : Results.BadRequest(new { errors = new[] { err } });
             if (string.IsNullOrEmpty(req.ClassId) || !content.Current.TryGetClass(req.ClassId, out var cls))
                 return Results.BadRequest(new ApiError("invalid_class", "Clase desconocida"));
-            if (await repo.CountByAccountAsync(claims.AccountId, ct) >= Validation.MaxCharactersPerAccount)
-                return Results.BadRequest(new ApiError("max_characters", $"Máximo {Validation.MaxCharactersPerAccount} personajes por cuenta"));
-            if (await repo.NameExistsAsync(req.Name!, ct))
-                return Results.Conflict(new ApiError("name_taken", "Ese nombre ya está en uso"));
-            var created = await repo.CreateAsync(factory.Create(claims.AccountId, req.Name!, cls!), ct);
-            if (created is null) return Results.Conflict(new ApiError("name_taken", "Ese nombre ya está en uso"));
-            return Results.Created($"/api/characters/{created.Id}", new CharacterResponse(created.Id, created.Name, created.ClassId, created.Level, created.MapId));
+            // El repositorio comprueba el límite e inserta de forma atómica: peticiones concurrentes no lo superan.
+            var result = await repo.CreateAsync(factory.Create(claims.AccountId, req.Name!, cls!), Validation.MaxCharactersPerAccount, ct);
+            return result switch
+            {
+                { Status: CreateCharacterStatus.LimitReached } => Results.BadRequest(new ApiError("max_characters", $"Máximo {Validation.MaxCharactersPerAccount} personajes por cuenta")),
+                { Status: CreateCharacterStatus.NameTaken } => Results.Conflict(new ApiError("name_taken", "Ese nombre ya está en uso")),
+                { Character: { } created } => Results.Created($"/api/characters/{created.Id}", new CharacterResponse(created.Id, created.Name, created.ClassId, created.Level, created.MapId)),
+                _ => throw new InvalidOperationException($"Resultado de creación inesperado: {result.Status}"),
+            };
         }).RequireJwt();
 
         chars.MapDelete("/{id:guid}", async (HttpContext http, Guid id, ICharacterRepository repo, CancellationToken ct) =>

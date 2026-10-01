@@ -69,9 +69,15 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
         return await db.Characters.AnyAsync(c => c.DeletedAt == null && c.Name == name, ct);
     }
 
-    public async Task<CharacterSaveDto?> CreateAsync(NewCharacter character, CancellationToken ct = default)
+    public async Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Bloquea la fila de la cuenta hasta el COMMIT: las creaciones de una misma cuenta se serializan y el conteo
+        // de abajo (READ COMMITTED: instantánea nueva por sentencia) ya ve lo que insertó la anterior.
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM accounts WHERE id = {character.AccountId} FOR UPDATE", ct);
+        if (await db.Characters.CountAsync(x => x.AccountId == character.AccountId && x.DeletedAt == null, ct) >= maxPerAccount)
+            return new CreateCharacterResult(CreateCharacterStatus.LimitReached);
         var now = DateTime.UtcNow;
         var c = new Character
         {
@@ -82,8 +88,9 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
         c.Hotbar = character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = c.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }).ToList();
         db.Characters.Add(c);
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { return null; }
-        return Map(c);
+        catch (DbUpdateException) { return new CreateCharacterResult(CreateCharacterStatus.NameTaken); }
+        await tx.CommitAsync(ct);
+        return new CreateCharacterResult(CreateCharacterStatus.Created, Map(c));
     }
 
     public async Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default)

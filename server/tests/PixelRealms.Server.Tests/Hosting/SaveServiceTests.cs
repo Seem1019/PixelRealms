@@ -24,7 +24,7 @@ public sealed class SaveServiceTests
         public Task<IReadOnlyList<CharacterSummary>> ListByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CountByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> NameExistsAsync(string name, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<CharacterSaveDto?> CreateAsync(NewCharacter character, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default) => throw new NotSupportedException();
     }

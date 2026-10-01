@@ -25,7 +25,9 @@ public interface ICharacterRepository
     /// <summary>¿Existe un personaje no borrado con ese nombre (sin distinguir mayúsculas)?</summary>
     Task<bool> NameExistsAsync(string name, CancellationToken ct = default);
 
-    Task<CharacterSaveDto?> CreateAsync(NewCharacter character, CancellationToken ct = default);
+    /// <summary>Crea el personaje si la cuenta tiene menos de <paramref name="maxPerAccount"/> vivos y el nombre está libre.
+    /// Comprobar el límite e insertar es atómico frente a creaciones concurrentes de la misma cuenta.</summary>
+    Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default);
 
     /// <summary>Carga completa (items + hotbar). Null si no existe o está borrado.</summary>
     Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default);
