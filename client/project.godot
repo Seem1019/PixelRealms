@@ -23,6 +23,7 @@ Settings="*res://autoload/settings.gd"
 Content="*res://autoload/content.gd"
 Net="*res://autoload/net.gd"
 GameState="*res://autoload/game_state.gd"
+Api="*res://scripts/net/api_client.gd"
 
 [debug]
 

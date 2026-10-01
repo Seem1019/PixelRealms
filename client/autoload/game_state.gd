@@ -20,6 +20,8 @@ var target_id: int = -1
 var party: Dictionary = {}
 var cooldowns: Dictionary = {}  # spellId → msec de fin (predicho)
 var rules_hash: String = ""
+## Ticket obtenido en la selección de personaje; lo consume la escena World al conectar (HU-014).
+var pending_ticket: String = ""
 
 
 func _ready() -> void:

@@ -8,13 +8,18 @@ using PixelRealms.Server.Hosting;
 namespace PixelRealms.Server.Net;
 
 /// <summary>Contexto que recibe un handler: conexión, tick y utilidades para responder.</summary>
-public sealed class HandlerContext(ConnectionManager connections, TickContext tick, int connectionId)
+public sealed class HandlerContext(ConnectionManager connections, TickContext tick, int connectionId, PixelRealms.Server.Players.PlayerRegistry players)
 {
     public ConnectionManager Connections { get; } = connections;
 
     public TickContext Tick { get; } = tick;
 
     public int ConnectionId { get; } = connectionId;
+
+    public PixelRealms.Server.Players.PlayerRegistry Players { get; } = players;
+
+    /// <summary>Jugador de esta conexión, o null si aún no entró al mundo.</summary>
+    public PixelRealms.Game.Entities.Player? Player => Players.ByConnection(ConnectionId);
 
     public void Send(IServerMessage msg) => Connections.Send(ConnectionId, msg);
 
@@ -35,13 +40,16 @@ public interface IConnectionObserver
     void OnConnected(int connectionId, HandlerContext ctx);
 
     void OnDisconnected(int connectionId, HandlerContext ctx);
+
+    /// <summary>Hello aceptado: el adjunto es el personaje ya leído de BD (HU-014).</summary>
+    void OnPlayerJoin(int connectionId, object? attachment, HandlerContext ctx);
 }
 
 /// <summary>
 /// Drena la cola de entrada en el tick (máx. 500 mensajes por tick) y despacha cada sobre a su handler por nombre `t`, sin
 /// reflexión por mensaje (diccionario nombre → delegado). Un mensaje sin handler recibe `invalid_payload`.
 /// </summary>
-public sealed class MessageRouter(ConnectionManager connections, ILogger<MessageRouter> logger)
+public sealed class MessageRouter(ConnectionManager connections, PixelRealms.Server.Players.PlayerRegistry players, ILogger<MessageRouter> logger)
 {
     public const int MaxMessagesPerTick = 500;
 
@@ -74,7 +82,7 @@ public sealed class MessageRouter(ConnectionManager connections, ILogger<Message
         while (n < MaxMessagesPerTick && reader.TryRead(out var inbound))
         {
             n++;
-            var ctx = new HandlerContext(connections, tick, inbound.ConnectionId);
+            var ctx = new HandlerContext(connections, tick, inbound.ConnectionId, players);
             try
             {
                 switch (inbound.Kind)
@@ -84,6 +92,9 @@ public sealed class MessageRouter(ConnectionManager connections, ILogger<Message
                         break;
                     case InboundKind.Disconnected:
                         foreach (var o in _observers) o.OnDisconnected(inbound.ConnectionId, ctx);
+                        break;
+                    case InboundKind.PlayerJoin:
+                        foreach (var o in _observers) o.OnPlayerJoin(inbound.ConnectionId, inbound.Attachment, ctx);
                         break;
                     default:
                         if (_handlers.TryGetValue(inbound.Type, out var h)) h(inbound.Payload, ctx);

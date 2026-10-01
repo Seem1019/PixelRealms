@@ -21,11 +21,11 @@
 | HU-004 | Esqueleto del game loop de 20 Hz | E0 | Must | M | Hecha |
 | HU-005 | Proyecto Godot base (autoloads, pixel-perfect, GUT) | E0 | Must | M | Hecha |
 | HU-006 | Protocolo base: sobre, registro, Ping/Pong | E0 | Must | M | Hecha |
-| HU-010 | Registro de cuenta | E1 | Must | S | Pendiente |
-| HU-011 | Inicio de sesión | E1 | Must | S | Pendiente |
-| HU-012 | Crear personaje | E1 | Must | M | Pendiente |
-| HU-013 | Listar y borrar personajes | E1 | Must | S | Pendiente |
-| HU-014 | Entrar al mundo (ticket + Hello/Welcome) | E1 | Must | M | Pendiente |
+| HU-010 | Registro de cuenta | E1 | Must | S | Hecha |
+| HU-011 | Inicio de sesión | E1 | Must | S | Hecha |
+| HU-012 | Crear personaje | E1 | Must | M | Hecha |
+| HU-013 | Listar y borrar personajes | E1 | Must | S | Hecha |
+| HU-014 | Entrar al mundo (ticket + Hello/Welcome) | E1 | Must | M | Hecha |
 | HU-020 | Cargar mapa Tiled en servidor y cliente | E2 | Must | M | Hecha |
 | HU-021 | Movimiento autoritativo con colisión | E2 | Must | L | Pendiente |
 | HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Pendiente |

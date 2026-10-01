@@ -7,7 +7,7 @@ using PixelRealms.Server.Hosting;
 namespace PixelRealms.Server.Net;
 
 /// <summary>Sesiones vivas por id de conexión. El tick la consulta para enviar; las sesiones se registran desde el endpoint /ws.</summary>
-public sealed class ConnectionManager(ILogger<ConnectionManager> logger)
+public sealed class ConnectionManager(ILogger<ConnectionManager> logger, IHelloGate helloGate)
 {
     private readonly ConcurrentDictionary<int, WebSocketSession> _sessions = new();
     private int _nextId;
@@ -23,7 +23,7 @@ public sealed class ConnectionManager(ILogger<ConnectionManager> logger)
     public async Task HandleAsync(WebSocket socket, TimeSpan idleTimeout, CancellationToken serverStopping)
     {
         var id = Interlocked.Increment(ref _nextId);
-        using var session = new WebSocketSession(id, socket, Inbound.Writer, idleTimeout, logger);
+        using var session = new WebSocketSession(id, socket, Inbound.Writer, idleTimeout, logger, helloGate);
         _sessions[id] = session;
         logger.LogDebug("Conexión {Conn} abierta", id);
         try

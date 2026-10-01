@@ -23,11 +23,16 @@ public sealed class WebSocketSession : IDisposable
     private readonly ILogger _logger;
     private readonly TimeSpan _idleTimeout;
     private readonly TaskCompletionSource _closeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly IHelloGate? _helloGate;
     private int _invalidCount;
+
+    /// <summary>Ya envió un Hello aceptado (PlayerJoin encolado).</summary>
+    public bool Joined { get; private set; }
     private long _lastTrafficTicks;
 
-    public WebSocketSession(int id, WebSocket socket, ChannelWriter<InboundMessage> inbound, TimeSpan idleTimeout, ILogger logger)
+    public WebSocketSession(int id, WebSocket socket, ChannelWriter<InboundMessage> inbound, TimeSpan idleTimeout, ILogger logger, IHelloGate? helloGate = null)
     {
+        _helloGate = helloGate;
         Id = id;
         _socket = socket;
         _inbound = inbound;
@@ -132,6 +137,24 @@ public sealed class WebSocketSession : IDisposable
 
                 var decoded = MessageRegistry.Decode(buffer.AsSpan(0, total));
                 if (decoded.Status != MessageRegistry.DecodeStatus.Ok) { if (await RejectAsync(ct)) return; continue; }
+
+                if (decoded.Message is Hello hello)
+                {
+                    // HU-014: versión, ticket y lectura de BD fuera del tick; después se encola PlayerJoin con el personaje cargado.
+                    if (Joined || _helloGate is null) { if (await RejectAsync(ct)) return; continue; }
+                    var gate = await _helloGate.ProcessAsync(hello, this, ct);
+                    if (gate.ErrorCode is not null)
+                    {
+                        await _outbound.Writer.WriteAsync(MessageRegistry.Encode(new Error(gate.ErrorCode, null, null)), ct);
+                        CloseReason = gate.ErrorCode;
+                        await Task.Delay(20, ct);
+                        await CloseOutputAsync();
+                        continue;
+                    }
+                    Joined = true;
+                    _inbound.TryWrite(new InboundMessage(Id, "Hello", default, InboundKind.PlayerJoin, gate.JoinAttachment));
+                    continue;
+                }
 
                 // El payload viaja como JsonElement clonado: el tick lo deserializa al tipo concreto (MessageRouter).
                 using var doc = System.Text.Json.JsonDocument.Parse(buffer.AsMemory(0, total));

@@ -29,3 +29,4 @@ Thumbs.db
 # Godot: datos de GUT y archivos de import de assets generados en el editor
 client/.godot/
 client/gut_results.xml
+client/maps/

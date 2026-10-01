@@ -5,6 +5,7 @@ using PixelRealms.Protocol.Messages;
 using PixelRealms.Server.Api;
 using PixelRealms.Server.Auth;
 using PixelRealms.Server.Net;
+using PixelRealms.Server.Players;
 using PixelRealms.Server.Net.Handlers;
 
 namespace PixelRealms.Server.Hosting;
@@ -73,6 +74,12 @@ public static class ServerApp
         builder.Services.AddSingleton(simulation);
         builder.Services.AddSingleton<ConnectionManager>();
         builder.Services.AddSingleton<MessageRouter>();
+        builder.Services.AddSingleton<PlayerRegistry>();
+        builder.Services.AddSingleton<PlayerMapper>();
+        builder.Services.AddSingleton<IHelloGate, HelloGate>();
+        builder.Services.AddSingleton<WorldSession>();
+        builder.Services.AddSingleton<SaveService>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<SaveService>());
         builder.Services.AddSingleton<GameLoopService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
 
@@ -80,8 +87,17 @@ public static class ServerApp
         // HU-002 CA3: migraciones automáticas al arrancar (Development y producción, con log de cuáles).
         PersistenceModule.MigrateAsync(app.Services, app.Configuration).GetAwaiter().GetResult();
         var router = app.Services.GetRequiredService<MessageRouter>();
+        var worldSession = app.Services.GetRequiredService<WorldSession>();
+        app.Services.GetRequiredService<PlayerMapper>().MapIdOf = worldSession.MapIdOf;
+        router.AddObserver(worldSession);
         router.Register(new PingHandler());
         simulation.OnPreTick(router.Drain);
+        // Al apagar (Ctrl+C): guardar a todos los jugadores conectados antes de salir (HU-026 CA2), en el hilo del tick.
+        app.Services.GetRequiredService<GameLoopService>().OnStopping = () =>
+        {
+            var registry = app.Services.GetRequiredService<PlayerRegistry>();
+            foreach (var p in registry.All.ToList()) worldSession.Leave(p, "shutdown");
+        };
 
         var net = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<NetOptions>>().Value;
         app.UseRateLimiter();

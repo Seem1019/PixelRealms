@@ -1,4 +1,5 @@
 using PixelRealms.Game.Core;
+using PixelRealms.Game.Items;
 
 namespace PixelRealms.Game.Entities;
 
@@ -28,6 +29,20 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
 
     public long LastInputAtMs { get; set; }
 
+    public Guid AccountId { get; init; }
+
+    public Inventory Inventory { get; } = new();
+
+    public Equipment Equipment { get; } = new();
+
+    /// <summary>Barra 4+4 (ADR-014): índice 0–3 hechizos, 4–7 utilizables; null = casilla vacía. (kind, ref).</summary>
+    public (string Kind, string Ref)?[] Hotbar { get; } = new (string, string)?[8];
+
+    public List<string> KnownSpells { get; } = new();
+
     /// <summary>Marca de "hay cambios sin guardar" para el autosave (HU-026).</summary>
     public bool Dirty { get; set; }
+
+    /// <summary>Id de conexión que controla a este jugador; −1 si está linkdead (HU-025).</summary>
+    public int ConnectionId { get; set; } = -1;
 }
