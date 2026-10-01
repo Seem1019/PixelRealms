@@ -2,7 +2,7 @@
 
 ### HU-060 · Chat
 **Como** jugador **quiero** chatear con otros **para** coordinarme con mis amigos.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `net-protocol`, `godot-client`, `dotnet-server`
 
@@ -14,11 +14,14 @@
 5. **Dado** un texto > 200 caracteres, vacío o con caracteres de control **entonces** se recorta/rechaza; el cliente escapa BBCode (`[`) para evitar inyección en `RichTextLabel`.
 6. **Dado** colores por canal **entonces** say blanco, global naranja, grupo azul, susurro rosa, sistema amarillo.
 
----
+**Notas de implementación**
+- `Social/ChatService`: say (≤ `rules.movement.sayRangeTiles`), global, party, whisper (error si no está conectado), 1–200 caracteres sin control, 5 mensajes / 5 s (solo cuentan los aceptados). Cliente `chat_panel.gd`: Enter enfoca/envía, Esc cancela, WASD bloqueado al escribir, `/g`, `/w Nombre`, `/p`, colores por canal (say blanco, global naranja, grupo azul, susurro rosa, sistema amarillo), BBCode escapado, burbuja 4 s.
+- Tests: `SocialTests.Chat_*`, `SocialFlowTests.Chat_*`.
 
+---
 ### HU-061 · Grupos
 **Como** jugador **quiero** formar un grupo con mis amigos **para** combatir juntos.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-060
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -29,11 +32,14 @@
 4. **Dado** que el líder usa `/kick Nombre` **entonces** el miembro sale.
 5. **Dado** un miembro que se desconecta **entonces** sigue en el grupo como "desconectado" 5 min; luego sale automáticamente.
 
----
+**Notas de implementación**
+- `Social/PartyService`: `/invite` o clic derecho → Invitar (la invitación viaja como `PartyUpdate{leader, members: []}`, caduca `inviteExpireSec`), aceptar → grupo con el que invitó como líder (máx. `maxMembers`), `/leave` (hereda el siguiente; con 1 se disuelve), `/kick` solo el líder, desconectados "(desc.)" durante `offlineGraceSec` y luego fuera.
+- Tests: `SocialTests.Party_*`, `SocialFlowTests.Party_*`. Decisión provisional: la invitación reutiliza `PartyUpdate` con lista vacía (no hay mensaje de invitación en el protocolo).
 
+---
 ### HU-062 · Marcos de grupo y XP/oro compartidos
 **Como** miembro de un grupo **quiero** ver la vida de mis compañeros y compartir recompensas **para** jugar en equipo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-061, HU-040, HU-050
 - Skills: `godot-client`, `combat-system`, `inventory-items`
 
@@ -45,11 +51,14 @@
 4. **Dado** el botín **entonces** cualquiera del grupo puede abrir el cadáver y ver qué cayó y para quién; solo el dueño toma cada item (HU-050). Los items uncommon+ se anuncian en el chat de grupo con el nombre del ganador.
 5. **Dado** F1–F5 **entonces** selecciono a mí mismo y a los miembros 1–4.
 
----
+**Notas de implementación**
+- Marcos de grupo (`social_panels.gd`) con nombre, clase, nivel, vida y estado, actualizados con `PartyUpdate` cada 500 ms (`EventDispatcher.PartyFrameEveryTicks`) aunque estén fuera de la AOI; clic o F1–F5 seleccionan. XP de grupo con la fórmula del GDD (`GroupXp.Split`: activos vivos a ≤ `xpRangeTiles` con acción en `activeWindowSec`, referencia nivel máximo, pesos `0.75^max(0, brecha−2)` mín. 0.10, `bonusBySize`); oro y botín para los miembros elegibles del grupo (`LootSystem.EligibleFor`).
+- Tests: `GroupXp_Example_10_8_5_vs_Normal9` (26.5 / 26.5 / 11.2), `GroupXp_InWorld_DeadOrFarMembersExcluded`. CA4: `LootAnnouncedEvent` al crear la bolsa → `ChatMessage{party}` a los miembros conectados del grupo del ganador (`EventDispatcher`); si el monstruo es jefe va al `global` (HU-083 CA4). Test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`.
 
+---
 ### HU-063 · Lista de jugadores en línea
 **Como** jugador **quiero** ver quién está conectado **para** saber si mis amigos están jugando.
-- Prioridad: Should · Estimación: S · Estado: Pendiente
+- Prioridad: Should · Estimación: S · Estado: Hecha
 - Dependencias: HU-060
 - Skills: `net-protocol`, `godot-client`
 
@@ -57,11 +66,13 @@
 1. **Dado** `/who` o la tecla O **entonces** veo la lista con nombre, clase, nivel y zona de cada jugador conectado.
 2. **Dado** un nombre de la lista **cuando** hago clic derecho **entonces** puedo susurrar o invitar al grupo.
 
----
+**Notas de implementación**
+- `/who` (`ChatSend{channel: "who"}`) → mensaje de sistema con nombre, clase, nivel y zona de cada conectado. CA2 (clic derecho en la lista) y la tecla O quedan pendientes (la lista llega como texto en el chat).
 
+---
 ### HU-064 · Duelos (PvP amistoso)
 **Como** jugador **quiero** retar a un amigo a un duelo **para** medirnos sin perder nada.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-033, HU-035, HU-037, HU-060
 - Skills: `combat-system`, `net-protocol`, `godot-client`
 
@@ -79,3 +90,7 @@
 - ADR-011. `PvpService` es la única puerta: `EffectResolver` le pregunta antes de aplicar daño/auras a un jugador. El pipeline de combate no cambia.
 - `DuelSession { A, B, state, startedAt }` vive en la `MapInstance`; termina también si alguno cambia de mapa.
 - Cliente: marco del rival en naranja durante el duelo; resultado en pantalla 3 s.
+
+**Notas de implementación**
+- `Social/PvpService` (única puerta del PvP): `/duel` o clic derecho → `DuelUpdate{requested}` (caduca `requestExpireSec`), aceptar → `countdown` (`countdownSec`) → `active`; `CanAttack(a, b)` devuelve el ruleset o null (sin duelo, otro rival, `enabledRulesets` vacío); daño con `rules.classAdvantage`; al llegar a `endAtHpPct` el daño se recorta, nadie muere, ambos se restauran, se limpian auras y se anuncia en `say`; pierde quien se rinde, se aleja > `maxDistanceTiles`, se desconecta o cambia de mapa; los monstruos ignoran a los duelistas y estos no atacan a monstruos ni terceros; los `ally` no aceptan al rival; mismas reglas de auras (ADR-022). Cliente: diálogo, cuenta atrás, rival en naranja, resultado 3 s.
+- Tests: `SocialTests.Duel_*`, `SocialFlowTests.Duel_*`.

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Carga y validación de content/*.json → modelos inmutables (ADR-005, ADR-008). -->
+  <ItemGroup>
+    <ProjectReference Include="../PixelRealms.Protocol/PixelRealms.Protocol.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <!-- OfflineBuild=true: compila sin los paquetes que necesitan NuGet (EF Core/Npgsql, Testcontainers). Solo para
+         entornos sin acceso a NuGet; ver docs/progress/fase-1.md. El build normal es `dotnet build server/PixelRealms.sln`. -->
+    <OfflineBuild Condition="'$(OfflineBuild)' == ''">false</OfflineBuild>
+    <DefineConstants Condition="'$(OfflineBuild)' == 'true'">$(DefineConstants);OFFLINE_BUILD</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+</Project>

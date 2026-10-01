@@ -1,0 +1,82 @@
+# HU-074: export Web → carpeta /play del VPS (Caddy la sirve) y export Windows → .zip en itch.io (butler).
+# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PATH?, BUTLER_API_KEY, ITCH_TARGET (usuario/juego:windows).
+# Variables: SERVER_URL (https://<dominio>) se escribe en el cliente antes de exportar.
+name: Publicar cliente
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "URL pública del servidor (https://juego.ejemplo.com)"
+        required: true
+      version:
+        description: "Versión mostrada (p. ej. 0.1.0)"
+        required: true
+        default: "0.1.0"
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  export:
+    name: Exportar Web y Windows
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Plantillas de exportación
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/ 2>/dev/null || true
+      - name: Copiar contenido y mapas al cliente
+        run: godot --path client --headless -s ../tools/sync_content.gd
+      - name: Fijar URL del servidor por defecto
+        run: sed -i "s|const DEFAULT_SERVER_URL := \".*\"|const DEFAULT_SERVER_URL := \"${{ github.event.inputs.server_url }}\"|" client/autoload/settings.gd
+      - name: Export Web
+        run: |
+          mkdir -p builds/web
+          godot --path client --headless --export-release "Web" ../builds/web/index.html
+      - name: Export Windows
+        run: |
+          mkdir -p builds/windows
+          godot --path client --headless --export-release "Windows Desktop" ../builds/windows/PixelRealms.exe
+          cd builds && zip -r PixelRealms-windows-${{ github.event.inputs.version }}.zip windows
+      - uses: actions/upload-artifact@v4
+        with: { name: web, path: builds/web }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: builds/PixelRealms-windows-${{ github.event.inputs.version }}.zip
+
+  publish-web:
+    name: Subir /play al VPS
+    needs: export
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: web, path: web }
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "web/*"
+          strip_components: 1
+          target: ${{ secrets.VPS_PATH || '~/pixelrealms' }}/deploy/play
+
+  publish-itch:
+    name: Subir Windows a itch.io (página privada)
+    needs: export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: windows, path: dist }
+      - name: butler push
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          curl -L -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip && chmod +x butler
+          ./butler push dist/*.zip ${{ secrets.ITCH_TARGET }} --userversion ${{ github.event.inputs.version }}

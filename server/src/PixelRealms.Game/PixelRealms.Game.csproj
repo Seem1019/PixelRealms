@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Dominio PURO: sin IO, sin ASP.NET, sin EF, sin DateTime.Now ni Random (regla 3 de CLAUDE.md). -->
+  <ItemGroup>
+    <ProjectReference Include="../PixelRealms.Protocol/PixelRealms.Protocol.csproj" />
+    <ProjectReference Include="../PixelRealms.Content/PixelRealms.Content.csproj" />
+  </ItemGroup>
+</Project>

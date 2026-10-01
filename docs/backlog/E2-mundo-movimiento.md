@@ -2,7 +2,7 @@
 
 ### HU-020 · Cargar mapa Tiled en servidor y cliente
 **Como** jugador **quiero** ver el mundo con su terreno y obstáculos **para** explorarlo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-005, HU-004
 - Skills: `world-maps`, `godot-client`, `dotnet-server`
 
@@ -12,11 +12,16 @@
 3. **Dado** el cliente en la escena `World` **entonces** se ve el mapa con capas `ground`, `detail`, `walls` y `above` por encima de las entidades.
 4. **Dado** `maps/test_small.tmj` **entonces** `TiledMapLoaderTests` cubre: CSV, flags de flip, `solid`, `blocksSight`, objetos de cada tipo.
 
----
+**Notas de implementación**
+- `maps/meadow.tmj` (64×64: Aldea Robledal `safe`, Campos, camino, muro de prueba, arbustos, agua, 4 spawns, Marta, 2 cementerios, portal a `mine` con minLevel 4), `maps/mine.tmj` mínimo (destino del portal; HU-083 lo completa), `maps/test_small.tmj` (10×10) y tilesets `placeholder.tsj` / `collision.tsj` con `solid`/`blocksSight`. Generados como JSON de Tiled válido (CSV sin compresión), sin imágenes todavía.
+- `Game/Map/TiledMapLoader`: lee capas `walls` + `collision` (GID & 0x1FFFFFFF), tilesets externos, objetos `spawns`/`npcs`/`graveyards`/`zones`/`portals`; valida monsterId/vendorId, spawns en sólido, cementerio obligatorio y portales a mapas existentes (`MapLoadException`). `ServerApp` carga `maps/`, registra `MapData`, crea una `MapInstance` por mapa y loguea tamaño/spawns/puntos seguros.
+- 5 tests `TiledMapLoaderTests` (CSV, flip, solid, blocksSight, cada objeto, meadow+mine, errores).
+- **Pendiente cliente (CA3):** sin YATI ni tileset PNG no se dibuja el mapa; el cliente leerá el .tmj para su CollisionGrid en HU-022.
 
+---
 ### HU-021 · Movimiento autoritativo con colisión
 **Como** jugador **quiero** moverme con WASD sin atravesar paredes **para** recorrer el mundo.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-014, HU-020
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -32,11 +37,15 @@
 - Algoritmo exacto en `docs/architecture.md` §4 y en el propio archivo de vectores.
 - Sin predicción todavía: el cliente dibuja la posición del snapshot (se verá con retraso; se resuelve en HU-022).
 
----
+**Notas de implementación**
+- Servidor: `Game/Movement/MovementStep` (algoritmo de `docs/architecture.md` §4 en px; pasa `shared/test-vectors/movement.json` en `MovementVectorTests`), `MovementSystem` (clamp de dx/dy, descarte de seq decreciente con log debug, parada a los 500 ms sin input, velocidad desde `rules.movement.baseSpeedTilesPerSec` × multiplicadores), `Net/Handlers/MoveInputHandler`, `Net/SnapshotBuilder` (10 Hz, `self{x,y,speed,hp,res}` + `ackSeq`).
+- Cliente: `world.gd` envía `MoveInput` al cambiar la dirección, cada 200 ms mientras se mantiene y `0,0` al soltar (CA1).
+- Tests: `MovementVectorTests`, `MovementSystemTests` (clamp, seq, timeout, deslizamiento) y `MovementAndAoiTests` (integración WebSocket).
 
+---
 ### HU-022 · Predicción y reconciliación del jugador propio
 **Como** jugador **quiero** que mi personaje responda al instante **para** que el juego no se sienta lento con latencia.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-021
 - Skills: `godot-client`, `net-protocol`
 
@@ -48,11 +57,16 @@
 4b. **Dado** que casteo moviéndome **entonces** el cliente aplica `castMoveSpeedMult` desde su propio `CastStarted` hasta `CastEnded`, y `shared/test-vectors/movement.json` incluye casos a velocidad reducida que pasan en ambos lados.
 5. **Dado** un desplazamiento por habilidad (Carga, salto a un punto) **entonces** el cliente no lo predice: aplica la posición del servidor con un suavizado de ~100 ms (ADR-016).
 
----
+**Notas de implementación**
+- `scripts/net/movement_step.gd` es traducción literal de `MovementStep.cs`; `tests/test_movement_vectors.gd` pasa los vectores (copiados a `client/tests/vectors/`).
+- `scripts/net/prediction.gd`: inputs pendientes, re-simulación con seq > ackSeq, corrección < 2 px suavizada en 100 ms y salto si es mayor (`test_prediction.gd`). Overlay F3 muestra inputs pendientes, ackSeq y error en px (CA4).
+- `Net.simulated_latency_ms` retrasa envío y recepción (mitad y mitad) para CA2; la comprobación visual "sin tirones" queda para probar jugando.
+- **Pendiente:** CA4b (`castMoveSpeedMult` en el cliente y vectores a velocidad reducida) y CA5 (desplazamientos por habilidad) dependen del casteo de M2 (HU-032/HU-087): se cierran allí.
 
+---
 ### HU-023 · Ver a otros jugadores (AOI + interpolación)
 **Como** jugador **quiero** ver a mis amigos moverse con fluidez **para** jugar juntos.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-021
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -67,11 +81,15 @@
 - `InterestSystem` con celdas de 16×16 tiles; recalcular pertenencia a celda solo cuando la entidad cambia de celda.
 - `tools/LoadBot`: consola .NET que crea N cuentas/personajes y los mueve aleatoriamente (útil para todo el proyecto).
 
----
+**Notas de implementación**
+- Servidor: `Game/Interest/InterestSystem` (celdas de 16 tiles, radio 1, recalculo solo al cambiar de celda) emite `EntityEnteredView`/`EntityLeftView`; `Net/EventDispatcher` los traduce a `EntitySpawn` (nombre, clase, nivel) y `EntityDespawn{reason:"left"}`. Tests `InterestSystemTests` + `MovementAndAoiTests` (dos clientes se ven, se alejan y dejan de verse).
+- Cliente: `scripts/net/interpolation_buffer.gd` (100 ms atrás, extrapola ≤ 100 ms y congela) y `scripts/world/remote_entity.gd` (placeholder de color por tipo + nombre); `world.gd` crea/borra remotos con spawn/despawn y les pasa el estado del snapshot.
+- **Pendiente:** CA4 (`tools/LoadBot`, 30 bots y medición p99/KB·s) se hace con HU-089; CA5 (animaciones `walk_<dir>`/`idle_<dir>`) necesita sprites (HU-070).
 
+---
 ### HU-024 · Cámara, capas y nombres sobre personajes
 **Como** jugador **quiero** una cámara que me siga y ver nombres **para** orientarme y reconocer a mis amigos.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -81,11 +99,14 @@
 3. **Dado** cualquier jugador **entonces** su nombre aparece encima (blanco; el propio en amarillo; miembros de grupo en azul — HU-061).
 4. **Dado** que entro en una zona de `zones` **entonces** aparece su nombre en el centro con fade de 2 s.
 
----
+**Notas de implementación**
+- Cámara hija de `PlayerSelf` con `position_smoothing` 8, límites al tamaño del mapa y `snap_2d_transforms_to_pixel` en `project.godot` (CA1); `Entities` con `y_sort_enabled`, capa `above` con z_index 10 (CA2); nombre propio en amarillo y remotos en blanco (`RemoteEntity.set_name_color` para el azul de HU-061) (CA3); etiqueta `ZoneName` con fade de 2 s al entrar en una zona de `zones` (CA4).
+- Sin verificar visualmente en el editor (sandbox headless): probar jugando.
 
+---
 ### HU-025 · Desconexión, linkdead y reconexión
 **Como** jugador **quiero** que un corte breve de internet no me saque del juego **para** no perder el ritmo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `dotnet-server`, `godot-client`, `net-protocol`
 
@@ -95,11 +116,16 @@
 3. **Dado** el cliente sin conexión **entonces** muestra "Reconectando… (intento 2/5)" y tras 5 intentos vuelve al login.
 4. **Dado** que cierro el juego con la X **entonces** el cliente envía close normal y el servidor guarda de inmediato (sin esperar 10 s) salvo si estoy en combate.
 
----
+**Notas de implementación**
+- Servidor: `Actor.LastCombatAtMs`/`IsInCombat` (ventana `rules.combat.inCombatWindowSec`), `Game/Sessions/LinkdeadPolicy` (puro, 6 tests) y `WorldSession`: al perder la conexión el jugador queda linkdead quieto; sale a los `rules.combat.linkdeadSec` (10) salvo en combate (hasta salir de combate, tope `linkdeadInCombatMaxSec`); un cierre normal del cliente fuera de combate guarda y sale ya (CA4). Reconexión con el mismo personaje: `PlayerRegistry.Attach`, Welcome con el estado vivo y `InterestSystem.ResetObserver` para reenviar la AOI (CA2).
+- Cliente: `Net.ticket_refresher` pide un ticket nuevo con el JWT antes de cada reintento (backoff 1-2-4-8 s, 5 intentos, "Reconectando… (intento n/5)", luego login); `Net._notification(WM_CLOSE_REQUEST)` envía Close 1000 antes de salir.
+- Tests: `LinkdeadPolicyTests` (Game) y `LinkdeadTests` (integración: corte sin Close → sigue en el mundo → sale; reconexión retoma selfId/posición; cierre normal guarda al instante).
+- **Nota de contenido:** `rules.combat.linkdeadSec` (10) añadido a `rules.json` y su schema: el valor solo estaba en `docs/architecture.md` y en el texto de la HU (regla 4: toda constante en rules).
 
+---
 ### HU-026 · Guardado de posición y estado
 **Como** jugador **quiero** aparecer donde lo dejé **para** continuar mi partida.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-025
 - Skills: `dotnet-server`
 
@@ -111,11 +137,15 @@
 5. **Dado** los tests de Persistence **entonces** cubren guardar y cargar un personaje completo (Testcontainers).
 6. **Dado** el estado de combate **entonces** se guardan vida, recurso y posición al salir, cambiar de mapa, subir de nivel, completar un intercambio, cambiar de clase y morir (además del guardado cada 60 s); nunca en cada tick, y no se guardan cooldowns, auras ni casteos (ADR-018).
 
----
+**Notas de implementación**
+- `WorldSession.SweepLinkdead` (post-tick) encola el guardado de los jugadores `Dirty` cada `Persistence:AutosaveSec` (60 s, appsettings: es infraestructura, no regla de juego) y limpia `Dirty`; `WorldSession.Save(player, now, reason)` es el punto único de guardado por evento (salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir) que irán llamando las HUs de M2/M3.
+- `SaveService` (ya existente): cola fuera del tick, 3 intentos con backoff 200/400 ms, log `error` con el DTO al fallar; al apagar vacía la cola (máx. 10 s) y `GameLoopService.OnStopping` saca y guarda a todos en el hilo del tick.
+- Tests: `SaveServiceTests` (reintentos), `PersistenceFlowTests` (volver a la misma posición/vida/recurso, apagado guarda a todos, autosave solo si Dirty). CA5 (Testcontainers) está escrito en `Persistence.Tests/Ef` pero sin compilar (sin NuGet en el sandbox).
 
+---
 ### HU-027 · Portales y cambio de mapa
 **Como** jugador **quiero** entrar a la Mina Abandonada por su portal **para** llegar a la mazmorra y su jefe.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-020, HU-023, HU-026
 - Skills: `world-maps`, `dotnet-server`, `net-protocol`, `godot-client`
 
@@ -130,3 +160,10 @@
 **Notas técnicas**
 - ADR-007. `MapData` inmutable y compartido; `MapInstance` con su propio `InterestSystem`, monstruos, loot y tabla de amenaza.
 - `MapInstance.Id` ≠ `mapId` desde el día uno (permite N instancias del mismo mapa en el futuro sin tocar el protocolo: el cliente solo conoce `mapId`).
+
+**Notas de implementación**
+- Game: `Portals/PortalSystem` (tras el movimiento) detecta al jugador dentro del rectángulo del portal o con `UsePortal` pendiente a ≤ 1 casilla; `PortalPolicy.Check` → `is_dead` / `in_combat` / `level_too_low`; el rechazo se emite una sola vez hasta salir del portal. Eventos `PortalUsed`/`PortalRejected`.
+- Server: `Players/MapTransferService` (post-tick, antes del EventDispatcher): `InterestSystem.ForgetEntity` → `EntityDespawn{left}` a quienes lo veían, cambio de `MapInstance`, `ChangeMap{mapId,x,y}` en px, guardado inmediato (`WorldSession.Save`, HU-026 CA6); los `EntitySpawn` de la nueva AOI salen en el tick siguiente. `Error{level_too_low, "Necesitas nivel 4"}` con el nivel del portal (CA4).
+- Cliente: `world.gd._on_change_map`: fundido a negro 0,25 s, carga `res://maps/<mapId>.tmj` (no hay escenas .tscn por mapa: el mapa se dibuja desde el .tmj con el renderer placeholder), recoloca al jugador y reinicia la predicción; el HUD no se reinicia. El texto del `Error` del servidor se muestra 3 s.
+- Tests: `PortalSystemTests` (6) y `PortalTests` (integración: cruzar al entrar, volver con `UsePortal`, despawn para el otro, `mapId` guardado y reconexión en el mapa nuevo; `level_too_low` una sola vez; `out_of_range`/`not_found`).
+- **Pendiente:** CA5 (`say` por mapa, `party`/`global` y nombre del mapa en los marcos de grupo) se cierra con las HUs de chat y grupo (HU-060/HU-061).

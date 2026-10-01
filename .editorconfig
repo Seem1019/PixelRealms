@@ -1,0 +1,47 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,props,targets,csproj,sln}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = when_multiline:suggestion
+dotnet_sort_system_directives_first = true
+# Reglas que no aportan en este proyecto (un solo proceso, español en mensajes de log y excepciones).
+dotnet_diagnostic.CA1848.severity = none   # LoggerMessage delegates: no en rutas frías
+dotnet_diagnostic.CA1812.severity = none   # clases internas instanciadas por DI/JSON
+dotnet_diagnostic.CA1515.severity = none   # tipos públicos en proyectos de tests
+dotnet_diagnostic.CA2007.severity = none   # ConfigureAwait en aplicación (no biblioteca)
+dotnet_diagnostic.CA1303.severity = none   # literales de texto en español
+dotnet_diagnostic.CA1308.severity = none   # ToLowerInvariant para ids
+dotnet_diagnostic.CA1707.severity = none   # guiones bajos en nombres de tests
+dotnet_diagnostic.CA1861.severity = none   # arrays constantes en tests
+dotnet_diagnostic.CA1024.severity = none   # métodos vs propiedades
+dotnet_diagnostic.CA1002.severity = none   # List<T> en APIs internas
+dotnet_diagnostic.CA1819.severity = none   # arrays en propiedades (DTOs)
+dotnet_diagnostic.CA1062.severity = none   # validación de argumentos públicos (Nullable lo cubre)
+dotnet_diagnostic.CA1724.severity = none   # nombres que coinciden con namespaces
+dotnet_diagnostic.CA1716.severity = none   # identificadores que coinciden con palabras clave de otros lenguajes
+dotnet_diagnostic.CA1034.severity = none   # tipos anidados
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA1056.severity = none
+dotnet_diagnostic.CA2227.severity = none   # colecciones de solo lectura en DTOs
+dotnet_diagnostic.CA1305.severity = none   # IFormatProvider (InvariantGlobalization)
+dotnet_diagnostic.CA1310.severity = none
+dotnet_diagnostic.CA1311.severity = none
+dotnet_diagnostic.CA1822.severity = suggestion
+dotnet_diagnostic.IDE0058.severity = none
+dotnet_diagnostic.CA1720.severity = none   # Int/Single son nombres de stats y puntas del pentagrama (rules.json)
+dotnet_diagnostic.CA1873.severity = none   # argumentos de log: las rutas calientes no loguean
+
+# Migraciones de EF Core: código generado por `dotnet ef`, los analizadores no lo revisan.
+[server/src/PixelRealms.Persistence/Migrations/*.cs]
+generated_code = true

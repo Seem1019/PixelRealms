@@ -1,0 +1,50 @@
+using PixelRealms.Game.Core;
+using PixelRealms.Game.Entities;
+
+namespace PixelRealms.Game.Map;
+
+/// <summary>
+/// Estado vivo de una copia de un mapa (ADR-007): jugadores, monstruos, botín, amenaza, AOI. El id de instancia es propio y
+/// distinto del mapId (el cliente solo conoce mapId). MVP: una instancia por mapa.
+/// </summary>
+public sealed class MapInstance(int id, MapData data)
+{
+    private readonly Dictionary<int, Player> _players = new();
+    private readonly Dictionary<int, Monster> _monsters = new();
+    private readonly Dictionary<int, Actor> _actors = new();
+
+    public int Id { get; } = id;
+
+    public MapData Data { get; } = data;
+
+    public string MapId => Data.MapId;
+
+    public IReadOnlyDictionary<int, Player> Players => _players;
+
+    public IReadOnlyDictionary<int, Monster> Monsters => _monsters;
+
+    public IReadOnlyDictionary<int, Actor> Actors => _actors;
+
+    public void Add(Actor actor)
+    {
+        _actors[actor.Id.Value] = actor;
+        actor.MapInstanceId = Id;
+        switch (actor)
+        {
+            case Player p: _players[p.Id.Value] = p; break;
+            case Monster m: _monsters[m.Id.Value] = m; break;
+            default: break;
+        }
+    }
+
+    public bool Remove(EntityId id)
+    {
+        if (!_actors.Remove(id.Value, out var actor)) return false;
+        _players.Remove(id.Value);
+        _monsters.Remove(id.Value);
+        actor.MapInstanceId = -1;
+        return true;
+    }
+
+    public Actor? Find(EntityId id) => _actors.GetValueOrDefault(id.Value);
+}

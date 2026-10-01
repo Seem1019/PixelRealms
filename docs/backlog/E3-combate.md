@@ -2,7 +2,7 @@
 
 ### HU-030 · Seleccionar objetivo
 **Como** jugador **quiero** seleccionar enemigos y aliados **para** dirigirles mis ataques y curas.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `godot-client`, `net-protocol`
 
@@ -13,11 +13,13 @@
 4. **Dado** la selección **entonces** se envía `SelectTarget{targetId}` y el servidor la guarda (la usan otros jugadores como "objetivo de mi objetivo" y los monstruos no).
 5. **Dado** que el objetivo sale de la AOI o muere **entonces** se deselecciona (muerto: se mantiene para lootear, ver HU-050).
 
----
+**Notas de implementación**
+- Cliente: clic izquierdo selecciona (círculo bajo los pies rojo hostil / verde aliado, marco de objetivo), Tab cicla enemigos vivos a ≤ 12 casillas del más cercano al más lejano, Esc o clic en el suelo deselecciona; envía `SelectTarget{targetId}` y el servidor lo guarda en `CombatState.TargetId` (`SelectTargetHandler`; viaja en `EntState.tgt`). Si el objetivo sale de la AOI se deselecciona; muerto se mantiene.
 
+---
 ### HU-031 · Monstruos: spawn, patrulla y respawn
 **Como** jugador **quiero** encontrar monstruos en el mundo **para** tener algo que combatir.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-020, HU-023
 - Skills: `world-maps`, `combat-system`, `dotnet-server`
 
@@ -27,11 +29,14 @@
 3. **Dado** un monstruo muerto **entonces** reaparece en su spawn tras `respawnSec`.
 4. **Dado** el cliente **entonces** los monstruos se ven con su sprite (o placeholder), nombre y nivel coloreado según diferencia con el mío (gris ≤ −5, verde −3..−4, amarillo ±2, naranja +3..+4, rojo ≥ +5).
 
----
+**Notas de implementación**
+- `Ai/SpawnSystem`: al arrancar crea `count` monstruos por spawn (casilla libre del rectángulo) con los datos de monsters.json y programa la reaparición `respawnSec` tras la muerte (independiente del cadáver de HU-037). `Ai/MonsterAiSystem`: patrulla en `wanderRadius` con pausas de 2–6 s. Cliente: placeholder de color, nombre y nivel coloreado por diferencia (`RemoteEntity.level_color`).
+- Tests: `MonsterAiTests.Wander_StaysInRadius_WithPauses_Spawn_PopulatesAndRespawns`.
 
+---
 ### HU-032 · Ataque básico (todas las clases, melee y varita)
 **Como** jugador de cualquier clase **quiero** atacar automáticamente con mi arma **para** hacer daño básico sin gastar recursos.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-030, HU-031
 - Skills: `combat-system`, `net-protocol`
 
@@ -46,11 +51,14 @@
 6. **Dado** que empiezo un casteo **entonces** el temporizador del básico se pausa y se reanuda al terminar, interrumpir o cancelar el casteo.
 7. **Dado** un hechizo instantáneo **cuando** lo lanzo **entonces** el temporizador del básico no se reinicia, pero durante `rules.combat.abilityLockMs` (250) no sale el básico ni otro hechizo; si el básico tocaba en ese hueco, sale al terminar el bloqueo (test con `FakeClock`).
 
----
+**Notas de implementación**
+- `Combat/AutoAttackSystem`: `AutoAttack{on}` sobre el objetivo; swing `speedMs / haste` (monstruos: `attackSpeedMs`), alcance por tipo de arma (`rules.weapons`), escuela por `scaling` (int → magic con spellPower), pausa fuera de alcance / casteando sin reiniciar, bloqueo `abilityLockMs` tras un instantáneo (el básico sale al terminar), fórmula de combat.md con afinidad, tabla de impacto, armadura y crit; ira al impactar; maná por golpe normalizado por swing. Sin arma equipada no hay básico (decisión provisional).
+- Tests: `CombatCalculatorTests` (hit/crit/miss/dodge/mitigación exactos), `AutoAttackTests` (Sacerdote con varita mata un Slime sin gastar maná; pausa; ira; mismo maná/s espada vs bastón; pausa por casteo y bloqueo de 250 ms), integración `CombatFlowTests`. CA1b visual (proyectil del básico) queda para el arte de HU-070.
 
+---
 ### HU-033 · Lanzar hechizos (casteo, GCD, CD, recurso)
 **Como** jugador **quiero** lanzar los hechizos de mi clase **para** combatir y apoyar a mi grupo.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-032, HU-039
 - Skills: `combat-system`, `net-protocol`, `game-content`
 
@@ -66,11 +74,14 @@
 5. **Dado** un hechizo con `projectile` **entonces** el impacto ocurre `distancia / speed` después y el cliente dibuja el proyectil viajando hacia el objetivo.
 6. **Dado** un hechizo `ally` sin objetivo aliado **entonces** se lanza sobre mí.
 
----
+**Notas de implementación**
+- `Combat/CastSystem`: validaciones en el orden de la skill (conocido/disponible, nivel, muerto, aturdido, silenciado, bloqueo, CD, GCD/abilityLock, recurso, objetivo/alcance/LOS o `targetPos` válido), GCD al empezar, recurso y cooldown al terminar, revalidación con `castRangeToleranceTiles` (`CastEnded{failed, reason}` sin coste), punto fijo en áreas y saltos, cancelación por otro hechizo, interrupción por stun/silence/`interrupt` con `interruptLockoutMs`, proyectiles a `distancia / speed` resueltos aunque muera el lanzador; `ally` sin aliado → sobre mí. `Cooldown{spellId,remainingMs}`/`{gcdMs}` al lanzador. Cliente: GCD predicho al enviar, corregido por `Cooldown`, revertido con `Error`.
+- Tests: `CastSystemTests` (Bola de fuego 39/40 ticks y coste leído del contenido; impacto a distancia/speed; velocidad ×0,5; stun interrumpe sin coste + locked_out; root/slow no cortan; fuera de alcance al terminar sin coste ni CD; punto fijo; cancelación; un test por código de error).
 
+---
 ### HU-034 · Resolución de efectos y fórmulas
 **Como** diseñador **quiero** que todos los hechizos se resuelvan con un único motor de efectos **para** crear contenido sin programar.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-033
 - Skills: `combat-system`, `game-content`
 
@@ -81,11 +92,14 @@
 3b. **Dado** las 4 clases con el mismo equipo (`iron_sword` + `recruit_mail_shirt`) **entonces** el DPS básico del Sacerdote está entre el 55 % y el 65 % del Pícaro, y el aguante del Mago entre el 50 % y el 60 % del Guerrero (el test usa exactamente este escenario y lee los márgenes de `rules.balanceTargets.offRoleDamagePct` / `offRoleSurvivalPct`, sin fijar porcentajes en código; otros escenarios, como el Mago con placas y escudo de `combat.md` §Referencia, se revisan en HU-084).
 4. **Dado** los 32 hechizos de clase del contenido (8 por clase, `docs/design/class-kits.md`) **entonces** un test paramétrico lanza sobre un maniquí todos los que el validador marca como disponibles (ADR-023: en esta HU, los de un objetivo y `self_aoe_*`) y verifica que no lanzan excepción y producen al menos un evento; los no disponibles (`ground_*`, `leap`, cono, línea) se comprueba que no se aprenden ni se equipan. HU-086 y HU-087 amplían el test hasta cubrir los 32.
 
----
+**Notas de implementación**
+- `Combat/EffectResolver` + `TargetResolver`: `damage`, `heal` (+`bonusBelowHpPct`), `restore_resource`, `apply_aura`, `taunt`, `dash` (adyacente, exige `minRange`), `interrupt` y `leap`; `applyTo: self` una vez por lanzamiento; una tirada por objetivo enemigo (los de solo auras también fallan). Targetings `self`/`enemy`/`ally`/`self_aoe_*`/`ground_aoe_*` con radio al cuadrado, LOS desde el centro, más cercanos primero y `maxTargets` ≤ `aoeMaxTargetsCap`.
+- Tests: `TargetingAndEffectsTests`: posiciones concretas (CA2), derivados exactos de las 4 clases a nivel 1/5/15 con espada + placas (CA3), balance CA3b con `iron_sword + recruit_mail_shirt` leyendo `rules.balanceTargets` (Sacerdote/Pícaro ≈ 0,61; Mago/Guerrero ≈ 0,51), y test paramétrico sobre los 32 hechizos de clase: los disponibles lanzan sin excepción y producen eventos; cono/línea no se aprenden (CA4).
 
+---
 ### HU-035 · Auras
 **Como** jugador **quiero** aplicar efectos en el tiempo (venenos, curas periódicas, escudos, aturdimientos) **para** tener un combate con más profundidad.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-034
 - Skills: `combat-system`
 
@@ -105,11 +119,14 @@
 11. **Dado** dos escudos de lanzadores distintos **entonces** conviven y se gasta primero el que caduca antes; **dado** Carrera (+50 %) y Sendero de luz (+30 %) **entonces** la velocidad sube un 50 % y Sendero se muestra en gris hasta que Carrera termina.
 12. **Dado** que termina un `stun`, `root` o `silence` **entonces** el objetivo es inmune a los tres durante `rules.combat.hardControlImmunitySec` (1.5 s) y un control fuerte nuevo da `immune`; un `interrupt` corta el casteo igualmente. Ninguna ralentización supera `maxSlowPct` (0.4).
 
----
+**Notas de implementación**
+- `Combat/AuraSystem` + `AuraSet`: instancia = (aura, lanzador); renovar refresca la duración sin reiniciar el ritmo de ticks; cargas solo con `maxStacks` > 1; ticks que no fallan ni critican con mitigación fijada al aplicar; `shield` por orden de caducidad; `removesKinds`/`immuneKinds`; jefes inmunes a `bossImmuneToAuraKinds` (evento `immune`); topes 16/16 sin contar controles con expulsión de la de menos tiempo (ADR-021); manda la ralentización más fuerte (tope `maxSlowPct`) y el bono de velocidad mayor; inmunidad `hardControlImmunitySec` tras stun/root/silence (ADR-022). Cliente: iconos (texto) con tiempo y cargas, en gris las que no mandan.
+- Tests: `AuraSystemTests` (12 CA).
 
+---
 ### HU-036 · IA de monstruos: aggro, persecución, amenaza, evadir
 **Como** jugador **quiero** que los monstruos reaccionen, me persigan y respeten al tanque **para** que el combate en grupo tenga roles.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-032, HU-035
 - Skills: `combat-system`, `world-maps`
 
@@ -124,11 +141,14 @@
 5d. **Dado** un monstruo no jefe **entonces** sigue la misma inmunidad tras control que los jugadores (ADR-022); un jefe muestra `immune` a aturdir, enraizar y ralentizar.
 6. **Dado** 300 monstruos **entonces** la IA completa cuesta < 3 ms por tick (benchmark en tests o `LoadBot`).
 
----
+**Notas de implementación**
+- `Ai/MonsterAiSystem` + `Ai/Pathfinder` (A* 8 direcciones sin cortar esquinas, 200 nodos) + `Combat/ThreatTable`: percepción cada 250 ms con `aggroRange` y LOS (0 = solo si le pegan), persecución recalculando cada 500 ms o si el objetivo se mueve > 2 casillas, cambio de objetivo 110 %/130 %, Provocar fija `durationMs`, evasión al superar `leashRange` (inmune, ×`evadeSpeedMult`, vida completa y amenaza limpia), hechizos de monstruo listos por CD y `hpBelowPct` con `target` (current / random_not_top_threat / self); los que atacan a distancia no se acercan.
+- **Pendiente:** CA5c (duelistas sin aggro) con HU-064 (hook `CanBeAggroed` listo); CA5d cubierto por AuraSystem; CA6 (benchmark 300 monstruos) con HU-089.
 
+---
 ### HU-037 · Muerte y reaparición
 **Como** jugador **quiero** reaparecer tras morir **para** volver a la acción.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-032
 - Skills: `combat-system`, `godot-client`
 
@@ -138,11 +158,14 @@
 3. **Dado** que estoy muerto **entonces** no puedo moverme, castear, usar items ni lootear (errores `is_dead`).
 4. **Dado** un monstruo muerto **entonces** su cadáver permanece `rules.combat.corpseLifetimeSec` (o hasta ser saqueado) y luego desaparece.
 
----
+**Notas de implementación**
+- `Combat/DeathSystem`: hp ≤ 0 → auras fuera, casteo cancelado, los monstruos lo olvidan, `Died{killerId}`; `Respawn` → cementerio más cercano con `respawnHpPct`/`respawnResourcePct`; muerto no se mueve ni castea (`is_dead`); cadáver de monstruo `corpseLifetimeSec` (o saqueado, hook `IsLooted` para HU-050). Cliente: panel "Has muerto" + "Reaparecer", cuerpo translúcido para `anim: dead`.
+- Tests: `DeathAndResourceTests`, `CombatFlowTests.Death_SendsDied_RespawnRestoresAtGraveyard`. La animación `death` llega con los sprites (HU-070).
 
+---
 ### HU-038 · HUD de combate
 **Como** jugador **quiero** ver mi vida, recurso, objetivo, casteos y daño **para** tomar decisiones en combate.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-033, HU-035
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -155,11 +178,14 @@
 5. **Dado** la barra de casteo **entonces** sigue llenándose aunque me mueva y termina en "Interrumpido" (rojo), "Fuera de alcance" (gris) o sin mensaje si cancelo.
 6. **Dado** efectos visuales **entonces** salen de reservas precreadas (32 marcas de área, 64 proyectiles, 48 textos, 32 impactos) y hay como máximo 24 marcas, 48 proyectiles y 40 textos visibles; nunca se oculta una marca enemiga que me alcanza; los ticks de una misma aura se agrupan y con más de 6 números por entidad y segundo se muestra uno sumado (ADR-018).
 
----
+**Notas de implementación**
+- `client/scripts/ui/combat_hud.gd` (construido por código, sin arte): marco propio (nombre, nivel, vida roja, recurso con color por tipo), marco de objetivo con vida y auras, barra de casteo que sigue llenándose en movimiento y termina en "Interrumpido" (rojo) / "Fuera de alcance" (gris) / nada al cancelar, barra 4+4 según `rules.loadout` con tecla, barrido de CD/GCD y oscurecido sin recurso o fuera de alcance (visual), error del servidor en rojo 2 s, auras en gris si no mandan e "Inmune" como texto flotante. `FloatingText`: reserva de 48, 40 visibles, > 6 por entidad y segundo → uno sumado; `AoeReticle`: hasta 24 marcas, las enemigas nunca se ocultan.
+- **Parcial:** sin iconos ni retratos (texto), sin reservas de proyectiles/impactos (no hay VFX todavía); todo pendiente de comprobar en el editor y de los assets (HU-070/HU-071).
 
+---
 ### HU-039 · Recursos: maná, ira, energía y regeneración
 **Como** jugador **quiero** que mi recurso de clase funcione de forma distinta **para** que cada clase se sienta única.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-032
 - Skills: `combat-system`
 
@@ -170,11 +196,14 @@
 4. **Dado** fuera de combate 6 s **entonces** todos regeneran vida según `spi` y `sta`.
 5. **Dado** tests con `FakeClock` **entonces** cubren cada fórmula con números exactos leídos de `rules.json` (si cambia un valor del archivo, el test sigue verde).
 
----
+**Notas de implementación**
+- `Combat/ResourceSystem`: maná por `spi`/`int` cada tick (por 5 s → por segundo) con penalización tras gastar; energía `energyPerSec`; ira +`ragePerHitDealt`/+`ragePerHitTaken` en `DamagePipeline` y decaimiento fuera de combate; vida fuera de combate tras `hpRegenDelaySec`. Acumuladores de fracciones.
+- Tests: `DeathAndResourceTests` (números leídos de rules.json).
 
+---
 ### HU-086 · Hechizos de área apuntados (combate híbrido)
 **Como** jugador **quiero** lanzar los hechizos de área donde apunte con el ratón y ver las áreas enemigas antes de que golpeen **para** que el combate tenga esquiva y posicionamiento sin perder el tab-target.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-034, HU-038
 - Skills: `combat-system`, `net-protocol`, `godot-client`, `game-content`
 
@@ -193,11 +222,14 @@
 - ADR-015 y ADR-018. `CastState` guarda `targetPos`; `TargetResolver` recibe el punto. `targetPos`, `dir` y `radius` son campos opcionales del protocolo (no sube `ProtocolVersion`).
 - Los números y el reparto de áreas por clase están en `docs/design/class-kits.md` y `docs/design/balance-report.md` (Fase 1 medida; Fases 2 y 3 provisionales).
 
----
+**Notas de implementación**
+- Servidor: `ground_aoe_*` con `targetPos` obligatorio (NaN/fuera del mapa → `invalid_payload`), alcance + tolerancia y LOS al punto al iniciar, punto fijo en `CastState`, objetivos dentro de `aoeRadius` al terminar (más cercanos al centro, `maxTargets` ≤ tope), sin fuego amigo; los monstruos usan el mismo camino (Golpe de pico apunta a la posición del objetivo al empezar). Cliente: retícula de `aoeRadius` bajo el cursor (roja fuera de alcance), clic envía `targetPos`, marcas en el suelo con `CastStarted{targetPos}` hasta `CastEnded` (las enemigas nunca se ocultan).
+- **Pendiente (HU-088):** la búsqueda recorre los actores de la instancia en vez de la rejilla AOI; con ≤ 300 actores es suficiente para la Fase 1.
 
+---
 ### HU-085 · Hechizo de área del Sacerdote (`ground_aoe_all`)
 **Como** Sacerdote **quiero** un hechizo de área que cure a mis aliados y dañe un poco a los enemigos **para** tener algo propio tanto en solitario como en grupo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-086
 - Skills: `combat-system`, `game-content`
 
@@ -210,11 +242,13 @@
 **Notas técnicas**
 - El contenido ya existe (`priest_holy_pulse`, `priest_path_of_light` en `spells.json`; números en `balance-report.md`): esta HU implementa el targeting en el motor. Los ids de contenido no se reutilizan (`priest_prayer_of_healing` no vuelve).
 
----
+**Notas de implementación**
+- `TargetResolver` devuelve aliados y enemigos para `ground_aoe_all` y `EffectResolver` aplica los efectos positivos (cura, recurso, aura beneficiosa) a aliados y los negativos (daño, auras perjudiciales, interrupt, taunt) a enemigos. Tests: `GroundAoeAll_PositiveToAllies_NegativeToEnemies`, `HolyPulse_DamageMuchLowerThanHeal_SameSpellPower`. CA3 (duelo) con HU-064 (`PvpCanAttack`).
 
+---
 ### HU-087 · Saltos a un punto (`leap`)
 **Como** jugador **quiero** saltar hacia donde apunto **para** acercarme, alejarme o caer sobre un grupo de enemigos.
-- Prioridad: Must (Paso sombrío del Pícaro, nivel 3, lo usa en la Fase 1) · Estimación: M · Estado: Pendiente
+- Prioridad: Must (Paso sombrío del Pícaro, nivel 3, lo usa en la Fase 1) · Estimación: M · Estado: Hecha
 - Dependencias: HU-022, HU-086
 - Skills: `combat-system`, `net-protocol`, `godot-client`, `game-content`
 
@@ -229,8 +263,11 @@
 **Notas técnicas**
 - ADR-016. El `leap` no pasa por `MovementStep`, así que no cambia `shared/test-vectors/movement.json`; `Snapshot.self` lleva la posición nueva y el cliente la trata como una corrección grande con suavizado.
 
----
+**Notas de implementación**
+- `Combat/ForcedMovement.LeapDestination`: destino recortado a `maxRange` y a la última casilla libre con LOS (nunca sale del mapa ni atraviesa colisión); `rooted`/`stunned` lo rechazan sin coste; los efectos posteriores se resuelven en el punto de llegada; cancela el casteo propio sin coste. Cliente: tras un `CastStarted` propio de salto/Carga la corrección grande se suaviza ~100 ms en vez de saltar.
+- Tests: `Leap_ClampsToFreeTile_WithLos_EffectsAtLanding`, `Leap_CancelsOwnCast_WithoutCost`, `Rooted` en `ErrorCodes_EachValidation`.
 
+---
 ### HU-088 · Rendimiento del combate
 **Como** anfitrión **quiero** que el combate aguante muchas áreas y auras a la vez **para** que no haya lag ni el servidor se caiga en las peleas grandes.
 - Prioridad: Must · Estimación: L · Estado: Pendiente
@@ -246,3 +283,8 @@
 
 **Notas técnicas**
 - ADR-018. Microbenchmarks con BenchmarkDotNet para las pruebas de forma y la consulta de área.
+
+**Notas de implementación (parcial, 2026-10-01)**
+- Hecho con el dominio de M2: \`CombatEvents\` agrupado por observador y tick (máx. 64 entradas, CA4); topes de `rules.limits` para objetivos por área, impactos pendientes por instancia y auras 16/16 sin controles (CA2 en parte); listas reutilizadas en `TargetResolver`/`CastSystem`/`AutoAttackSystem`.
+- 2026-10-01 (HU-089): sin asignaciones por tick en `Pathfinder` (buffers `[ThreadStatic]`), `ThreatTable.Reevaluate<TState>` sin closure e `InterestSystem` con listas reutilizadas; medición por sistema en `Simulation.SystemTimings/SystemAllocs` (LoadBot).
+- Pendiente: reservas de capacidad fija y buffer circular de eventos (CA1), áreas duraderas (no hay hechizos con área persistente en la Fase 1; CA2/CA3), búsqueda de objetivos con la rejilla AOI (hoy recorre los actores de la instancia), microbenchmarks y la medición p99 del escenario de HU-089 (CA5). Se cierra junto con HU-089.

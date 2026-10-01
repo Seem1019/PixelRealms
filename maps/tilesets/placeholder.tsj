@@ -1,0 +1,77 @@
+{
+ "columns": 8,
+ "image": "../../client/assets/tiles/placeholder.png",
+ "imageheight": 16,
+ "imagewidth": 128,
+ "margin": 0,
+ "name": "placeholder",
+ "spacing": 0,
+ "tilecount": 8,
+ "tiledversion": "1.11.2",
+ "tileheight": 16,
+ "tilewidth": 16,
+ "type": "tileset",
+ "version": "1.10",
+ "tiles": [
+  {
+   "id": 3,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "blocksSight",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "blocksSight",
+     "type": "bool",
+     "value": false
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "blocksSight",
+     "type": "bool",
+     "value": false
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "properties": [
+    {
+     "name": "solid",
+     "type": "bool",
+     "value": true
+    },
+    {
+     "name": "blocksSight",
+     "type": "bool",
+     "value": true
+    }
+   ]
+  }
+ ]
+}

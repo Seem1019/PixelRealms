@@ -48,7 +48,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `UsePortal` | `{ portalId }` | a ≤ 1 tile, vivo, fuera de combate, `minLevel` |
 | `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo activo |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
-| `AdminCommand` | `{ text }` | `accounts.is_admin` |
+| `AdminCommand` | `{ text }` | `accounts.is_admin` (si no, `forbidden`); `text` = `/tp x y`, `/tpto Nombre`, `/spawn id [n]`, `/give id [qty] [Nombre]`, `/level n`, `/heal`, `/kill`, `/gold n`, `/god`, `/debug move on\|off`, `/announce texto`; la respuesta llega como `ChatMessage{channel:"system"}` (HU-070) |
 
 ## Servidor → Cliente
 

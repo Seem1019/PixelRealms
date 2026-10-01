@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  dotnet:
+    name: Servidor .NET (build + tests + validador)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore server/PixelRealms.sln
+      - name: Build (warnings as errors)
+        run: dotnet build server/PixelRealms.sln --no-restore -warnaserror
+      - name: Tests
+        run: dotnet test server/PixelRealms.sln --no-build --logger "trx;LogFileName=results.trx"
+      - name: Validador de contenido
+        run: dotnet run --project server/tools/ContentValidator --no-build -- content/
+
+  godot:
+    name: Cliente Godot (GUT headless)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ¿Existe el proyecto Godot?
+        id: has_client
+        run: |
+          if [ -f client/project.godot ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; echo "client/project.godot no existe: se omite GUT (HU-005)"; fi
+      - name: Descargar Godot headless
+        if: steps.has_client.outputs.present == 'true'
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot && chmod +x godot
+      - name: Copiar content/ al cliente e importar proyecto
+        if: steps.has_client.outputs.present == 'true'
+        run: |
+          ./godot --path client --headless -s ../tools/sync_content.gd
+          ./godot --path client --headless --import || true
+      - name: Tests GUT
+        if: steps.has_client.outputs.present == 'true'
+        run: ./godot --path client --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit -gjunit_xml_file=res://../gut-results.xml

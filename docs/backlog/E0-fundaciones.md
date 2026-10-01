@@ -3,14 +3,14 @@
 ### HU-001 · Monorepo, solución .NET y CI
 **Como** desarrollador **quiero** la estructura del monorepo, la solución .NET y un pipeline de CI **para** que cada
 cambio compile y se pruebe automáticamente desde el primer día.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: —
 - Skills: `dotnet-server`, `hu-implementation`
 
 **Criterios de aceptación**
 1. **Dado** un clon limpio **cuando** ejecuto `dotnet build server/PixelRealms.sln -warnaserror` **entonces** compila sin errores ni warnings.
 2. **Dado** la solución **cuando** ejecuto `dotnet test server/PixelRealms.sln` **entonces** corre al menos un test de humo por proyecto de tests y pasa.
-3. **Dado** un push o PR a `main` **cuando** corre GitHub Actions **entonces** ejecuta build + tests .NET + tests GUT headless (job separado con Godot 4.5 headless) y falla si alguno falla.
+3. **Dado** un push o PR a `main` **cuando** corre GitHub Actions **entonces** ejecuta build + tests .NET + tests GUT headless (job separado con Godot 4.7.2 headless, la versión instalada en el PC de desarrollo) y falla si alguno falla.
 4. **Dado** el repo **entonces** existen `.gitignore` (bin/obj, .godot/, .env, *.user), `.gitattributes` (LF para `*.gd`, `*.cs`, `*.json`; LFS para `*.png`, `*.wav`, `*.ogg`), `.editorconfig`, `README.md`.
 
 **Notas técnicas**
@@ -20,11 +20,16 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - CI: `actions/setup-dotnet@v4` con `10.0.x`; Godot vía imagen `barichello/godot-ci` o descarga del binario headless.
 - Referencias entre proyectos según `docs/architecture.md` §2 (Game **no** referencia Server ni Persistence).
 
----
+**Notas de implementación**
+- Solución clásica `server/PixelRealms.sln` (formato .sln, no .slnx) con 5 proyectos `src/`, `tools/ContentValidator` y 4 de tests; `Directory.Build.props` (net10.0, Nullable, TreatWarningsAsErrors, AnalysisLevel latest-recommended) y `Directory.Packages.props` (CPM).
+- Propiedad `OfflineBuild=true` para compilar sin NuGet (excluye EF Core/Npgsql y Testcontainers); solo para entornos sin red, ver `docs/progress/fase-1.md`.
+- CI en `.github/workflows/ci.yml`: job .NET (restore, build -warnaserror, test, validador) y job GUT con Godot 4.7.2 headless que se omite si no existe `client/project.godot`.
+- `.editorconfig` en la raíz con las reglas CA desactivadas y su motivo; `.gitattributes` con LF para gd/cs/json y LFS para png/wav/ogg.
 
+---
 ### HU-002 · Infra local con Docker (PostgreSQL)
 **Como** desarrollador **quiero** levantar la base de datos con un comando **para** no instalar Postgres a mano.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `dotnet-server`
 
@@ -39,11 +44,16 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - Cadena de conexión en `appsettings.Development.json` leyendo variables de entorno; secretos con `dotnet user-secrets`.
 - Primera migración `Initial` con `accounts` y `characters` (ver `docs/database.md`).
 
----
+**Notas de implementación**
+- `docker-compose.yml` (postgres:17-alpine, volumen `pgdata`, healthcheck `pg_isready`, servicio `server` comentado para HU-073) y `.env.example` (POSTGRES_USER/PASSWORD/DB, JWT_SIGNING_KEY); el servidor carga `.env` de la raíz (`Hosting/DotEnv`).
+- `PixelRealms.Persistence`: entidades de `docs/database.md`, DTOs inmutables (`CharacterSaveDto`…), `IAccountRepository`/`ICharacterRepository`, proveedor `InMemory` (tests, `Persistence:Provider=InMemory`) y proveedor EF Core + Npgsql en `Ef/` (`GameDbContext` con snake_case, índices únicos, checks; repositorios; `MigrateAsync` al arrancar con log).
+- **Sin compilar ni ejecutar:** todo `Ef/` y `Persistence.Tests/Ef/` (Testcontainers) requieren NuGet y Docker. Pendiente en el PC: `dotnet build`, generar la migración `Initial` (`dotnet ef migrations add Initial -p server/src/PixelRealms.Persistence -s server/src/PixelRealms.Server`) y `docker compose up -d postgres`.
+- Tests: 2 del contrato de repositorios sobre InMemory (compilan y pasan); 2 EF (round-trip y nombres únicos) escritos para Testcontainers.
 
+---
 ### HU-003 · Carga y validación de contenido (ContentValidator)
 **Como** diseñador **quiero** que el contenido JSON se valide automáticamente **para** detectar errores antes de ejecutar el juego.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `game-content`, `dotnet-server`
 
@@ -72,12 +82,17 @@ cambio compile y se pruebe automáticamente desde el primer día.
   `PixelRealms.Content`: porta sus reglas (y su lista de funciones del motor implementadas), añade los tests y el hook, y
   después borra `tools/ContentCheck/`.
 
----
+**Notas de implementación**
+- `PixelRealms.Content`: `Defs/` (records inmutables, enums en snake_case, defaults del schema), `ContentJson` (camelCase, `UnmappedMemberHandling.Disallow`), `ContentLoader` (schemas → cruzadas → `ContentDb`), `ContentDb` (`FrozenDictionary`, `KeyNotFoundException` con mensaje), `ReloadableContent` (recarga de rules.json conservando el anterior si es inválido).
+- Validación de schemas con `Validation/SchemaValidator` propio (subconjunto de 2020-12 que usan los schemas del repo) en lugar de JsonSchema.Net: decisión provisional porque el entorno no tenía NuGet; cambiar a JsonSchema.Net es un reemplazo local de esa clase (ver `docs/progress/fase-1.md`).
+- `Validation/CrossRefValidator` con todas las reglas de la skill game-content y CA 3/4/4b/4d; `EngineCapabilities` es la lista de funciones del motor implementadas (ADR-023): los 4 hechizos de cono/línea quedan no disponibles con aviso.
+- CLI `server/tools/ContentValidator`; el servidor no arranca con contenido inválido (CA5); hook PostToolUse en `.claude/settings.json` → `tools/hooks/validate-content.sh`; `tools/ContentCheck` retirado. Tests en `Game.Tests/Content/ContentLoaderTests` (20 casos, uno por regla).
 
+---
 ### HU-004 · Esqueleto del game loop de 20 Hz
 **Como** desarrollador **quiero** un bucle de simulación de paso fijo en un hilo dedicado **para** tener una base
 determinista donde agregar sistemas.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001, HU-003
 - Skills: `dotnet-server`
 
@@ -93,12 +108,16 @@ determinista donde agregar sistemas.
 - `Channel<InboundMessage>` bounded 10 000. `TickContext { long Tick; long NowMs; List<IGameEvent> Events; ... }`.
 - Orden de sistemas documentado en `docs/architecture.md` §3; registrarlos en una lista explícita, no por reflexión.
 
----
+**Notas de implementación**
+- `PixelRealms.Game/Core`: `IGameClock`/`TickClock`, `IRng`/`SeededRng`, `Vec2` (casillas), `EntityId`, `IGameEvent`/`TickContext`, `World` (colección de `MapInstance` sobre `MapData`, ADR-007), `Simulation` (ganchos pre/post + lista explícita de `IMapSystem`), `TickScheduler` (acumulador puro, máx. 3 ticks de recuperación) y `TickStats` (p50/p99 en buffer circular).
+- `Server/Hosting/GameLoopService`: hilo "GameLoop" con Stopwatch, warn > 50 ms, informe p50/p99/entidades cada 30 s, excepción en el tick no tumba el loop, StopAsync < 1 s con gancho `OnStopping`; `InboundChannel` bounded 10 000 (DropWrite).
+- Helpers de test: `FakeClock`/`TickClock`, `SeededRng`, `FixedRng`, `WorldBuilder`, `TickRunner`, `TestContent`; 9 tests de dominio (40 ticks, orden de sistemas, scheduler, stats) y 3 de servidor (20 ticks/s medidos en 2 s, parada < 1 s, excepción).
 
+---
 ### HU-005 · Proyecto Godot base
 **Como** desarrollador **quiero** el proyecto Godot configurado para pixel art y con la arquitectura de autoloads
 **para** construir pantallas sobre una base consistente.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -115,11 +134,16 @@ determinista donde agregar sistemas.
 - Input Map: `move_up/down/left/right` (WASD + flechas), `target_next` (Tab), `spell_1..4` (teclas 1–4), `usable_1..4` (teclas 5–8), `toggle_inventory` (I), `toggle_character` (C), `toggle_spellbook` (P), `chat_focus` (Enter), `ui_cancel` (Esc).
 - `Theme` pixel inicial con fuente libre (ver `CREDITS.md`).
 
----
+**Notas de implementación**
+- `client/project.godot` escrito a mano (Godot 4.7, GL Compatibility, 480×270, stretch viewport/keep/integer, filtro Nearest, snap a píxel, Input Map completo, F3 = `debug_overlay`).
+- Autoloads tipados en orden: `EventBus`, `Settings` (user://settings.cfg, URL del servidor), `Content` (res://content/*.json → diccionarios por id, `rule(section, key)`), `Net`, `GameState`. Escena `Boot` con título, estado y `DebugOverlay`.
+- GUT 9.6.1 copiado desde su repo oficial a `client/addons/gut` (MIT, en `assets/CREDITS.md`); 8 tests GUT pasan en headless. `tools/sync_content.gd` copia `../content` a `client/content/` (ignorada).
+- Pendiente que requiere decisión: la fuente pixel (se usa la de Godot por defecto; CA1 solo parcial) y YATI (no descargable en la sesión). La comprobación visual del escalado entero (CA2) queda para el editor.
 
+---
 ### HU-006 · Protocolo base: sobre, registro, Ping/Pong
 **Como** desarrollador **quiero** la infraestructura de mensajes en ambos lados **para** agregar mensajes nuevos de forma mecánica.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-004, HU-005
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -134,3 +158,9 @@ determinista donde agregar sistemas.
 - `WebSocketSession`: bucle de lectura (acumula frames hasta `EndOfMessage`), tarea de escritura desde su `Channel`.
 - `MessageRouter`: `Dictionary<string, Func<JsonElement, IClientMessage>>` generado en `MessageRegistry`.
 - `net.gd`: `WebSocketPeer`, `poll()` en `_process`, `_handlers: Dictionary[String, Callable]`.
+
+**Notas de implementación**
+- `PixelRealms.Protocol`: todos los DTOs de `docs/protocol.md` (34 C→S, 24 S→C) como records, `ProtocolJsonContext` (source-gen, camelCase, opcionales omitidos, parámetros obligatorios respetados) y `MessageRegistry` (sobre `{t,d}`, codificación sin reflexión por mensaje, decodificación con estados Ok/InvalidJson/UnknownType/InvalidPayload/TooLarge).
+- Servidor: `WebSocketSession` (frames acumulados hasta EndOfMessage con tope 4 KB, canal de salida bounded 256, 3 inválidos → `Error{invalid_payload}` y cierre con handshake, cierre por inactividad `Net:IdleTimeoutSec`), `ConnectionManager`, `MessageRouter` (drena ≤ 500 mensajes por tick, diccionario t → handler, observadores de conexión), `PingHandler`, `ServerApp` (composición reutilizable por los tests) y flag `Net:RequireTicket` (false en Development hasta HU-014).
+- Cliente: `autoload/net.gd` (WebSocketPeer, poll en _process, Ping cada 5 s, RTT en el overlay F3, reconexión 1-2-4-8 s máx. 5), `scripts/net/protocol.gd`.
+- Tests: 8 de ida y vuelta en `Protocol.Tests` (JSON exacto de Ping/Pong/Error/Snapshot, casos inválidos), 5 de integración en `Server.Tests` con el servidor real en un puerto libre + `TestGameClient` (ClientWebSocket); no se usa Mvc.Testing (NuGet) sino `WebApplication` en 127.0.0.1:0.
