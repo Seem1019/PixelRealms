@@ -32,15 +32,23 @@ public sealed class SnapshotBuilder(World world, PlayerRegistry players, Connect
         }
     }
 
-    public static EntStateDto ToEntState(Actor a) => new(a.Id.Value, Px(a.Position.X), Px(a.Position.Y), a.Facing.ToWire(), HpPct(a), AnimOf(a), null);
+    public static EntStateDto ToEntState(Actor a) => new(a.Id.Value, Px(a.Position.X), Px(a.Position.Y), a.Facing.ToWire(), HpPct(a), AnimOf(a), a.Combat.TargetId?.Value);
 
     public static EntitySpawn ToSpawn(Actor a) => new(a.Id.Value, a.Kind switch { ActorKind.Player => "player", ActorKind.Monster => "monster", _ => "npc" },
         a is Monster m ? m.TemplateId : a is Player p ? p.ClassId : a.Name, a.Name, Px(a.Position.X), Px(a.Position.Y), a.Facing.ToWire(), a.Level,
-        a is Player pl ? pl.ClassId : null, HpPct(a), a.IsDead ? 2 : 0);
+        a is Player pl ? pl.ClassId : null, HpPct(a), a.Flags);
 
     public static float Px(float tiles) => MathF.Round(tiles * GameConstants.PixelsPerTile, 2);
 
     private static int HpPct(Actor a) => a.MaxHp <= 0 ? 0 : (int)Math.Round(100.0 * a.Hp / a.MaxHp);
 
-    private static string AnimOf(Actor a) => a.IsDead ? "dead" : a is Player p && (p.MoveDx != 0 || p.MoveDy != 0) ? "walk" : "idle";
+    private static string AnimOf(Actor a)
+    {
+        if (a.IsDead) return "dead";
+        if (a.Combat.IsCasting) return "cast";
+        if (a is Player p && (p.MoveDx != 0 || p.MoveDy != 0)) return "walk";
+        if (a is Monster m && m.Brain.State == Game.Ai.AiState.Chase) return "walk";
+        if (a.Combat.AutoAttackOn && a.Combat.TargetId is not null) return "attack";
+        return "idle";
+    }
 }

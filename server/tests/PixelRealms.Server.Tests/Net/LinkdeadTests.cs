@@ -36,17 +36,17 @@ public sealed class LinkdeadTests
         var (bobApi, _, bob) = await Enter(server, "bob", "Bob", "mage");
         using (anaApi) using (bobApi)
         {
-            await ana.ExpectAsync("Welcome");
+            var anaId = (await ana.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
             await bob.ExpectAsync("Welcome");
-            await bob.ExpectAsync("EntitySpawn");
+            await bob.ExpectForIdAsync("EntitySpawn", anaId);
 
             ana.Abort(); // corte sin Close
             await Task.Delay(400);
             server.Services.GetRequiredService<WorldSession>().LinkdeadCount.ShouldBe(1);
-            // Sigue en el mundo: Bob no recibe despawn todavía.
-            await Should.ThrowAsync<TimeoutException>(() => bob.ExpectAsync("EntityDespawn", 300));
+            // Sigue en el mundo: Bob no recibe su despawn todavía.
+            (await bob.ArrivesAsync("EntityDespawn", m => m.GetProperty("id").GetInt32() == anaId, 300)).ShouldBeFalse();
 
-            var despawn = await bob.ExpectAsync("EntityDespawn", 2500);
+            var despawn = await bob.ExpectForIdAsync("EntityDespawn", anaId, 2500);
             despawn.GetProperty("reason").GetString().ShouldBe("left");
             server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(1);
             var saver = server.Services.GetRequiredService<SaveService>();
@@ -66,8 +66,8 @@ public sealed class LinkdeadTests
         {
             var welcome = await ana.ExpectAsync("Welcome");
             var selfId = welcome.GetProperty("selfId").GetInt32();
-            await bob.ExpectAsync("Welcome");
-            await ana.ExpectAsync("EntitySpawn");
+            var bobId = (await bob.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
+            await ana.ExpectForIdAsync("EntitySpawn", bobId);
             await ana.SendAsync("MoveInput", """{"seq":1,"dx":1,"dy":0}""");
             await Task.Delay(200);
             var before = (await ana.LatestAsync("Snapshot")).GetProperty("self").GetProperty("x").GetSingle();
@@ -79,8 +79,8 @@ public sealed class LinkdeadTests
             var welcome2 = await ana2.ExpectAsync("Welcome");
             welcome2.GetProperty("selfId").GetInt32().ShouldBe(selfId);          // mismo personaje vivo, no uno nuevo
             welcome2.GetProperty("self").GetProperty("x").GetSingle().ShouldBeGreaterThanOrEqualTo(before); // posición del mundo, no de BD
-            (await ana2.ExpectAsync("EntitySpawn")).GetProperty("name").GetString().ShouldBe("Bob"); // AOI reenviada
-            await Should.ThrowAsync<TimeoutException>(() => bob.ExpectAsync("EntityDespawn", 300)); // Bob nunca dejó de verla
+            (await ana2.ExpectForIdAsync("EntitySpawn", bobId)).GetProperty("name").GetString().ShouldBe("Bob"); // AOI reenviada
+            (await bob.ArrivesAsync("EntityDespawn", m => m.GetProperty("id").GetInt32() == selfId, 300)).ShouldBeFalse(); // Bob nunca dejó de verla
             server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(2);
             await ana.DisposeAsync();
             await bob.DisposeAsync();

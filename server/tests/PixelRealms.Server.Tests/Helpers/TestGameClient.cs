@@ -51,6 +51,28 @@ public sealed class TestGameClient : IAsyncDisposable
         }
     }
 
+    /// <summary>Espera el siguiente mensaje de ese tipo que cumpla el predicado; los que no lo cumplen se descartan.</summary>
+    public async Task<JsonElement> ExpectAsync(string type, Func<JsonElement, bool> where, int timeoutMs = 3000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (true)
+        {
+            var remaining = (int)Math.Max(1, (deadline - DateTime.UtcNow).TotalMilliseconds);
+            var m = await ExpectAsync(type, remaining);
+            if (where(m)) return m;
+        }
+    }
+
+    /// <summary>Un mensaje de ese tipo con `id` concreto (EntitySpawn/EntityDespawn de una entidad).</summary>
+    public Task<JsonElement> ExpectForIdAsync(string type, int id, int timeoutMs = 3000) => ExpectAsync(type, m => m.GetProperty("id").GetInt32() == id, timeoutMs);
+
+    /// <summary>¿Llega un mensaje de ese tipo que cumpla el predicado en la ventana? (sin lanzar).</summary>
+    public async Task<bool> ArrivesAsync(string type, Func<JsonElement, bool> where, int windowMs)
+    {
+        try { await ExpectAsync(type, where, windowMs); return true; }
+        catch (TimeoutException) { return false; }
+    }
+
     /// <summary>Vacía el buffer y lee durante `windowMs`; devuelve el último mensaje de ese tipo (útil para Snapshot).</summary>
     public async Task<JsonElement> LatestAsync(string type, int windowMs = 250)
     {

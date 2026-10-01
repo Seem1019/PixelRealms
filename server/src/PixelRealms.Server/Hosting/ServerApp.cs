@@ -1,4 +1,5 @@
 using PixelRealms.Content;
+using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Interest;
 using PixelRealms.Game.Portals;
@@ -73,9 +74,23 @@ public static class ServerApp
             Console.Error.WriteLine("maps/ inválido: el servidor no arranca.");
             return null;
         }
-        var simulation = new Simulation(world, content.Rules, new SeededRng(Environment.TickCount), new TickClock());
+        var rng = new SeededRng(Environment.TickCount);
+        var simulation = new Simulation(world, content.Rules, rng, new TickClock());
+        var movementSystem = new MovementSystem();
+        var interestSystem = new InterestSystem();
+        var combat = CombatModule.Create(() => content.Current, world, movementSystem, interestSystem);
+        // HU-031 CA1: monstruos de cada spawn al arrancar.
+        foreach (var instance in world.Instances)
+        {
+            var created = combat.Spawns.Populate(instance, rng);
+            Console.WriteLine($"Instancia {instance.MapId}: {created} monstruos creados");
+        }
         builder.Services.AddSingleton(world);
         builder.Services.AddSingleton(simulation);
+        builder.Services.AddSingleton(combat);
+        builder.Services.AddSingleton(movementSystem);
+        builder.Services.AddSingleton(interestSystem);
+        builder.Services.AddSingleton<CombatHandlerDeps>();
         builder.Services.AddSingleton<ConnectionManager>();
         builder.Services.AddSingleton<MessageRouter>();
         builder.Services.AddSingleton<PlayerRegistry>();
@@ -83,8 +98,6 @@ public static class ServerApp
         builder.Services.AddSingleton<IHelloGate, HelloGate>();
         builder.Services.AddSingleton<WorldSession>();
         builder.Services.AddSingleton<SaveService>();
-        builder.Services.AddSingleton<MovementSystem>();
-        builder.Services.AddSingleton<InterestSystem>();
         builder.Services.AddSingleton<PortalSystem>();
         builder.Services.AddSingleton<MapTransferService>();
         builder.Services.AddSingleton<SnapshotBuilder>();
@@ -103,11 +116,16 @@ public static class ServerApp
         router.Register(new PingHandler());
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
         router.Register(new UsePortalHandler());
+        var combatDeps = app.Services.GetRequiredService<CombatHandlerDeps>();
+        router.Register(new SelectTargetHandler());
+        router.Register(new CastSpellHandler(combatDeps));
+        router.Register(new CancelCastHandler(combatDeps));
+        router.Register(new AutoAttackHandler(combatDeps));
+        router.Register(new RespawnHandler(combatDeps));
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
-        simulation.OnPreTick(router.Drain)
-            .AddSystem(app.Services.GetRequiredService<MovementSystem>())
-            .AddSystem(app.Services.GetRequiredService<PortalSystem>())
-            .AddSystem(app.Services.GetRequiredService<InterestSystem>())
+        simulation.OnPreTick(router.Drain);
+        app.Services.GetRequiredService<CombatModule>().Register(simulation, app.Services.GetRequiredService<PortalSystem>());
+        simulation
             .OnPostTick(app.Services.GetRequiredService<MapTransferService>().OnPostTick)
             .OnPostTick(worldSession.SweepLinkdead)
             .OnPostTick(app.Services.GetRequiredService<EventDispatcher>().OnPostTick)

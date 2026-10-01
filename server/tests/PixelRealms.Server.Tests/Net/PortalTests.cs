@@ -40,23 +40,25 @@ public sealed class PortalTests
         var (bobApi, bobId, bob) = await Enter(server, "bob", "Bob", "mage");
         using (anaApi) using (bobApi)
         {
-            (await ana.ExpectAsync("Welcome")).GetProperty("mapId").GetString().ShouldBe("meadow");
-            await bob.ExpectAsync("Welcome");
+            var anaWelcome = await ana.ExpectAsync("Welcome");
+            anaWelcome.GetProperty("mapId").GetString().ShouldBe("meadow");
+            var anaEnt = anaWelcome.GetProperty("selfId").GetInt32();
+            var bobEnt = (await bob.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
             var change = await ana.ExpectAsync("ChangeMap");
             change.GetProperty("mapId").GetString().ShouldBe("mine");
             change.GetProperty("x").GetSingle().ShouldBe(80f); // targetX 5 casillas → 80 px
             change.GetProperty("y").GetSingle().ShouldBe(80f);
             await bob.ExpectAsync("ChangeMap");
             // En la mina se ven entre sí (AOI nueva).
-            (await ana.ExpectAsync("EntitySpawn")).GetProperty("name").GetString().ShouldBe("Bob");
-            (await bob.ExpectAsync("EntitySpawn")).GetProperty("name").GetString().ShouldBe("Ana");
+            (await ana.ExpectForIdAsync("EntitySpawn", bobEnt)).GetProperty("name").GetString().ShouldBe("Bob");
+            (await bob.ExpectForIdAsync("EntitySpawn", anaEnt)).GetProperty("name").GetString().ShouldBe("Ana");
 
             // Ana usa el portal de vuelta (está a ≤ 1 casilla de su borde): Bob la deja de ver.
             await ana.SendAsync("UsePortal", """{"portalId":"mine_to_meadow"}""");
             var back = await ana.ExpectAsync("ChangeMap");
             back.GetProperty("mapId").GetString().ShouldBe("meadow");
             back.GetProperty("x").GetSingle().ShouldBe(58 * 16f);
-            var despawn = await bob.ExpectAsync("EntityDespawn");
+            var despawn = await bob.ExpectForIdAsync("EntityDespawn", anaEnt);
             despawn.GetProperty("reason").GetString().ShouldBe("left");
 
             // CA6: el guardado refleja el mapa nuevo; al reconectar aparecen allí.

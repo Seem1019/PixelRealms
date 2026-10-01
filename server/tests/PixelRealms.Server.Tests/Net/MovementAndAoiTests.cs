@@ -60,18 +60,19 @@ public sealed class MovementAndAoiTests
         await using var server = await TestServer.StartAsync();
         await using var ana = await Enter(server, "ana", "Ana", "warrior");
         await using var bob = await Enter(server, "bob", "Bob", "mage");
-        var spawnForAna = await ana.ExpectAsync("EntitySpawn");
+        var spawnForAna = await ana.ExpectAsync("EntitySpawn", m => m.GetProperty("kind").GetString() == "player");
         spawnForAna.GetProperty("name").GetString().ShouldBe("Bob");
         spawnForAna.GetProperty("kind").GetString().ShouldBe("player");
         spawnForAna.GetProperty("classId").GetString().ShouldBe("mage");
         spawnForAna.GetProperty("level").GetInt32().ShouldBe(1);
-        (await bob.ExpectAsync("EntitySpawn")).GetProperty("name").GetString().ShouldBe("Ana");
+        var bobId = spawnForAna.GetProperty("id").GetInt32();
+        (await bob.ExpectAsync("EntitySpawn", m => m.GetProperty("kind").GetString() == "player")).GetProperty("name").GetString().ShouldBe("Ana");
         var snap = await ana.LatestAsync("Snapshot");
-        snap.GetProperty("ents").GetArrayLength().ShouldBe(1);
-        snap.GetProperty("ents")[0].GetProperty("anim").GetString().ShouldBe("idle");
+        var bobState = snap.GetProperty("ents").EnumerateArray().Single(e => e.GetProperty("id").GetInt32() == bobId);
+        bobState.GetProperty("anim").GetString().ShouldBe("idle");
 
         await bob.DisposeAsync();
-        var despawn = await ana.ExpectAsync("EntityDespawn", 3000);
+        var despawn = await ana.ExpectForIdAsync("EntityDespawn", bobId, 3000);
         despawn.GetProperty("reason").GetString().ShouldBe("left");
     }
 }
