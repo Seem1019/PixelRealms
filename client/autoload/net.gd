@@ -212,5 +212,10 @@ func _on_pong(d: Dictionary) -> void:
 	EventBus.rtt_updated.emit(rtt_ms)
 
 
+## Texto que acompañó al último Error del servidor (p. ej. "Necesitas nivel 4"); "" si no traía.
+var last_error_message: String = ""
+
+
 func _on_error(d: Dictionary) -> void:
+	last_error_message = str(d.get("message", "")) if d.get("message") != null else ""
 	EventBus.ui_error.emit(str(d.get("code", "")), int(d.get("reqId", 0)))

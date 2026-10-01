@@ -12,21 +12,30 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     private readonly Channel<CharacterSaveDto> _queue = Channel.CreateUnbounded<CharacterSaveDto>(new UnboundedChannelOptions { SingleReader = true });
     private int _saved;
     private int _failed;
+    private int _pending;
 
     public int Saved => _saved;
 
     public int Failed => _failed;
 
-    public int Pending => _queue.Reader.Count;
+    /// <summary>Guardados encolados y aún no terminados.</summary>
+    public int Pending => _pending;
 
-    public void Enqueue(CharacterSaveDto dto) => _queue.Writer.TryWrite(dto);
+    public void Enqueue(CharacterSaveDto dto)
+    {
+        Interlocked.Increment(ref _pending);
+        _queue.Writer.TryWrite(dto);
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
             await foreach (var dto in _queue.Reader.ReadAllAsync(stoppingToken))
+            {
                 await SaveWithRetryAsync(dto, CancellationToken.None);
+                Interlocked.Decrement(ref _pending);
+            }
         }
         catch (OperationCanceledException) { }
     }
@@ -39,6 +48,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         while (_queue.Reader.TryRead(out var dto) && !cts.IsCancellationRequested)
         {
             await SaveWithRetryAsync(dto, cts.Token);
+            Interlocked.Decrement(ref _pending);
             drained++;
         }
         if (drained > 0) logger.LogInformation("Guardados {Count} personajes al apagar", drained);

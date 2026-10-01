@@ -53,4 +53,10 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
     public long LinkdeadSinceMs { get; set; } = -1;
 
     public bool IsLinkdead => LinkdeadSinceMs >= 0;
+
+    /// <summary>`UsePortal{portalId}` pendiente de resolver en el tick (HU-027).</summary>
+    public string? RequestedPortalId { get; set; }
+
+    /// <summary>Portal cuyo rechazo ya se notificó; se limpia al salir de su rectángulo (HU-027, evita spam de Error).</summary>
+    public string? RejectedPortalId { get; set; }
 }

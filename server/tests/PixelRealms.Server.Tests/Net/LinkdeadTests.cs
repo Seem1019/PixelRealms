@@ -31,7 +31,7 @@ public sealed class LinkdeadTests
     public async Task ConnectionCut_PlayerStaysLinkdead_ThenLeavesAfterLinkdeadSec() // CA1
     {
         using var content = PatchedContent.WithRules(r => r["combat"]!["linkdeadSec"] = 1);
-        await using var server = await TestServer.StartAsync(new() { ["Content:Dir"] = content.Dir, ["Maps:Dir"] = Path.Combine(TestContent.RepoRoot, "maps") });
+        await using var server = await TestServer.StartAsync(content.Settings);
         var (anaApi, _, ana) = await Enter(server, "ana", "Ana", "warrior");
         var (bobApi, _, bob) = await Enter(server, "bob", "Bob", "mage");
         using (anaApi) using (bobApi)

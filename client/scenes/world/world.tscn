@@ -46,6 +46,17 @@ unique_name_in_owner = true
 z_index = 10
 script = ExtResource("2")
 
+[node name="FadeLayer" type="CanvasLayer" parent="."]
+layer = 50
+
+[node name="Fade" type="ColorRect" parent="FadeLayer"]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
 [node name="HUD" type="CanvasLayer" parent="."]
 
 [node name="HudStatus" type="Label" parent="HUD"]

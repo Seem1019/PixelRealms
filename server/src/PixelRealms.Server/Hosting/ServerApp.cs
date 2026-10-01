@@ -1,6 +1,7 @@
 using PixelRealms.Content;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Interest;
+using PixelRealms.Game.Portals;
 using PixelRealms.Game.Movement;
 using PixelRealms.Persistence;
 using PixelRealms.Protocol.Messages;
@@ -84,6 +85,8 @@ public static class ServerApp
         builder.Services.AddSingleton<SaveService>();
         builder.Services.AddSingleton<MovementSystem>();
         builder.Services.AddSingleton<InterestSystem>();
+        builder.Services.AddSingleton<PortalSystem>();
+        builder.Services.AddSingleton<MapTransferService>();
         builder.Services.AddSingleton<SnapshotBuilder>();
         builder.Services.AddSingleton<EventDispatcher>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SaveService>());
@@ -99,10 +102,13 @@ public static class ServerApp
         router.AddObserver(worldSession);
         router.Register(new PingHandler());
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
+        router.Register(new UsePortalHandler());
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
         simulation.OnPreTick(router.Drain)
             .AddSystem(app.Services.GetRequiredService<MovementSystem>())
+            .AddSystem(app.Services.GetRequiredService<PortalSystem>())
             .AddSystem(app.Services.GetRequiredService<InterestSystem>())
+            .OnPostTick(app.Services.GetRequiredService<MapTransferService>().OnPostTick)
             .OnPostTick(worldSession.SweepLinkdead)
             .OnPostTick(app.Services.GetRequiredService<EventDispatcher>().OnPostTick)
             .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick);

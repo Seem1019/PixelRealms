@@ -14,6 +14,7 @@ const ZONE_FADE_SEC := 2.0
 @onready var _camera: Camera2D = %Camera
 @onready var _hud_status: Label = %HudStatus
 @onready var _zone_label: Label = %ZoneName
+@onready var _fade: ColorRect = %Fade
 @onready var _overlay: DebugOverlay = $DebugOverlay
 
 var map: TmjMap
@@ -28,17 +29,20 @@ var _remotes: Dictionary = {}  # id → RemoteEntity
 var _current_zone: String = ""
 var _zone_fade_left: float = 0.0
 var _character_id: String = ""
+var _status_clear_at: int = -1
 
 
 func _ready() -> void:
 	Net.register_handler("Welcome", _on_welcome)
 	Net.register_handler("EntitySpawn", _on_entity_spawn)
 	Net.register_handler("EntityDespawn", _on_entity_despawn)
+	Net.register_handler("ChangeMap", _on_change_map)
 	Net.snapshot.connect(_on_snapshot)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
 	_player.visible = false
 	_zone_label.modulate.a = 0.0
+	_fade.modulate.a = 0.0
 	_hud_status.text = "Conectando…"
 	var ticket := GameState.pending_ticket
 	GameState.pending_ticket = ""
@@ -126,6 +130,9 @@ func _process(delta: float) -> void:
 		_update_zone(delta)
 		_overlay.pending_inputs = prediction.pending.size()
 		_overlay.reconcile_error_px = prediction.last_error_px
+	if _status_clear_at >= 0 and Time.get_ticks_msec() >= _status_clear_at:
+		_status_clear_at = -1
+		_hud_status.text = ""
 
 
 func _on_snapshot(d: Dictionary) -> void:
@@ -176,6 +183,31 @@ func _clear_remotes() -> void:
 	_remotes.clear()
 
 
+# --- Cambio de mapa (HU-027 CA2) ---------------------------------------------------------------------------------------
+
+## Fundido a negro, carga del nuevo .tmj y recolocación del jugador; el HUD (misma escena) no se reinicia.
+func _on_change_map(d: Dictionary) -> void:
+	GameState._on_change_map(d)
+	in_world = false
+	var target := Vector2(float(d.get("x", 0)), float(d.get("y", 0)))
+	var tween := create_tween()
+	tween.tween_property(_fade, "modulate:a", 1.0, 0.25)
+	await tween.finished
+	_clear_remotes()
+	_current_zone = ""
+	_load_map(GameState.map_id)
+	var grid: CollisionGrid = map.collision if map != null else CollisionGrid.new()
+	prediction.setup(grid, target, prediction.speed_tiles_per_sec)
+	_player.position = target
+	_camera.reset_smoothing()
+	_seq += 1
+	_last_dx = 0
+	_last_dy = 0
+	in_world = true
+	var tween_in := create_tween()
+	tween_in.tween_property(_fade, "modulate:a", 0.0, 0.25)
+
+
 # --- Zonas (HU-024 CA4) -----------------------------------------------------------------------------------------------
 
 func _update_zone(delta: float) -> void:
@@ -206,4 +238,5 @@ func _on_ui_error(code: String, _req_id: int) -> void:
 			get_tree().set_meta("login_notice", ApiMessages.text_for(code))
 			get_tree().change_scene_to_file("res://scenes/login/login.tscn")
 		_:
-			_hud_status.text = ApiMessages.text_for(code)
+			_hud_status.text = Net.last_error_message if not Net.last_error_message.is_empty() else ApiMessages.text_for(code)
+			_status_clear_at = Time.get_ticks_msec() + 3000
