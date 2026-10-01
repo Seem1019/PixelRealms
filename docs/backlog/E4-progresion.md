@@ -2,7 +2,7 @@
 
 ### HU-040 · Ganar experiencia
 **Como** jugador **quiero** ganar XP al matar monstruos **para** progresar.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-037
 - Skills: `combat-system`, `dotnet-server`
 
@@ -14,11 +14,14 @@
 3. **Dado** un monstruo que otro jugador (fuera de mi grupo) taggeó primero **entonces** no recibo XP ni botín.
 4. **Dado** el tope de nivel de la fase activa (`rules.progression.levelCapByPhase[world.currentPhase − 1]`, 6 en la Fase 1) **entonces** no se acumula XP y la barra muestra "Nivel máximo".
 
----
+**Notas de implementación**
+- `Progression/ProgressionSystem` (tras la muerte en el tick): XP con `XpCurve.SoloKillXp` (fórmula y modificador por diferencia de `rules.progression`, `xpRate`) al jugador que taggeó al monstruo (`Monster.TaggedBy`: primer jugador que le hizo daño; el reparto en grupo llega con HU-062 por el hook `XpRecipients`), `XpGain{amount, sourceId}`; en el tope de la fase (`levelCapByPhase[currentPhase − 1]`) no se acumula. Cliente: barra de XP con tooltip `xp / xpNext` y "Nivel máximo".
+- Tests: `XpCurveTests` (CA1b exactos), `ProgressionSystemTests` (tag, xpRate ×3, tope).
 
+---
 ### HU-041 · Subir de nivel y desbloquear hechizos
 **Como** jugador **quiero** subir de nivel y aprender hechizos **para** sentir que mi personaje se hace más fuerte.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-040
 - Skills: `combat-system`, `godot-client`
 
@@ -29,8 +32,11 @@
 3b. **Dado** un nivel de `rules.progression.spellRankLevels` (4, 8 y 12; ADR-024) **entonces** todos los hechizos de clase conocidos suben un rango y cada rango añade `spellRankBonusPct` (+15 %) sobre el valor base del hechizo; en la Fase 1 el rango sube solo, `LevelUp{rankUps}` lo informa y el cliente muestra un aviso. En la Fase 1 (tope 6) solo se alcanza el rango del nivel 4 (test: nivel 4 → `rankUps` con los 3 hechizos conocidos hasta entonces; nivel 5 → `newSpells` y sin `rankUps`). El +15 % se aplica al `base` de los efectos numéricos del hechizo (daño, cura, escudo, cantidad de aura); qué más escala y si los rangos se acumulan de forma lineal o compuesta solo importa desde la Fase 2 (ADR-024).
 4. **Dado** tests **entonces** cubren la tabla de XP de niveles 1→15 con los valores exactos del GDD (100, 367, 933 … 24 850; si cambia `killCycleSecTarget` o `minutesPerLevel`, la tabla cambia sin tocar código) y los niveles de desbloqueo 1, 2, 3, 5, 7, 9, 11, 13 (`rules.progression.spellUnlockLevels`) y de rango 4, 8, 12 (`spellRankLevels`).
 
----
+**Notas de implementación**
+- Subida con sobrante y varios niveles de golpe, stats recalculados (+`statsPerLevel` vía `StatCalculator`), vida y recurso llenos, hechizos de `spellUnlockLevels` aprendidos (`LevelUp{newSpells}`), rangos en `spellRankLevels` (`LevelUp{rankUps}`; `SpellRanks.BaseMultiplier` aplica +`spellRankBonusPct` al `base` de daño/cura/escudo/auras de hechizos de clase), `StatsUpdate` al jugador, `EntitySpawn` renovado a la AOI (nivel sobre el nombre) y guardado inmediato. Cliente: hechizo nuevo a la primera casilla libre (`SetHotbar`, handler con validación de casillas 0–3 hechizos / 4–7 consumibles) y avisos de nivel/rango.
+- Tests: `XpCurveTests.Table_MatchesGdd_1To14` (100, 367, 933 … 24 850), `ProgressionSystemTests` (sobrante, nivel 4 → rankUps de los 3 conocidos; nivel 5 → newSpells sin rankUps; niveles de desbloqueo y rango de rules). El efecto visual de subida (CA3) llega con el arte.
 
+---
 ### HU-042 · Panel de personaje
 **Como** jugador **quiero** ver mis estadísticas y equipo **para** entender cómo mejora mi personaje.
 - Prioridad: Should · Estimación: M · Estado: Pendiente

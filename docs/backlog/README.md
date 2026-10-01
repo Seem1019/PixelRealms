@@ -44,8 +44,8 @@
 | HU-037 | Muerte y reaparición | E3 | Must | M | Hecha |
 | HU-038 | HUD de combate (marcos, cast bar, hotbar, textos) | E3 | Must | L | Hecha |
 | HU-039 | Recursos: maná, ira, energía y regeneración | E3 | Must | M | Hecha |
-| HU-040 | Ganar experiencia | E4 | Must | S | Pendiente |
-| HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Pendiente |
+| HU-040 | Ganar experiencia | E4 | Must | S | Hecha |
+| HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Hecha |
 | HU-042 | Panel de personaje (stats) | E4 | Should | M | Pendiente |
 | HU-043 | Libro de hechizos y barra (4 hechizos + 4 utilizables) | E4 | Must | M | Pendiente |
 | HU-044 | Cambio de clase en NPC (Fases 1–2) | E4 | Must | M | Pendiente |
