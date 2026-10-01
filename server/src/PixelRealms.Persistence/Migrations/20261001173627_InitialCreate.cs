@@ -171,6 +171,10 @@ namespace PixelRealms.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "accounts");
+
+            // EF no revierte la collation creada en Up; sin esto, up → down → up falla con 42710 (already exists).
+            // Va al final: las columnas e índices que la usan ya se borraron con sus tablas.
+            migrationBuilder.Sql("DROP COLLATION IF EXISTS case_insensitive;");
         }
     }
 }
