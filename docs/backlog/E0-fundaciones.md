@@ -112,7 +112,7 @@ determinista donde agregar sistemas.
 ### HU-005 · Proyecto Godot base
 **Como** desarrollador **quiero** el proyecto Godot configurado para pixel art y con la arquitectura de autoloads
 **para** construir pantallas sobre una base consistente.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -129,11 +129,16 @@ determinista donde agregar sistemas.
 - Input Map: `move_up/down/left/right` (WASD + flechas), `target_next` (Tab), `spell_1..4` (teclas 1–4), `usable_1..4` (teclas 5–8), `toggle_inventory` (I), `toggle_character` (C), `toggle_spellbook` (P), `chat_focus` (Enter), `ui_cancel` (Esc).
 - `Theme` pixel inicial con fuente libre (ver `CREDITS.md`).
 
----
+**Notas de implementación**
+- `client/project.godot` escrito a mano (Godot 4.7, GL Compatibility, 480×270, stretch viewport/keep/integer, filtro Nearest, snap a píxel, Input Map completo, F3 = `debug_overlay`).
+- Autoloads tipados en orden: `EventBus`, `Settings` (user://settings.cfg, URL del servidor), `Content` (res://content/*.json → diccionarios por id, `rule(section, key)`), `Net`, `GameState`. Escena `Boot` con título, estado y `DebugOverlay`.
+- GUT 9.6.1 copiado desde su repo oficial a `client/addons/gut` (MIT, en `assets/CREDITS.md`); 8 tests GUT pasan en headless. `tools/sync_content.gd` copia `../content` a `client/content/` (ignorada).
+- Pendiente que requiere decisión: la fuente pixel (se usa la de Godot por defecto; CA1 solo parcial) y YATI (no descargable en la sesión). La comprobación visual del escalado entero (CA2) queda para el editor.
 
+---
 ### HU-006 · Protocolo base: sobre, registro, Ping/Pong
 **Como** desarrollador **quiero** la infraestructura de mensajes en ambos lados **para** agregar mensajes nuevos de forma mecánica.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-004, HU-005
 - Skills: `net-protocol`, `dotnet-server`, `godot-client`
 
@@ -148,3 +153,9 @@ determinista donde agregar sistemas.
 - `WebSocketSession`: bucle de lectura (acumula frames hasta `EndOfMessage`), tarea de escritura desde su `Channel`.
 - `MessageRouter`: `Dictionary<string, Func<JsonElement, IClientMessage>>` generado en `MessageRegistry`.
 - `net.gd`: `WebSocketPeer`, `poll()` en `_process`, `_handlers: Dictionary[String, Callable]`.
+
+**Notas de implementación**
+- `PixelRealms.Protocol`: todos los DTOs de `docs/protocol.md` (34 C→S, 24 S→C) como records, `ProtocolJsonContext` (source-gen, camelCase, opcionales omitidos, parámetros obligatorios respetados) y `MessageRegistry` (sobre `{t,d}`, codificación sin reflexión por mensaje, decodificación con estados Ok/InvalidJson/UnknownType/InvalidPayload/TooLarge).
+- Servidor: `WebSocketSession` (frames acumulados hasta EndOfMessage con tope 4 KB, canal de salida bounded 256, 3 inválidos → `Error{invalid_payload}` y cierre con handshake, cierre por inactividad `Net:IdleTimeoutSec`), `ConnectionManager`, `MessageRouter` (drena ≤ 500 mensajes por tick, diccionario t → handler, observadores de conexión), `PingHandler`, `ServerApp` (composición reutilizable por los tests) y flag `Net:RequireTicket` (false en Development hasta HU-014).
+- Cliente: `autoload/net.gd` (WebSocketPeer, poll en _process, Ping cada 5 s, RTT en el overlay F3, reconexión 1-2-4-8 s máx. 5), `scripts/net/protocol.gd`.
+- Tests: 8 de ida y vuelta en `Protocol.Tests` (JSON exacto de Ping/Pong/Error/Snapshot, casos inválidos), 5 de integración en `Server.Tests` con el servidor real en un puerto libre + `TestGameClient` (ClientWebSocket); no se usa Mvc.Testing (NuGet) sino `WebApplication` en 127.0.0.1:0.

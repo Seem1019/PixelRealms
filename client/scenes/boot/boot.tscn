@@ -1,0 +1,62 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0otscene000001"]
+
+[ext_resource type="Script" path="res://scenes/boot/boot.gd" id="1_boot"]
+[ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="2_dbg"]
+
+[node name="Boot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_boot")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.117647, 0.164706, 0.227451, 1)
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -40.0
+offset_right = 120.0
+offset_bottom = -8.0
+theme_override_font_sizes/font_size = 32
+text = "PixelRealms"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = 8.0
+offset_right = 200.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 8
+text = "..."
+horizontal_alignment = 1
+
+[node name="DebugOverlay" type="CanvasLayer" parent="."]
+layer = 100
+script = ExtResource("2_dbg")
+
+[node name="InfoLabel" type="Label" parent="DebugOverlay"]
+unique_name_in_owner = true
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 240.0
+offset_bottom = 28.0
+theme_override_font_sizes/font_size = 8
+text = "RTT —"

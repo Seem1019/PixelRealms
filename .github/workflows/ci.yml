@@ -43,9 +43,11 @@ jobs:
         run: |
           curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q godot.zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot && chmod +x godot
-      - name: Importar proyecto
+      - name: Copiar content/ al cliente e importar proyecto
         if: steps.has_client.outputs.present == 'true'
-        run: ./godot --path client --headless --import || true
+        run: |
+          ./godot --path client --headless -s ../tools/sync_content.gd
+          ./godot --path client --headless --import || true
       - name: Tests GUT
         if: steps.has_client.outputs.present == 'true'
         run: ./godot --path client --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit -gjunit_xml_file=res://../gut-results.xml

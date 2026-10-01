@@ -19,8 +19,8 @@
 | HU-002 | Infra local con Docker (PostgreSQL) | E0 | Must | S | Pendiente |
 | HU-003 | Carga y validación de contenido (ContentValidator) | E0 | Must | M | Hecha |
 | HU-004 | Esqueleto del game loop de 20 Hz | E0 | Must | M | Hecha |
-| HU-005 | Proyecto Godot base (autoloads, pixel-perfect, GUT) | E0 | Must | M | Pendiente |
-| HU-006 | Protocolo base: sobre, registro, Ping/Pong | E0 | Must | M | Pendiente |
+| HU-005 | Proyecto Godot base (autoloads, pixel-perfect, GUT) | E0 | Must | M | Hecha |
+| HU-006 | Protocolo base: sobre, registro, Ping/Pong | E0 | Must | M | Hecha |
 | HU-010 | Registro de cuenta | E1 | Must | S | Pendiente |
 | HU-011 | Inicio de sesión | E1 | Must | S | Pendiente |
 | HU-012 | Crear personaje | E1 | Must | M | Pendiente |

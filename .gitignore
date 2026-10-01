@@ -25,3 +25,7 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Godot: datos de GUT y archivos de import de assets generados en el editor
+client/.godot/
+client/gut_results.xml
