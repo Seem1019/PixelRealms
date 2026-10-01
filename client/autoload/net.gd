@@ -25,6 +25,7 @@ var _reconnect_at_msec: int = -1
 var _ping_timer: float = 0.0
 var _next_req_id: int = 1
 var _auto_reconnect: bool = false
+var _connecting: bool = false
 var _delayed_out: Array[Dictionary] = []  # [{at, text}] con simulated_latency_ms
 var _delayed_in: Array[Dictionary] = []  # [{at, text}]
 ## HU-025 CA2: antes de cada reintento se pide un ticket nuevo (el anterior es de un solo uso). Devuelve "" si falla.
@@ -103,14 +104,16 @@ func _process(delta: float) -> void:
 				_ping_timer = 0.0
 				send("Ping", {"clientTime": Time.get_ticks_msec()})
 		WebSocketPeer.STATE_CLOSED:
-			if _was_open or _reconnect_at_msec < 0:
+			if _was_open or _connecting:
+				# Se cerró una conexión abierta o falló un intento: se anuncia una sola vez y se programa el reintento.
 				var reason := _peer.get_close_reason()
 				_was_open = false
+				_connecting = false
 				is_connected = false
 				disconnected.emit(reason)
 				EventBus.connection_changed.emit(false)
 				_schedule_reconnect()
-			elif Time.get_ticks_msec() >= _reconnect_at_msec and not _refreshing:
+			elif _reconnect_at_msec >= 0 and Time.get_ticks_msec() >= _reconnect_at_msec and not _refreshing:
 				_reconnect_at_msec = -1
 				_reopen_with_fresh_ticket()
 		_:
@@ -161,8 +164,10 @@ func _open() -> void:
 	var url := _url if _ticket.is_empty() else "%s?ticket=%s" % [_url, _ticket]
 	_peer = WebSocketPeer.new()
 	_peer.inbound_buffer_size = 1 << 20
+	_connecting = true
 	var err := _peer.connect_to_url(url)
 	if err != OK:
+		_connecting = false
 		push_warning("No se pudo iniciar la conexión a %s (código %d)" % [url, err])
 		_schedule_reconnect()
 

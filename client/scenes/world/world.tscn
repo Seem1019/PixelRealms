@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3 uid="uid://world000000001"]
+[gd_scene load_steps=7 format=3 uid="uid://world000000001"]
 
 [ext_resource type="Script" path="res://scenes/world/world.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world/placeholder_map_renderer.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/ui/debug_overlay.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/ui/combat_hud.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/world/floating_text.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/world/aoe_reticle.gd" id="6"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1")
@@ -41,6 +44,16 @@ unique_name_in_owner = true
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0
 
+[node name="AoeReticle" type="Node2D" parent="."]
+unique_name_in_owner = true
+z_index = -5
+script = ExtResource("6")
+
+[node name="FloatingText" type="Node2D" parent="."]
+unique_name_in_owner = true
+z_index = 20
+script = ExtResource("5")
+
 [node name="Above" type="Node2D" parent="."]
 unique_name_in_owner = true
 z_index = 10
@@ -71,6 +84,10 @@ offset_bottom = 16.0
 theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
 theme_override_font_sizes/font_size = 8
 horizontal_alignment = 1
+
+[node name="CombatHud" type="Control" parent="HUD"]
+unique_name_in_owner = true
+script = ExtResource("4")
 
 [node name="ZoneName" type="Label" parent="HUD"]
 unique_name_in_owner = true

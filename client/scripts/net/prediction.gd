@@ -11,6 +11,10 @@ var render_position: Vector2 = Vector2.ZERO  ## posición dibujada (suaviza corr
 var speed_tiles_per_sec: float = 4.0
 var last_error_px: float = 0.0
 var pending: Array[Dictionary] = []  # [{seq, dx, dy}]
+## Tras un salto/Carga (ADR-016): la siguiente corrección grande se suaviza ~100 ms en vez de saltar.
+var smooth_large_corrections: bool = false
+## Tras reaparecer: la siguiente corrección se aplica de golpe sin contar como error.
+var snap_next: bool = false
 
 var _grid: CollisionGrid
 var _lerp_from: Vector2 = Vector2.ZERO
@@ -47,7 +51,11 @@ func reconcile(server_px: Vector2, ack_seq: int, server_speed: float) -> void:
 		pos = MovementStep.step(pos.x, pos.y, int(inp["dx"]), int(inp["dy"]), speed_tiles_per_sec, _grid)
 	last_error_px = pos.distance_to(predicted_before)
 	position = pos
-	if last_error_px >= SNAP_THRESHOLD_PX:
+	if snap_next:
+		snap_next = false
+		render_position = pos
+		_lerp_t = 1.0
+	elif last_error_px >= SNAP_THRESHOLD_PX and not smooth_large_corrections:
 		render_position = pos  # salto
 		_lerp_t = 1.0
 	elif last_error_px > 0.0:
