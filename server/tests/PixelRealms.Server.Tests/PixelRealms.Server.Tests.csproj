@@ -8,4 +8,12 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Shouldly" />
   </ItemGroup>
+  <!-- Tests de API contra PostgreSQL real (Testcontainers), igual que Persistence.Tests; fuera con OfflineBuild=true. -->
+  <ItemGroup Condition="'$(OfflineBuild)' != 'true'">
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="SSH.NET" /> <!-- fija la versión parcheada (NU1903) que Testcontainers trae transitiva -->
+  </ItemGroup>
+  <ItemGroup Condition="'$(OfflineBuild)' == 'true'">
+    <Compile Remove="Postgres/**" />
+  </ItemGroup>
 </Project>

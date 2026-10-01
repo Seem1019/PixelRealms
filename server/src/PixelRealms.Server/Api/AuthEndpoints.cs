@@ -27,8 +27,10 @@ public static class AuthEndpoints
         {
             // Mismo mensaje para usuario inexistente y contraseña errónea (HU-011 CA2).
             var invalid = Results.Json(new ApiError("invalid_credentials", "Usuario o contraseña incorrectos"), statusCode: StatusCodes.Status401Unauthorized);
-            if (string.IsNullOrEmpty(req.Username) || string.IsNullOrEmpty(req.Password)) return invalid;
-            var account = await accounts.FindByUsernameAsync(req.Username, ct);
+            // Mismo formato que el registro antes de consultar la BD: ninguna cuenta puede tener otro, y así Postgres (ICU)
+            // e InMemory responden igual ("ｂｏｂ" no entra como "bob") y un "\0" no llega a Npgsql.
+            if (Validation.Username(req.Username) is not null || string.IsNullOrEmpty(req.Password)) return invalid;
+            var account = await accounts.FindByUsernameAsync(req.Username!, ct);
             if (account is null || !passwords.Verify(account.PasswordHash, req.Password)) return invalid;
             var now = DateTimeOffset.UtcNow;
             await accounts.TouchLastLoginAsync(account.Id, now.UtcDateTime, ct);
