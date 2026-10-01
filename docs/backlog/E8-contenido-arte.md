@@ -21,7 +21,7 @@
 - Skills: `pixel-art-assets`
 
 **Criterios de aceptación**
-1. **Dado** las 4 clases y 6 monstruos **entonces** cada uno tiene `idle`, `walk`, `attack` o `cast`, `hurt`, `death` en las direcciones de la skill.
+1. **Dado** las 4 clases y los 8 monstruos del Tier 1 (`monsters.json`: Slime, Jabalí, Bandido, Lobo, Goblin arquero, Kóbold, Gólem y Capataz Grask) **entonces** cada uno tiene `idle`, `walk`, `attack` o `cast`, `hurt`, `death` en las direcciones de la skill.
 2. **Dado** el script `build_sprite_frames.gd` **entonces** genera los `SpriteFrames` desde hoja + JSON de metadatos.
 3. **Dado** `client/assets/CREDITS.md` **entonces** lista origen y licencia de cada asset.
 

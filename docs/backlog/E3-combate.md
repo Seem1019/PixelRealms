@@ -29,7 +29,7 @@
 
 ---
 
-### HU-032 · Auto-ataque
+### HU-032 · Ataque básico (todas las clases, melee y varita)
 **Como** jugador de cualquier clase **quiero** atacar automáticamente con mi arma **para** hacer daño básico sin gastar recursos.
 - Prioridad: Must · Estimación: M · Estado: Pendiente
 - Dependencias: HU-030, HU-031
@@ -40,7 +40,7 @@
 1b. **Dado** un arma con `scaling: int` **entonces** el golpe básico es de escuela `magic` (usa `spellPower`, no se mitiga por armadura) y dibuja un proyectil visual; con `str`/`agi` es `physical` con `attackPower`.
 1c. **Dado** un Sacerdote con varita **entonces** puede matar un Slime solo con básicos sin gastar maná (test de integración).
 2. **Dado** que me alejo **entonces** el swing se pausa y se reanuda al volver al rango (sin reiniciar el temporizador si no pasó el tiempo).
-3. **Dado** un golpe **entonces** se calcula con la fórmula de ataque básico de `docs/design/combat.md` (afinidad del arma, poder / 14 · swing, tabla de impacto, armadura, crit) y se envía `CombatEvent`. Un Guerrero gana `ragePerHitDealt` de ira al impactar.
+3. **Dado** un golpe **entonces** se calcula con la fórmula de ataque básico de `docs/design/combat.md` (afinidad del arma, poder / 14 · swing, tabla de impacto, armadura, crit) y el resultado va en el `CombatEvents` del tick (ADR-018). Un Guerrero gana `ragePerHitDealt` de ira al impactar.
 4. **Dado** tests con `FixedRng` **entonces** cubren hit, crit, miss, dodge y mitigación por armadura con números exactos.
 5. **Dado** un personaje con maná (cualquier clase y arma) **cuando** un básico impacta **entonces** recupera `maxMana · rules.combat.manaPerBasicHitPctPerSec · (swingMs / 1000)`; un fallo o una esquiva no dan maná. Test: un Mago con espada y un Mago con bastón recuperan el mismo maná por segundo.
 6. **Dado** que empiezo un casteo **entonces** el temporizador del básico se pausa y se reanuda al terminar, interrumpir o cancelar el casteo.
@@ -55,7 +55,7 @@
 - Skills: `combat-system`, `net-protocol`, `game-content`
 
 **Criterios de aceptación**
-1. **Dado** Bola de fuego (2 s) **cuando** la lanzo sobre un enemigo en rango **entonces** todos en la AOI reciben `CastStarted`; tras 2 s se resuelve y se descuentan 20 de maná.
+1. **Dado** Bola de fuego (2 s) **cuando** la lanzo sobre un enemigo en rango **entonces** todos en la AOI reciben `CastStarted`; tras 2 s se resuelve y se descuenta su `cost.amount` (8 de maná en `spells.json`; el test lee el valor del contenido).
 2. **Dado** que me muevo durante el casteo **entonces** el casteo sigue y mi velocidad es `velocidad · rules.combat.castMoveSpeedMult` (0.5) hasta que termina (ADR-019); recibir daño tampoco lo corta.
 2b. **Dado** un casteo **cuando** recibo un `stun`, un `silence` (hechizo `magic`) o el efecto `interrupt` **entonces** se corta (`CastEnded{interrupted}`), no se gasta recurso, el GCD sigue corriendo y no puedo castear durante `interruptLockoutMs` (`Error{locked_out}`). Una `root` o un `slow` no lo cortan.
 2c. **Dado** un hechizo a un objetivo **cuando** al terminar el casteo el objetivo está fuera de `range + castRangeToleranceTiles` (1.5) o sin LOS **entonces** `CastEnded{failed, reason}` sin gastar recurso ni cooldown.
@@ -91,7 +91,7 @@
 
 **Criterios de aceptación**
 1. **Dado** Renovar (`hot` 12 s, tick 3 s) **entonces** produce exactamente 4 ticks de cura (el 4.º en el mismo tick que la expiración); **dado** Latigazo del Capataz (`dot` físico 9 s, tick 3 s) **entonces** produce 3 ticks de daño y luego `AuraRemoved`; los ticks no fallan ni critican y el DoT físico usa la mitigación calculada al aplicarse.
-2. **Dado** Veneno (`maxStacks: 3`) aplicado 4 veces **entonces** tiene 3 stacks, daño por tick ×3, duración refrescada y el temporizador de tick reiniciado.
+2. **Dado** Veneno (`maxStacks: 3`) aplicado 4 veces **entonces** tiene 3 stacks, daño por tick ×3 y duración refrescada **sin reiniciar el ritmo de ticks** (ADR-022, ver CA10).
 2b. **Dado** Carrera (`removesKinds: [root, slow]`, `immuneKinds: [root, slow]`) sobre un Pícaro congelado **entonces** la raíz desaparece al instante y una Nova durante los 6 s no lo enraíza.
 2c. **Dado** un monstruo `boss: true` **entonces** ignora auras de `rules.combat.bossImmuneToAuraKinds` (Gubia sobre el Capataz no lo aturde; el evento reporta `immune`).
 3. **Dado** `stun` **entonces** el objetivo no se mueve, no castea (interrumpe el casteo actual) ni ataca; `root` solo impide moverse; `silence` impide hechizos no físicos; `slow` reduce velocidad.
@@ -99,7 +99,7 @@
 5. **Dado** `stat_mod` (Carrera +50 % velocidad) **entonces** la velocidad cambia al aplicar y vuelve al expirar (el cliente predice con la velocidad del `Snapshot.self.speed`).
 6. **Dado** el cliente **entonces** muestra íconos de auras en marcos propio/objetivo con tiempo restante y stacks.
 7. **Dado** una entidad con `rules.limits.maxBuffsPerEntity` (16) auras beneficiosas **cuando** recibe una aura perjudicial **entonces** se aplica igual; **dado** su grupo lleno **entonces** sale la de ese grupo con menos tiempo restante y entra la nueva (tests para ambos grupos; ADR-021).
-8. **Dado** un control (`rules.combat.controlAuraKinds`) **entonces** no cuenta para ningún tope y se aplica aunque los grupos estén llenos (salvo inmunidad de jefe).
+8. **Dado** un control (`rules.combat.controlAuraKinds`) **entonces** no cuenta para ningún tope y se aplica aunque los grupos estén llenos (salvo inmunidad de jefe o la inmunidad tras un control fuerte de CA12, ADR-022).
 9. **Dado** dos ralentizaciones activas (20 % y 40 %) **entonces** la velocidad baja un 40 %, no un 52 %; **dado** dos aturdimientos solapados **entonces** dura hasta el que termina más tarde.
 10. **Dado** un aura con `maxStacks` 1 reaplicada por el mismo lanzador **entonces** vuelve a su duración completa sin reiniciar el ritmo de ticks; **dado** Veneno de dos Pícaros **entonces** hay dos instancias con sus propias cargas (hasta 3 cada una) y cuentan 2 en el tope (ADR-022).
 11. **Dado** dos escudos de lanzadores distintos **entonces** conviven y se gasta primero el que caduca antes; **dado** Carrera (+50 %) y Sendero de luz (+30 %) **entonces** la velocidad sube un 50 % y Sendero se muestra en gris hasta que Carrera termina.
@@ -116,7 +116,7 @@
 **Criterios de aceptación**
 1. **Dado** un jabalí (`aggroRange: 4`) **cuando** entro a ≤ 4 tiles con línea de visión **entonces** me ataca; un slime (`aggroRange: 0`) solo responde si le pego.
 2. **Dado** un monstruo persiguiéndome **entonces** rodea obstáculos (A*) y no atraviesa paredes.
-3. **Dado** un guerrero con más amenaza **cuando** un mago le supera en < 130 % **entonces** el monstruo sigue con el guerrero; al superar 130 % cambia al mago. Provocar fija al guerrero 3 s.
+3. **Dado** un guerrero con más amenaza **cuando** un mago le supera en < 130 % **entonces** el monstruo sigue con el guerrero; al superar 130 % cambia al mago. Provocar fija al guerrero durante el `durationMs` de su efecto `taunt` (2 s en `spells.json`).
 4. **Dado** que arrastro al monstruo a más de `leashRange` de su spawn **entonces** entra en `Evade`: vuelve, es inmune, recupera toda la vida y olvida la amenaza.
 5. **Dado** el goblin arquero **entonces** se queda a distancia y usa `goblin_shoot` cuando está listo (cooldown y casteo tomados de `spells.json`).
 5b. **Dado** el Capataz Grask bajo el 50 % **entonces** lanza `foreman_rally` sobre sí mismo; `foreman_whip` siempre va a alguien que no sea el de mayor amenaza.
@@ -181,7 +181,7 @@
 **Criterios de aceptación**
 1. **Dado** un hechizo `ground_aoe_*` **cuando** pulso su tecla **entonces** el cliente muestra el círculo de `aoeRadius` bajo el cursor (en rojo si está fuera de alcance) y al hacer clic envía `CastSpell{spellId, targetPos}` sin necesidad de objetivo seleccionado.
 2. **Dado** un `targetPos` a más de `range + castRangeToleranceTiles` del lanzador o sin línea de visión **entonces** `Error{out_of_range|no_los}`; un `targetPos` con NaN o fuera del mapa devuelve `invalid_payload`.
-3. **Dado** un casteo de área aceptado **entonces** todos en la AOI reciben `CastStarted{targetPos, radius}` y ven la marca en el suelo durante el casteo; el punto no cambia aunque el objetivo se mueva.
+3. **Dado** un casteo de área aceptado **entonces** todos en la AOI reciben `CastStarted{targetPos}` (forma y tamaño salen del contenido del cliente; `radius` solo viaja si algo lo modifica, ADR-018) y ven la marca en el suelo durante el casteo; el punto no cambia aunque el objetivo se mueva.
 4. **Dado** el fin del casteo **entonces** el área afecta solo a quien está dentro de `aoeRadius` en ese tick (hasta `maxTargets`, los más cercanos al centro); quien salió de la marca no recibe nada (test con posiciones concretas).
 5. **Dado** un monstruo con hechizo de área (Golpe de pico del Capataz) **entonces** usa la misma marca: apunta a la posición de su objetivo al empezar el casteo y los jugadores pueden esquivarlo.
 6. **Dado** el contenido **entonces** `target_aoe_enemies` ya no existe en el schema y Estallido de llamas y Golpe de pico usan `ground_aoe_enemies` (hecho en el contenido el 2026-09-30); el validador lo comprueba.
@@ -190,8 +190,8 @@
 8. **Dado** el schema de hechizos **entonces** `shape` admite `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`) y `line` (`aoeLength`, `aoeWidth`); en esta HU solo se implementa `circle`; los hechizos con `cone`/`line` quedan no disponibles hasta que se implementen (ADR-023).
 
 **Notas técnicas**
-- ADR-015. `CastState` guarda `targetPos`; `TargetResolver` recibe el punto. `targetPos` y `radius` son campos opcionales del protocolo (no sube `ProtocolVersion`).
-- Los números y el reparto de áreas por clase salen del rediseño de kits (ver `docs/backlog/README.md` §Pendiente de diseño).
+- ADR-015 y ADR-018. `CastState` guarda `targetPos`; `TargetResolver` recibe el punto. `targetPos`, `dir` y `radius` son campos opcionales del protocolo (no sube `ProtocolVersion`).
+- Los números y el reparto de áreas por clase están en `docs/design/class-kits.md` y `docs/design/balance-report.md` (Fase 1 medida; Fases 2 y 3 provisionales).
 
 ---
 
@@ -203,7 +203,7 @@
 
 **Criterios de aceptación**
 1. **Dado** `targeting: ground_aoe_all` **entonces**, dentro del área, los efectos positivos (cura, escudo, beneficios) se aplican a los aliados (incluido el lanzador) y los negativos (daño, controles, perjuicios) a los enemigos; ningún objetivo recibe ambos. Lo usan Pulso sagrado y Sendero de luz.
-2. **Dado** Pulso sagrado (`docs/design/class-kits.md`) **entonces** reemplaza a `priest_prayer_of_healing` (Rezo de sanación), se desbloquea a nivel 5, ralentiza a los enemigos alcanzados y su daño a enemigos es mucho menor que su curación (test que compara ambos valores a igual `spellPower`).
+2. **Dado** Pulso sagrado (`docs/design/class-kits.md`) **entonces** es el hechizo de nivel 5 del Sacerdote (`priest_holy_pulse`; sustituyó a Rezo de sanación en el contenido el 2026-09-30, ADR-020), se desbloquea a nivel 5, ralentiza a los enemigos alcanzados y su daño a enemigos es mucho menor que su curación (test que compara ambos valores a igual `spellPower`).
 3. **Dado** un rival de duelo dentro del área **entonces** recibe la parte de daño solo si `PvpService.CanAttack` lo permite.
 4. **Dado** el validador **entonces** acepta `ground_aoe_all` y exige que el hechizo tenga al menos un efecto `heal` y uno `damage`.
 
