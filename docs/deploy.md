@@ -7,6 +7,12 @@ copias de seguridad diarias y despliegue desde GitHub con un clic. Todo lo de es
 
 > Estado: escrito sin poder probarlo en un VPS real (no había Docker ni red en la sesión que lo generó). La primera vez,
 > sigue los pasos en orden y anota aquí lo que haya que corregir.
+>
+> Primer despliegue real (2026-10-02, Vultr Miami, Ubuntu 24.04, opción B): funcionó tras dos arreglos en
+> `server/Dockerfile`: copiar el `.editorconfig` de la raíz (sin él, CA1716/CA1720 rompen el `dotnet publish`) y usar
+> `Urls` en vez de `ASPNETCORE_URLS` (el `"Urls"` de `appsettings.json` pisa la variable con prefijo y el servidor solo
+> escuchaba en `localhost` dentro del contenedor). Con opción B pon `SERVER_IMAGE=pixelrealms-server:local` en `.env`.
+> El cliente se exportó en local (plantillas 4.7.2) y se subió a `deploy/play` con `scp`; los workflows siguen sin probar.
 
 ## 1. Comprar VPS y dominio
 - VPS Linux (Ubuntu 24.04 LTS o Debian 12), 2 vCPU y 2–4 GB de RAM bastan para ~20 jugadores (el servidor usa < 1 GB; Postgres
