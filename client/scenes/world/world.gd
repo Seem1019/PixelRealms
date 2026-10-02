@@ -351,7 +351,9 @@ func _use_slot(slot: int) -> void:
 	if entry.is_empty():
 		return
 	if str(entry.get("kind", "spell")) != "spell":
-		Net.send("UseItem", {"itemId": str(entry.get("ref", ""))})  # HU-055
+		var payload := _use_item_payload(str(entry.get("ref", "")))
+		if not payload.is_empty():
+			Net.send("UseItem", payload)  # HU-055
 		return
 	var spell := Content.spell(str(entry.get("ref", "")))
 	if spell.is_empty():
@@ -369,6 +371,15 @@ func _use_slot(slot: int) -> void:
 		payload["targetId"] = GameState.target_id
 	Net.send("CastSpell", payload)
 	GameState.predict_gcd(str(spell["id"]))
+
+
+## La barra guarda la plantilla (SetHotbar.ref) pero UseItem pide el id de una instancia de la bolsa: se usa la primera pila.
+## Vacío si no queda ninguna (la casilla ya se ve gris).
+func _use_item_payload(template_id: String) -> Dictionary:
+	var item := GameState.first_bag_item(template_id)
+	if item.is_empty():
+		return {}
+	return {"itemId": str(item.get("id", "")), "reqId": Net.next_req_id()}
 
 
 func _start_aiming(spell: Dictionary) -> void:

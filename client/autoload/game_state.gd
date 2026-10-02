@@ -149,6 +149,14 @@ func bag_item(item_id: String) -> Dictionary:
 	return {}
 
 
+## Primera pila de la bolsa con esa plantilla (o vacío): lo que usa una casilla de utilizable.
+func first_bag_item(template_id: String) -> Dictionary:
+	for it: Variant in inventory:
+		if it is Dictionary and str((it as Dictionary).get("templateId", "")) == template_id:
+			return it
+	return {}
+
+
 ## Cantidad total de una plantilla en la bolsa (casillas de utilizables, HU-043 CA3).
 func bag_count(template_id: String) -> int:
 	var n := 0
