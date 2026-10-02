@@ -75,7 +75,7 @@ client/
 - `Theme` único `ui/theme/pixel_theme.tres` (NinePatch 9-slice, fuente pixel tamaño 16/8, sin antialias).
 - Colores de rareza: junk `#9d9d9d`, common `#ffffff`, uncommon `#1eff00`, rare `#0070dd`, epic `#a335ee`.
 - Ventanas arrastrables (`ui/common/draggable_window.tscn`), cerrar con Esc, posición guardada en Settings.
-- Atajos: WASD mover, Tab ciclar objetivo, 1–4 hechizos y 5–8 utilizables (las áreas se apuntan con el ratón), I inventario, C personaje, P hechizos, Enter chat, Esc cerrar/deseleccionar.
+- Atajos: WASD mover, Espacio ataque básico (se acerca solo si está lejos; mantener muestra el alcance), Tab ciclar objetivo, 1–4 hechizos y 5–8 utilizables (las áreas se apuntan con el ratón), I inventario, C personaje, P hechizos, Enter chat, Esc cerrar/deseleccionar.
 - Drag & drop con `_get_drag_data` / `_can_drop_data` / `_drop_data` → el drop **envía** `InventoryMove` y no mueve
   nada localmente hasta recibir `InventoryUpdate` (se puede mostrar el ícono "fantasma" mientras tanto).
 

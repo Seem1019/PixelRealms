@@ -41,7 +41,7 @@
 - Skills: `combat-system`, `net-protocol`
 
 **Criterios de aceptación**
-1. **Dado** un enemigo seleccionado **cuando** hago clic derecho sobre él o pulso la acción "Atacar" **entonces** se envía `AutoAttack{on:true}` y mi personaje golpea cada `speedMs / haste` (`rules.classScaling.<clase>.haste`) mientras esté en rango: el alcance del tipo de arma en `rules.weapons` (daga 1.25, espada/maza/hacha 1.5, varita 7, bastón 5 tiles). El básico no ocupa ninguna casilla de hechizo (ADR-019).
+1. **Dado** un enemigo seleccionado **cuando** pulso la acción "Atacar" (Espacio desde HU-094; antes clic derecho) **entonces** se envía `AutoAttack{on:true}` y mi personaje golpea cada `speedMs / haste` (`rules.classScaling.<clase>.haste`) mientras esté en rango: el alcance del tipo de arma en `rules.weapons` (daga 1.25, espada/maza/hacha 1.5, varita 7, bastón 5 tiles). El básico no ocupa ninguna casilla de hechizo (ADR-019).
 1b. **Dado** un arma con `scaling: int` **entonces** el golpe básico es de escuela `magic` (usa `spellPower`, no se mitiga por armadura) y dibuja un proyectil visual; con `str`/`agi` es `physical` con `attackPower`.
 1c. **Dado** un Sacerdote con varita **entonces** puede matar un Slime solo con básicos sin gastar maná (test de integración).
 2. **Dado** que me alejo **entonces** el swing se pausa y se reanuda al volver al rango (sin reiniciar el temporizador si no pasó el tiempo).
