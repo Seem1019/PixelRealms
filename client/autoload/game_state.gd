@@ -12,6 +12,7 @@ signal cast_changed  ## casteo propio empezó/terminó
 signal died(killer_id: int)
 signal respawned
 signal xp_changed
+signal xp_gained(amount: int)  ## XpGain: el mundo lo muestra como número flotante
 signal leveled_up(level: int, new_spells: Array, rank_ups: Array)
 signal notice(text: String)  ## avisos cortos para el HUD ("Nuevo hechizo: …")
 signal chat_received(channel: String, from: String, text: String)
@@ -298,8 +299,11 @@ func at_level_cap() -> bool:
 
 
 func _on_xp_gain(d: Dictionary) -> void:
-	xp += int(d.get("amount", 0))
+	var amount := int(d.get("amount", 0))
+	xp += amount
 	xp_changed.emit()
+	if amount > 0:
+		xp_gained.emit(amount)
 
 
 ## HU-041 CA2: los hechizos nuevos van a la primera casilla libre de hechizos (SetHotbar) con aviso; CA3b: aviso de rangos.

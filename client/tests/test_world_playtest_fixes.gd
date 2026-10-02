@@ -166,6 +166,19 @@ func test_remote_mark_goes_away_when_the_caster_leaves_or_the_cast_should_have_e
 	assert_false(_world._reticle._marks.has(8))
 
 
+# --- Punto 9: XP ganada ------------------------------------------------------------------------------------------------
+
+func test_xp_gain_shows_a_floating_number_over_the_player() -> void:
+	_welcome()
+	await get_tree().process_frame
+	_dispatch("XpGain", {"amount": 12, "sourceId": 7})
+	await get_tree().process_frame
+	var texts: Array[String] = []
+	for e: Variant in _world._floating._active:
+		texts.append(((e as Dictionary)["label"] as Label).text)
+	assert_has(texts, "+12 XP", "antes solo se movía la barra de 3 px")
+
+
 # --- Punto 7: el chat se desvanece -------------------------------------------------------------------------------------
 
 func test_chat_fades_when_idle_and_comes_back_on_message_or_enter() -> void:

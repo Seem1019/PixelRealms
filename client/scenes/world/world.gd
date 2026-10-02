@@ -59,6 +59,7 @@ func _ready() -> void:
 	GameState.target_changed.connect(_on_target_changed)
 	GameState.respawned.connect(func() -> void: prediction.snap_next = true)
 	GameState.died.connect(func(_killer: int) -> void: _stop_aiming())
+	GameState.xp_gained.connect(func(amount: int) -> void: _floating.show_event(GameState.self_id, "xp", amount, false, _player.position))
 	_hud.respawn_requested.connect(func() -> void: Net.send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
