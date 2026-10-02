@@ -66,4 +66,10 @@ public sealed class ConnectionManager(ILogger<ConnectionManager> logger, IHelloG
     {
         if (_sessions.TryGetValue(connectionId, out var s)) s.Close(reason);
     }
+
+    /// <summary>Cierra la conexión después de enviar lo ya encolado.</summary>
+    public void CloseAfterFlush(int connectionId, string reason)
+    {
+        if (_sessions.TryGetValue(connectionId, out var s)) s.CloseAfterFlush(reason);
+    }
 }

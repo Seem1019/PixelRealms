@@ -139,15 +139,34 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         logger.LogDebug("{Name} guardado ({Reason})", player.Name, reason);
     }
 
+    /// <summary>Motivo con el que `Logout` saca al jugador (HU-015).</summary>
+    public const string LogoutReason = "logout";
+
+    /// <summary>
+    /// HU-015: `Logout` del cliente. En combate devuelve `in_combat` y no cambia nada; si no, cancela el casteo, guarda, saca al
+    /// jugador como un cierre normal (duelo e intercambio se cancelan) y devuelve null. El handler responde y cierra.
+    /// </summary>
+    public string? Logout(Player player, TickContext tick)
+    {
+        var rules = content.Current.Rules;
+        if (player.IsInCombat(tick.NowMs, rules.Combat.InCombatWindowSec)) return ErrorCodes.InCombat;
+        if (world.GetInstance(player.MapInstanceId) is { } map) Combat?.Casts.Cancel(player, map, tick);
+        player.LastSaveAtMs = tick.NowMs;
+        Leave(player, LogoutReason, tick);
+        return null;
+    }
+
     /// <summary>Saca al jugador del mundo y encola su guardado.</summary>
-    public void Leave(Player player, string reason)
+    public void Leave(Player player, string reason) => Leave(player, reason, _sweepCtx);
+
+    private void Leave(Player player, string reason, TickContext? tick)
     {
         var instance = world.GetInstance(player.MapInstanceId);
-        if (instance is not null && Combat is not null && _sweepCtx is not null)
+        if (instance is not null && Combat is not null && tick is not null)
         {
-            Combat.Pvp.Abandon(player, reason, instance, _sweepCtx);
-            Combat.Trades.CancelBy(player, reason, instance, _sweepCtx);
-            if (Combat.Parties.SetOnline(player.CharacterId, false, _sweepCtx.NowMs) is { } party) _sweepCtx.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
+            Combat.Pvp.Abandon(player, reason, instance, tick);
+            Combat.Trades.CancelBy(player, reason, instance, tick);
+            if (Combat.Parties.SetOnline(player.CharacterId, false, tick.NowMs) is { } party) tick.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
         }
         saver.Enqueue(mapper.ToSave(player));
         player.Dirty = false;

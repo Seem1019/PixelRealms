@@ -13,6 +13,8 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     private int _saved;
     private int _failed;
     private int _pending;
+    /// <summary>Guardados pendientes por personaje: HelloGate espera a que se escriban antes de leerlo (HU-015 CA5).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> _pendingByCharacter = new();
 
     /// <summary>Plazo para vaciar la cola al apagar (HU-026 CA2).</summary>
     public TimeSpan DrainTimeout { get; init; } = TimeSpan.FromSeconds(10);
@@ -27,10 +29,30 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     public void Enqueue(CharacterSaveDto dto)
     {
         Interlocked.Increment(ref _pending);
+        _pendingByCharacter.AddOrUpdate(dto.Id, 1, (_, n) => n + 1);
         if (_queue.Writer.TryWrite(dto)) return;
         // La cola ya se cerró al apagar: nadie lo va a escribir.
-        Interlocked.Decrement(ref _pending);
+        Done(dto);
         LogLost(dto, "encolado después del apagado");
+    }
+
+    /// <summary>¿Queda algún guardado de este personaje sin escribir?</summary>
+    public bool HasPending(Guid characterId) => _pendingByCharacter.TryGetValue(characterId, out var n) && n > 0;
+
+    /// <summary>
+    /// Espera (fuera del tick) a que se escriban los guardados encolados de un personaje, como mucho `timeout`: así quien sale
+    /// a la selección y vuelve a entrar enseguida lee de la BD el estado con el que salió (HU-015 CA5).
+    /// </summary>
+    public async Task WaitForCharacterAsync(Guid characterId, TimeSpan timeout, CancellationToken ct)
+    {
+        var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        while (HasPending(characterId) && Environment.TickCount64 < deadline) await Task.Delay(20, ct);
+    }
+
+    private void Done(CharacterSaveDto dto)
+    {
+        Interlocked.Decrement(ref _pending);
+        _pendingByCharacter.AddOrUpdate(dto.Id, 0, (_, n) => Math.Max(0, n - 1));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,7 +62,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             await foreach (var dto in _queue.Reader.ReadAllAsync(stoppingToken))
             {
                 await SaveWithRetryAsync(dto, CancellationToken.None);
-                Interlocked.Decrement(ref _pending);
+                Done(dto);
                 // ReadAllAsync no mira el token entre elementos ya encolados: al apagar, el resto lo vacía StopAsync.
                 if (stoppingToken.IsCancellationRequested) break;
             }
@@ -73,8 +95,8 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             while (!cts.IsCancellationRequested && _queue.Reader.TryRead(out current))
             {
                 await SaveWithRetryAsync(current, cts.Token);
+                Done(current);
                 current = null;
-                Interlocked.Decrement(ref _pending);
                 drained++;
             }
         }
@@ -85,7 +107,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             if (current is not null)
             {
                 // Puede que la BD sí lo confirmara antes de reaccionar al token: Failed sobra como mucho, y el DTO queda en el log.
-                Interlocked.Decrement(ref _pending);
+                Done(current);
                 LogLost(current, "plazo de apagado agotado durante el guardado");
             }
             LogRemaining("plazo de apagado agotado");
@@ -97,7 +119,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     {
         while (_queue.Reader.TryRead(out var left))
         {
-            Interlocked.Decrement(ref _pending);
+            Done(left);
             LogLost(left, reason);
         }
     }

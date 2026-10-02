@@ -8,8 +8,12 @@ using PixelRealms.Server.Net;
 namespace PixelRealms.Server.Players;
 
 /// <summary>HU-014 CA3/CA4: versión igual, ticket válido (un solo uso, 30 s) y personaje leído de BD fuera del tick.</summary>
-public sealed class HelloGate(TicketService tickets, ICharacterRepository characters, IAccountRepository accounts, Microsoft.Extensions.Options.IOptions<NetOptions> net) : IHelloGate
+public sealed class HelloGate(TicketService tickets, ICharacterRepository characters, IAccountRepository accounts, Microsoft.Extensions.Options.IOptions<NetOptions> net,
+    SaveService? saver = null) : IHelloGate
 {
+    /// <summary>Máximo que un Hello espera a los guardados pendientes de su personaje.</summary>
+    public static readonly TimeSpan SaveWaitTimeout = TimeSpan.FromSeconds(3);
+
     public async Task<HelloResult> ProcessAsync(Hello hello, WebSocketSession session, CancellationToken ct)
     {
         if (hello.ProtocolVersion != ProtocolVersion.Current) return HelloResult.Fail(ErrorCodes.BadVersion);
@@ -26,6 +30,8 @@ public sealed class HelloGate(TicketService tickets, ICharacterRepository charac
             session.IsAdmin = (await accounts.GetAsync(devChar.AccountId, ct))?.IsAdmin ?? false;
             return HelloResult.Ok(devChar);
         }
+        // HU-015 CA5: si acaba de salir (Logout o cierre), su guardado puede seguir en cola: se lee después de escribirlo.
+        if (saver is not null) await saver.WaitForCharacterAsync(ticket.CharacterId, SaveWaitTimeout, ct);
         var character = await characters.LoadAsync(ticket.CharacterId, ct);
         if (character is null || character.AccountId != ticket.AccountId) return HelloResult.Fail(ErrorCodes.BadTicket);
         session.AccountId = ticket.AccountId;

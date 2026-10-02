@@ -49,6 +49,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo activo |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
 | `ChangeClass` | `{ npcId, classId, reqId? }` | NPC `class_change` a ≤ `vendorRangeTiles`, vivo, fuera de combate, sin duelo ni intercambio, clase distinta (HU-044); responde con `Welcome` + `StatsUpdate` por la misma conexión |
+| `Logout` | `{ reqId? }` | volver a la selección de personaje o salir del juego (HU-015). En combate (`Actor.IsInCombat`) → `Error{in_combat}` y el jugador sigue dentro. Si no: cancela el casteo, cancela duelo e intercambio como al desconectarse, guarda, saca al jugador del mundo (los demás reciben `EntityDespawn{reason:"left"}`), responde `LoggedOut` y cierra la conexión con motivo `logout` cuando la respuesta ya salió. Ejemplo: `{"t":"Logout","d":{"reqId":12}}` |
 | `AdminCommand` | `{ text }` | `accounts.is_admin` (si no, `forbidden`); `text` = `/tp x y`, `/tpto Nombre`, `/spawn id [n]`, `/give id [qty] [Nombre]`, `/level n`, `/heal`, `/kill`, `/gold n`, `/god`, `/debug move on\|off`, `/announce texto`; la respuesta llega como `ChatMessage{channel:"system"}` (HU-070) |
 
 ## Servidor → Cliente
@@ -77,6 +78,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Died` | `{ killerId? , respawnInMs }` | |
 | `Error` | `{ code, message?, reqId? }` | códigos abajo |
 | `Pong` | `{ clientTime, serverTick }` | |
+| `LoggedOut` | `{}` | `Logout` aceptado: el personaje ya está guardado (encolado) y fuera del mundo; el servidor cierra después la conexión. El cliente cierra con `disconnect_from_server()` (sin reconexión) y vuelve a la selección de personaje con el mismo token. Un `Hello` posterior del mismo personaje espera (máx. 3 s) a que ese guardado esté escrito antes de leerlo de la BD |
 
 `EntState` (en `Snapshot`) = `{ id, x, y, dir, hpPct, anim: "idle"|"walk"|"cast"|"attack"|"dead", tgt? }`
 — solo campos que cambian con frecuencia. Los estáticos van en `EntitySpawn`.
@@ -92,3 +94,9 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 2. Renombrar/quitar campo, cambiar semántica o tipo → `ProtocolVersion++` y actualizar cliente a la vez.
 3. Todo mensaje nuevo: DTO en `PixelRealms.Protocol/Messages/`, registro en `MessageRegistry`,
    handler en `client/autoload/net.gd` (`_handlers`), fila en esta tabla, test de ida y vuelta.
+4. Un mensaje nuevo que solo se usa cuando el jugador lo pide (p. ej. `Logout`/`LoggedOut`, HU-015) no rompe a los clientes
+   anteriores: el servidor nunca lo envía sin que el cliente lo haya pedido. Cliente y servidor se publican juntos, así que
+   **no** se sube `protocolVersion` (sigue en 1).
+
+## Historial
+- v1 · HU-015: `Logout` (C→S) y `LoggedOut` (S→C), sin subir versión (regla 4).

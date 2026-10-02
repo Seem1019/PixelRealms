@@ -104,6 +104,22 @@ public sealed class SaveServiceTests
         svc.Failed.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task WaitForCharacter_ReturnsOnceThatCharactersSaveIsWritten() // HU-015 CA5
+    {
+        var repo = new SlowRepo(TimeSpan.FromMilliseconds(300), honorCancel: false);
+        var svc = new SaveService(repo, NullLogger<SaveService>.Instance);
+        await svc.StartAsync(TestContext.Current.CancellationToken);
+        var dto = Dto();
+        svc.Enqueue(dto);
+        svc.HasPending(dto.Id).ShouldBeTrue();
+        svc.HasPending(Guid.NewGuid()).ShouldBeFalse(); // otro personaje no espera
+        await svc.WaitForCharacterAsync(dto.Id, TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        repo.Saves.ShouldBe(1); // al volver, el guardado ya está escrito
+        svc.HasPending(dto.Id).ShouldBeFalse();
+        await svc.StopAsync(TestContext.Current.CancellationToken);
+    }
+
     // Sin StartAsync el servicio no consume en segundo plano: todo lo encolado lo vacía StopAsync.
 
     [Fact]

@@ -54,7 +54,9 @@ public static class MessageRegistry
         Register<TradeCancel>("TradeCancel");
         Register<AdminCommand>("AdminCommand");
         Register<ChangeClass>("ChangeClass");
+        Register<Logout>("Logout");
         RegisterServer<Welcome>("Welcome");
+        RegisterServer<LoggedOut>("LoggedOut");
         RegisterServer<Snapshot>("Snapshot");
         RegisterServer<EntitySpawn>("EntitySpawn");
         RegisterServer<EntityDespawn>("EntityDespawn");

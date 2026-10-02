@@ -62,8 +62,8 @@ public sealed class EnvelopeTests
         MessageRegistry.ClientMessageNames.ShouldContain("MoveInput");
         MessageRegistry.ServerMessageNames.ShouldContain("CombatEvents");
         MessageRegistry.ServerMessageNames.ShouldNotContain("CombatEvent");
-        MessageRegistry.ClientMessageNames.Count.ShouldBe(34);
-        MessageRegistry.ServerMessageNames.Count.ShouldBe(24);
+        MessageRegistry.ClientMessageNames.Count.ShouldBe(35);
+        MessageRegistry.ServerMessageNames.Count.ShouldBe(25);
     }
 
     [Fact]
@@ -71,5 +71,15 @@ public sealed class EnvelopeTests
     {
         var snap = new Snapshot(10, 5, new SnapshotSelfDto(80, 96, 4, 50, 60, 10, 100), [new EntStateDto(2, 16, 32, "s", 100, "idle", null)]);
         MessageRegistry.EncodeToString(snap).ShouldBe("""{"t":"Snapshot","d":{"tick":10,"ackSeq":5,"self":{"x":80,"y":96,"speed":4,"hp":50,"maxHp":60,"res":10,"maxRes":100},"ents":[{"id":2,"x":16,"y":32,"dir":"s","hpPct":100,"anim":"idle"}]}}""");
+    }
+
+    [Fact]
+    public void Logout_RoundTrip_AndLoggedOut_EncodesEmpty() // HU-015
+    {
+        var r = MessageRegistry.Decode("""{"t":"Logout","d":{"reqId":4}}""");
+        r.Status.ShouldBe(MessageRegistry.DecodeStatus.Ok);
+        r.Message.ShouldBeOfType<Logout>().ReqId.ShouldBe(4);
+        MessageRegistry.Decode("""{"t":"Logout","d":{}}""").Message.ShouldBeOfType<Logout>().ReqId.ShouldBeNull();
+        MessageRegistry.EncodeToString(new LoggedOut()).ShouldBe("""{"t":"LoggedOut","d":{}}""");
     }
 }
