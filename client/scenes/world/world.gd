@@ -5,11 +5,10 @@ extends Node2D
 
 const ZONE_FADE_SEC := 2.0
 
-@onready var _ground: PlaceholderMapRenderer = %Ground
-@onready var _above: PlaceholderMapRenderer = %Above
+@onready var _ground: TerrainRenderer = %Ground
+@onready var _above: TerrainRenderer = %Above
 @onready var _entities: Node2D = %Entities
 @onready var _player: Node2D = %PlayerSelf
-@onready var _player_name: Label = %PlayerName
 @onready var _camera: Camera2D = %Camera
 @onready var _hud_status: Label = %HudStatus
 @onready var _zone_label: Label = %ZoneName
@@ -30,13 +29,16 @@ const ZONE_FADE_SEC := 2.0
 var map: TmjMap
 var prediction: Prediction = Prediction.new()
 var _movement: MovementDriver = MovementDriver.new()
-## Barra de vida sobre el personaje propio (las remotas las lleva RemoteEntity).
+## Sprite, sombra y placa del personaje propio (las remotas las lleva RemoteEntity).
+var _self_visual: EntityVisual
+## Barra de vida de la placa propia.
 var _self_health: HealthBar
 var in_world: bool = false
 
 var _remotes: Dictionary = {}  # id → RemoteEntity
 var _current_zone: String = ""
 var _zone_fade_left: float = 0.0
+var _zone_group: CanvasGroup
 var _character_id: String = ""
 ## ¿Ya llegó el Welcome de esta conexión? Uno posterior no es una entrada nueva al mundo (HU-044).
 var _welcomed_on_connection: bool = false
@@ -46,6 +48,8 @@ var _aiming_spell: Dictionary = {}
 ## Último CastStarted propio de un salto/Carga: la corrección grande siguiente se suaviza en vez de saltar (HU-087 CA4).
 var _forced_move_until_ms: int = -1
 const TARGET_CYCLE_RANGE_TILES := 12.0
+## Hacia dónde mira el personaje propio (última tecla de movimiento).
+var _self_dir: String = "s"
 
 
 func _ready() -> void:
@@ -74,16 +78,17 @@ func _ready() -> void:
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
-	var self_body := _player.get_node("Body") as ColorRect
-	var body_rect := BodyShape.rect_px(Vector2.ZERO)
-	self_body.position = body_rect.position
-	self_body.size = body_rect.size
-	_self_health = HealthBar.new()
-	_self_health.position = Vector2(0, -14)
-	_player.add_child(_self_health)
+	_self_visual = EntityVisual.new()
+	_player.add_child(_self_visual)
+	_self_health = _self_visual.plate.health_bar
 	GameState.vitals_changed.connect(_refresh_self_health)
 	_player.visible = false
-	_zone_label.modulate.a = 0.0
+	# El rótulo de zona se desvanece dentro de un CanvasGroup: así el contorno y la letra se funden juntos (sin dobles).
+	_zone_group = CanvasGroup.new()
+	_zone_label.get_parent().add_child(_zone_group)
+	_zone_label.get_parent().move_child(_zone_group, 1)  # debajo de las ventanas
+	_zone_label.reparent(_zone_group)
+	_zone_group.self_modulate.a = 0.0
 	_fade.modulate.a = 0.0
 	_hud_status.text = "Conectando…"
 	var ticket := GameState.pending_ticket
@@ -116,7 +121,7 @@ func _on_welcome(d: Dictionary) -> void:
 	# Welcome reenviado en la misma conexión (cambio de clase): el mundo sigue igual y el servidor no reenvía la AOI.
 	if _welcomed_on_connection and str(d.get("mapId", "")) == GameState.map_id:
 		GameState._on_welcome(d, true)
-		_player_name.text = GameState.character_name
+		_refresh_self_visual()
 		if GameState.target_id > 0:
 			Net.send("SelectTarget", {"targetId": GameState.target_id})  # el servidor limpia el objetivo al cambiar de clase
 		return
@@ -130,16 +135,27 @@ func _on_welcome(d: Dictionary) -> void:
 	var grid: CollisionGrid = map.collision if map != null else CollisionGrid.new()
 	prediction.setup(grid, start, float(Content.rule("movement", "baseSpeedTilesPerSec", 4.0)))
 	_player.position = start
-	_player_name.text = GameState.character_name
+	_refresh_self_visual()
 	_player.visible = true
 	_camera.position = Vector2.ZERO
 	_camera.reset_smoothing()
 	in_world = true
 
 
+## Sprite de la clase y nombre del personaje propio (Welcome y cambio de clase).
+func _refresh_self_visual() -> void:
+	_self_visual.set_sprite(EntitySprites.ref_for("player", GameState.class_id, GameState.class_id), RemoteEntity.PLAYER_COLOR, GameState.character_name)
+	_self_visual.plate.display_name = GameState.character_name
+	_self_visual.plate.name_color = UiTheme.ACCENT
+
+
 func _refresh_self_health() -> void:
 	_self_health.pct = roundi(100.0 * GameState.hp / maxf(1.0, GameState.max_hp))
-	_self_health.visible = not GameState.is_dead
+	var show := not GameState.is_dead
+	if _self_health.visible != show:
+		_self_health.visible = show
+		_self_visual.plate.refresh_layout()
+	_self_visual.set_dead(GameState.is_dead)
 
 
 func _load_map(map_id: String) -> void:
@@ -169,6 +185,9 @@ func _physics_process(delta: float) -> void:
 	# Ticks fijos de 50 ms como el servidor (los frames físicos van a 60 Hz): un MoveInput por tick con movimiento.
 	for input: Dictionary in _movement.advance(delta, dx, dy, prediction):
 		Net.send("MoveInput", input)
+	if dx != 0 or dy != 0:
+		_self_dir = ("e" if dx > 0 else "w") if dx != 0 else ("s" if dy > 0 else "n")
+	_self_visual.set_motion(_self_dir, dx != 0 or dy != 0)
 
 
 func _process(delta: float) -> void:
@@ -184,6 +203,7 @@ func _process(delta: float) -> void:
 			_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
 		_overlay.pending_inputs = prediction.pending.size()
 		_overlay.reconcile_error_px = prediction.last_error_px
+		_layout_nameplates()
 	if _vendor.visible and _vendor.npc_id > 0:
 		var range_tiles := float(Content.rule("economy", "vendorRangeTiles", 3.0))
 		var npc: RemoteEntity = _remotes.get(_vendor.npc_id)
@@ -215,7 +235,7 @@ func _on_snapshot(d: Dictionary) -> void:
 			var r: RemoteEntity = _remotes[id]
 			r.apply_state(ed, now)
 			if id == GameState.target_id:
-				_hud.set_target_info(r.display_name, r.level, r.hp_pct)
+				_hud.set_target_info(r.display_name, r.level, r.hp_pct, r.portrait())
 
 
 # --- Entidades remotas (HU-023, HU-024) -----------------------------------------------------------------------------
@@ -332,7 +352,7 @@ func _on_target_changed(entity_id: int) -> void:
 	for r: RemoteEntity in _remotes.values():
 		r.selected = r.entity_id == entity_id
 		if r.selected:
-			_hud.set_target_info(r.display_name, r.level, r.hp_pct)
+			_hud.set_target_info(r.display_name, r.level, r.hp_pct, r.portrait())
 
 
 ## Tab: enemigos vivos visibles a ≤ 12 casillas, del más cercano al más lejano (HU-030 CA2).
@@ -555,15 +575,22 @@ func _show_bubble(from: String, text: String) -> void:
 				break
 	if anchor == null:
 		return
+	var bubble := PanelContainer.new()
+	bubble.add_theme_stylebox_override("panel", UiTheme.nine("tooltip", 4, 3, UiTheme.TOOLTIP_BG))
 	var label := Label.new()
 	label.text = text.substr(0, 60)
-	label.add_theme_font_size_override("font_size", UiTheme.FONT_SMALL)
-	label.position = Vector2(-40, -40)
-	label.custom_minimum_size = Vector2(80, 10)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size = Vector2(minf(100.0, 6.0 + 5.0 * label.text.length()), 0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.z_index = 60
-	anchor.add_child(label)
-	get_tree().create_timer(4.0).timeout.connect(label.queue_free)
+	bubble.add_child(label)
+	var holder := Node2D.new()
+	holder.z_index = 60
+	holder.z_as_relative = false
+	holder.position = Vector2(0, -52)
+	holder.add_child(bubble)
+	anchor.add_child(holder)
+	bubble.resized.connect(func() -> void: bubble.position = Vector2(-roundf(bubble.size.x / 2.0), -bubble.size.y))
+	get_tree().create_timer(4.0).timeout.connect(holder.queue_free)
 
 
 ## HU-064: marco del rival en naranja durante el duelo.
@@ -583,6 +610,44 @@ func _on_item_dropped_outside(item_id: String) -> void:
 	var item := GameState.bag_item(item_id)
 	if not item.is_empty():
 		_inventory.request_destroy(item)
+
+
+## Placas de nombre: las cercanas se apilan en vez de pisarse y ninguna se sale de lo que muestra la cámara.
+func _layout_nameplates() -> void:
+	var plates: Array[Dictionary] = []
+	var visuals := {}
+	if _player.visible:
+		plates.append({"id": 0, "rect": _self_visual.plate_anchor_rect()})
+		visuals[0] = _self_visual
+	for r: RemoteEntity in _remotes.values():
+		if r.visual != null and r.visual.plate != null:
+			plates.append({"id": r.entity_id, "rect": r.visual.plate_anchor_rect()})
+			visuals[r.entity_id] = r.visual
+	# Sin meterse bajo los marcos de arriba ni la barra rápida (la interfaz va encima).
+	var view := _view_rect()
+	view = view.grow_individual(0, -CombatHud.FRAMES_BOTTOM, 0, -CombatHud.HOTBAR_HEIGHT - UiTheme.SCREEN_MARGIN)
+	var offsets := NameplateLayout.solve(plates, view)
+	# Las placas que caerían bajo los marcos de vida o la barra rápida se ocultan (asomaban por sus huecos).
+	var full := _view_rect()
+	var hud_rects := [
+		Rect2(full.position, Vector2(2 * CombatHud.FRAME_WIDTH + 6 * UiTheme.SCREEN_MARGIN, CombatHud.FRAMES_BOTTOM)),
+		Rect2(full.position + Vector2(0, full.size.y - CombatHud.HOTBAR_HEIGHT - UiTheme.SCREEN_MARGIN), Vector2(full.size.x, CombatHud.HOTBAR_HEIGHT + UiTheme.SCREEN_MARGIN)),
+	]
+	for p: Dictionary in plates:
+		var v: EntityVisual = visuals[p["id"]]
+		var moved := Rect2((p["rect"] as Rect2).position + (offsets[p["id"]] as Vector2), (p["rect"] as Rect2).size)
+		v.set_plate_offset(offsets[p["id"]])
+		var hidden := false
+		for r: Rect2 in hud_rects:
+			hidden = hidden or r.intersects(moved)
+		v.plate.visible = not hidden
+
+
+## Rectángulo del mundo que se ve en pantalla.
+func _view_rect() -> Rect2:
+	var inv := get_viewport().get_canvas_transform().affine_inverse()
+	var vp := get_viewport().get_visible_rect()
+	return Rect2(inv * vp.position, vp.size / get_viewport().get_canvas_transform().get_scale())
 
 
 # --- Cambio de mapa (HU-027 CA2) ---------------------------------------------------------------------------------------
@@ -620,11 +685,11 @@ func _update_zone(delta: float) -> void:
 			_current_zone = zone_name
 			if not zone_name.is_empty():
 				_zone_label.text = zone_name
-				_zone_label.modulate.a = 1.0
+				_zone_group.self_modulate.a = 1.0
 				_zone_fade_left = ZONE_FADE_SEC
 	if _zone_fade_left > 0.0:
 		_zone_fade_left -= delta
-		_zone_label.modulate.a = clampf(_zone_fade_left / ZONE_FADE_SEC, 0.0, 1.0)
+		_zone_group.self_modulate.a = clampf(_zone_fade_left / ZONE_FADE_SEC, 0.0, 1.0)
 
 
 # --- Conexión -----------------------------------------------------------------------------------------------------------

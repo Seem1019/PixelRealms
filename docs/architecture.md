@@ -123,6 +123,11 @@ sequenceDiagram
 - Un único `Theme` creado por código (`scripts/ui/ui_theme.gd`; el autoload `UiStyle` lo fusiona con el tema por defecto
   del motor, porque los `Control` dentro de un `CanvasLayer` no heredan el de la ventana):
   tamaños de letra, espaciados, colores y estilos. Tooltips propios (`RichTooltip`) de ancho contenido.
+- Aspecto (ADR-026): fuente pixel Tiny5 a su tamaño nativo (8 px, ×2 para titulares), estilos 9-slice (`StyleBoxTexture`)
+  y arte en la paleta Resurrect 64 generado por `tools/art/`. El mapa se dibuja con `TerrainBaker`/`TerrainRenderer`: al
+  cargar, hornea el `.tmj` (los mismos GIDs que lee la colisión) con autotile dual-grid en texturas por trozos, una capa
+  bajo las entidades y otra (copas, aleros) encima. Las entidades son `EntityVisual` (sprite de 32×32 animado, sombra y
+  placa de nombre); `NameplateLayout` separa las placas que se pisan.
 
 ## 7. Despliegue (amigos)
 - VPS Linux (2 vCPU / 2–4 GB). `docker compose`: `server`, `postgres`, `caddy` (TLS automático → `wss://`).

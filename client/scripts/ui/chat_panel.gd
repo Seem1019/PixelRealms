@@ -8,10 +8,11 @@ extends Control
 signal bubble_requested(from: String, text: String)
 signal command(name: String, args: String)
 
-const COLORS := {"say": "#ffffff", "global": "#ffa040", "party": "#5b9bff", "whisper": "#ff80d0", "system": "#ffe066"}
+const COLORS := {"say": "#fbf3e0", "global": "#f79617", "party": "#8fd3ff", "whisper": "#ed8099", "system": "#f9c22b"}
 const MAX_LINES := 60
-const WIDTH := 200
-const LOG_HEIGHT := 64
+## Estrecho para no tapar la barra de casteo, centrada sobre la barra rápida.
+const WIDTH := 156
+const LOG_HEIGHT := 48
 const INPUT_HEIGHT := 14
 const FADE_DELAY_SEC := 8.0
 const FADE_SEC := 1.0
@@ -30,7 +31,14 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(WIDTH, LOG_HEIGHT + INPUT_HEIGHT + UiTheme.GAP)
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	# Abajo a la izquierda, encima de la barra rápida (CombatHud).
-	UiTheme.dock(self, Control.PRESET_BOTTOM_LEFT, UiTheme.SCREEN_MARGIN, -(CombatHud.HOTBAR_HEIGHT + 2 * UiTheme.PADDING + UiTheme.GAP))
+	UiTheme.dock(self, Control.PRESET_BOTTOM_LEFT, UiTheme.SCREEN_MARGIN, -(CombatHud.HOTBAR_HEIGHT + UiTheme.SCREEN_MARGIN + UiTheme.GAP))
+	# Fondo tenue detrás del registro para leerlo sobre cualquier suelo; el texto lleva contorno.
+	var back := PanelContainer.new()
+	back.add_theme_stylebox_override("panel", UiTheme.nine("tooltip", 4, 2, UiTheme.TOOLTIP_BG))
+	back.self_modulate = Color(1, 1, 1, 0.4)
+	back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(back)
 	var v := VBoxContainer.new()
 	v.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	v.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -40,6 +48,8 @@ func _ready() -> void:
 	_log.scroll_following = true
 	_log.custom_minimum_size = Vector2(WIDTH, LOG_HEIGHT)
 	_log.add_theme_font_size_override("normal_font_size", UiTheme.FONT_SMALL)
+	_log.add_theme_constant_override("outline_size", 2)
+	_log.add_theme_constant_override("line_separation", 0)
 	_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(_log)
 	_input = LineEdit.new()

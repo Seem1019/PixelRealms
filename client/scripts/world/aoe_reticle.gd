@@ -1,9 +1,11 @@
 class_name AoeReticle
 extends Node2D
-## Marca de área (HU-086 CA1/CA3): círculo de `aoeRadius` bajo el cursor mientras se apunta (rojo si está fuera de alcance) y
+## Marca de área (HU-086 CA1/CA3): anillo pixelado con runas de `aoeRadius` bajo el cursor mientras se apunta (dorado; rojo
+## si está fuera de alcance) y
 ## marcas en el suelo de casteos ajenos (CastStarted{targetPos}) hasta que terminan. La forma y el tamaño salen del contenido.
 ## Una marca se borra con su CastEnded, si el lanzador sale de la AOI (EntityDespawn) o, si nada de eso llega, al pasar la
-## duración del casteo más EXPIRY_MARGIN_MS.
+## duración del casteo más EXPIRY_MARGIN_MS. Se dibuja en el suelo (debajo de las entidades) con un relleno muy tenue, para
+## leerse sin tapar a nadie: borde de 1 px con contorno oscuro y un anillo interior discontinuo que gira despacio.
 
 const POOL_SIZE := 32
 const MAX_VISIBLE := 24
@@ -50,12 +52,25 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
+	var t := Time.get_ticks_msec() / 120.0
 	for m: Variant in _marks.values():
 		var md: Dictionary = m
-		var color := Color(1, 0.3, 0.2, 0.35) if bool(md["enemy"]) else Color(0.3, 0.6, 1, 0.3)
-		draw_circle(md["pos"], float(md["radius"]), color)
-		draw_arc(md["pos"], float(md["radius"]), 0, TAU, 32, color.lightened(0.3), 1.0)
+		var enemy := bool(md["enemy"])
+		_rune(md["pos"], float(md["radius"]), Color("e83b3b") if enemy else Color("4d9be6"), Color("fb6b1d") if enemy else Color("8fd3ff"), t)
 	if aiming:
-		var c := Color(0.3, 1, 0.4, 0.3) if aim_in_range else Color(1, 0.2, 0.2, 0.3)
-		draw_circle(aim_pos, aim_radius_px, c)
-		draw_arc(aim_pos, aim_radius_px, 0, TAU, 32, c.lightened(0.4), 1.0)
+		var main := Color("f9c22b") if aim_in_range else Color("e83b3b")
+		_rune(aim_pos, aim_radius_px, main, Color("fbff86") if aim_in_range else Color("f68181"), t)
+
+
+## Anillo de runa: relleno tenue, borde con contorno oscuro, anillo interior discontinuo girando y cuatro marcas.
+func _rune(center: Vector2, radius: float, main: Color, light: Color, t: float) -> void:
+	var r := maxf(4.0, radius)
+	PixelDraw.disc(self, center, r, Color(main, 0.13))
+	PixelDraw.ring(self, center, r + 1.0, Color(UiTheme.OUTLINE, 0.6))
+	PixelDraw.ring(self, center, r, main)
+	if r > 10.0:
+		PixelDraw.ring(self, center, r - 3.0, Color(light, 0.75), 3, t)
+	for k: int in 4:
+		var a := TAU * k / 4.0 + t * 0.02
+		var p := (center + Vector2(cos(a), sin(a)) * (r - 1.0)).round()
+		draw_rect(Rect2(p - Vector2.ONE, Vector2(2, 2)), light)

@@ -30,3 +30,6 @@ Thumbs.db
 client/.godot/
 client/gut_results.xml
 client/maps/
+
+# Generador de arte (tools/art)
+__pycache__/

@@ -251,3 +251,30 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - **Consecuencias:** cambia `docs/architecture.md` §6. Con sprites reales (HU-081) los objetos pueden quedar entre píxeles
   lógicos al moverse; si se nota, se redondean las posiciones al dibujar. Una fuente pixel sigue siendo posible encima de
   este modo.
+
+## ADR-026 · Rediseño visual: fuente Tiny5, 9-slice y arte generado; el mapa se hornea en el cliente
+- **Contexto:** el cliente funcionaba pero se veía como prototipo (rectángulos de color, la sans por defecto de Godot,
+  cajas con borde de 1 px). Queríamos la dirección artística de Heartwood Online (16×16 con detalle, paleta cálida, interfaz
+  de madera) sin tocar servidor, protocolo ni datos de mapas, y desde un entorno sin acceso a itch.io ni OpenGameArt.
+- **Decisión:**
+  - Fuente **Tiny5** (OFL): rejilla de 8 px por em, así que `FONT_SMALL/BODY/TITLE = 8` y `FONT_HEADLINE = 16` son su tamaño
+    nativo y su doble; se carga con `fixed_size = 8`, escala entera, sin antialias ni hinting (`UiTheme.font()`). Sin
+    cursiva: las descripciones de los tooltips van en color atenuado.
+  - El estilo sigue viviendo en `UiTheme.build()`: `StyleBoxTexture` 9-slice (panel, tooltip, botones, casillas, barras,
+    campo de texto) con texturas de `assets/ui/`.
+  - Todo el arte (tiles, sprites, íconos, UI) lo dibuja `tools/art/generate_all.py` en **Resurrect 64**, determinista y
+    reproducible; las rutas son las que ya pedía `content/` (`icons/items/sword_worn`, `sprites/monsters/slime`…).
+  - El mapa **no cambia**: el cliente interpreta los GIDs de `placeholder.tsj` (pasto, tierra, camino, muro, arbusto, agua,
+    roca, suelo) y los hornea con autotile **dual-grid** (cada pieza cubre la esquina de 4 casillas y elige 1 de 16 formas,
+    con bordes irregulares que casan). Los muros de una casilla de grosor se dibujan como cerca; los bloques, como casa en
+    zona segura o peñasco fuera; la roca unida al borde, como bosque; el agua aislada de la plaza, como pozo. Las capas de
+    colisión, línea de visión, spawns, NPCs y zonas quedan intactas.
+- **Alternativas descartadas:** pintar tilesets reales en Tiled y cambiar los GIDs de los `.tmj` (habría que duplicar las
+  propiedades `solid`/`blocksSight` en el tileset nuevo y repasar los tests del `TiledMapLoader`; queda como evolución
+  natural cuando haya artista y YATI); packs de itch.io/OpenGameArt (no accesibles desde la sesión; si se usan después,
+  sustituyen los PNG con las mismas rutas y se registran en `client/assets/CREDITS.md`).
+- **Consecuencias:** el horneado del prado tarda ~0,9 s la primera vez (se guarda en caché para el resto de la sesión; la
+  pantalla de inicio lo aprovecha como fondo). Las piezas del atlas y las filas de `TerrainBaker` deben coincidir con
+  `tools/art/gen_tiles.py`. Las capturas de referencia están en `docs/screenshots/redesign/`
+  (`client/tools/screenshots.gd`).
+

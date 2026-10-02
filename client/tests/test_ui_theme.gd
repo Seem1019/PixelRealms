@@ -44,8 +44,47 @@ func test_slot_labels_never_cut_words() -> void:
 	var slot := ItemSlot.new()
 	add_child_autofree(slot)
 	slot.set_item({"id": "i1", "templateId": "minor_healing_potion", "qty": 20})
-	assert_eq(slot._name.text, "Poción", "antes «Poci»")
+	# Rediseño: la casilla muestra el ícono (16×16 a ×2) y la cantidad; el nombre entero, nunca cortado, va en el tooltip.
+	assert_not_null(slot.icon_texture(), "antes salía la palabra «Poción» en vez del ícono")
+	assert_eq(slot.icon_texture().get_size(), Vector2(16, 16))
 	assert_eq(slot._qty.text, "20")
+	assert_string_contains(slot.tooltip_bbcode, "Poción menor de vida")
+
+
+func test_theme_uses_the_pixel_font_at_native_size() -> void:
+	var font := ThemeDB.get_default_theme().default_font as FontFile
+	assert_not_null(font, "la fuente por defecto de Godot es una sans suave")
+	assert_eq(font.antialiasing, TextServer.FONT_ANTIALIASING_NONE)
+	assert_eq(font.hinting, TextServer.HINTING_NONE)
+	assert_eq(font.subpixel_positioning, TextServer.SUBPIXEL_POSITIONING_DISABLED)
+	for size: int in [UiTheme.FONT_SMALL, UiTheme.FONT_BODY, UiTheme.FONT_TITLE, UiTheme.FONT_HEADLINE]:
+		assert_eq(size % UiTheme.FONT_NATIVE, 0, "%d no es múltiplo entero de %d: se vería borrosa" % [size, UiTheme.FONT_NATIVE])
+
+
+func test_panels_and_buttons_are_9_slice_textures() -> void:
+	var t := ThemeDB.get_default_theme()
+	assert_is(t.get_stylebox("panel", "PanelContainer"), StyleBoxTexture, "antes caja oscura con borde de 1 px")
+	assert_is(t.get_stylebox("normal", "Button"), StyleBoxTexture)
+	assert_is(t.get_stylebox("panel", "TooltipPanel"), StyleBoxTexture)
+
+
+func test_empty_equipment_slot_shows_a_faint_silhouette_not_text() -> void:
+	var slot := ItemSlot.new()
+	slot.container = "equip"
+	add_child_autofree(slot)
+	slot.set_placeholder("Cabeza", "head")
+	assert_not_null(slot.icon_texture(), "antes salía el texto «Cabeza»")
+	assert_lt(slot._icon.modulate.a, 1.0)
+	assert_eq(slot.tooltip_text, "Cabeza")
+
+
+func test_rarity_is_the_slot_frame_color() -> void:
+	var slot := ItemSlot.new()
+	add_child_autofree(slot)
+	slot.set_item({"id": "i1", "templateId": "wolf_tooth_necklace", "qty": 1})
+	var rarity := str(Content.item("wolf_tooth_necklace").get("rarity", ""))
+	assert_true(slot._frame.visible)
+	assert_eq(slot._frame.self_modulate, ItemSlot.RARITY_COLORS[rarity])
 
 
 func test_spell_tooltip_lists_cost_cast_and_cooldown() -> void:

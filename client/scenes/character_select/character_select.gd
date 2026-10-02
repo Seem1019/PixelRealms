@@ -53,12 +53,20 @@ func _reload() -> void:
 	if not r.ok():
 		_status.text = r.message
 		return
-	_characters = r.data if r.data is Array else []
+	show_characters(r.data if r.data is Array else [])
+
+
+## Lista de personajes: sprite de su clase, nombre y debajo clase y nivel.
+func show_characters(characters: Array) -> void:
+	_characters = characters
 	_list.clear()
 	for c: Variant in _characters:
 		var d: Dictionary = c
-		var cls := Content.character_class(str(d.get("classId", "")))
-		_list.add_item("%s · %s nv %d" % [d.get("name", "?"), cls.get("name", d.get("classId", "?")), int(d.get("level", 1))])
+		var class_id := str(d.get("classId", ""))
+		var cls := Content.character_class(class_id)
+		var sprite := EntitySprites.portrait(EntitySprites.ref_for("player", class_id, class_id), false)
+		var idx := _list.add_item("%s  ·  %s  ·  Nv %d" % [d.get("name", "?"), cls.get("name", class_id), int(d.get("level", 1))], sprite)
+		_list.set_item_tooltip_enabled(idx, false)
 	_status.text = "" if not _characters.is_empty() else "No tienes personajes: pulsa Nuevo"
 	if not _characters.is_empty():
 		_list.select(0)
@@ -86,7 +94,7 @@ func _fill_classes() -> void:
 	for cls: Variant in Content.classes():
 		var d: Dictionary = cls
 		_class_ids.append(str(d["id"]))
-		_class_list.add_item(str(d.get("name", d["id"])))
+		_class_list.add_item(str(d.get("name", d["id"])), UiTheme.icon("classes/" + str(d["id"])))
 	if not _class_ids.is_empty():
 		_class_list.select(0)
 		_on_class_selected(0)

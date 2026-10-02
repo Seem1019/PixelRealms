@@ -100,13 +100,16 @@ func test_health_bars_follow_hp_for_monsters_players_and_self() -> void:
 
 # --- Punto 4: el cuadro dibujado es el que alcanza el área --------------------------------------------------------------
 
-func test_drawn_body_matches_the_rules_body_box() -> void:
+func test_highlighted_body_matches_the_rules_body_box() -> void:
 	_welcome()
 	_dispatch("EntitySpawn", {"id": 7, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 120.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
 	await get_tree().process_frame
 	var slime: RemoteEntity = _world._remotes[7]
-	var drawn := Rect2(slime._body.position + slime.position, slime._body.size)
-	assert_eq(drawn, BodyShape.rect_px(slime.position))
+	# Rediseño: el cuerpo se dibuja con un sprite de 32×32; el cuadro que se resalta al apuntar es el de las reglas.
+	assert_eq(Rect2(slime.body_rect().position + slime.position, slime.body_rect().size), BodyShape.rect_px(slime.position))
+	assert_true(slime.hint_rect().encloses(slime.body_rect()), "el contorno rodea el cuadro con el que decide el servidor")
+	assert_true(slime.visual.sprite.visible, "el slime tiene sprite, no un cuadrado de color")
+	assert_eq(slime.visual.sprite.position.y + float(EntitySprites.meta(slime.visual.sprite_ref)["feet"]), 0.0, "los pies del sprite caen en la posición de la entidad")
 
 
 func test_aiming_highlights_who_the_area_would_hit() -> void:
