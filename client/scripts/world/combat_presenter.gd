@@ -168,10 +168,18 @@ func _show(ed: Dictionary, with_impact: bool) -> void:
 		vfx.play_once(sheet, pos + Vector2(0, -8 if sheet != "heal" else -10))
 
 
+## ¿El básico de src viaja como proyectil? Monstruos: según su `attackRange` de monsters.json (un jefe cuerpo a cuerpo con
+## el objetivo algo lejos no dispara flechas). Jugadores (el cliente no sabe qué arma lleva otro): por la distancia, ya que
+## ningún arma cuerpo a cuerpo llega a RANGED_BASIC_MIN_TILES.
 func _ranged_basic(src: int, dst: int) -> bool:
 	var a := _pos(src)
 	var b := _pos(dst)
-	return a != Vector2.INF and b != Vector2.INF and a.distance_to(b) > VfxCatalog.RANGED_BASIC_MIN_TILES * 16.0
+	if a == Vector2.INF or b == Vector2.INF:
+		return false
+	var monster := Content.monster(str(archetype_of.call(src))) if archetype_of.is_valid() else {}
+	if not monster.is_empty():
+		return float(monster.get("attackRange", 1.0)) > VfxCatalog.RANGED_BASIC_MIN_TILES
+	return a.distance_to(b) > VfxCatalog.RANGED_BASIC_MIN_TILES * 16.0
 
 
 func _basic_projectile(src: int) -> String:
