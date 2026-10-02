@@ -105,6 +105,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         PlayerEntered?.Invoke(player, new MapInstanceRef(instance));
         // Welcome no trae stats primarios ni oro: sin esto el cliente los ve a 0. Va al final para no dejar la entrada a medias.
         ctx.Send(mapper.ToStatsUpdate(player));
+        foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd); // recargas que siguieron corriendo fuera (HU-015)
     }
 
     /// <summary>HU-025 CA2: la conexión nueva toma el personaje que seguía en el mundo; se reenvía Welcome y la AOI completa.</summary>
@@ -117,6 +118,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         ctx.Send(mapper.ToWelcome(player, mapId, ctx.Tick.Tick));
         if (instance is not null) interest.ResetObserver(instance, player);
         ctx.Send(mapper.ToStatsUpdate(player)); // stats y oro tras el Welcome (ver OnPlayerJoin)
+        foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd);
         logger.LogInformation("{Name} reconectó (conexión {Conn})", player.Name, connectionId);
     }
 

@@ -33,6 +33,7 @@ public sealed class Character
     public DateTime? DeletedAt { get; set; }
     public List<CharacterItem> Items { get; set; } = new();
     public List<CharacterHotbarSlot> Hotbar { get; set; } = new();
+    public List<CharacterCooldown> Cooldowns { get; set; } = new();
 }
 
 /// <summary>Instancia de item (id de instancia NUNCA se reutiliza). container: 0 = bolsa, 1 = equipo.</summary>
@@ -53,6 +54,15 @@ public sealed class CharacterHotbarSlot
     public short Slot { get; set; }
     public short Kind { get; set; }
     public string Ref { get; set; } = "";
+}
+
+/// <summary>Cooldown que sigue corriendo al salir (HU-015). kind 0 = spell, 1 = item (plantilla de consumible).</summary>
+public sealed class CharacterCooldown
+{
+    public Guid CharacterId { get; set; }
+    public short Kind { get; set; }
+    public string Ref { get; set; } = "";
+    public DateTime EndsAt { get; set; }
 }
 
 public sealed class ItemAuditLog

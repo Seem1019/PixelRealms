@@ -59,6 +59,7 @@ var _logout_after: String = ""
 var _logout_req_id: int = -1
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select/character_select.tscn"
 const LOGOUT_IN_COMBAT_TEXT := "No puedes salir en combate"
+const LOGOUT_REJECTED_TEXT := "No se pudo salir: el servidor rechazó la petición"
 ## Cambio de escena tras el Logout (los tests lo sustituyen para no salir de la escena de prueba).
 var change_scene: Callable = func(path: String) -> void: get_tree().change_scene_to_file(path)
 
@@ -811,10 +812,12 @@ func _on_disconnected(reason: String) -> void:
 
 
 func _on_ui_error(code: String, req_id: int) -> void:
-	if code == "in_combat" and req_id > 0 and req_id == _logout_req_id:
+	if not _logout_after.is_empty() and (req_id == _logout_req_id or (req_id <= 0 and code == "invalid_payload")):
+		# El Logout no salió: en combate, o un servidor que no lo entiende (invalid_payload sin reqId). El menú queda
+		# abierto y usable para Continuar o volver a intentarlo.
 		_logout_after = ""
 		_game_menu.waiting = false
-		_hud.show_error(LOGOUT_IN_COMBAT_TEXT)  # el menú sigue abierto para Continuar
+		_hud.show_error(LOGOUT_IN_COMBAT_TEXT if code == "in_combat" else LOGOUT_REJECTED_TEXT)
 		return
 	match code:
 		"bad_version", "bad_ticket", "disconnected":

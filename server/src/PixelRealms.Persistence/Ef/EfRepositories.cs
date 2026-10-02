@@ -104,7 +104,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
     public async Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        var c = await db.Characters.AsNoTracking().Include(x => x.Items).Include(x => x.Hotbar).FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct);
+        var c = await db.Characters.AsNoTracking().Include(x => x.Items).Include(x => x.Hotbar).Include(x => x.Cooldowns).FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct);
         return c is null ? null : Map(c);
     }
 
@@ -120,8 +120,10 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
             .SetProperty(c => c.Hp, character.Hp).SetProperty(c => c.Resource, character.Resource).SetProperty(c => c.UpdatedAt, now), ct);
         await db.CharacterItems.Where(i => i.CharacterId == character.Id).ExecuteDeleteAsync(ct);
         await db.CharacterHotbar.Where(h => h.CharacterId == character.Id).ExecuteDeleteAsync(ct);
+        await db.CharacterCooldowns.Where(c => c.CharacterId == character.Id).ExecuteDeleteAsync(ct);
         db.CharacterItems.AddRange(character.Items.Select(i => new CharacterItem { Id = i.Id, CharacterId = character.Id, TemplateId = i.TemplateId, Quantity = i.Quantity, Container = i.Container, Slot = i.Slot }));
         db.CharacterHotbar.AddRange(character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = character.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }));
+        db.CharacterCooldowns.AddRange((character.Cooldowns ?? []).Select(c => new CharacterCooldown { CharacterId = character.Id, Kind = c.Kind, Ref = c.Ref, EndsAt = c.EndsAtUtc }));
         db.ItemAuditLog.AddRange(character.Audit.Select(a => new ItemAuditLog { ItemId = a.ItemId, CharacterId = character.Id, Action = a.Action, TemplateId = a.TemplateId, Quantity = a.Quantity, At = now, CounterpartyCharacterId = a.CounterpartyCharacterId }));
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
@@ -140,5 +142,6 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
 
     private static CharacterSaveDto Map(Character c) => new(c.Id, c.AccountId, c.Name, c.ClassId, c.Level, c.Xp, c.Gold, c.MapId, c.X, c.Y, c.Hp, c.Resource,
         c.Items.Select(i => new SavedItem(i.Id, i.TemplateId, i.Quantity, i.Container, i.Slot)).ToList(),
-        c.Hotbar.Select(h => new SavedHotbarSlot(h.Slot, h.Kind, h.Ref)).ToList(), []);
+        c.Hotbar.Select(h => new SavedHotbarSlot(h.Slot, h.Kind, h.Ref)).ToList(), [],
+        c.Cooldowns.Select(x => new SavedCooldown(x.Kind, x.Ref, DateTime.SpecifyKind(x.EndsAt, DateTimeKind.Utc))).ToList());
 }

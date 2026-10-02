@@ -42,6 +42,21 @@ public sealed class PlayerMapper(ReloadableContent content)
         Recalculate(player);
         player.Hp = Math.Clamp(dto.Hp, 0, player.MaxHp);
         player.Resource = Math.Clamp(dto.Resource, 0, player.MaxResource);
+        // HU-015: los cooldowns siguen corriendo con el reloj real mientras está fuera; solo vuelven los que no han terminado.
+        var nowMs = NowMs();
+        var utcNow = Time.GetUtcNow().UtcDateTime;
+        foreach (var cd in dto.Cooldowns ?? [])
+        {
+            // Nunca más que la recarga actual del contenido (reloj del host corregido, contenido rebajado) ni de algo que ya no existe.
+            int maxMs;
+            Dictionary<string, long> cooldowns;
+            if (cd.Kind == 0 && db.TryGetSpell(cd.Ref, out var spell) && spell is not null) (maxMs, cooldowns) = (spell.CooldownMs, player.Combat.CooldownEndsAtMs);
+            else if (cd.Kind == 1 && db.TryGetItem(cd.Ref, out var tpl) && tpl is not null) (maxMs, cooldowns) = (tpl.UseCooldownMs, player.ItemCooldownEndsAtMs);
+            else continue;
+            var remainingMs = Math.Min((long)(cd.EndsAtUtc - utcNow).TotalMilliseconds, maxMs);
+            if (remainingMs <= 0) continue;
+            cooldowns[cd.Ref] = nowMs + remainingMs;
+        }
         return player;
     }
 
@@ -61,7 +76,29 @@ public sealed class PlayerMapper(ReloadableContent content)
         var hotbar = new List<SavedHotbarSlot>();
         for (var i = 0; i < p.Hotbar.Length; i++)
             if (p.Hotbar[i] is { } h) hotbar.Add(new SavedHotbarSlot((short)i, (short)(h.Kind == "spell" ? 0 : 1), h.Ref));
-        return new CharacterSaveDto(p.CharacterId, p.AccountId, p.Name, p.ClassId, p.Level, p.Xp, p.Gold, MapIdOf(p), p.Position.X, p.Position.Y, p.Hp, p.Resource, items, hotbar, audit ?? []);
+        return new CharacterSaveDto(p.CharacterId, p.AccountId, p.Name, p.ClassId, p.Level, p.Xp, p.Gold, MapIdOf(p), p.Position.X, p.Position.Y, p.Hp, p.Resource, items, hotbar, audit ?? [],
+            ToSavedCooldowns(p));
+    }
+
+    /// <summary>Cooldowns de hechizo y de consumible aún activos, como instante UTC de fin (el reloj de juego no sobrevive al reinicio).</summary>
+    private List<SavedCooldown> ToSavedCooldowns(Player p)
+    {
+        var nowMs = NowMs();
+        var utcNow = Time.GetUtcNow().UtcDateTime;
+        var saved = new List<SavedCooldown>();
+        foreach (var (spellId, end) in p.Combat.CooldownEndsAtMs)
+            if (end > nowMs) saved.Add(new SavedCooldown(0, spellId, utcNow.AddMilliseconds(end - nowMs)));
+        foreach (var (templateId, end) in p.ItemCooldownEndsAtMs)
+            if (end > nowMs) saved.Add(new SavedCooldown(1, templateId, utcNow.AddMilliseconds(end - nowMs)));
+        return saved;
+    }
+
+    /// <summary>`Cooldown` de cada hechizo aún en recarga: tras Welcome el cliente los dibuja en la barra (HU-015).</summary>
+    public IEnumerable<Cooldown> ToCooldowns(Player p)
+    {
+        var nowMs = NowMs();
+        foreach (var (spellId, end) in p.Combat.CooldownEndsAtMs)
+            if (end > nowMs) yield return new Cooldown(spellId, (int)(end - nowMs), null);
     }
 
     /// <summary>Recalcula máximos con clase + nivel + equipo (StatCalculator); la vida actual se recorta si bajó el máximo.</summary>
@@ -114,4 +151,10 @@ public sealed class PlayerMapper(ReloadableContent content)
 
     /// <summary>MapId actual del jugador (su instancia); se rellena desde el mundo en WorldSession.</summary>
     public Func<Player, string> MapIdOf { get; set; } = _ => "";
+
+    /// <summary>Reloj de juego (ms) para convertir cooldowns; lo fija la composición con el de la simulación.</summary>
+    public Func<long> NowMs { get; set; } = () => 0;
+
+    /// <summary>Reloj real para que los cooldowns guardados sigan corriendo fuera del juego (en tests, uno falso).</summary>
+    public TimeProvider Time { get; set; } = TimeProvider.System;
 }

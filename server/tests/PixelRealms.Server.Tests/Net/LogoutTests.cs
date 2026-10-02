@@ -137,6 +137,52 @@ public sealed class LogoutTests
     }
 
     [Fact]
+    public async Task Logout_ThenReentry_KeepsTheSpellCooldownRunning() // HU-015 pendiente: los cooldowns no se reiniciaban
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, anaChar, ana, _) = await Enter(server, "ana", "Ana", "warrior");
+        using (anaApi)
+        {
+            var registry = server.Services.GetRequiredService<PlayerRegistry>();
+            await server.RunOnTickAsync(tick => registry.All.Single().Combat.CooldownEndsAtMs["warrior_charge"] = tick.NowMs + 12_000); // recarga de 16 s
+
+            await ana.SendAsync("Logout");
+            await ana.ExpectAsync("LoggedOut");
+            await using var again = await Connect(server, anaApi, anaChar);
+            await again.ExpectAsync("Welcome");
+            var cd = await again.ExpectAsync("Cooldown", x => x.GetProperty("spellId").GetString() == "warrior_charge");
+            cd.GetProperty("remainingMs").GetInt32().ShouldBeInRange(8_000, 12_000);
+            await ana.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_DropsThePlayersThreatAndTagsOnMonsters() // HU-015: sin XP ni botín para un ausente
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, _, ana, _) = await Enter(server, "ana", "Ana", "warrior");
+        using (anaApi)
+        {
+            var session = server.Services.GetRequiredService<WorldSession>();
+            var registry = server.Services.GetRequiredService<PlayerRegistry>();
+            var world = server.Services.GetRequiredService<PixelRealms.Game.Core.World>();
+            await server.RunOnTickAsync(tick =>
+            {
+                var p = registry.All.Single();
+                var monster = world.GetInstance(p.MapInstanceId)!.Monsters.Values.First();
+                monster.Threat.Add(p.Id, 50);
+                monster.TaggedBy = p.Id;
+
+                session.Logout(p, tick).ShouldBeNull(); // en el mismo tick: el monstruo no llega a meterla en combate
+
+                monster.Threat.Contains(p.Id).ShouldBeFalse();
+                monster.TaggedBy.ShouldBeNull();
+            });
+            await ana.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task Logout_WithoutBeingInTheWorld_IsConfirmedAnyway()
     {
         await using var server = await TestServer.StartAsync();
