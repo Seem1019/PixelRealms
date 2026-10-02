@@ -22,4 +22,4 @@ el resto del repositorio. Se generó así porque desde el entorno de trabajo no 
 | `sprites/characters/`, `sprites/npcs/`, `sprites/monsters/`, `sprites/shadow*.png` | `tools/art/gen_chars.py` | 4 clases, 2 NPC, 8 monstruos de 32×32 y 2 jefes de 64×64; 3 direcciones (w = e espejado), reposo y caminar |
 | `icons/items/`, `icons/spells/`, `icons/slots/`, `icons/classes/` | `tools/art/gen_icons.py` | 37 items, 38 hechizos, 9 siluetas de equipo, 4 clases (16×16) |
 | `ui/` | `tools/art/gen_ui.py` | marcos 9-slice de madera, botones, casillas, barras, campo de texto, aviso, casillas de verificación y logo |
-| `sprites/characters/{warrior,mage,priest}.png` (HD) | `tools/art/import_heroes.py` | hojas de referencia aportadas por el equipo (`tools/art/refs/*_sheet.webp`), recortadas a 120×120 con `pixelScale` 3 |
+| `sprites/characters/{warrior,mage,rogue,priest}.png` (HD) | `tools/art/import_heroes.py` | hojas de referencia aportadas por el equipo (`tools/art/refs/*_sheet.webp`), recortadas a 120×120 con `pixelScale` 3 |

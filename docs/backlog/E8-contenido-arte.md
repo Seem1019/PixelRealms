@@ -151,7 +151,7 @@
 
 ### HU-099 · Héroes en alta resolución
 **Como** jugador **quiero** que los cuatro héroes se vean con el detalle y las animaciones de sus hojas dibujadas **para** que no pierdan calidad al reducirlos a 32 px.
-- Prioridad: Should · Estimación: M · Estado: En curso
+- Prioridad: Should · Estimación: M · Estado: Hecha
 - Dependencias: HU-093
 - Skills: `pixel-art-assets`, `godot-client`
 
@@ -163,4 +163,5 @@
 
 **Notas de implementación**
 - Detección de cuadros robusta a brillos que unen cuadros vecinos (parte el tramo por su línea menos densa) y fondo encerrado por efectos (negro casi puro y grande) transparente.
-- El sacerdote no trae vista de espaldas: el norte repite la de frente. Falta la hoja del pícaro.
+- El pícaro usa un umbral de fondo más bajo (`BG_LEVEL_BY_CLASS`): su ropa casi negra se borraba con el fondo.
+- Limitación: el sacerdote no trae vista de espaldas (el norte repite la de frente) y el ataque y casteo de espaldas del guerrero y el mago repiten cuadros de caminar.

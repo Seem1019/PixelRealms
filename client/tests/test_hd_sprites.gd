@@ -3,7 +3,7 @@ extends GutTest
 
 
 func test_hero_sheets_are_hd_with_the_full_animation_set() -> void:
-	for cls: String in ["warrior", "mage", "priest"]:
+	for cls: String in ["warrior", "mage", "priest", "rogue"]:
 		var ref := "characters/" + cls
 		assert_eq(EntitySprites.scale_of(ref), 3, ref)
 		var frames := EntitySprites.frames_for(ref)
@@ -28,4 +28,4 @@ func test_hd_portraits_cover_the_same_logical_area() -> void:
 	var head := EntitySprites.portrait("characters/priest", true)
 	assert_eq(body.get_size(), Vector2(96, 96), "32×32 lógicos a ×3")
 	assert_eq(head.get_size(), Vector2(48, 48), "16×16 lógicos a ×3")
-	assert_eq(EntitySprites.scale_of("characters/rogue"), 1, "una hoja procedural sigue a escala 1")
+	assert_eq(EntitySprites.scale_of("npcs/shopkeeper"), 1, "una hoja procedural sigue a escala 1")

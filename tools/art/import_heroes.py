@@ -31,6 +31,8 @@ FEET_Y = 36 * PIXEL_SCALE
 ## Altura del personaje de pie (reposo sur): 26 px lógicos, la misma que el resto de personajes.
 STAND_HEIGHT = 26 * PIXEL_SCALE
 BG_LEVEL = 40  # canal máximo por debajo del cual un píxel cuenta como fondo negro
+## Ropa casi negra (el pícaro): umbral de fondo más bajo para que botas y pantalones no se borren con él.
+BG_LEVEL_BY_CLASS = {"rogue": 12}
 ENCLOSED_BG_MIN_PX = 300  # fondo encerrado por un efecto: al menos este tamaño (los contornos son mucho menores)
 
 ## Animaciones: cuadros (los mismos en las tres direcciones), fps y bucle. Más cuadros que las hojas procedurales;
@@ -73,6 +75,14 @@ FRAMES: dict[str, dict[str, dict[str, list[str]]]] = {
               "hurt": ["1,1", "1,6"], "death": keys(7, [7, 8, 10, 11])},
         "e": {"idle": keys(0, [0, 4, 9, 11]), "walk": even(3, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
               "cast": keys(4, [0, 2, 4, 6, 8, 4]), "hurt": keys(7, [6, 7]), "death": keys(7, [7, 8, 10, 11])},
+    },
+    "rogue": {
+        "s": {"idle": keys(0, [0, 4, 8, 12]), "walk": even(2, 16, 8), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
+              "cast": keys(7, [0, 1, 2, 3, 4, 6]), "hurt": keys(8, [3, 4]), "death": keys(8, [6, 7, 8, 10])},
+        "n": {"idle": keys(1, [0, 1, 2, 1]), "walk": keys(1, [0, 1, 2, 4, 5, 6, 7, 1]), "attack": keys(1, [2, 4, 5, 6, 7, 2]),
+              "cast": keys(1, [0, 1, 2, 4, 5, 6]), "hurt": keys(1, [0, 1]), "death": keys(8, [6, 7, 8, 10])},
+        "e": {"idle": keys(0, [0, 4, 8, 12]), "walk": even(3, 16, 8), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
+              "cast": keys(7, [0, 1, 2, 3, 4, 6]), "hurt": keys(8, [3, 4]), "death": keys(8, [6, 7, 8, 10])},
     },
     # Sin vista de espaldas: el norte repite la de frente hasta tener cuadros de espaldas.
     "priest": {d: {"idle": keys(0, [0, 4, 8, 12]), "walk": even(1 if d != "e" else 2, 15, 8),
@@ -126,11 +136,11 @@ def find_frames(img: Image.Image) -> list[list[tuple[int, int, int, int]]]:
     return out
 
 
-def cut_out(img: Image.Image, box: tuple[int, int, int, int]) -> Image.Image:
+def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = BG_LEVEL) -> Image.Image:
     """Recorte con el fondo negro conectado al borde transparente (el contorno oscuro interior se conserva)."""
     x0, y0, x1, y1 = box
     c = np.asarray(img.crop((x0 - 2, y0 - 2, x1 + 2, y1 + 2))).astype(np.uint8)
-    lab, n = ndimage.label(c.max(axis=2) < BG_LEVEL - 2)
+    lab, n = ndimage.label(c.max(axis=2) < bg_level - 2)
     background = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
     # Fondo encerrado (p. ej. dentro del arco de un tajo): negro casi puro y grande; los contornos son finos y no lo son.
     darkest = c.max(axis=2)
@@ -138,6 +148,14 @@ def cut_out(img: Image.Image, box: tuple[int, int, int, int]) -> Image.Image:
     means = ndimage.mean(darkest, lab, range(1, n + 1))  # la compresión deja bordes de hasta ~37: cuenta la media
     background |= {i + 1 for i in range(n) if sizes[i] >= ENCLOSED_BG_MIN_PX and means[i] < 12}
     alpha = np.where(np.isin(lab, list(background)), 0, 255).astype(np.uint8)
+    # Motas oscuras sueltas que deja la compresión alrededor de la silueta con un umbral bajo.
+    solid, k = ndimage.label(alpha > 0)
+    if k > 1:
+        areas = ndimage.sum(np.ones_like(solid), solid, range(1, k + 1))
+        lum = ndimage.mean(darkest, solid, range(1, k + 1))
+        for i in range(k):
+            if areas[i] < 25 and lum[i] < 40:
+                alpha[solid == i + 1] = 0
     return Image.fromarray(np.dstack([c, alpha]), "RGBA")
 
 
@@ -186,7 +204,8 @@ def build_class(class_id: str) -> bool:
             assert len(frames) == a["frames"], f"{class_id}/{d}/{name}: {len(frames)} cuadros, se esperan {a['frames']}"
             anims[name] = {"column": col, **a}
             for key in frames:
-                sheet.paste(frame_cell(shrink(cut_out(img, box(key)), scale)), (col * SIZE, r * SIZE))
+                cut = cut_out(img, box(key), BG_LEVEL_BY_CLASS.get(class_id, BG_LEVEL))
+                sheet.paste(frame_cell(shrink(cut, scale)), (col * SIZE, r * SIZE))
                 col += 1
     out = ASSETS / "sprites" / "characters"
     sheet.save(out / f"{class_id}.png")
