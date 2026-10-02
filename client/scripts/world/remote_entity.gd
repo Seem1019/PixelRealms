@@ -7,6 +7,8 @@ extends Node2D
 const PLAYER_COLOR := Color(0.55, 0.75, 1.0)
 const MONSTER_COLOR := Color(0.9, 0.35, 0.3)
 const NPC_COLOR := Color(0.5, 0.9, 0.5)
+## Destello al recibir un golpe o una cura (blanco / verde), para ver a quién alcanza un área.
+const FLASH_MS := 160
 
 var entity_id: int = -1
 var kind: String = "player"
@@ -28,6 +30,8 @@ var area_hint: bool = false:
 var hostile: bool = false
 var cast_started_ms: int = -1
 var cast_duration_ms: int = 0
+var _flash_until_ms: int = -1
+var _flash_color: Color = Color.WHITE
 
 var _buffer: InterpolationBuffer = InterpolationBuffer.new()
 var _body: ColorRect
@@ -117,8 +121,19 @@ func _process(_delta: float) -> void:
 		var frac := clampf(float(Time.get_ticks_msec() - cast_started_ms) / float(maxi(1, cast_duration_ms)), 0.0, 1.0)
 		_cast_bar.offset_right = -8.0 + 16.0 * frac
 	if _body != null:
+		_body.modulate = _flash_color if is_flashing() else Color.WHITE
 		_body.modulate.a = 0.45 if anim == "dead" else 1.0
 	queue_redraw()
+
+
+## Destella el cuerpo FLASH_MS (CombatEvents: daño en blanco, cura en verde).
+func flash(color: Color) -> void:
+	_flash_color = color
+	_flash_until_ms = Time.get_ticks_msec() + FLASH_MS
+
+
+func is_flashing() -> bool:
+	return Time.get_ticks_msec() < _flash_until_ms
 
 
 ## HU-030 CA1: círculo bajo los pies (rojo hostil, verde aliado) cuando está seleccionada.

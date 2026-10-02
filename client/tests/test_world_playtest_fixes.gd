@@ -166,6 +166,26 @@ func test_remote_mark_goes_away_when_the_caster_leaves_or_the_cast_should_have_e
 	assert_false(_world._reticle._marks.has(8))
 
 
+# --- Punto 11: a quién alcanza un área ----------------------------------------------------------------------------------
+
+func test_every_target_of_an_area_flashes_and_gets_its_own_number() -> void:
+	_welcome()
+	for id: int in [7, 8, 10]:
+		_dispatch("EntitySpawn", {"id": id, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 100.0 + id * 10.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	await get_tree().process_frame
+	_dispatch("CombatEvents", {"tick": 13, "e": [
+		{"src": 1, "dst": 7, "spellId": "mage_flame_burst", "kind": "dmg", "amount": 30, "crit": false, "school": "magic"},
+		{"src": 1, "dst": 8, "spellId": "mage_flame_burst", "kind": "dmg", "amount": 28, "crit": true, "school": "magic"},
+		{"src": 1, "dst": 10, "spellId": "mage_flame_burst", "kind": "miss", "amount": 0, "crit": false, "school": "magic"}]})
+	await get_tree().process_frame
+	assert_eq(_world._floating._active.size(), 3, "un número por objetivo")
+	assert_true((_world._remotes[7] as RemoteEntity).is_flashing())
+	assert_true((_world._remotes[8] as RemoteEntity).is_flashing())
+	assert_false((_world._remotes[10] as RemoteEntity).is_flashing(), "un fallo no destella")
+	var label: Label = (_world._floating._active[0] as Dictionary)["label"]
+	assert_gt(label.get_theme_constant("outline_size"), 0, "contorno para leerse sobre cualquier fondo")
+
+
 # --- Punto 10: tooltip en la tienda ------------------------------------------------------------------------------------
 
 func test_vendor_rows_show_the_item_tooltip_with_the_buy_price() -> void:

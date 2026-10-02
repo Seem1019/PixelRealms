@@ -19,6 +19,8 @@ func _ready() -> void:
 	for i: int in POOL_SIZE:
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", UiTheme.FONT_BODY)
+		l.add_theme_constant_override("outline_size", 2)  # legible sobre cualquier suelo
+		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		l.visible = false
 		l.z_index = 50
 		add_child(l)
@@ -52,7 +54,7 @@ func show_event(entity_id: int, kind: String, amount: int, crit: bool, world_pos
 			return
 	if not _allow(entity_id, kind, amount, world_pos):
 		return
-	_spawn(text, color, world_pos)
+	_spawn(text, color, world_pos, crit)
 
 
 ## Límite por entidad y segundo: a partir del 6.º número se acumula y se muestra sumado al cerrar la ventana.
@@ -72,7 +74,7 @@ func _allow(entity_id: int, kind: String, amount: int, world_pos: Vector2) -> bo
 	return allowed
 
 
-func _spawn(text: String, color: Color, world_pos: Vector2) -> void:
+func _spawn(text: String, color: Color, world_pos: Vector2, big: bool = false) -> void:
 	if _active.size() >= MAX_VISIBLE:
 		return
 	var l: Label = null
@@ -84,6 +86,7 @@ func _spawn(text: String, color: Color, world_pos: Vector2) -> void:
 		return
 	l.text = text
 	l.add_theme_color_override("font_color", color)
+	l.add_theme_font_size_override("font_size", UiTheme.FONT_TITLE if big else UiTheme.FONT_BODY)
 	l.modulate.a = 1.0
 	l.position = world_pos + Vector2(-8 + randf_range(-4, 4), -20)
 	l.visible = true

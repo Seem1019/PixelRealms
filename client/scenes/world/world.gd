@@ -497,7 +497,10 @@ func _on_combat_events(d: Dictionary) -> void:
 		var pos := _player.position if dst == GameState.self_id else (_remotes[dst] as RemoteEntity).position if _remotes.has(dst) else Vector2.INF
 		if pos == Vector2.INF:
 			continue
-		_floating.show_event(dst, str(ed.get("kind", "")), int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
+		var kind := str(ed.get("kind", ""))
+		_floating.show_event(dst, kind, int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
+		if kind in ["dmg", "heal"] and _remotes.has(dst):
+			(_remotes[dst] as RemoteEntity).flash(Color(3, 3, 3) if kind == "dmg" else Color(0.6, 2.2, 0.6))  # destello por objetivo (área)
 
 
 ## Clic derecho sobre otro jugador: Invitar / Retar a duelo / Intercambiar (HU-061, HU-064, HU-059).
