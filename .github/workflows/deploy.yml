@@ -24,7 +24,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/pixelrealms-server
+  # GHCR exige minúsculas y el dueño es "Seem1019": las expresiones no tienen lower(), así que va fijo.
+  IMAGE: ghcr.io/seem1019/pixelrealms-server
   GODOT_VERSION: 4.7.2
   SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
