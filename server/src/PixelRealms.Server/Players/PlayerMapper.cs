@@ -93,12 +93,14 @@ public sealed class PlayerMapper(ReloadableContent content)
         return saved;
     }
 
-    /// <summary>`Cooldown` de cada hechizo aún en recarga: tras Welcome el cliente los dibuja en la barra (HU-015).</summary>
+    /// <summary>`Cooldown` de cada hechizo y cada consumible aún en recarga: tras Welcome el cliente los dibuja en la barra (HU-015).</summary>
     public IEnumerable<Cooldown> ToCooldowns(Player p)
     {
         var nowMs = NowMs();
         foreach (var (spellId, end) in p.Combat.CooldownEndsAtMs)
             if (end > nowMs) yield return new Cooldown(spellId, (int)(end - nowMs), null);
+        foreach (var (templateId, end) in p.ItemCooldownEndsAtMs)
+            if (end > nowMs) yield return new Cooldown(null, (int)(end - nowMs), null, templateId);
     }
 
     /// <summary>Recalcula máximos con clase + nivel + equipo (StatCalculator); la vida actual se recorta si bajó el máximo.</summary>

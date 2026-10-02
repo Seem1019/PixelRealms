@@ -170,6 +170,10 @@ public sealed class LootAndVendorTests
         var heal = w.Content.Spell("item_minor_heal").Effects[0];
         var ctx = w.Begin();
         w.Combat.ItemUse.Use(ana, potion.Id, w.Map, ctx).ShouldBeNull();
+        // El cliente necesita la recarga para dibujarla en la barra (prueba de juego: solo veía "Aún no está listo").
+        var cooldown = ctx.Events.OfType<CooldownEvent>().Single(e => e.TemplateId == "minor_healing_potion");
+        cooldown.RemainingMs.ShouldBe(w.Content.Item("minor_healing_potion").UseCooldownMs);
+        cooldown.SpellId.ShouldBeNull();
         (ana.Hp - 10).ShouldBeInRange((int)(heal.Base * rules.Combat.VarianceMin), (int)Math.Ceiling(heal.Base * rules.Combat.VarianceMax * rules.Combat.CritMultiplier));
         potion.Qty.ShouldBe(1);
         // CD compartido por plantilla: el otro stack también está en CD y no se consume.

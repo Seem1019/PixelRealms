@@ -92,7 +92,7 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     connections.Send(victim.ConnectionId, new Died(died.Killer?.Id.Value, 0));
                     break;
                 case CooldownEvent cd when cd.Caster is Player { ConnectionId: >= 0 } caster:
-                    connections.Send(caster.ConnectionId, new Cooldown(cd.SpellId, cd.RemainingMs, cd.GcdMs));
+                    connections.Send(caster.ConnectionId, new Cooldown(cd.SpellId, cd.RemainingMs, cd.GcdMs, cd.TemplateId));
                     break;
                 case CombatErrorEvent err when err.Player.ConnectionId >= 0:
                     connections.Send(err.Player.ConnectionId, new Error(err.Code, err.Message, err.ReqId));

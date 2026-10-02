@@ -37,7 +37,7 @@ public sealed record AuraApplied(int TargetId, string AuraId, int? CasterId, int
 
 public sealed record AuraRemoved(int TargetId, string AuraId, int? CasterId) : IServerMessage;
 
-public sealed record Cooldown(string? SpellId, int? RemainingMs, int? GcdMs) : IServerMessage;
+public sealed record Cooldown(string? SpellId, int? RemainingMs, int? GcdMs, string? TemplateId = null) : IServerMessage;
 
 public sealed record StatsDto(int Str, int Agi, int Int, int Spi, int Sta);
 

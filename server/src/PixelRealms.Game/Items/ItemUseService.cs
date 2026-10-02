@@ -23,7 +23,11 @@ public sealed class ItemUseService(CombatServices services, CastSystem casts)
         if (!services.Content.TryGetSpell(tpl.UseSpellId, out var spell) || spell is null) return "invalid_payload";
         var error = casts.TryBeginCast(p, spell, p.Id, null, map, ctx, cancelCurrent: false);
         if (error is not null) return error;
-        if (tpl.UseCooldownMs > 0) p.ItemCooldownEndsAtMs[tpl.Id] = ctx.NowMs + tpl.UseCooldownMs;
+        if (tpl.UseCooldownMs > 0)
+        {
+            p.ItemCooldownEndsAtMs[tpl.Id] = ctx.NowMs + tpl.UseCooldownMs;
+            ctx.Emit(new CooldownEvent(map.Id, p, null, tpl.UseCooldownMs, null, tpl.Id)); // la barra la dibuja como la de un hechizo
+        }
         InventoryOps.Remove(p, itemId, 1, "use", services.Content);
         ctx.Emit(new InventoryChangedEvent(map.Id, p, null));
         return null;

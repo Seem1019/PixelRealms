@@ -47,6 +47,16 @@ public sealed class PlayerMapperTests
     }
 
     [Fact]
+    public void ToCooldowns_IncludesPendingItemCooldowns_SoTheHotbarCanDrawThem()
+    {
+        var mapper = Mapper();
+        mapper.NowMs = () => 10_000;
+        var p = mapper.ToPlayer(Dto(), new EntityId(1));
+        p.ItemCooldownEndsAtMs["minor_healing_potion"] = 52_000; // faltan 42 s
+        mapper.ToCooldowns(p).ShouldContain(new PixelRealms.Protocol.Messages.Cooldown(null, 42_000, null, "minor_healing_potion"));
+    }
+
+    [Fact]
     public void LoadedCooldowns_AreCappedToTheContent_AndUnknownOnesAreDropped() // revisión de autoridad
     {
         var time = new FakeTime(new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.Zero));

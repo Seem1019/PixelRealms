@@ -97,6 +97,21 @@ func test_items_are_offered_by_dragging_from_the_bag_and_removed_with_right_clic
 	assert_false(trade.mine_slots()[0].draggable, "las casillas del intercambio no se arrastran a la bolsa")
 
 
+# --- 5: la recarga de las pociones se ve en la barra y en la descripción ----------------------------------------------------
+
+func test_potion_cooldown_shows_on_the_hotbar_and_in_the_tooltip() -> void:
+	_welcome({"hotbar": [{"slot": 4, "kind": "item", "ref": "minor_healing_potion"}],
+		"inventory": [{"id": "0192f0aa-0000-7000-8000-000000000002", "templateId": "minor_healing_potion", "qty": 11}]})
+	await _frames(1)
+	_dispatch("Cooldown", {"templateId": "minor_healing_potion", "remainingMs": 42000})
+	_world._hud._refresh_sweeps()
+	var slot: Control = _world._hud._slots[4]
+	assert_gt(slot._sweep.size.y, 0.0, "antes la casilla no mostraba nada y solo salía «Aún no está listo»")
+	assert_eq(slot._cd_text.text, "42")
+	assert_eq(GameState.item_cooldown_remaining_ms("minor_healing_potion") > 41000, true)
+	assert_string_contains(slot.tooltip_bbcode, "Recarga 60 s")
+
+
 # --- 4: en duelo el rival es un objetivo enemigo -------------------------------------------------------------------------
 
 func test_duel_opponent_is_hostile_only_while_the_duel_is_active() -> void:

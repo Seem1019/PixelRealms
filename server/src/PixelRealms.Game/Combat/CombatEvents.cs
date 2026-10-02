@@ -40,8 +40,9 @@ public sealed record ActorDiedEvent(int MapInstanceId, Actor Victim, Actor? Kill
 /// <summary>Jugador reaparecido (posición nueva, vida/recurso restaurados).</summary>
 public sealed record RespawnedEvent(int MapInstanceId, Player Player) : IGameEvent;
 
-/// <summary>Cooldown iniciado (hechizo) o GCD iniciado (SpellId null) para el lanzador.</summary>
-public sealed record CooldownEvent(int MapInstanceId, Actor Caster, string? SpellId, int? RemainingMs, int? GcdMs) : IGameEvent;
+/// <summary>Para el lanzador: recarga de un hechizo (SpellId), de un consumible (TemplateId, compartida por plantilla) o GCD
+/// (GcdMs, sin SpellId ni TemplateId).</summary>
+public sealed record CooldownEvent(int MapInstanceId, Actor Caster, string? SpellId, int? RemainingMs, int? GcdMs, string? TemplateId = null) : IGameEvent;
 
 /// <summary>El lanzador se desplazó por habilidad (dash/leap): el cliente no lo predice (ADR-016).</summary>
 public sealed record ForcedMoveEvent(int MapInstanceId, Actor Actor, Vec2 From, Vec2 To) : IGameEvent;
