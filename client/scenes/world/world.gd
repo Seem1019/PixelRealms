@@ -50,6 +50,9 @@ var _forced_move_until_ms: int = -1
 const TARGET_CYCLE_RANGE_TILES := 12.0
 ## Hacia dónde mira el personaje propio (última tecla de movimiento).
 var _self_dir: String = "s"
+## Animaciones y efectos de combate (HU-090, HU-091).
+var _presenter: CombatPresenter
+var _vfx: VfxLayer
 
 
 func _ready() -> void:
@@ -81,6 +84,7 @@ func _ready() -> void:
 	_self_visual = EntityVisual.new()
 	_player.add_child(_self_visual)
 	_self_health = _self_visual.plate.health_bar
+	_setup_combat_presenter()
 	GameState.vitals_changed.connect(_refresh_self_health)
 	_player.visible = false
 	# El rótulo de zona se desvanece dentro de un CanvasGroup: así el contorno y la letra se funden juntos (sin dobles).
@@ -149,6 +153,49 @@ func _refresh_self_visual() -> void:
 	_self_visual.plate.name_color = UiTheme.ACCENT
 
 
+## Capas de efectos: los brillos de casteo bajo los cuerpos (encima de la marca de área) y el resto por encima de las
+## entidades y los tejados, pero por debajo de las placas (z 40), los números (FloatingText) y la interfaz (CanvasLayer).
+func _setup_combat_presenter() -> void:
+	var vfx_ground := Node2D.new()
+	vfx_ground.name = "VfxGround"
+	vfx_ground.z_index = -4
+	add_child(vfx_ground)
+	_vfx = VfxLayer.new()
+	_vfx.name = "Vfx"
+	_vfx.z_index = 12
+	_vfx.ground = vfx_ground
+	add_child(_vfx)
+	_presenter = CombatPresenter.new()
+	_presenter.name = "CombatPresenter"
+	_presenter.vfx = _vfx
+	_presenter.floating = _floating
+	_presenter.entity_pos = _entity_feet
+	_presenter.visual_of = _entity_visual
+	_presenter.archetype_of = _entity_archetype
+	add_child(_presenter)
+
+
+func _entity_feet(id: int) -> Vector2:
+	if id == GameState.self_id and _player.visible:
+		return _player.position
+	var r: RemoteEntity = _remotes.get(id)
+	return Vector2.INF if r == null else r.position
+
+
+func _entity_visual(id: int) -> EntityVisual:
+	if id == GameState.self_id:
+		return _self_visual
+	var r: RemoteEntity = _remotes.get(id)
+	return null if r == null else r.visual
+
+
+func _entity_archetype(id: int) -> String:
+	if id == GameState.self_id:
+		return GameState.class_id
+	var r: RemoteEntity = _remotes.get(id)
+	return "" if r == null else (r.class_id if r.kind == "player" else r.template_id)
+
+
 func _refresh_self_health() -> void:
 	_self_health.pct = roundi(100.0 * GameState.hp / maxf(1.0, GameState.max_hp))
 	var show := not GameState.is_dead
@@ -201,6 +248,7 @@ func _process(delta: float) -> void:
 			_update_area_preview(mouse)
 			var tolerance := float(Content.rule("combat", "castRangeToleranceTiles", 0.0))
 			_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
+		_vfx.view_rect = _view_rect()
 		_overlay.pending_inputs = prediction.pending.size()
 		_overlay.reconcile_error_px = prediction.last_error_px
 		_layout_nameplates()
@@ -257,6 +305,7 @@ func _on_entity_spawn(d: Dictionary) -> void:
 func _on_entity_despawn(d: Dictionary) -> void:
 	var id := int(d.get("id", -1))
 	_reticle.clear_mark(id)  # su CastEnded ya no llegará
+	_presenter.forget(id)
 	if _remotes.has(id):
 		var r: RemoteEntity = _remotes[id]
 		_remotes.erase(id)
@@ -267,6 +316,7 @@ func _clear_remotes() -> void:
 	for r: RemoteEntity in _remotes.values():
 		r.queue_free()
 	_remotes.clear()
+	_presenter.clear()
 
 
 # --- Objetivo y combate (HU-030, HU-032, HU-033, HU-086) -------------------------------------------------------------
@@ -482,6 +532,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 				var radius: float = float(d["radius"]) if d.get("radius") != null else float(spell.get("aoeRadius", 1.0))
 				var enemy: bool = _remotes.has(caster) and (_remotes[caster] as RemoteEntity).hostile
 				_reticle.set_mark(caster, Vector2(float(tp.get("x", 0)), float(tp.get("y", 0))), radius * 16.0, enemy, int(d.get("durationMs", 0)))
+			_presenter.cast_started(d)
 		"CastEnded":
 			var caster := int(d.get("casterId", -1))
 			_reticle.clear_mark(caster)
@@ -489,6 +540,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 				_hud.show_cast_result(str(d.get("result", "")), str(d.get("reason", "")))
 			elif _remotes.has(caster):
 				(_remotes[caster] as RemoteEntity).end_cast(str(d.get("result", "")))
+			_presenter.cast_ended(d)
 		"LootWindow":
 			var names := {}
 			for r: RemoteEntity in _remotes.values():
@@ -510,18 +562,9 @@ func _on_message(type: String, d: Dictionary) -> void:
 			pass
 
 
-## Lote del tick (ADR-018): un número por entrada sobre la entidad destino.
+## Lote del tick (ADR-018): número, golpe, ataque e impacto por entrada (CombatPresenter, HU-090/HU-091).
 func _on_combat_events(d: Dictionary) -> void:
-	for e: Variant in d.get("e", []):
-		var ed: Dictionary = e
-		var dst := int(ed.get("dst", -1))
-		var pos := _player.position if dst == GameState.self_id else (_remotes[dst] as RemoteEntity).position if _remotes.has(dst) else Vector2.INF
-		if pos == Vector2.INF:
-			continue
-		var kind := str(ed.get("kind", ""))
-		_floating.show_event(dst, kind, int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
-		if kind in ["dmg", "heal"] and _remotes.has(dst):
-			(_remotes[dst] as RemoteEntity).flash(Color(3, 3, 3) if kind == "dmg" else Color(0.6, 2.2, 0.6))  # destello por objetivo (área)
+	_presenter.combat_events(d)
 
 
 ## Clic derecho sobre otro jugador: Invitar / Retar a duelo / Intercambiar (HU-061, HU-064, HU-059).
