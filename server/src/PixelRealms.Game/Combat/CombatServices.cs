@@ -94,6 +94,7 @@ public sealed class CombatServices(Func<ContentDb> content)
     public bool IsEnemy(Actor a, Actor b)
     {
         if (ReferenceEquals(a, b)) return false;
+        if (a is Npc || b is Npc) return false; // neutrales: no se atacan ni atacan (tendera, maestro de clases)
         if (a is Player pa && b is Player pb) return PvpCanAttack(pa, pb);
         if (a is Player da && InDuel(da)) return false;
         if (b is Player db2 && InDuel(db2)) return false;

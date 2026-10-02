@@ -11,7 +11,13 @@ const POOL_SIZE := 32
 const MAX_VISIBLE := 24
 const EXPIRY_MARGIN_MS := 500
 
-var aiming: bool = false
+## Al dejar de apuntar hace falta un último redibujado: `_process` solo redibuja mientras se apunta o hay marcas, y sin él el
+## círculo se quedaba pintado donde estaba hasta volver a apuntar.
+var aiming: bool = false:
+	set(value):
+		if value != aiming:
+			aiming = value
+			queue_redraw()
 var aim_radius_px: float = 0.0
 var aim_in_range: bool = true
 var aim_pos: Vector2 = Vector2.ZERO

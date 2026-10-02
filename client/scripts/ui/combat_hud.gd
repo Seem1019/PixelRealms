@@ -477,6 +477,13 @@ func _refresh_sweeps() -> void:
 				remaining_ms = cd
 			elif gcd > 0 and bool(spell.get("triggersGcd", true)):
 				frac = float(gcd) / float(gcd_total)
+		elif not entry.is_empty():
+			var template_id := str(entry.get("ref", ""))
+			var item_cd := GameState.item_cooldown_remaining_ms(template_id)
+			var item_total := int(Content.item(template_id).get("useCooldownMs", 0))
+			if item_cd > 0 and item_total > 0:
+				frac = float(item_cd) / float(item_total)
+				remaining_ms = item_cd
 		_slots[i].set_cooldown(frac, remaining_ms)
 
 

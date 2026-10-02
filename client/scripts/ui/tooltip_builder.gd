@@ -70,6 +70,9 @@ static func build(item: Dictionary, qty: int, class_id: String, level: int, equi
 		lines.append(("[color=#ff5555]Requiere nivel %d[/color]" if level < level_req else "Requiere nivel %d") % level_req)
 	if item.has("description"):
 		lines.append("[color=%s]%s[/color]" % [MUTED, str(item["description"])])
+	var use_cd := int(item.get("useCooldownMs", 0))
+	if use_cd >= 2000:  # el segundo del pan no merece línea
+		lines.append("Recarga %s s (compartida con las demás de su tipo)" % _num(use_cd / 1000.0))
 	if buy_price >= 0:
 		lines.append("[color=#ffdb6b]Compra: %s[/color]" % MoneyFormat.format(buy_price))
 	var sell := int(item.get("sellPrice", 0))

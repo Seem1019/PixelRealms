@@ -37,7 +37,7 @@ public sealed record AuraApplied(int TargetId, string AuraId, int? CasterId, int
 
 public sealed record AuraRemoved(int TargetId, string AuraId, int? CasterId) : IServerMessage;
 
-public sealed record Cooldown(string? SpellId, int? RemainingMs, int? GcdMs) : IServerMessage;
+public sealed record Cooldown(string? SpellId, int? RemainingMs, int? GcdMs, string? TemplateId = null) : IServerMessage;
 
 public sealed record StatsDto(int Str, int Agi, int Int, int Spi, int Sta);
 
@@ -61,7 +61,10 @@ public sealed record ChangeMap(string MapId, float X, float Y) : IServerMessage;
 
 public sealed record DuelUpdate(string State, int OpponentId, int? WinnerId, int? StartsInMs) : IServerMessage;
 
-public sealed record OfferDto(IReadOnlyList<TradeItemDto> Items, long Gold);
+/// <summary>Objeto de una oferta de intercambio tal como lo ven los dos: id de la instancia, plantilla y cantidad.</summary>
+public sealed record OfferedItemDto(string ItemId, string TemplateId, int Qty);
+
+public sealed record OfferDto(IReadOnlyList<OfferedItemDto> Items, long Gold);
 
 public sealed record TradeUpdate(string State, int PartnerId, int Version, OfferDto Mine, OfferDto Theirs, bool ConfirmedMine, bool ConfirmedTheirs, string? Reason) : IServerMessage;
 

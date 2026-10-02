@@ -46,6 +46,9 @@ public sealed class PvpService(AuraSystem auras)
 
     public bool InActiveDuel(Player p) => DuelOf(p) is { State: DuelState.Active };
 
+    /// <summary>¿El jugador tiene un intercambio pedido o abierto? No se reta a duelo en pleno intercambio (lo rellena CombatModule).</summary>
+    public Func<Player, bool> InTrade { get; set; } = static _ => false;
+
     /// <summary>Ruleset aplicable si `a` puede atacar a `b`, o null (HU-064 CA7).</summary>
     public PvpRuleset? CanAttack(Player a, Player b, IRules rules)
     {
@@ -64,6 +67,7 @@ public sealed class PvpService(AuraSystem auras)
         if (ReferenceEquals(from, to) || from.MapInstanceId != to.MapInstanceId) return "invalid_target";
         if (from.IsDead || to.IsDead) return "is_dead";
         if (DuelOf(from) is not null || DuelOf(to) is not null) return "duel_busy";
+        if (InTrade(from) || InTrade(to)) return "trade_busy";
         if (!rs.AllowedInSafeZones && (map.Data.IsSafeZone(from.Position) || map.Data.IsSafeZone(to.Position))) return "pvp_not_allowed";
         if (Vec2.Distance(from.Position, to.Position) > rs.MaxDistanceTiles) return "out_of_range";
         var duel = new DuelSession(from, to, ruleset, ctx.NowMs);
@@ -84,6 +88,18 @@ public sealed class PvpService(AuraSystem auras)
             ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", null));
             Remove(map, duel);
             return null;
+        }
+        // Entre el reto y la respuesta pueden pasar 30 s: muerto, en otro mapa o comerciando ya no vale (al terminar el duelo
+        // se restauraría a un muerto, o el duelo seguiría en un mapa donde ya no está).
+        var invalid = duel.A.IsDead || duel.B.IsDead ? "is_dead"
+            : duel.A.MapInstanceId != duel.B.MapInstanceId ? "invalid_target"
+            : InTrade(duel.A) || InTrade(duel.B) ? "trade_busy" : null;
+        if (invalid is not null)
+        {
+            duel.State = DuelState.Ended;
+            ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", invalid));
+            Remove(map, duel);
+            return invalid;
         }
         duel.State = DuelState.Countdown;
         duel.StartsAtMs = ctx.NowMs + (long)(rs.CountdownSec * 1000);
@@ -132,6 +148,7 @@ public sealed class PvpService(AuraSystem auras)
         {
             foreach (var p in new[] { duel.A, duel.B })
             {
+                if (p.IsDead) continue; // un muerto no resucita por terminar el duelo: pasa por Respawn como siempre
                 // El daño que termina el duelo todavía no se ha restado: se restaura después igualmente.
                 p.Hp = p.MaxHp + (ReferenceEquals(p, duel.Opponent(winner)) ? applyAfterDamage : 0);
                 p.Resource = p.MaxResource;
@@ -158,6 +175,11 @@ public sealed class PvpService(AuraSystem auras)
             var rs = ctx.Rules.Pvp.Rulesets[duel.Ruleset];
             switch (duel.State)
             {
+                case DuelState.Requested or DuelState.Countdown when duel.A.IsDead || duel.B.IsDead || duel.A.MapInstanceId != map.Id || duel.B.MapInstanceId != map.Id:
+                    duel.State = DuelState.Ended;
+                    ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", duel.A.IsDead || duel.B.IsDead ? "died" : "left_map"));
+                    Remove(map, duel);
+                    break;
                 case DuelState.Requested when ctx.NowMs - duel.RequestedAtMs > rs.RequestExpireSec * 1000:
                     duel.State = DuelState.Ended;
                     ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", "expired"));
