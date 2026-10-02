@@ -34,6 +34,23 @@ func _welcome(extra: Dictionary = {}) -> void:
 	_dispatch("Welcome", d)
 
 
+# --- Punto 1: el seq de movimiento es por conexión ---------------------------------------------------------------------
+
+func test_second_welcome_on_the_same_connection_keeps_the_move_seq() -> void:
+	_welcome()
+	await get_tree().process_frame
+	_world._movement.seq = 120  # lleva un rato caminando
+	_welcome()  # p. ej. el que reenvía el servidor tras cambiar de clase
+	assert_eq(_world._movement.seq, 120, "el servidor descartaría los MoveInput con seq ≤ 120")
+
+
+func test_new_connection_restarts_the_move_seq() -> void:
+	_welcome()
+	_world._movement.seq = 120
+	_world._on_connected("t")  # reconexión: Hello nuevo, el servidor reinicia LastInputSeq
+	assert_eq(_world._movement.seq, 0)
+
+
 # --- Punto 6: poción desde la barra ----------------------------------------------------------------------------------
 
 func test_hotbar_item_sends_the_bag_instance_id_not_the_template() -> void:

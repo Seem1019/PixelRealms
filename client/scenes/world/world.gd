@@ -1,9 +1,8 @@
 extends Node2D
 ## Escena del mundo (HU-014, HU-020..HU-024): conecta con el ticket, envía Hello, carga el mapa del Welcome, mueve al
-## jugador con predicción + reconciliación (MoveInput cada 200 ms / al cambiar / 0,0 al soltar), dibuja las entidades de la
+## jugador con predicción + reconciliación (un MoveInput por tick de 50 ms al moverse, 0,0 al soltar), dibuja las entidades de la
 ## AOI con interpolación y muestra el nombre de la zona al entrar. El cliente nunca decide resultados: solo refleja.
 
-const MOVE_RESEND_MS := 200
 const ZONE_FADE_SEC := 2.0
 
 @onready var _ground: PlaceholderMapRenderer = %Ground
@@ -30,12 +29,9 @@ const ZONE_FADE_SEC := 2.0
 
 var map: TmjMap
 var prediction: Prediction = Prediction.new()
+var _movement: MovementDriver = MovementDriver.new()
 var in_world: bool = false
 
-var _seq: int = 0
-var _last_dx: int = 0
-var _last_dy: int = 0
-var _last_sent_ms: int = 0
 var _remotes: Dictionary = {}  # id → RemoteEntity
 var _current_zone: String = ""
 var _zone_fade_left: float = 0.0
@@ -86,6 +82,7 @@ func _ready() -> void:
 
 
 func _on_connected(_ticket: String) -> void:
+	_movement.reset()  # el seq es por conexión: el servidor lo reinicia con cada Hello
 	Net.send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": Net.current_ticket()})
 
 
@@ -115,9 +112,6 @@ func _on_welcome(d: Dictionary) -> void:
 	_camera.position = Vector2.ZERO
 	_camera.reset_smoothing()
 	in_world = true
-	_seq = 0
-	_last_dx = 0
-	_last_dy = 0
 
 
 func _load_map(map_id: String) -> void:
@@ -136,7 +130,7 @@ func _load_map(map_id: String) -> void:
 
 # --- Movimiento propio (HU-021 CA1, HU-022) -------------------------------------------------------------------------
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not in_world or not Net.is_connected:
 		return
 	var dx := int(Input.is_action_pressed("move_right")) - int(Input.is_action_pressed("move_left"))
@@ -144,18 +138,9 @@ func _physics_process(_delta: float) -> void:
 	if GameState.is_dead or _chat.is_typing():
 		dx = 0
 		dy = 0
-	var now := Time.get_ticks_msec()
-	var changed := dx != _last_dx or dy != _last_dy
-	var moving := dx != 0 or dy != 0
-	if changed or (moving and now - _last_sent_ms >= MOVE_RESEND_MS):
-		_seq += 1
-		Net.send("MoveInput", {"seq": _seq, "dx": dx, "dy": dy})
-		_last_sent_ms = now
-		_last_dx = dx
-		_last_dy = dy
-	if moving:
-		# Un tick de simulación por frame físico (50 ms = 20 Hz, igual que el servidor).
-		prediction.apply_input(_seq, dx, dy)
+	# Ticks fijos de 50 ms como el servidor (los frames físicos van a 60 Hz): un MoveInput por tick con movimiento.
+	for input: Dictionary in _movement.advance(delta, dx, dy, prediction):
+		Net.send("MoveInput", input)
 
 
 func _process(delta: float) -> void:
@@ -567,9 +552,7 @@ func _on_change_map(d: Dictionary) -> void:
 	prediction.setup(grid, target, prediction.speed_tiles_per_sec)
 	_player.position = target
 	_camera.reset_smoothing()
-	_seq += 1
-	_last_dx = 0
-	_last_dy = 0
+	_movement.forget_last_input()
 	in_world = true
 	var tween_in := create_tween()
 	tween_in.tween_property(_fade, "modulate:a", 0.0, 0.25)

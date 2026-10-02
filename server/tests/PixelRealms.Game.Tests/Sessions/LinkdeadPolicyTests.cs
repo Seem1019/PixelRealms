@@ -69,6 +69,16 @@ public sealed class LinkdeadPolicyTests
     }
 
     [Fact]
+    public void Reconnect_RestartsInputSequence()
+    {
+        var p = NewPlayer();
+        p.LastInputSeq = 4200;
+        LinkdeadPolicy.MarkLinkdead(p, 0);
+        LinkdeadPolicy.MarkReconnected(p, 7);
+        p.LastInputSeq.ShouldBe(0); // el cliente nuevo numera desde 1
+    }
+
+    [Fact]
     public void InCombat_WindowFromRules()
     {
         var a = NewPlayer();

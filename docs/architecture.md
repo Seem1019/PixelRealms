@@ -84,14 +84,17 @@ sequenceDiagram
 - Formato: JSON texto, sobre `{ "t": string, "d": object }`. Límite 4 KB por mensaje entrante.
 - Autenticación: login REST → JWT (15 min) → `POST /api/game/ticket` (ticket de un solo uso, 30 s) →
   `ws://host/ws?ticket=...` (el navegador no permite headers en WebSocket). Primer mensaje: `Hello`.
-- Rate limiting por conexión (token bucket): `MoveInput` 30/s, `CastSpell` 10/s, `Chat` 5/5 s, resto 20/s.
+- Rate limiting por conexión (token bucket): `MoveInput` 30/s con ráfaga de 90 (un corte de red breve entrega los inputs de golpe), `CastSpell` 10/s, `Chat` 5/5 s, resto 20/s.
   Exceder 3 veces en 10 s → desconexión con `Error{code:"rate_limited"}`.
 - Heartbeat: `Ping` cada 5 s; sin tráfico 15 s → desconectar. Reconexión: el personaje queda 10 s en el mundo
   ("linkdead") para evitar abuso de desconectar en combate.
 
 ### Movimiento (predicción + reconciliación)
-- Cliente envía `MoveInput { seq, dx, dy }` al cambiar la dirección (8 direcciones, valores −1/0/1) y
-  como keep-alive cada 200 ms mientras se mueve.
+- Cliente simula a ticks fijos de 50 ms (acumulador propio, no los frames) y envía un `MoveInput { seq, dx, dy }`
+  (8 direcciones, valores −1/0/1) por cada tick con movimiento, más uno con 0,0 al parar. El `seq` es por conexión: vuelve a 1
+  con cada `Hello` (el servidor lo reinicia al reconectar) y un `Welcome` posterior en la misma conexión no lo toca.
+- Si dos inputs llegan en el mismo tick del servidor (variación de latencia), el servidor avanza un paso y confirma el
+  `seq` mayor: el cliente corrige un paso (3,2 px). Con variaciones de ±10 ms no ocurre.
 - Servidor aplica el último input por jugador en cada tick: `vel = normalize(dx,dy) * speed` (speed base 4 tiles/s),
   colisión AABB (caja 10×6 px en los pies) eje por eje contra la grilla de colisión.
 - Snapshot incluye `ackSeq` (último `seq` procesado) y posición autoritativa del jugador propio.

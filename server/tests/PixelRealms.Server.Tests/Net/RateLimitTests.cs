@@ -17,12 +17,22 @@ public sealed class RateLimitTests
     [Fact]
     public void Bucket_AllowsBurst_ThenLimits_AndRefills() // CA1
     {
-        var limiter = new MessageRateLimiter(new RateLimitOptions { MoveInputPerSec = 30 });
+        var limiter = new MessageRateLimiter(new RateLimitOptions { MoveInputPerSec = 30, MoveInputBurst = 30 });
         for (var i = 0; i < 30; i++) limiter.Check("MoveInput", 1000).ShouldBe(RateDecision.Allowed);
         limiter.Check("MoveInput", 1000).ShouldBe(RateDecision.Limited);
         // 100 ms después hay 3 fichas nuevas (30/s).
         for (var i = 0; i < 3; i++) limiter.Check("MoveInput", 1100).ShouldBe(RateDecision.Allowed);
         limiter.Check("MoveInput", 1100).ShouldBe(RateDecision.Limited);
+    }
+
+    [Fact]
+    public void MoveInputs_DeliveredInOneBurstAfterANetworkStall_AreNotLimited()
+    {
+        var limiter = new MessageRateLimiter(new RateLimitOptions());
+        // El cliente manda un MoveInput por tick (20/s) mientras camina...
+        for (var t = 0; t < 5000; t += 50) limiter.Check("MoveInput", t).ShouldBe(RateDecision.Allowed);
+        // ...y un corte de 2 s que TCP entrega de golpe: 40 inputs en el mismo instante no deben desconectar.
+        for (var i = 0; i < 40; i++) limiter.Check("MoveInput", 7000).ShouldBe(RateDecision.Allowed);
     }
 
     [Fact]

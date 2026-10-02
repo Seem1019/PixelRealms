@@ -30,7 +30,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 |---|---|---|
 | `Hello` | `{ protocolVersion, ticket }` | ticket válido/no usado/no expirado; versión igual. Si falla → `Error` + close |
 | `Ping` | `{ clientTime }` | — |
-| `MoveInput` | `{ seq, dx, dy }` dx,dy ∈ {-1,0,1} | seq creciente; vivo; no aturdido/raíz |
+| `MoveInput` | `{ seq, dx, dy }` dx,dy ∈ {-1,0,1} | seq creciente por conexión (vuelve a 1 tras cada `Hello`; un `Welcome` posterior en la misma conexión no lo reinicia); uno por tick de 50 ms con movimiento y uno con 0,0 al parar; vivo; no aturdido/raíz |
 | `SelectTarget` | `{ targetId? }` | entidad existe y está en AOI |
 | `CastSpell` | `{ spellId, targetId?, targetPos?: Vec2, reqId }` | conoce el hechizo, nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no aturdido (ni silenciado si el hechizo es `magic`), fuera del bloqueo tras interrupción (`locked_out`). Si ya está casteando, el casteo actual se cancela (ADR-019). Área al tope de la instancia → `area_limit`. Hechizos `ground_*`, de cono o línea y con `leap` (ADR-015, ADR-016): `targetPos` obligatorio, a ≤ `range + castRangeToleranceTiles` y con LOS al punto (el cono y la línea solo usan su dirección) |
 | `CancelCast` | `{}` | — |
