@@ -30,6 +30,25 @@ public sealed class CharacterRepositoryTests(PostgresFixture pg) : IClassFixture
     }
 
     [Fact]
+    public async Task Cooldowns_RoundTrip_AsUtc_AndEachSaveReplacesThePrevious() // HU-015 pendiente
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var accounts = new EfAccountRepository(pg.Factory);
+        var chars = new EfCharacterRepository(pg.Factory);
+        var acc = (await accounts.CreateAsync("cdu", "hash", ct)).ShouldNotBeNull();
+        var created = (await chars.CreateAsync(new NewCharacter(acc.Id, "Cdu", "warrior", "meadow", 10, 12, 60, 0, [], []), Max, ct)).Character.ShouldNotBeNull();
+        var ends = new DateTime(2026, 10, 2, 12, 0, 30, DateTimeKind.Utc);
+        await chars.SaveAsync(created with { Cooldowns = [new SavedCooldown(0, "warrior_charge", ends), new SavedCooldown(1, "potion_minor", ends)] }, ct);
+        await chars.SaveAsync(created with { Cooldowns = [new SavedCooldown(0, "warrior_charge", ends)] }, ct);
+
+        var loaded = (await chars.LoadAsync(created.Id, ct)).ShouldNotBeNull();
+        var cd = loaded.Cooldowns.ShouldNotBeNull().ShouldHaveSingleItem(); // el consumible ya no estaba en el último guardado
+        cd.Ref.ShouldBe("warrior_charge");
+        cd.EndsAtUtc.ShouldBe(ends);
+        cd.EndsAtUtc.Kind.ShouldBe(DateTimeKind.Utc);
+    }
+
+    [Fact]
     public async Task DuplicateNames_AreRejected_CaseInsensitive() // HU-010 CA2, HU-012 CA3
     {
         var accounts = new EfAccountRepository(pg.Factory);

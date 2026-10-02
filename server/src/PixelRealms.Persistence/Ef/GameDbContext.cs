@@ -11,6 +11,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
     public DbSet<Character> Characters => Set<Character>();
     public DbSet<CharacterItem> CharacterItems => Set<CharacterItem>();
     public DbSet<CharacterHotbarSlot> CharacterHotbar => Set<CharacterHotbarSlot>();
+    public DbSet<CharacterCooldown> CharacterCooldowns => Set<CharacterCooldown>();
     public DbSet<ItemAuditLog> ItemAuditLog => Set<ItemAuditLog>();
 
     /// <summary>Índices de unicidad; los repositorios traducen su violación (23505) a "nombre en uso".</summary>
@@ -41,6 +42,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.HasIndex(x => x.AccountId);
             e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Hotbar).WithOne().HasForeignKey(h => h.CharacterId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Cooldowns).WithOne().HasForeignKey(h => h.CharacterId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<CharacterItem>(e =>
         {
@@ -53,6 +55,12 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
         {
             e.ToTable("character_hotbar");
             e.HasKey(x => new { x.CharacterId, x.Slot });
+            e.Property(x => x.Ref).IsRequired().HasMaxLength(48);
+        });
+        modelBuilder.Entity<CharacterCooldown>(e =>
+        {
+            e.ToTable("character_cooldowns");
+            e.HasKey(x => new { x.CharacterId, x.Kind, x.Ref });
             e.Property(x => x.Ref).IsRequired().HasMaxLength(48);
         });
         modelBuilder.Entity<ItemAuditLog>(e =>

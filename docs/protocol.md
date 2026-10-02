@@ -64,7 +64,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled"|"failed", reason? }` | `failed` con `reason: out_of_range\|no_los` si al terminar el objetivo quedó fuera (sin coste) |
 | `CombatEvents` | `{ tick, e: { src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }[] }` | una vez por tick y observador con todos los resultados que ve (máx. 64 entradas; si hay más, se parte). Reemplaza al antiguo `CombatEvent` por golpe (ADR-018) |
 | `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, casterId?, stacks, durationMs }` / `{ targetId, auraId, casterId? }` | `casterId` distingue instancias del mismo aura de lanzadores distintos (ADR-022) |
-| `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
+| `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear, y tras cada `Welcome` uno por hechizo aún en recarga (guardados al salir, HU-015) |
 | `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | tras cada `Welcome` (por la misma conexión, después de él) y al cambiar |
 | `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[], rankUps?: { spellId, rank }[] }` | `rankUps`: hechizos que subieron de rango (ADR-014) |
 | `InventoryUpdate` | `{ bag: (ItemStack|null)[24], equipment: (ItemStack|null)[9], gold, reqId? }` | tras cualquier op (estado completo v1) |
