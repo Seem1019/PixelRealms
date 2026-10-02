@@ -56,6 +56,7 @@ func _ready() -> void:
 	Net.snapshot.connect(_on_snapshot)
 	GameState.target_changed.connect(_on_target_changed)
 	GameState.respawned.connect(func() -> void: prediction.snap_next = true)
+	GameState.died.connect(func(_killer: int) -> void: _stop_aiming())
 	_hud.respawn_requested.connect(func() -> void: Net.send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
@@ -218,6 +219,7 @@ func _on_entity_spawn(d: Dictionary) -> void:
 
 func _on_entity_despawn(d: Dictionary) -> void:
 	var id := int(d.get("id", -1))
+	_reticle.clear_mark(id)  # su CastEnded ya no llegará
 	if _remotes.has(id):
 		var r: RemoteEntity = _remotes[id]
 		_remotes.erase(id)
@@ -346,6 +348,7 @@ func _use_slot(slot: int) -> void:
 	var entry := _slot_entry(slot)
 	if entry.is_empty():
 		return
+	_stop_aiming()  # otra casilla sustituye al apuntado en curso (si es otra área, vuelve a apuntar abajo)
 	if str(entry.get("kind", "spell")) != "spell":
 		var payload := _use_item_payload(str(entry.get("ref", "")))
 		if not payload.is_empty():
@@ -424,7 +427,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 				var tp: Dictionary = d["targetPos"]
 				var radius: float = float(d["radius"]) if d.get("radius") != null else float(spell.get("aoeRadius", 1.0))
 				var enemy: bool = _remotes.has(caster) and (_remotes[caster] as RemoteEntity).hostile
-				_reticle.set_mark(caster, Vector2(float(tp.get("x", 0)), float(tp.get("y", 0))), radius * 16.0, enemy)
+				_reticle.set_mark(caster, Vector2(float(tp.get("x", 0)), float(tp.get("y", 0))), radius * 16.0, enemy, int(d.get("durationMs", 0)))
 		"CastEnded":
 			var caster := int(d.get("casterId", -1))
 			_reticle.clear_mark(caster)
@@ -551,6 +554,7 @@ func _on_item_dropped_outside(item_id: String) -> void:
 func _on_change_map(d: Dictionary) -> void:
 	GameState._on_change_map(d)
 	in_world = false
+	_stop_aiming()
 	var target := Vector2(float(d.get("x", 0)), float(d.get("y", 0)))
 	var tween := create_tween()
 	tween.tween_property(_fade, "modulate:a", 1.0, 0.25)

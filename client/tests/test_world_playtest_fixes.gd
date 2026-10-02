@@ -74,6 +74,50 @@ func test_class_change_welcome_keeps_the_world_and_applies_the_new_class() -> vo
 	assert_eq(GameState.auras_of(7).size(), 1, "las auras de otros no cambian con mi clase")
 
 
+# --- Punto 5: círculos de área que no desaparecían -------------------------------------------------------------------
+
+func _welcome_with_area_spell() -> void:
+	_welcome({"hotbar": [{"slot": 0, "kind": "spell", "ref": "mage_flame_burst"}, {"slot": 1, "kind": "spell", "ref": "mage_fireball"},
+		{"slot": 4, "kind": "item", "ref": "minor_healing_potion"}], "knownSpells": ["mage_flame_burst", "mage_fireball"],
+		"inventory": [{"id": "0192f0aa-0000-7000-8000-000000000002", "templateId": "minor_healing_potion", "qty": 2}]})
+
+
+func test_using_another_slot_cancels_aiming() -> void:
+	_welcome_with_area_spell()
+	_world._use_slot(0)
+	assert_true(_world._reticle.aiming)
+	_world._use_slot(1)  # Bola de fuego: no apunta al suelo
+	assert_false(_world._reticle.aiming, "el círculo verde se quedaba siguiendo al ratón")
+	_world._use_slot(0)
+	_world._use_slot(4)  # poción
+	assert_false(_world._reticle.aiming)
+
+
+func test_dying_or_changing_map_cancels_aiming() -> void:
+	_welcome_with_area_spell()
+	_world._use_slot(0)
+	_dispatch("Died", {"killerId": 7, "respawnInMs": 0})
+	assert_false(_world._reticle.aiming)
+	_dispatch("Snapshot", {"tick": 20, "ackSeq": 0, "self": {"x": 100.0, "y": 100.0, "speed": 4.0, "hp": 50, "maxHp": 100, "res": 30, "maxRes": 60}, "ents": []})
+	_world._use_slot(0)
+	_dispatch("ChangeMap", {"mapId": "meadow", "x": 100.0, "y": 100.0})
+	assert_false(_world._reticle.aiming)
+
+
+func test_remote_mark_goes_away_when_the_caster_leaves_or_the_cast_should_have_ended() -> void:
+	_welcome()
+	_dispatch("EntitySpawn", {"id": 7, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 120.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	_dispatch("EntitySpawn", {"id": 8, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 140.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	_dispatch("CastStarted", {"casterId": 7, "spellId": "foreman_slam", "targetPos": {"x": 100.0, "y": 100.0}, "durationMs": 1500})
+	_dispatch("CastStarted", {"casterId": 8, "spellId": "foreman_slam", "targetPos": {"x": 100.0, "y": 100.0}, "durationMs": 1500})
+	assert_true(_world._reticle._marks.has(7))
+	_dispatch("EntityDespawn", {"id": 7, "reason": "left"})  # sale de la AOI: su CastEnded ya no llega
+	assert_false(_world._reticle._marks.has(7))
+	# Si el CastEnded se pierde, la marca caduca poco después de cuando debía terminar el casteo.
+	_world._reticle.prune(Time.get_ticks_msec() + 1500 + AoeReticle.EXPIRY_MARGIN_MS + 1)
+	assert_false(_world._reticle._marks.has(8))
+
+
 # --- Punto 6: poción desde la barra ----------------------------------------------------------------------------------
 
 func test_hotbar_item_sends_the_bag_instance_id_not_the_template() -> void:
