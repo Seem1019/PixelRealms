@@ -67,6 +67,7 @@ public sealed class TargetingAndEffectsTests
         var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "mage", 5, (4, 4))
             .WithMonster("boar", (10.5f, 12.1f), wanderRadius: 0)
             .BuildWithCombat();
+        Targets(w, "mage_flame_burst", pos: new Vec2(10.5f, 9.0f)).ShouldContain(w.Monster("boar")); // sin muro: el cuadro entra (pies fuera)
         w.Map.Data.Collision.SetBlocksSight(10, 11);
         Targets(w, "mage_flame_burst", pos: new Vec2(10.5f, 9.0f)).ShouldNotContain(w.Monster("boar"));
     }
