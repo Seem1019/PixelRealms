@@ -1,11 +1,14 @@
 extends Node
-## Capturas del rediseño visual (docs/screenshots/redesign/). Sin servidor: instancia las escenas y les inyecta mensajes como
+## Capturas del rediseño visual (docs/screenshots/redesign/) y del combate y el menú (docs/screenshots/combat/, HU-090,
+## HU-091, HU-015). Sin servidor: instancia las escenas y les inyecta mensajes como
 ## los tests. Necesita render (no --headless):
 ##   xvfb-run -a -s "-screen 0 1440x810x24" godot --path client --rendering-driver opengl3 -s res://tools/screenshots.gd
 ## Argumento opcional tras `--`: nombres de captura separados por comas (p. ej. `-- world_hud,npc_dialog`).
 ## (tools/screenshots.gd arranca este nodo cuando ya existen los autoloads.)
 
 const OUT := "res://../docs/screenshots/redesign/"
+const OUT_COMBAT := "res://../docs/screenshots/combat/"
+const COMBAT_SHOTS := ["attack_classes", "monster_attacks", "cast_glow", "projectile", "impact", "area_resolve", "dead_monster", "esc_menu", "logout_in_combat"]
 const WORLD := "res://scenes/world/world.tscn"
 
 var _only: PackedStringArray = []
@@ -17,9 +20,11 @@ func _ready() -> void:
 		_only = args[0].split(",")
 	await get_tree().process_frame
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_COMBAT))
 	await _login()
 	await _character_select()
 	await _world_shots()
+	await _combat_shots()
 	get_tree().quit()
 
 
@@ -27,13 +32,14 @@ func _wanted(name: String) -> bool:
 	return _only.is_empty() or _only.has(name)
 
 
-func _shot(name: String) -> void:
-	for i: int in 4:
+func _shot(name: String, dir: String = OUT, settle_frames: int = 4) -> Image:
+	for i: int in settle_frames:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var img := get_tree().root.get_texture().get_image()
-	img.save_png(ProjectSettings.globalize_path(OUT + name + ".png"))
+	img.save_png(ProjectSettings.globalize_path(dir + name + ".png"))
 	print("captura: ", name, " ", img.get_size())
+	return img
 
 
 func _login() -> void:
@@ -182,3 +188,157 @@ func _world_shots() -> void:
 			await _shot("spellbook_tooltip")
 		w.queue_free()
 		await get_tree().process_frame
+
+
+# --- Combate (HU-090, HU-091) y menú (HU-015): docs/screenshots/combat/ -----------------------------------------------------
+
+func _wait_ms(ms: int) -> void:
+	await get_tree().create_timer(ms / 1000.0).timeout
+
+
+## Recorte ampliado alrededor de un punto del mundo (para ver la animación de cerca).
+func _crop(img: Image, w: Node2D, world_pos: Vector2, name: String, half: Vector2 = Vector2(36, 30)) -> void:
+	var scale := float(img.get_width()) / UiTheme.base_size().x
+	var center := (w.get_viewport().get_canvas_transform() * world_pos) * scale
+	var r := Rect2i(Vector2i((center - half * scale).round()), Vector2i((half * 2.0 * scale).round()))
+	r = r.intersection(Rect2i(Vector2i.ZERO, img.get_size()))
+	if r.size.x <= 0 or r.size.y <= 0:
+		return
+	var part := img.get_region(r)
+	part.resize(part.get_width() * 2, part.get_height() * 2, Image.INTERPOLATE_NEAREST)
+	part.save_png(ProjectSettings.globalize_path(OUT_COMBAT + name + ".png"))
+	print("recorte: ", name)
+
+
+func _spawn(id: int, kind: String, template: String, name: String, at: Vector2, dir: String, level: int = 3, hp_pct: int = 100) -> void:
+	var d := {"id": id, "kind": kind, "templateId": template, "name": name, "x": at.x, "y": at.y, "dir": dir, "level": level, "hpPct": hp_pct, "flags": 0}
+	if kind == "player":
+		d["classId"] = template
+	_dispatch("EntitySpawn", d)
+
+
+func _hit(src: int, dst: int, amount: int, spell: Variant = null, kind: String = "dmg", crit: bool = false) -> Dictionary:
+	return {"src": src, "dst": dst, "spellId": spell, "kind": kind, "amount": amount, "crit": crit, "school": "physical" if spell == null else "magic"}
+
+
+func _combat_shots() -> void:
+	var any := false
+	for n: String in COMBAT_SHOTS:
+		any = any or _wanted(n)
+	if not any:
+		return
+	var self_at := Vector2(780, 640)
+	var w := await _new_world(self_at.x, self_at.y)
+	await _wait_ms(100)
+	w.set("_zone_fade_left", 0.0)  # el rótulo "Campos" tapaba el centro de las capturas
+	(w.get("_zone_group") as CanvasGroup).self_modulate.a = 0.0
+	if _wanted("attack_classes"):
+		# Las cuatro clases golpeando a la vez (ataque básico cuerpo a cuerpo; el mago con su bastón a 1 casilla).
+		var attackers := {"warrior": Vector2(700, 600), "rogue": Vector2(845, 600), "mage": Vector2(700, 690), "priest": Vector2(845, 690)}
+		var names := {"warrior": "Guerrero", "rogue": "Pícara", "mage": "Maga", "priest": "Sacerdote"}
+		var id := 30
+		var hits: Array = []
+		for cls: String in attackers:
+			var at: Vector2 = attackers[cls]
+			_spawn(id, "player", cls, names[cls], at, "e", 4)
+			_spawn(id + 1, "monster", "boar" if cls != "mage" else "slime", "Jabalí" if cls != "mage" else "Slime", at + Vector2(30, 0), "w", 2)
+			hits.append(_hit(id, id + 1, 9 + id % 7))
+			id += 2
+		await _wait_ms(150)
+		_dispatch("CombatEvents", {"tick": 30, "e": hits})
+		await _wait_ms(170)  # tercer cuadro del ataque (el golpe), a 12 fps
+		var img := await _shot("attack_classes", OUT_COMBAT, 1)
+		for cls: String in attackers:
+			_crop(img, w, (attackers[cls] as Vector2) + Vector2(14, -10), "attack_" + cls)
+		await _clear(w)
+	if _wanted("monster_attacks"):
+		var line := [["slime", Vector2(575, 590)], ["boar", Vector2(690, 590)], ["skeleton_warrior", Vector2(825, 590)], ["bandit", Vector2(940, 590)],
+			["goblin_archer", Vector2(860, 655)], ["foreman_grask", Vector2(740, 725)], ["lesser_lich_king", Vector2(905, 725)]]
+		var hits: Array = []
+		var id := 50
+		for e: Array in line:
+			var at: Vector2 = e[1]
+			_spawn(id, "monster", e[0], Content.monster(str(e[0])).get("name", e[0]), at, "e", 4)
+			var target_at := at + (Vector2(26, 0) if e[0] != "goblin_archer" else Vector2(60, 0))
+			if e[0] in ["foreman_grask", "lesser_lich_king"]:
+				target_at.x += 10  # los jefes ocupan 64×64
+			_spawn(id + 1, "player", "warrior", "Tanque", target_at, "w", 4)
+			hits.append(_hit(id, id + 1, 7))
+			id += 2
+		await _wait_ms(150)
+		_dispatch("CombatEvents", {"tick": 31, "e": hits})
+		await _wait_ms(100)
+		var img := await _shot("monster_attacks", OUT_COMBAT, 1)
+		_crop(img, w, Vector2(780, 705), "monster_attacks_foreman", Vector2(60, 44))
+		_crop(img, w, Vector2(945, 705), "monster_attacks_lich", Vector2(60, 44))
+		await _clear(w)
+	if _wanted("cast_glow") or _wanted("projectile") or _wanted("impact"):
+		_spawn(60, "monster", "wolf", "Lobo de las colinas", self_at + Vector2(90, -20), "w", 4)
+		_spawn(61, "player", "priest", "Lumen", self_at + Vector2(-50, 30), "e", 4)
+		_spawn(62, "player", "warrior", "Diego", self_at + Vector2(-40, -10), "e", 5)
+		await _wait_ms(150)
+		_dispatch("CastStarted", {"casterId": 1, "spellId": "mage_fireball", "targetId": 60, "durationMs": 2000})
+		_dispatch("CastStarted", {"casterId": 61, "spellId": "priest_heal", "targetId": 62, "durationMs": 1500})
+		await _wait_ms(400)
+		if _wanted("cast_glow"):
+			var img := await _shot("cast_glow", OUT_COMBAT, 1)
+			_crop(img, w, self_at + Vector2(-25, 0), "cast_glow_closeup", Vector2(60, 34))
+		_dispatch("CastEnded", {"casterId": 1, "spellId": "mage_fireball", "result": "done"})
+		_dispatch("CastEnded", {"casterId": 61, "spellId": "priest_heal", "result": "done"})
+		await _wait_ms(230)
+		if _wanted("projectile"):
+			var img := await _shot("projectile", OUT_COMBAT, 1)
+			_crop(img, w, self_at + Vector2(45, -18), "projectile_closeup", Vector2(60, 34))
+		_dispatch("CombatEvents", {"tick": 40, "e": [_hit(1, 60, 38, "mage_fireball", "dmg", true), _hit(61, 62, 24, "priest_heal", "heal")]})
+		# La bola tarda distancia / velocidad (≈ 470 ms aquí) desde el CastEnded: la captura cae justo tras el impacto.
+		await _wait_ms(320)
+		if _wanted("impact"):
+			var img := await _shot("impact", OUT_COMBAT, 1)
+			_crop(img, w, self_at + Vector2(90, -34), "impact_closeup", Vector2(50, 34))
+		await _clear(w)
+	if _wanted("area_resolve"):
+		for i: int in 4:
+			_spawn(70 + i, "monster", "slime", "Slime", Vector2(860, 610) + Vector2(i % 2 * 22 - 11, i / 2 * 18 - 9), "w", 2)
+		await _wait_ms(120)
+		_dispatch("CastStarted", {"casterId": 1, "spellId": "mage_flame_burst", "targetPos": {"x": 860.0, "y": 610.0}, "durationMs": 1500})
+		await _wait_ms(300)
+		_dispatch("CastEnded", {"casterId": 1, "spellId": "mage_flame_burst", "result": "done"})
+		_dispatch("CombatEvents", {"tick": 50, "e": [_hit(1, 70, 21, "mage_flame_burst"), _hit(1, 71, 19, "mage_flame_burst"), _hit(1, 72, 24, "mage_flame_burst"), _hit(1, 73, 20, "mage_flame_burst")]})
+		await _wait_ms(120)
+		var img := await _shot("area_resolve", OUT_COMBAT, 1)
+		_crop(img, w, Vector2(850, 605), "area_resolve_closeup", Vector2(60, 40))
+		await _clear(w)
+	if _wanted("dead_monster"):
+		_spawn(80, "monster", "boar", "Jabalí", self_at + Vector2(50, 0), "w", 2)
+		_spawn(81, "monster", "wolf", "Lobo", self_at + Vector2(-50, 10), "e", 3)
+		_spawn(82, "monster", "skeleton_warrior", "Esqueleto", self_at + Vector2(10, 40), "n", 5)
+		await _wait_ms(150)
+		_snapshot(self_at, [{"id": 80, "x": self_at.x + 50, "y": self_at.y, "dir": "w", "hpPct": 0, "anim": "dead"},
+			{"id": 81, "x": self_at.x - 50, "y": self_at.y + 10, "dir": "e", "hpPct": 0, "anim": "dead"},
+			{"id": 82, "x": self_at.x + 10, "y": self_at.y + 40, "dir": "n", "hpPct": 0, "anim": "dead"}])
+		await _wait_ms(800)
+		var img := await _shot("dead_monster", OUT_COMBAT, 1)
+		_crop(img, w, self_at + Vector2(0, 14), "dead_monster_closeup", Vector2(76, 40))
+		await _clear(w)
+	if _wanted("esc_menu") or _wanted("logout_in_combat"):
+		_spawn(90, "monster", "wolf", "Lobo de las colinas", self_at + Vector2(40, -10), "w", 4)
+		await _wait_ms(100)
+		w.call("_open_game_menu")
+		if _wanted("esc_menu"):
+			await _shot("esc_menu", OUT_COMBAT)
+		if _wanted("logout_in_combat"):
+			w.set("_logout_req_id", 99)
+			w.set("_logout_after", "select")
+			_dispatch("Error", {"code": "in_combat", "reqId": 99})
+			await _shot("logout_in_combat", OUT_COMBAT)
+		(w.get("_game_menu") as GameMenu).close()
+	w.queue_free()
+	await get_tree().process_frame
+
+
+## Quita las entidades de la captura anterior (EntityDespawn como el servidor) y los efectos que queden.
+func _clear(w: Node2D) -> void:
+	for id: Variant in (w.get("_remotes") as Dictionary).keys():
+		_dispatch("EntityDespawn", {"id": id, "reason": "left"})
+	(w.get("_presenter") as CombatPresenter).clear()
+	await get_tree().process_frame

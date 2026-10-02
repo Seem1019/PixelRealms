@@ -26,6 +26,7 @@
 | HU-012 | Crear personaje | E1 | Must | M | Hecha |
 | HU-013 | Listar y borrar personajes | E1 | Must | S | Hecha |
 | HU-014 | Entrar al mundo (ticket + Hello/Welcome) | E1 | Must | M | Hecha |
+| HU-015 | Volver a la selección de personaje desde el juego | E1 | Must | M | Hecha |
 | HU-020 | Cargar mapa Tiled en servidor y cliente | E2 | Must | M | Hecha |
 | HU-021 | Movimiento autoritativo con colisión | E2 | Must | L | Hecha |
 | HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Hecha |
@@ -80,6 +81,8 @@
 | HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Hecha |
 | HU-088 | Rendimiento del combate | E3 | Must | L | Parcial |
 | HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Parcial |
+| HU-090 | Animaciones de combate del cuerpo | E8 | Should | L | Hecha |
+| HU-091 | Efectos visuales de hechizos | E8 | Should | M | Hecha |
 
 ## Pendiente de diseño
 - **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).

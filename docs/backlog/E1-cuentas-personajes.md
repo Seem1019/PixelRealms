@@ -99,3 +99,29 @@
 - Flag de desarrollo: con `Net:RequireTicket=false` se acepta `ticket = "dev:<characterId>"`.
 - Cliente: `scenes/world` conecta con el ticket, envía Hello, carga el mapa (render provisional por colores desde el .tmj) y coloca al jugador; errores `bad_version`/`bad_ticket` vuelven al login.
 - Tests: 5 de integración (Welcome completo, ticket usado, versión, reemplazo con guardado, guardado al desconectar).
+
+---
+### HU-015 · Volver a la selección de personaje desde el juego
+**Como** jugador **quiero** salir del mundo a la selección de personaje sin cerrar el juego **para** jugar con otro personaje, crear uno nuevo o volver a entrar.
+- Prioridad: Must · Estimación: M · Estado: Hecha
+- Dependencias: HU-014, HU-025, HU-038
+- Skills: `net-protocol`, `dotnet-server`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** que estoy en el mundo fuera de combate **cuando** elijo "Volver a selección de personaje" **entonces** el cliente envía `Logout{}`, el servidor guarda (`WorldSession.Save`), me saca del mundo como un cierre normal (los demás ven `EntityDespawn{reason:"left"}`), responde `LoggedOut{}` y cierra la conexión; el cliente vuelve a la selección con la lista recargada y sin pedir login.
+2. **Dado** que estoy en combate (`Actor.IsInCombat`) **cuando** pido salir **entonces** el servidor responde `Error{code:"in_combat"}`, sigo en el mundo y el HUD muestra "No puedes salir en combate".
+3. **Dado** que estaba casteando o en un duelo o intercambio **cuando** salgo **entonces** el casteo se cancela y duelo e intercambio se cancelan igual que al desconectarse.
+4. **Dado** el mundo **cuando** pulso Esc sin nada que cerrar (ventanas, casteo, apuntado, objetivo) o el botón de menú del HUD **entonces** se abre el menú del juego (Continuar, Volver a selección de personaje, Salir del juego); con el menú abierto la barra rápida y el movimiento no actúan. "Salir del juego" también pasa por `Logout` y luego cierra la aplicación.
+5. **Dado** que acabo de salir **cuando** vuelvo a entrar enseguida con el mismo personaje **entonces** entro una sola vez (ni duplicado ni linkdead) y con el estado con el que salí.
+
+**Notas técnicas**
+- El cliente no sabe si está en combate: lo decide el servidor. Al recibir `LoggedOut` el cliente cierra con `Net.disconnect_from_server()` (sin reconexión ni "Desconectado").
+- El `Hello` del mismo personaje espera a que su guardado pendiente esté escrito (máx. 3 s) antes de leerlo de la BD.
+
+**Notas de implementación**
+- Protocolo: `Logout{reqId?}` / `LoggedOut{}` sin subir versión (regla 4 de `docs/protocol.md`). `WorldSession.Logout` decide `in_combat`, cancela el casteo y sale por `Leave` (duelo, intercambio, grupo offline, guardado); el handler responde y cierra con `CloseAfterFlush` (marca en la cola de salida + cierre forzado a los 2 s).
+- Sin duplicados al volver a entrar: un `Hello` del mismo personaje aún dentro toma ese `Player` vivo (no se recarga de BD); si la lectura de BD es anterior al guardado de salida (`SaveService` numera los guardados por personaje), el tick usa el DTO de salida que guarda en memoria hasta que esté escrito.
+- Al salir se descartan los impactos en vuelo del jugador, su amenaza y las marcas (`TaggedBy`) de los monstruos.
+- Cliente: `GameMenu` (Esc cuando no queda nada que cerrar, o el engranaje del HUD), `world.gd` `request_logout` → `LoggedOut` → `Net.disconnect_from_server()`, `GameState.reset()` y `character_select.tscn` con el mismo token. Con el menú abierto la barra y el movimiento no actúan.
+- Tests: `LogoutTests` (7: fuera/dentro de combate, CA3, sin jugador, toma del personaje vivo, reentrada con BD atrasada), `SaveServiceTests` (generaciones), GUT `test_logout_menu.gd`. Pendiente: los cooldowns y auras no se guardan, así que salir y volver a entrar los reinicia (ya pasaba al cerrar el juego); queda para una HU de persistencia de cooldowns.
+
