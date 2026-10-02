@@ -120,9 +120,16 @@ Si el cliente es de otra versión de protocolo, el servidor responde `bad_versio
 a `/play/` (configurable en `user://settings.cfg` → `[net] update_url`).
 
 ## 7. Actualizar
-- Servidor: *Deploy servidor → Run workflow* (o `docker compose -f docker-compose.prod.yml pull server && docker compose -f docker-compose.prod.yml up -d server`).
-  El servidor guarda a todos los jugadores al pararse (`OnStopping`), pero avisa antes con `/announce`.
-- Cliente: *Publicar cliente → Run workflow*. La web se actualiza al recargar; el `.zip` de itch.io lo bajan los jugadores.
+- **Automático** (`.github/workflows/deploy.yml`): cuando el CI pasa en un push a `main`, el workflow *Deploy* compara con
+  los SHA guardados en el VPS (`.deployed-server-sha`, `.deployed-web-sha`) y despliega solo lo que cambió: servidor
+  (`server/`, `content/`, `maps/`, `deploy/`, compose) → imagen en GHCR y reinicio; cliente (`client/`, `content/`, `maps/`)
+  → export Web a `/play/`. Un merge que solo toca docs no reinicia nada. A mano: *Deploy → Run workflow* (force = todo).
+  Requiere en el environment `production` los secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (clave solo para deploy,
+  restringida en `authorized_keys`), `VPS_KNOWN_HOSTS` (`ssh-keyscan -t ed25519 <ip>`, comprobando la huella) y la variable
+  `SERVER_URL`.
+- Reiniciar el servidor desconecta a todos: guarda a los jugadores al pararse (`OnStopping`), pero avisa antes con `/announce`.
+- A mano en el VPS: `docker compose -f docker-compose.prod.yml pull server && docker compose -f docker-compose.prod.yml up -d server`.
+- Cliente de escritorio: *Publicar cliente → Run workflow* (`.zip` para itch.io). La web se actualiza al recargar.
 - Contenido (`content/*.json`, `maps/*.tmj`) va dentro de la imagen: cambiar números = nuevo despliegue del servidor **y** del
   cliente (el cliente lleva su copia).
 
