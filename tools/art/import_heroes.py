@@ -56,6 +56,11 @@ def keys(row: int, cols: list[int]) -> list[str]:
     return ["%d,%d" % (row, c) for c in cols]
 
 
+def pl(anim: str, frames: list[int]) -> list[str]:
+    """Cuadros generados con PixelLab (refs/<clase>_pixellab/<anim>/frame_NNN.png) para vistas que la hoja no trae."""
+    return ["pl:%s/frame_%03d.png" % (anim, f) for f in frames]
+
+
 ## Cuadro de la hoja de referencia ("fila,columna") para cada animación y dirección. Las hojas traen vista 3/4 de frente
 ## (sur y este usan la misma, el oeste es el este espejado) y, salvo el sacerdote, algunas de espaldas para el norte.
 FRAMES: dict[str, dict[str, dict[str, list[str]]]] = {
@@ -84,10 +89,13 @@ FRAMES: dict[str, dict[str, dict[str, list[str]]]] = {
         "e": {"idle": keys(0, [0, 4, 8, 12]), "walk": even(3, 16, 8), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
               "cast": keys(7, [0, 1, 2, 3, 4, 6]), "hurt": keys(8, [3, 4]), "death": keys(8, [6, 7, 8, 10])},
     },
-    # Sin vista de espaldas: el norte repite la de frente hasta tener cuadros de espaldas.
+    # La hoja no trae vista de espaldas: el norte sale de PixelLab (rotación v3 del reposo sur y animaciones v3 al norte).
     "priest": {d: {"idle": keys(0, [0, 4, 8, 12]), "walk": even(1 if d != "e" else 2, 15, 8),
                    "attack": keys(3, [8, 9, 10, 11, 12, 13]), "cast": keys(7, [0, 1, 2, 3, 4, 5]),
-                   "hurt": keys(5, [12, 13]), "death": keys(6, [6, 7, 11, 12])} for d in DIRS},
+                   "hurt": keys(5, [12, 13]), "death": keys(6, [6, 7, 11, 12])} for d in DIRS}
+              | {"n": {"idle": pl("idle", [0, 1, 2, 3]), "walk": pl("walk", list(range(8))),
+                       "attack": pl("attack", list(range(6))), "cast": pl("cast", list(range(6))),
+                       "hurt": pl("idle", [0, 2]), "death": keys(6, [6, 7, 11, 12])}},
 }
 
 
@@ -194,6 +202,10 @@ def build_class(class_id: str) -> bool:
     box = lambda key: boxes[int(key.split(",")[0])][int(key.split(",")[1])]
     ref = box(FRAMES[class_id]["s"]["idle"][0])
     scale = STAND_HEIGHT / (ref[3] - ref[1])
+    pl_dir = REFS / f"{class_id}_pixellab"
+    pl_frame = lambda key: (lambda im: im.crop(im.getbbox()))(Image.open(pl_dir / key[3:]).convert("RGBA"))
+    # Los cuadros de PixelLab se escalan por su propio reposo para medir lo mismo que la vista de frente.
+    pl_scale = STAND_HEIGHT / pl_frame("pl:idle/frame_000.png").height if pl_dir.exists() else 1.0
     columns = sum(a["frames"] for a in ANIMS.values())
     sheet = Image.new("RGBA", (SIZE * columns, SIZE * len(DIRS)))
     anims = {}
@@ -204,8 +216,11 @@ def build_class(class_id: str) -> bool:
             assert len(frames) == a["frames"], f"{class_id}/{d}/{name}: {len(frames)} cuadros, se esperan {a['frames']}"
             anims[name] = {"column": col, **a}
             for key in frames:
-                cut = cut_out(img, box(key), BG_LEVEL_BY_CLASS.get(class_id, BG_LEVEL))
-                sheet.paste(frame_cell(shrink(cut, scale)), (col * SIZE, r * SIZE))
+                if key.startswith("pl:"):
+                    frame = shrink(pl_frame(key), pl_scale)
+                else:
+                    frame = shrink(cut_out(img, box(key), BG_LEVEL_BY_CLASS.get(class_id, BG_LEVEL)), scale)
+                sheet.paste(frame_cell(frame), (col * SIZE, r * SIZE))
                 col += 1
     out = ASSETS / "sprites" / "characters"
     sheet.save(out / f"{class_id}.png")
