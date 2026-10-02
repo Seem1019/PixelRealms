@@ -7,6 +7,9 @@ extends PanelContainer
 signal sell_requested(item: Dictionary)
 signal offer_requested(item: Dictionary)
 
+## Las ventanas empiezan debajo de los marcos de vida (CombatHud) y terminan encima de la barra rápida.
+const WINDOW_TOP := CombatHud.FRAMES_BOTTOM
+
 var vendor_mode: bool = false
 
 var _slots: Array[ItemSlot] = []
@@ -20,13 +23,10 @@ var _destroy_item: Dictionary = {}
 
 func _ready() -> void:
 	visible = false
-	position = Vector2(300, 60)
 	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
 	add_child(v)
-	var title := Label.new()
-	title.text = "Bolsa"
-	title.add_theme_font_size_override("font_size", 8)
-	v.add_child(title)
+	v.add_child(InventoryWindow.title_row("Bolsa", "I"))
 	var grid := GridContainer.new()
 	grid.columns = 6
 	grid.add_theme_constant_override("h_separation", 1)
@@ -41,9 +41,18 @@ func _ready() -> void:
 		s.split_requested.connect(_on_split)
 		grid.add_child(s)
 		_slots.append(s)
+	var gold_row := HBoxContainer.new()
+	gold_row.alignment = BoxContainer.ALIGNMENT_END
+	var coin := TextureRect.new()
+	coin.texture = UiTheme.icon("items/purse")
+	coin.custom_minimum_size = Vector2(16, 16)
+	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gold_row.add_child(coin)
 	_gold = Label.new()
-	_gold.add_theme_font_size_override("font_size", 8)
-	v.add_child(_gold)
+	_gold.theme_type_variation = "OutlinedLabel"
+	_gold.add_theme_color_override("font_color", UiTheme.ACCENT)
+	gold_row.add_child(_gold)
+	v.add_child(gold_row)
 
 	_split_dialog = ConfirmationDialog.new()
 	_split_dialog.title = "Dividir"
@@ -58,19 +67,37 @@ func _ready() -> void:
 
 	GameState.inventory_changed.connect(refresh)
 	refresh()
+	UiTheme.dock(self, Control.PRESET_TOP_RIGHT, UiTheme.SCREEN_MARGIN, WINDOW_TOP - UiTheme.SCREEN_MARGIN)
 
 
 func refresh() -> void:
 	for i: int in _slots.size():
 		var it: Variant = GameState.inventory[i] if i < GameState.inventory.size() else null
 		_slots[i].set_item(it if it is Dictionary else {})
-	_gold.text = "Oro: %s" % MoneyFormat.format(GameState.gold)
+	_gold.text = MoneyFormat.format(GameState.gold)
+
+
+## Fila de título de ventana: nombre en dorado a la izquierda y la tecla que la abre, atenuada, a la derecha.
+static func title_row(text: String, key: String = "") -> Control:
+	var row := HBoxContainer.new()
+	var title := Label.new()
+	title.text = text
+	title.theme_type_variation = "TitleLabel"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title)
+	if not key.is_empty():
+		var hint := Label.new()
+		hint.text = "[%s]" % key
+		hint.theme_type_variation = "SmallLabel"
+		row.add_child(hint)
+	return row
 
 
 func toggle() -> void:
 	visible = not visible
 	if visible:
 		refresh()
+		UiTheme.bring_to_front(self)
 
 
 func _on_dropped(from: Dictionary, to: Dictionary, qty: int) -> void:

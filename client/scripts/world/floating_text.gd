@@ -2,7 +2,8 @@ class_name FloatingText
 extends Node2D
 ## Números flotantes de combate (HU-038 CA2/CA6, ADR-018): reserva fija de etiquetas, suben y se desvanecen en 1 s.
 ## Colores de la skill combat-system: blanco daño, amarillo crit con "!", verde cura, gris "Falla"/"Esquiva", azul "Absorbe",
-## "Inmune" para controles bloqueados. Más de MAX_PER_ENTITY_PER_SEC números por entidad y segundo → uno sumado.
+## "Inmune" para controles bloqueados, morado "+N XP" sobre uno mismo. Más de MAX_PER_ENTITY_PER_SEC números por entidad y
+## segundo → uno sumado.
 
 const POOL_SIZE := 48
 const MAX_VISIBLE := 40
@@ -18,7 +19,9 @@ var _per_entity: Dictionary = {}  # entity_id → {windowStart, count, pending}
 func _ready() -> void:
 	for i: int in POOL_SIZE:
 		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 8)
+		l.add_theme_font_size_override("font_size", UiTheme.FONT_BODY)
+		l.add_theme_constant_override("outline_size", 2)  # legible sobre cualquier suelo
+		l.add_theme_color_override("font_outline_color", UiTheme.OUTLINE)
 		l.visible = false
 		l.z_index = 50
 		add_child(l)
@@ -32,10 +35,10 @@ func show_event(entity_id: int, kind: String, amount: int, crit: bool, world_pos
 	match kind:
 		"dmg":
 			text = str(amount) + ("!" if crit else "")
-			color = Color(1, 0.9, 0.2) if crit else Color.WHITE
+			color = Color("f9c22b") if crit else Color.WHITE
 		"heal":
 			text = "+" + str(amount) + ("!" if crit else "")
-			color = Color(0.3, 1, 0.3)
+			color = Color("91db69")
 		"miss":
 			text = "Falla"
 			color = Color(0.7, 0.7, 0.7)
@@ -44,15 +47,18 @@ func show_event(entity_id: int, kind: String, amount: int, crit: bool, world_pos
 			color = Color(0.7, 0.7, 0.7)
 		"absorb":
 			text = "Absorbe " + str(amount)
-			color = Color(0.4, 0.6, 1)
+			color = Color("8fd3ff")
 		"immune":
 			text = "Inmune"
 			color = Color(0.8, 0.8, 0.8)
+		"xp":
+			text = "+%d XP" % amount
+			color = Color("a884f3")
 		_:
 			return
 	if not _allow(entity_id, kind, amount, world_pos):
 		return
-	_spawn(text, color, world_pos)
+	_spawn(text, color, world_pos, crit)
 
 
 ## Límite por entidad y segundo: a partir del 6.º número se acumula y se muestra sumado al cerrar la ventana.
@@ -72,7 +78,7 @@ func _allow(entity_id: int, kind: String, amount: int, world_pos: Vector2) -> bo
 	return allowed
 
 
-func _spawn(text: String, color: Color, world_pos: Vector2) -> void:
+func _spawn(text: String, color: Color, world_pos: Vector2, big: bool = false) -> void:
 	if _active.size() >= MAX_VISIBLE:
 		return
 	var l: Label = null
@@ -84,8 +90,10 @@ func _spawn(text: String, color: Color, world_pos: Vector2) -> void:
 		return
 	l.text = text
 	l.add_theme_color_override("font_color", color)
+	l.add_theme_font_size_override("font_size", UiTheme.FONT_HEADLINE if big else UiTheme.FONT_BODY)
+	l.add_theme_constant_override("outline_size", 4 if big else 2)
 	l.modulate.a = 1.0
-	l.position = world_pos + Vector2(-8 + randf_range(-4, 4), -20)
+	l.position = (world_pos + Vector2(-8 + randf_range(-4, 4), -50)).round()  # por encima de la placa de nombre
 	l.visible = true
 	_active.append({"label": l, "t": 0.0})
 
@@ -100,5 +108,6 @@ func _process(delta: float) -> void:
 			_active.remove_at(i)
 			continue
 		e["t"] = t
-		l.position.y -= RISE_PX * delta
+		e["y"] = float(e.get("y", l.position.y)) - RISE_PX * delta
+		l.position.y = roundf(float(e["y"]))  # en la rejilla de píxeles
 		l.modulate.a = 1.0 - t / LIFETIME

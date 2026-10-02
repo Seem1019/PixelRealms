@@ -1,0 +1,21 @@
+{
+ "frameSize": [
+  64,
+  64
+ ],
+ "rows": [
+  "s",
+  "n",
+  "e"
+ ],
+ "columns": [
+  "idle0",
+  "idle1",
+  "walk0",
+  "walk1",
+  "walk2",
+  "walk3"
+ ],
+ "feetY": 60,
+ "note": "w = e espejado; generado por tools/art/gen_chars.py"
+}

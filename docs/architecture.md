@@ -84,14 +84,17 @@ sequenceDiagram
 - Formato: JSON texto, sobre `{ "t": string, "d": object }`. Límite 4 KB por mensaje entrante.
 - Autenticación: login REST → JWT (15 min) → `POST /api/game/ticket` (ticket de un solo uso, 30 s) →
   `ws://host/ws?ticket=...` (el navegador no permite headers en WebSocket). Primer mensaje: `Hello`.
-- Rate limiting por conexión (token bucket): `MoveInput` 30/s, `CastSpell` 10/s, `Chat` 5/5 s, resto 20/s.
+- Rate limiting por conexión (token bucket): `MoveInput` 30/s con ráfaga de 90 (un corte de red breve entrega los inputs de golpe), `CastSpell` 10/s, `Chat` 5/5 s, resto 20/s.
   Exceder 3 veces en 10 s → desconexión con `Error{code:"rate_limited"}`.
 - Heartbeat: `Ping` cada 5 s; sin tráfico 15 s → desconectar. Reconexión: el personaje queda 10 s en el mundo
   ("linkdead") para evitar abuso de desconectar en combate.
 
 ### Movimiento (predicción + reconciliación)
-- Cliente envía `MoveInput { seq, dx, dy }` al cambiar la dirección (8 direcciones, valores −1/0/1) y
-  como keep-alive cada 200 ms mientras se mueve.
+- Cliente simula a ticks fijos de 50 ms (acumulador propio, no los frames) y envía un `MoveInput { seq, dx, dy }`
+  (8 direcciones, valores −1/0/1) por cada tick con movimiento, más uno con 0,0 al parar. El `seq` es por conexión: vuelve a 1
+  con cada `Hello` (el servidor lo reinicia al reconectar) y un `Welcome` posterior en la misma conexión no lo toca.
+- Si dos inputs llegan en el mismo tick del servidor (variación de latencia), el servidor avanza un paso y confirma el
+  `seq` mayor: el cliente corrige un paso (3,2 px). Con variaciones de ±10 ms no ocurre.
 - Servidor aplica el último input por jugador en cada tick: `vel = normalize(dx,dy) * speed` (speed base 4 tiles/s),
   colisión AABB (caja 10×6 px en los pies) eje por eje contra la grilla de colisión.
 - Snapshot incluye `ackSeq` (último `seq` procesado) y posición autoritativa del jugador propio.
@@ -112,10 +115,19 @@ sequenceDiagram
 ## 6. Cliente Godot
 - Autoloads: `Net` (WebSocketPeer, cola, reconexión, dispatch por `t` a señales), `Content` (carga JSON de
   `res://content`), `GameState` (personaje propio, inventario, target, party — **solo reflejo** del servidor),
-  `Settings`.
+  `Settings`, `UiStyle` (tema de la interfaz).
 - Escenas: `Boot` → `Login` → `CharacterSelect` → `World` (TileMapLayer por Tiled/YATI, `Entities` YSort,
   `Camera2D` pixel-perfect) + `HUD` (CanvasLayer: barras, hotbar, target frame, cast bar, chat, party, ventanas).
-- Resolución lógica 480×270 (16:9), escalado entero (`stretch mode = viewport`, `scale mode = integer`).
+- Resolución lógica 480×270 (16:9), escalado entero (`stretch mode = canvas_items`, `scale mode = integer`, ADR-025): el 2D
+  se dibuja a la resolución de la ventana, así que el texto sale nítido a su tamaño y el mundo conserva la escala entera.
+- Un único `Theme` creado por código (`scripts/ui/ui_theme.gd`; el autoload `UiStyle` lo fusiona con el tema por defecto
+  del motor, porque los `Control` dentro de un `CanvasLayer` no heredan el de la ventana):
+  tamaños de letra, espaciados, colores y estilos. Tooltips propios (`RichTooltip`) de ancho contenido.
+- Aspecto (ADR-026): fuente pixel Tiny5 a su tamaño nativo (8 px, ×2 para titulares), estilos 9-slice (`StyleBoxTexture`)
+  y arte en la paleta Resurrect 64 generado por `tools/art/`. El mapa se dibuja con `TerrainBaker`/`TerrainRenderer`: al
+  cargar, hornea el `.tmj` (los mismos GIDs que lee la colisión) con autotile dual-grid en texturas por trozos, una capa
+  bajo las entidades y otra (copas, aleros) encima. Las entidades son `EntityVisual` (sprite de 32×32 animado, sombra y
+  placa de nombre); `NameplateLayout` separa las placas que se pisan.
 
 ## 7. Despliegue (amigos)
 - VPS Linux (2 vCPU / 2–4 GB). `docker compose`: `server`, `postgres`, `caddy` (TLS automático → `wss://`).

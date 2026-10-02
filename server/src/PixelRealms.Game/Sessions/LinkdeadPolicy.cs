@@ -27,9 +27,11 @@ public static class LinkdeadPolicy
         player.MoveDy = 0;
     }
 
+    /// <summary>La conexión nueva retoma el personaje; su cliente vuelve a numerar los MoveInput desde 1.</summary>
     public static void MarkReconnected(Player player, int connectionId)
     {
         player.ConnectionId = connectionId;
         player.LinkdeadSinceMs = -1;
+        player.LastInputSeq = 0;
     }
 }

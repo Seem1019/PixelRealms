@@ -132,7 +132,7 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	assert_gt(_world._spellbook._list.get_child_count(), 0)
 	_world._character.toggle()
 	assert_true(_world._character.visible)
-	assert_string_contains(_world._character._stats.text, "Vida")
+	assert_string_contains(_world._character.stats_text(), "Vida")
 
 	# Muerte y pantalla.
 	_dispatch("Died", {"killerId": 7, "respawnInMs": 0})

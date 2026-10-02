@@ -4,6 +4,8 @@ namespace PixelRealms.Server.Net;
 public sealed class RateLimitOptions
 {
     public double MoveInputPerSec { get; set; } = 30;
+    /// <summary>El cliente manda un MoveInput por tick (20/s): un corte de red breve los entrega de golpe y no debe desconectar.</summary>
+    public double MoveInputBurst { get; set; } = 90;
     public double CastSpellPerSec { get; set; } = 10;
     public double ChatPerSec { get; set; } = 1; // 5 por 5 s
     public double ChatBurst { get; set; } = 5;
@@ -49,7 +51,7 @@ public sealed class MessageRateLimiter(RateLimitOptions options)
         {
             bucket = key switch
             {
-                "move" => new Bucket(options.MoveInputPerSec, options.MoveInputPerSec, nowMs),
+                "move" => new Bucket(options.MoveInputPerSec, options.MoveInputBurst, nowMs),
                 "cast" => new Bucket(options.CastSpellPerSec, options.CastSpellPerSec, nowMs),
                 "chat" => new Bucket(options.ChatPerSec, options.ChatBurst, nowMs),
                 _ => new Bucket(options.DefaultPerSec, options.DefaultPerSec, nowMs),

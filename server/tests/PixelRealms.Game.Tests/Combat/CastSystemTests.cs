@@ -18,6 +18,16 @@ public sealed class CastSystemTests
         => w.Combat.Casts.TryBeginCast(w.Player("Ana"), w.Content.Spell(spellId), target, pos, w.Map, w.Begin());
 
     [Fact]
+    public void GroundArea_AimedInsideAWallThatBlocksSight_IsRejected()
+    {
+        // Un muro de una casilla en (12, 10) y el slime detrás: apuntar dentro del muro alcanzaba al otro lado.
+        var w = Arena(level: 5, distance: 3.5f);
+        w.Map.Data.Collision.SetBlocksSight(12, 10);
+        Cast(w, "mage_flame_burst", pos: new Vec2(12.5f, 10.5f)).ShouldBe(CastErrors.NoLos);
+        Cast(w, "mage_flame_burst", pos: new Vec2(11.5f, 10.5f)).ShouldBeNull(); // justo delante del muro sí
+    }
+
+    [Fact]
     public void Fireball_CastStarted_ResolvesAfter40Ticks_SpendsContentCost() // CA1 + skill §Integración de tick
     {
         var w = Arena();

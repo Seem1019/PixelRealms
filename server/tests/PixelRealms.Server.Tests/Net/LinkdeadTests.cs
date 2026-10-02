@@ -78,12 +78,39 @@ public sealed class LinkdeadTests
             await using var ana2 = await Connect(server, anaApi, anaId);
             var welcome2 = await ana2.ExpectAsync("Welcome");
             welcome2.GetProperty("selfId").GetInt32().ShouldBe(selfId);          // mismo personaje vivo, no uno nuevo
+            (await ana2.ExpectAsync("StatsUpdate", 1000)).GetProperty("stats").GetProperty("str").GetInt32().ShouldBeGreaterThan(0); // stats y oro tras el Welcome
             welcome2.GetProperty("self").GetProperty("x").GetSingle().ShouldBeGreaterThanOrEqualTo(before); // posición del mundo, no de BD
             (await ana2.ExpectForIdAsync("EntitySpawn", bobId)).GetProperty("name").GetString().ShouldBe("Bob"); // AOI reenviada
             (await bob.ArrivesAsync("EntityDespawn", m => m.GetProperty("id").GetInt32() == selfId, 300)).ShouldBeFalse(); // Bob nunca dejó de verla
             server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(2);
             await ana.DisposeAsync();
             await bob.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Reconnect_RestartsInputSequence_SoTheNewConnectionCanMove()
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, anaId, ana) = await Enter(server, "ana", "Ana", "warrior");
+        using (anaApi)
+        {
+            var selfId = (await ana.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
+            for (var seq = 1; seq <= 5; seq++) await ana.SendAsync("MoveInput", $$"""{"seq":{{seq}},"dx":1,"dy":0}""");
+            await ana.SendAsync("MoveInput", """{"seq":6,"dx":0,"dy":0}""");
+            await ana.ExpectAsync("Snapshot", s => s.GetProperty("ackSeq").GetInt32() == 6);
+            ana.Abort();
+            await Task.Delay(300, TestContext.Current.CancellationToken);
+
+            await using var ana2 = await Connect(server, anaApi, anaId);
+            var welcome2 = await ana2.ExpectAsync("Welcome");
+            welcome2.GetProperty("selfId").GetInt32().ShouldBe(selfId); // reconexión real (mismo Player), no una sesión nueva con seq 0
+            var startX = welcome2.GetProperty("self").GetProperty("x").GetSingle();
+            // El cliente nuevo empieza otra vez en seq 1: si el servidor conservara el 6 lo descartaría y no se movería.
+            await ana2.SendAsync("MoveInput", """{"seq":1,"dx":1,"dy":0}""");
+            var moved = await ana2.ExpectAsync("Snapshot", s => s.GetProperty("ackSeq").GetInt32() == 1 && s.GetProperty("self").GetProperty("x").GetSingle() > startX);
+            moved.GetProperty("ackSeq").GetInt32().ShouldBe(1);
+            await ana.DisposeAsync();
         }
     }
 

@@ -14,6 +14,9 @@ var tile_size: int = 16
 var collision: CollisionGrid = CollisionGrid.new()
 var layers: Dictionary = {}  # nombre → PackedInt32Array de GIDs (ya enmascarados)
 var zones: Array[Dictionary] = []
+## Solo para dibujar: cementerios (fogata) y portales (entrada a la cueva), en píxeles.
+var graveyards: Array[Vector2] = []
+var portals: Array[Rect2] = []
 var _tile_props: Dictionary = {}  # gid → {solid, blocksSight}
 
 
@@ -73,6 +76,13 @@ func _parse(path: String) -> bool:
 					if tp.get("blocksSight", false):
 						collision.set_blocks_sight(i % width, i / width)
 			layers[name] = data
+		elif str(l.get("type", "")) == "objectgroup" and name == "graveyards":
+			for o: Variant in l.get("objects", []):
+				graveyards.append(Vector2(float((o as Dictionary).get("x", 0)), float((o as Dictionary).get("y", 0))))
+		elif str(l.get("type", "")) == "objectgroup" and name == "portals":
+			for o: Variant in l.get("objects", []):
+				var po: Dictionary = o
+				portals.append(Rect2(float(po.get("x", 0)), float(po.get("y", 0)), maxf(float(po.get("width", 0)), 1.0), maxf(float(po.get("height", 0)), 1.0)))
 		elif str(l.get("type", "")) == "objectgroup" and name == "zones":
 			for o: Variant in l.get("objects", []):
 				var od: Dictionary = o

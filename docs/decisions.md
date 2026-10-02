@@ -235,3 +235,46 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   cooldowns y duraciones no cambian. Como en la Fase 1 solo existe un rango, queda para antes de la Fase 2 decidir si escala
   también los coeficientes y si los rangos se acumulan de forma lineal (+15 / +30 / +45 %) o compuesta; el modelo de
   `tools/balance/` lo incorporará entonces.
+
+## ADR-025 · Escala de la interfaz con `stretch mode = canvas_items`
+- **Contexto:** con `stretch mode = viewport` todo, texto incluido, se dibujaba a 480×270 y luego se ampliaba la imagen. La
+  fuente por defecto de Godot a 7–8 px quedaba pixelada y los tooltips nativos (letra de 16 px sobre 270 de alto) ocupaban
+  media pantalla. La fuente pixel prevista en HU-005 seguía sin elegir.
+- **Decisión:** `stretch mode = canvas_items` con la misma resolución lógica (480×270), `aspect = keep` y escala entera. El 2D
+  se dibuja a la resolución real: el texto se rasteriza a su tamaño final y el mundo y la interfaz crecen por factor entero
+  (×3 a 1440×810, ×4 a 1920×1080). Un único `Theme` por código (`UiTheme`) fija tamaños de letra, espaciados y colores, y
+  los tooltips son propios (`RichTooltip`) con ancho máximo.
+- **Alternativas descartadas:** seguir con `viewport` y añadir una fuente pixel (m5x7/m6x11): estética coherente con el
+  pixel art, pero con solo tamaños ×1/×2, unas 25 líneas de texto en pantalla y caracteres del español por comprobar; una
+  sub-vista de 480×270 solo para el mundo con la interfaz encima a resolución real: lo mejor de ambas, pero cambia la cámara y
+  la conversión de coordenadas del ratón.
+- **Consecuencias:** cambia `docs/architecture.md` §6. Con sprites reales (HU-081) los objetos pueden quedar entre píxeles
+  lógicos al moverse; si se nota, se redondean las posiciones al dibujar. Una fuente pixel sigue siendo posible encima de
+  este modo.
+
+## ADR-026 · Rediseño visual: fuente Tiny5, 9-slice y arte generado; el mapa se hornea en el cliente
+- **Contexto:** el cliente funcionaba pero se veía como prototipo (rectángulos de color, la sans por defecto de Godot,
+  cajas con borde de 1 px). Queríamos la dirección artística de Heartwood Online (16×16 con detalle, paleta cálida, interfaz
+  de madera) sin tocar servidor, protocolo ni datos de mapas, y desde un entorno sin acceso a itch.io ni OpenGameArt.
+- **Decisión:**
+  - Fuente **Tiny5** (OFL): rejilla de 8 px por em, así que `FONT_SMALL/BODY/TITLE = 8` y `FONT_HEADLINE = 16` son su tamaño
+    nativo y su doble; se carga con `fixed_size = 8`, escala entera, sin antialias ni hinting (`UiTheme.font()`). Sin
+    cursiva: las descripciones de los tooltips van en color atenuado.
+  - El estilo sigue viviendo en `UiTheme.build()`: `StyleBoxTexture` 9-slice (panel, tooltip, botones, casillas, barras,
+    campo de texto) con texturas de `assets/ui/`.
+  - Todo el arte (tiles, sprites, íconos, UI) lo dibuja `tools/art/generate_all.py` en **Resurrect 64**, determinista y
+    reproducible; las rutas son las que ya pedía `content/` (`icons/items/sword_worn`, `sprites/monsters/slime`…).
+  - El mapa **no cambia**: el cliente interpreta los GIDs de `placeholder.tsj` (pasto, tierra, camino, muro, arbusto, agua,
+    roca, suelo) y los hornea con autotile **dual-grid** (cada pieza cubre la esquina de 4 casillas y elige 1 de 16 formas,
+    con bordes irregulares que casan). Los muros de una casilla de grosor se dibujan como cerca; los bloques, como casa en
+    zona segura o peñasco fuera; la roca unida al borde, como bosque; el agua aislada de la plaza, como pozo. Las capas de
+    colisión, línea de visión, spawns, NPCs y zonas quedan intactas.
+- **Alternativas descartadas:** pintar tilesets reales en Tiled y cambiar los GIDs de los `.tmj` (habría que duplicar las
+  propiedades `solid`/`blocksSight` en el tileset nuevo y repasar los tests del `TiledMapLoader`; queda como evolución
+  natural cuando haya artista y YATI); packs de itch.io/OpenGameArt (no accesibles desde la sesión; si se usan después,
+  sustituyen los PNG con las mismas rutas y se registran en `client/assets/CREDITS.md`).
+- **Consecuencias:** el horneado del prado tarda ~0,9 s la primera vez (se guarda en caché para el resto de la sesión; la
+  pantalla de inicio lo aprovecha como fondo). Las piezas del atlas y las filas de `TerrainBaker` deben coincidir con
+  `tools/art/gen_tiles.py`. Las capturas de referencia están en `docs/screenshots/redesign/`
+  (`client/tools/screenshots.gd`).
+

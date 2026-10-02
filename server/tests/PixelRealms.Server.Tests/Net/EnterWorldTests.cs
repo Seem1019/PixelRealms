@@ -51,6 +51,25 @@ public sealed class EnterWorldTests
     }
 
     [Fact]
+    public async Task Welcome_IsFollowedByStatsUpdate_SoTheClientHasStatsAndGoldFromTheStart()
+    {
+        await using var server = await TestServer.StartAsync();
+        var (api, _, ticket) = await NewCharacterWithTicket(server);
+        using (api)
+        {
+            await using var client = await TestGameClient.ConnectAsync(server.WsUrl + "?ticket=" + ticket);
+            await client.SendAsync("Hello", $$"""{"protocolVersion":1,"ticket":"{{ticket}}"}""");
+            var welcome = await client.ExpectAsync("Welcome");
+            // Sin este mensaje el panel de personaje mostraba 0 en todo y la bolsa "Oro: 0c" hasta equipar algo.
+            var stats = await client.ExpectAsync("StatsUpdate", 1000);
+            stats.GetProperty("level").GetInt32().ShouldBe(1);
+            stats.GetProperty("stats").GetProperty("str").GetInt32().ShouldBeGreaterThan(0);
+            stats.GetProperty("derived").GetProperty("maxHp").GetInt32().ShouldBe(welcome.GetProperty("self").GetProperty("maxHp").GetInt32());
+            stats.TryGetProperty("gold", out _).ShouldBeTrue();
+        }
+    }
+
+    [Fact]
     public async Task Hello_UsedOrBadTicket_Error_AndClose() // HU-014 CA3
     {
         await using var server = await TestServer.StartAsync(new() { ["Net:RequireTicket"] = "true" });

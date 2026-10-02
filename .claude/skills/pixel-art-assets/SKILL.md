@@ -49,6 +49,14 @@ Los ids en `content/*.json` (`icon`, `sprite`) son estas rutas relativas sin ext
 Busca en itch.io packs 16×16 top-down con licencia CC0 o que permita uso comercial/no comercial. Anota **siempre**
 autor, URL y licencia en `client/assets/CREDITS.md`. No uses assets de juegos comerciales ni "rips".
 
+## Arte del proyecto (generado)
+El arte actual lo dibuja `tools/art/generate_all.py` en Resurrect 64 (`client/assets/palette.png`, ADR-026): tiles con
+autotile dual-grid (`gen_tiles.py`, filas que lee `client/scripts/world/terrain_baker.gd`), sprites 3/4 de 32×32 con hoja
+`filas = s, n, e` × `columnas = idle0, idle1, walk0..3` + `.json` (`gen_chars.py`, los lee `entity_sprites.gd`), íconos
+16×16 (`gen_icons.py`) y UI 9-slice (`gen_ui.py`). Fuente de la interfaz: Tiny5 (OFL) en `client/assets/fonts/`. Un pack
+o un dibujo a mano puede sustituir cualquier PNG con la misma ruta y tamaño; regístralo en `client/assets/CREDITS.md`.
+Capturas de referencia: `client/tools/screenshots.gd` → `docs/screenshots/redesign/`.
+
 ## Placeholders
 Mientras no haya arte: rectángulos de color por clase/monstruo generados por código (`PlaceholderSprite`) con la inicial
 del nombre. Nunca bloquear una HU de gameplay por falta de arte.

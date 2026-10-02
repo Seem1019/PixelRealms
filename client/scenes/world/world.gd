@@ -1,16 +1,14 @@
 extends Node2D
 ## Escena del mundo (HU-014, HU-020..HU-024): conecta con el ticket, envía Hello, carga el mapa del Welcome, mueve al
-## jugador con predicción + reconciliación (MoveInput cada 200 ms / al cambiar / 0,0 al soltar), dibuja las entidades de la
+## jugador con predicción + reconciliación (un MoveInput por tick de 50 ms al moverse, 0,0 al soltar), dibuja las entidades de la
 ## AOI con interpolación y muestra el nombre de la zona al entrar. El cliente nunca decide resultados: solo refleja.
 
-const MOVE_RESEND_MS := 200
 const ZONE_FADE_SEC := 2.0
 
-@onready var _ground: PlaceholderMapRenderer = %Ground
-@onready var _above: PlaceholderMapRenderer = %Above
+@onready var _ground: TerrainRenderer = %Ground
+@onready var _above: TerrainRenderer = %Above
 @onready var _entities: Node2D = %Entities
 @onready var _player: Node2D = %PlayerSelf
-@onready var _player_name: Label = %PlayerName
 @onready var _camera: Camera2D = %Camera
 @onready var _hud_status: Label = %HudStatus
 @onready var _zone_label: Label = %ZoneName
@@ -30,22 +28,28 @@ const ZONE_FADE_SEC := 2.0
 
 var map: TmjMap
 var prediction: Prediction = Prediction.new()
+var _movement: MovementDriver = MovementDriver.new()
+## Sprite, sombra y placa del personaje propio (las remotas las lleva RemoteEntity).
+var _self_visual: EntityVisual
+## Barra de vida de la placa propia.
+var _self_health: HealthBar
 var in_world: bool = false
 
-var _seq: int = 0
-var _last_dx: int = 0
-var _last_dy: int = 0
-var _last_sent_ms: int = 0
 var _remotes: Dictionary = {}  # id → RemoteEntity
 var _current_zone: String = ""
 var _zone_fade_left: float = 0.0
+var _zone_group: CanvasGroup
 var _character_id: String = ""
+## ¿Ya llegó el Welcome de esta conexión? Uno posterior no es una entrada nueva al mundo (HU-044).
+var _welcomed_on_connection: bool = false
 var _status_clear_at: int = -1
 ## Apuntado de área (HU-086 CA1): hechizo en curso de apuntar o vacío.
 var _aiming_spell: Dictionary = {}
 ## Último CastStarted propio de un salto/Carga: la corrección grande siguiente se suaviza en vez de saltar (HU-087 CA4).
 var _forced_move_until_ms: int = -1
 const TARGET_CYCLE_RANGE_TILES := 12.0
+## Hacia dónde mira el personaje propio (última tecla de movimiento).
+var _self_dir: String = "s"
 
 
 func _ready() -> void:
@@ -58,6 +62,8 @@ func _ready() -> void:
 	Net.snapshot.connect(_on_snapshot)
 	GameState.target_changed.connect(_on_target_changed)
 	GameState.respawned.connect(func() -> void: prediction.snap_next = true)
+	GameState.died.connect(func(_killer: int) -> void: _stop_aiming())
+	GameState.xp_gained.connect(func(amount: int) -> void: _floating.show_event(GameState.self_id, "xp", amount, false, _player.position))
 	_hud.respawn_requested.connect(func() -> void: Net.send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
@@ -72,8 +78,17 @@ func _ready() -> void:
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
+	_self_visual = EntityVisual.new()
+	_player.add_child(_self_visual)
+	_self_health = _self_visual.plate.health_bar
+	GameState.vitals_changed.connect(_refresh_self_health)
 	_player.visible = false
-	_zone_label.modulate.a = 0.0
+	# El rótulo de zona se desvanece dentro de un CanvasGroup: así el contorno y la letra se funden juntos (sin dobles).
+	_zone_group = CanvasGroup.new()
+	_zone_label.get_parent().add_child(_zone_group)
+	_zone_label.get_parent().move_child(_zone_group, 1)  # debajo de las ventanas
+	_zone_label.reparent(_zone_group)
+	_zone_group.self_modulate.a = 0.0
 	_fade.modulate.a = 0.0
 	_hud_status.text = "Conectando…"
 	var ticket := GameState.pending_ticket
@@ -86,6 +101,8 @@ func _ready() -> void:
 
 
 func _on_connected(_ticket: String) -> void:
+	_movement.reset()  # el seq es por conexión: el servidor lo reinicia con cada Hello
+	_welcomed_on_connection = false
 	Net.send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": Net.current_ticket()})
 
 
@@ -101,6 +118,14 @@ func _refresh_ticket() -> String:
 
 
 func _on_welcome(d: Dictionary) -> void:
+	# Welcome reenviado en la misma conexión (cambio de clase): el mundo sigue igual y el servidor no reenvía la AOI.
+	if _welcomed_on_connection and str(d.get("mapId", "")) == GameState.map_id:
+		GameState._on_welcome(d, true)
+		_refresh_self_visual()
+		if GameState.target_id > 0:
+			Net.send("SelectTarget", {"targetId": GameState.target_id})  # el servidor limpia el objetivo al cambiar de clase
+		return
+	_welcomed_on_connection = true
 	GameState._on_welcome(d)
 	_hud_status.text = ""
 	_clear_remotes()
@@ -110,14 +135,27 @@ func _on_welcome(d: Dictionary) -> void:
 	var grid: CollisionGrid = map.collision if map != null else CollisionGrid.new()
 	prediction.setup(grid, start, float(Content.rule("movement", "baseSpeedTilesPerSec", 4.0)))
 	_player.position = start
-	_player_name.text = GameState.character_name
+	_refresh_self_visual()
 	_player.visible = true
 	_camera.position = Vector2.ZERO
 	_camera.reset_smoothing()
 	in_world = true
-	_seq = 0
-	_last_dx = 0
-	_last_dy = 0
+
+
+## Sprite de la clase y nombre del personaje propio (Welcome y cambio de clase).
+func _refresh_self_visual() -> void:
+	_self_visual.set_sprite(EntitySprites.ref_for("player", GameState.class_id, GameState.class_id), RemoteEntity.PLAYER_COLOR, GameState.character_name)
+	_self_visual.plate.display_name = GameState.character_name
+	_self_visual.plate.name_color = UiTheme.ACCENT
+
+
+func _refresh_self_health() -> void:
+	_self_health.pct = roundi(100.0 * GameState.hp / maxf(1.0, GameState.max_hp))
+	var show := not GameState.is_dead
+	if _self_health.visible != show:
+		_self_health.visible = show
+		_self_visual.plate.refresh_layout()
+	_self_visual.set_dead(GameState.is_dead)
 
 
 func _load_map(map_id: String) -> void:
@@ -136,7 +174,7 @@ func _load_map(map_id: String) -> void:
 
 # --- Movimiento propio (HU-021 CA1, HU-022) -------------------------------------------------------------------------
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not in_world or not Net.is_connected:
 		return
 	var dx := int(Input.is_action_pressed("move_right")) - int(Input.is_action_pressed("move_left"))
@@ -144,18 +182,12 @@ func _physics_process(_delta: float) -> void:
 	if GameState.is_dead or _chat.is_typing():
 		dx = 0
 		dy = 0
-	var now := Time.get_ticks_msec()
-	var changed := dx != _last_dx or dy != _last_dy
-	var moving := dx != 0 or dy != 0
-	if changed or (moving and now - _last_sent_ms >= MOVE_RESEND_MS):
-		_seq += 1
-		Net.send("MoveInput", {"seq": _seq, "dx": dx, "dy": dy})
-		_last_sent_ms = now
-		_last_dx = dx
-		_last_dy = dy
-	if moving:
-		# Un tick de simulación por frame físico (50 ms = 20 Hz, igual que el servidor).
-		prediction.apply_input(_seq, dx, dy)
+	# Ticks fijos de 50 ms como el servidor (los frames físicos van a 60 Hz): un MoveInput por tick con movimiento.
+	for input: Dictionary in _movement.advance(delta, dx, dy, prediction):
+		Net.send("MoveInput", input)
+	if dx != 0 or dy != 0:
+		_self_dir = ("e" if dx > 0 else "w") if dx != 0 else ("s" if dy > 0 else "n")
+	_self_visual.set_motion(_self_dir, dx != 0 or dy != 0)
 
 
 func _process(delta: float) -> void:
@@ -166,10 +198,12 @@ func _process(delta: float) -> void:
 		if not _aiming_spell.is_empty():
 			var mouse := get_global_mouse_position()
 			_reticle.aim_pos = mouse
+			_update_area_preview(mouse)
 			var tolerance := float(Content.rule("combat", "castRangeToleranceTiles", 0.0))
 			_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
 		_overlay.pending_inputs = prediction.pending.size()
 		_overlay.reconcile_error_px = prediction.last_error_px
+		_layout_nameplates()
 	if _vendor.visible and _vendor.npc_id > 0:
 		var range_tiles := float(Content.rule("economy", "vendorRangeTiles", 3.0))
 		var npc: RemoteEntity = _remotes.get(_vendor.npc_id)
@@ -201,7 +235,7 @@ func _on_snapshot(d: Dictionary) -> void:
 			var r: RemoteEntity = _remotes[id]
 			r.apply_state(ed, now)
 			if id == GameState.target_id:
-				_hud.set_target_info(r.display_name, r.level, r.hp_pct)
+				_hud.set_target_info(r.display_name, r.level, r.hp_pct, r.portrait())
 
 
 # --- Entidades remotas (HU-023, HU-024) -----------------------------------------------------------------------------
@@ -222,6 +256,7 @@ func _on_entity_spawn(d: Dictionary) -> void:
 
 func _on_entity_despawn(d: Dictionary) -> void:
 	var id := int(d.get("id", -1))
+	_reticle.clear_mark(id)  # su CastEnded ya no llegará
 	if _remotes.has(id):
 		var r: RemoteEntity = _remotes[id]
 		_remotes.erase(id)
@@ -317,7 +352,7 @@ func _on_target_changed(entity_id: int) -> void:
 	for r: RemoteEntity in _remotes.values():
 		r.selected = r.entity_id == entity_id
 		if r.selected:
-			_hud.set_target_info(r.display_name, r.level, r.hp_pct)
+			_hud.set_target_info(r.display_name, r.level, r.hp_pct, r.portrait())
 
 
 ## Tab: enemigos vivos visibles a ≤ 12 casillas, del más cercano al más lejano (HU-030 CA2).
@@ -350,8 +385,11 @@ func _use_slot(slot: int) -> void:
 	var entry := _slot_entry(slot)
 	if entry.is_empty():
 		return
+	_stop_aiming()  # otra casilla sustituye al apuntado en curso (si es otra área, vuelve a apuntar abajo)
 	if str(entry.get("kind", "spell")) != "spell":
-		Net.send("UseItem", {"itemId": str(entry.get("ref", ""))})  # HU-055
+		var payload := _use_item_payload(str(entry.get("ref", "")))
+		if not payload.is_empty():
+			Net.send("UseItem", payload)  # HU-055
 		return
 	var spell := Content.spell(str(entry.get("ref", "")))
 	if spell.is_empty():
@@ -371,6 +409,15 @@ func _use_slot(slot: int) -> void:
 	GameState.predict_gcd(str(spell["id"]))
 
 
+## La barra guarda la plantilla (SetHotbar.ref) pero UseItem pide el id de una instancia de la bolsa: se usa la primera pila.
+## Vacío si no queda ninguna (la casilla ya se ve gris).
+func _use_item_payload(template_id: String) -> Dictionary:
+	var item := GameState.first_bag_item(template_id)
+	if item.is_empty():
+		return {}
+	return {"itemId": str(item.get("id", "")), "reqId": Net.next_req_id()}
+
+
 func _start_aiming(spell: Dictionary) -> void:
 	_aiming_spell = spell
 	_reticle.aiming = true
@@ -380,6 +427,23 @@ func _start_aiming(spell: Dictionary) -> void:
 func _stop_aiming() -> void:
 	_aiming_spell = {}
 	_reticle.aiming = false
+	for r: RemoteEntity in _remotes.values():
+		r.area_hint = false
+
+
+## Mientras se apunta: marca a quién alcanzaría el área en `center` con la misma cuenta que el servidor (solo visual: las
+## posiciones de los demás llegan con ~100 ms de retraso).
+func _update_area_preview(center: Vector2) -> void:
+	var targeting := str(_aiming_spell.get("targeting", ""))
+	var candidates: Array[Dictionary] = []
+	for r: RemoteEntity in _remotes.values():
+		var affected := r.hostile if targeting == "ground_aoe_enemies" else (not r.hostile if targeting == "ground_aoe_allies" else targeting == "ground_aoe_all")
+		if affected and r.kind != "npc" and r.anim != "dead":
+			candidates.append({"id": r.entity_id, "feet_px": r.position})
+	var max_targets := mini(int(_aiming_spell.get("maxTargets", 99)), int(Content.rule("limits", "aoeMaxTargetsCap", 10)))
+	var hits := BodyShape.area_hits(center, _reticle.aim_radius_px, max_targets, candidates, map.collision if map != null else null)
+	for r: RemoteEntity in _remotes.values():
+		r.area_hint = hits.has(r.entity_id)
 
 
 func _cast_ground(spell: Dictionary, world_pos: Vector2) -> void:
@@ -417,7 +481,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 				var tp: Dictionary = d["targetPos"]
 				var radius: float = float(d["radius"]) if d.get("radius") != null else float(spell.get("aoeRadius", 1.0))
 				var enemy: bool = _remotes.has(caster) and (_remotes[caster] as RemoteEntity).hostile
-				_reticle.set_mark(caster, Vector2(float(tp.get("x", 0)), float(tp.get("y", 0))), radius * 16.0, enemy)
+				_reticle.set_mark(caster, Vector2(float(tp.get("x", 0)), float(tp.get("y", 0))), radius * 16.0, enemy, int(d.get("durationMs", 0)))
 		"CastEnded":
 			var caster := int(d.get("casterId", -1))
 			_reticle.clear_mark(caster)
@@ -454,7 +518,10 @@ func _on_combat_events(d: Dictionary) -> void:
 		var pos := _player.position if dst == GameState.self_id else (_remotes[dst] as RemoteEntity).position if _remotes.has(dst) else Vector2.INF
 		if pos == Vector2.INF:
 			continue
-		_floating.show_event(dst, str(ed.get("kind", "")), int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
+		var kind := str(ed.get("kind", ""))
+		_floating.show_event(dst, kind, int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
+		if kind in ["dmg", "heal"] and _remotes.has(dst):
+			(_remotes[dst] as RemoteEntity).flash(Color(3, 3, 3) if kind == "dmg" else Color(0.6, 2.2, 0.6))  # destello por objetivo (área)
 
 
 ## Clic derecho sobre otro jugador: Invitar / Retar a duelo / Intercambiar (HU-061, HU-064, HU-059).
@@ -508,15 +575,22 @@ func _show_bubble(from: String, text: String) -> void:
 				break
 	if anchor == null:
 		return
+	var bubble := PanelContainer.new()
+	bubble.add_theme_stylebox_override("panel", UiTheme.nine("tooltip", 4, 3, UiTheme.TOOLTIP_BG))
 	var label := Label.new()
 	label.text = text.substr(0, 60)
-	label.add_theme_font_size_override("font_size", 7)
-	label.position = Vector2(-40, -40)
-	label.custom_minimum_size = Vector2(80, 10)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size = Vector2(minf(100.0, 6.0 + 5.0 * label.text.length()), 0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.z_index = 60
-	anchor.add_child(label)
-	get_tree().create_timer(4.0).timeout.connect(label.queue_free)
+	bubble.add_child(label)
+	var holder := Node2D.new()
+	holder.z_index = 60
+	holder.z_as_relative = false
+	holder.position = Vector2(0, -52)
+	holder.add_child(bubble)
+	anchor.add_child(holder)
+	bubble.resized.connect(func() -> void: bubble.position = Vector2(-roundf(bubble.size.x / 2.0), -bubble.size.y))
+	get_tree().create_timer(4.0).timeout.connect(holder.queue_free)
 
 
 ## HU-064: marco del rival en naranja durante el duelo.
@@ -538,12 +612,51 @@ func _on_item_dropped_outside(item_id: String) -> void:
 		_inventory.request_destroy(item)
 
 
+## Placas de nombre: las cercanas se apilan en vez de pisarse y ninguna se sale de lo que muestra la cámara.
+func _layout_nameplates() -> void:
+	var plates: Array[Dictionary] = []
+	var visuals := {}
+	if _player.visible:
+		plates.append({"id": 0, "rect": _self_visual.plate_anchor_rect()})
+		visuals[0] = _self_visual
+	for r: RemoteEntity in _remotes.values():
+		if r.visual != null and r.visual.plate != null:
+			plates.append({"id": r.entity_id, "rect": r.visual.plate_anchor_rect()})
+			visuals[r.entity_id] = r.visual
+	# Sin meterse bajo los marcos de arriba ni la barra rápida (la interfaz va encima).
+	var view := _view_rect()
+	view = view.grow_individual(0, -CombatHud.FRAMES_BOTTOM, 0, -CombatHud.HOTBAR_HEIGHT - UiTheme.SCREEN_MARGIN)
+	var offsets := NameplateLayout.solve(plates, view)
+	# Las placas que caerían bajo los marcos de vida o la barra rápida se ocultan (asomaban por sus huecos).
+	var full := _view_rect()
+	var hud_rects := [
+		Rect2(full.position, Vector2(2 * CombatHud.FRAME_WIDTH + 6 * UiTheme.SCREEN_MARGIN, CombatHud.FRAMES_BOTTOM)),
+		Rect2(full.position + Vector2(0, full.size.y - CombatHud.HOTBAR_HEIGHT - UiTheme.SCREEN_MARGIN), Vector2(full.size.x, CombatHud.HOTBAR_HEIGHT + UiTheme.SCREEN_MARGIN)),
+	]
+	for p: Dictionary in plates:
+		var v: EntityVisual = visuals[p["id"]]
+		var moved := Rect2((p["rect"] as Rect2).position + (offsets[p["id"]] as Vector2), (p["rect"] as Rect2).size)
+		v.set_plate_offset(offsets[p["id"]])
+		var hidden := false
+		for r: Rect2 in hud_rects:
+			hidden = hidden or r.intersects(moved)
+		v.plate.visible = not hidden
+
+
+## Rectángulo del mundo que se ve en pantalla.
+func _view_rect() -> Rect2:
+	var inv := get_viewport().get_canvas_transform().affine_inverse()
+	var vp := get_viewport().get_visible_rect()
+	return Rect2(inv * vp.position, vp.size / get_viewport().get_canvas_transform().get_scale())
+
+
 # --- Cambio de mapa (HU-027 CA2) ---------------------------------------------------------------------------------------
 
 ## Fundido a negro, carga del nuevo .tmj y recolocación del jugador; el HUD (misma escena) no se reinicia.
 func _on_change_map(d: Dictionary) -> void:
 	GameState._on_change_map(d)
 	in_world = false
+	_stop_aiming()
 	var target := Vector2(float(d.get("x", 0)), float(d.get("y", 0)))
 	var tween := create_tween()
 	tween.tween_property(_fade, "modulate:a", 1.0, 0.25)
@@ -556,9 +669,7 @@ func _on_change_map(d: Dictionary) -> void:
 	prediction.setup(grid, target, prediction.speed_tiles_per_sec)
 	_player.position = target
 	_camera.reset_smoothing()
-	_seq += 1
-	_last_dx = 0
-	_last_dy = 0
+	_movement.forget_last_input()
 	in_world = true
 	var tween_in := create_tween()
 	tween_in.tween_property(_fade, "modulate:a", 0.0, 0.25)
@@ -574,11 +685,11 @@ func _update_zone(delta: float) -> void:
 			_current_zone = zone_name
 			if not zone_name.is_empty():
 				_zone_label.text = zone_name
-				_zone_label.modulate.a = 1.0
+				_zone_group.self_modulate.a = 1.0
 				_zone_fade_left = ZONE_FADE_SEC
 	if _zone_fade_left > 0.0:
 		_zone_fade_left -= delta
-		_zone_label.modulate.a = clampf(_zone_fade_left / ZONE_FADE_SEC, 0.0, 1.0)
+		_zone_group.self_modulate.a = clampf(_zone_fade_left / ZONE_FADE_SEC, 0.0, 1.0)
 
 
 # --- Conexión -----------------------------------------------------------------------------------------------------------

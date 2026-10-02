@@ -12,6 +12,7 @@ signal cast_changed  ## casteo propio empezó/terminó
 signal died(killer_id: int)
 signal respawned
 signal xp_changed
+signal xp_gained(amount: int)  ## XpGain: el mundo lo muestra como número flotante
 signal leveled_up(level: int, new_spells: Array, rank_ups: Array)
 signal notice(text: String)  ## avisos cortos para el HUD ("Nuevo hechizo: …")
 signal chat_received(channel: String, from: String, text: String)
@@ -86,7 +87,9 @@ func set_target(entity_id: int) -> void:
 	EventBus.target_changed.emit(entity_id)
 
 
-func _on_welcome(d: Dictionary) -> void:
+## `same_connection`: Welcome reenviado en una conexión ya dentro del mundo (cambio de clase, HU-044). Cambian clase,
+## hechizos, barra y vitales; se conservan el objetivo y las auras (el servidor no las toca al cambiar de clase).
+func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	self_id = int(d.get("selfId", -1))
 	map_id = str(d.get("mapId", ""))
 	var self_state: Dictionary = d.get("self", {})
@@ -102,10 +105,11 @@ func _on_welcome(d: Dictionary) -> void:
 	resource_kind = str(self_state.get("resource", "mana"))
 	is_dead = hp <= 0
 	own_cast = {}
-	auras.clear()
 	cooldowns.clear()
 	gcd_end_ms = 0
-	target_id = -1
+	if not same_connection:
+		auras.clear()
+		target_id = -1
 	vitals_changed.emit()
 	inventory = d.get("inventory", [])
 	equipment = d.get("equipment", [])
@@ -145,6 +149,14 @@ func _on_inventory_update(d: Dictionary) -> void:
 func bag_item(item_id: String) -> Dictionary:
 	for it: Variant in inventory:
 		if it is Dictionary and str((it as Dictionary).get("id", "")) == item_id:
+			return it
+	return {}
+
+
+## Primera pila de la bolsa con esa plantilla (o vacío): lo que usa una casilla de utilizable.
+func first_bag_item(template_id: String) -> Dictionary:
+	for it: Variant in inventory:
+		if it is Dictionary and str((it as Dictionary).get("templateId", "")) == template_id:
 			return it
 	return {}
 
@@ -287,8 +299,11 @@ func at_level_cap() -> bool:
 
 
 func _on_xp_gain(d: Dictionary) -> void:
-	xp += int(d.get("amount", 0))
+	var amount := int(d.get("amount", 0))
+	xp += amount
 	xp_changed.emit()
+	if amount > 0:
+		xp_gained.emit(amount)
 
 
 ## HU-041 CA2: los hechizos nuevos van a la primera casilla libre de hechizos (SetHotbar) con aviso; CA3b: aviso de rangos.
