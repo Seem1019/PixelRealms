@@ -1,11 +1,15 @@
 class_name EntitySprites
 ## Hojas de sprites de personajes, NPC y monstruos (tools/art/gen_chars.py): filas = direcciones s, n, e (w = e espejado),
-## columnas = idle0, idle1, walk0..walk3; tamaño del cuadro y fila de los pies en el .json junto al PNG.
-## Construye y guarda en caché un SpriteFrames por hoja con las animaciones idle_<dir> y walk_<dir> (skill pixel-art-assets).
+## columnas según la tabla `anims` del .json junto al PNG ({nombre: {column, frames, fps, loop}}: idle, walk, attack, cast,
+## hurt, death; HU-090) más el tamaño del cuadro y la fila de los pies. Una hoja sin `anims` (formato anterior) solo trae
+## idle0, idle1, walk0..walk3. Construye y guarda en caché un SpriteFrames por hoja con `<anim>_<dir>` (skill pixel-art-assets).
 
 const DIRS := ["s", "n", "e"]
-const IDLE_FPS := 3.0
-const WALK_FPS := 8.0
+## Hojas sin tabla `anims`: idle en las columnas 0-1 y walk en 2-5.
+const LEGACY_ANIMS := {
+	"idle": {"column": 0, "frames": 2, "fps": 3, "loop": true},
+	"walk": {"column": 2, "frames": 4, "fps": 8, "loop": true},
+}
 ## NPC del mapa (templateId del EntitySpawn) → hoja.
 const NPC_SPRITES := {"vendor": "npcs/shopkeeper", "class_change": "npcs/trainer"}
 
@@ -37,7 +41,7 @@ static func sheet(ref: String) -> Texture2D:
 static func meta(ref: String) -> Dictionary:
 	if _meta.has(ref):
 		return _meta[ref]
-	var m := {"frame": 32, "feet": 28}
+	var m := {"frame": 32, "feet": 28, "anims": LEGACY_ANIMS}
 	var path := "res://assets/sprites/%s.json" % ref
 	if FileAccess.file_exists(path):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -45,6 +49,9 @@ static func meta(ref: String) -> Dictionary:
 			var size: Array = (parsed as Dictionary).get("frameSize", [32, 32])
 			m["frame"] = int(size[0])
 			m["feet"] = int((parsed as Dictionary).get("feetY", int(size[1]) - 4))
+			var anims: Variant = (parsed as Dictionary).get("anims")
+			if anims is Dictionary and not (anims as Dictionary).is_empty():
+				m["anims"] = anims
 	_meta[ref] = m
 	return m
 
@@ -59,15 +66,21 @@ static func frames_for(ref: String) -> SpriteFrames:
 	var size := int(meta(ref)["frame"])
 	var sf := SpriteFrames.new()
 	sf.remove_animation("default")
+	var anims: Dictionary = meta(ref)["anims"]
+	var columns := tex.get_width() / size
 	for row: int in DIRS.size():
 		var d: String = DIRS[row]
-		for anim: String in ["idle", "walk"]:
+		for anim: String in anims.keys():
+			var info: Dictionary = anims[anim]
+			var first := int(info.get("column", 0))
+			var count := int(info.get("frames", 1))
+			if first + count > columns:
+				continue  # la hoja no llega a esas columnas: EntityVisual cae a idle
 			var name := "%s_%s" % [anim, d]
 			sf.add_animation(name)
-			sf.set_animation_speed(name, IDLE_FPS if anim == "idle" else WALK_FPS)
-			sf.set_animation_loop(name, true)
-			var cols := [0, 1] if anim == "idle" else [2, 3, 4, 5]
-			for c: int in cols:
+			sf.set_animation_speed(name, float(info.get("fps", 8)))
+			sf.set_animation_loop(name, bool(info.get("loop", true)))
+			for c: int in range(first, first + count):
 				var at := AtlasTexture.new()
 				at.atlas = tex
 				at.region = Rect2(c * size, row * size, size, size)
@@ -90,6 +103,21 @@ static func portrait(ref: String, head_only: bool) -> Texture2D:
 	else:
 		at.region = Rect2(0, 0, size, size)
 	return at
+
+
+## Duración en ms de una animación de la hoja (frames / fps); 0 si la hoja no la tiene.
+static func anim_ms(ref: String, anim: String) -> int:
+	var info: Dictionary = (meta(ref)["anims"] as Dictionary).get(anim, {})
+	if info.is_empty():
+		return 0
+	return roundi(1000.0 * int(info.get("frames", 1)) / maxf(1.0, float(info.get("fps", 8))))
+
+
+## Vector (del mundo) → dirección del protocolo de 4 vías: el eje dominante manda.
+static func dir_from_vector(v: Vector2) -> String:
+	if absf(v.x) >= absf(v.y):
+		return "e" if v.x >= 0.0 else "w"
+	return "s" if v.y >= 0.0 else "n"
 
 
 ## Dirección del protocolo ("s", "n", "e", "w" o "down/up/right/left") → fila de la hoja y si se espeja.
