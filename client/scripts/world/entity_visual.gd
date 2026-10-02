@@ -13,11 +13,16 @@ const FLASH_MS := 160
 const RECOIL_MS := 120
 ## Ataque o golpe sin animación en la hoja: cuánto dura el estado igualmente (para que mire al objetivo).
 const DEFAULT_ONE_SHOT_MS := 300
+## Ralentizado (HU-098): tinte azul del cuerpo mientras dure.
+const SLOW_TINT := Color(0.62, 0.78, 1.0)
 
 var sprite: AnimatedSprite2D
 var placeholder: PlaceholderSprite
 var shadow: Sprite2D
 var plate: Nameplate
+## Aturdido, inmovilizado y escudo sobre la entidad (HU-098).
+var status: AuraIndicator
+var slowed: bool = false
 var sprite_ref: String = ""
 ## Alto visible del sprite sobre los pies (para anclar la placa).
 var body_height: float = 24.0
@@ -48,6 +53,8 @@ func _ready() -> void:
 	sprite = AnimatedSprite2D.new()
 	sprite.centered = false
 	add_child(sprite)
+	status = AuraIndicator.new()
+	add_child(status)
 	plate = Nameplate.new()
 	plate.z_index = 40
 	plate.z_as_relative = false
@@ -81,6 +88,15 @@ func set_sprite(ref: String, fallback_color: Color, display_name: String) -> voi
 		shadow.texture = UiTheme.texture("res://assets/sprites/shadow_big.png" if big else "res://assets/sprites/shadow.png")
 		_play()
 	plate.position = Vector2(0, -body_height - PLATE_GAP)
+	status.body_height = body_height
+
+
+## Auras de la entidad (GameState.auras_of): indicadores de control, tinte de ralentizado y mini-íconos de la placa.
+func set_auras(list: Array) -> void:
+	var summary := AuraStyle.summarize(list, Content.aura)
+	status.apply(summary)
+	slowed = bool(summary["slowed"])
+	plate.aura_icons = summary["icons"]
 
 
 ## Dirección del protocolo y si se está moviendo (walk) o quieto (idle).
@@ -220,7 +236,7 @@ func is_flashing() -> bool:
 
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec()
-	var tint := _flash_color if is_flashing() else Color.WHITE
+	var tint := _flash_color if is_flashing() else (SLOW_TINT if slowed and not dead else Color.WHITE)
 	if sprite != null:
 		sprite.modulate = tint
 		sprite.position = _sprite_base + (_recoil if now < _recoil_until_ms and not dead else Vector2.ZERO)

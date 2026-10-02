@@ -81,6 +81,7 @@ func _ready() -> void:
 	Net.combat_events.connect(_on_combat_events)
 	Net.snapshot.connect(_on_snapshot)
 	GameState.target_changed.connect(_on_target_changed)
+	GameState.auras_changed.connect(_on_auras_changed)
 	GameState.respawned.connect(func() -> void: prediction.snap_next = true)
 	GameState.died.connect(func(_killer: int) -> void:
 		_stop_aiming()
@@ -382,6 +383,15 @@ func _on_entity_spawn(d: Dictionary) -> void:
 		_entities.add_child(r)
 		_remotes[id] = r
 	r.setup(d)
+	if r.visual != null:
+		r.visual.set_auras(GameState.auras_of(id))
+
+
+## Estados sobre cualquier entidad visible, no solo en los marcos (HU-098 CA2–CA4).
+func _on_auras_changed(entity_id: int) -> void:
+	var v := _entity_visual(entity_id)
+	if v != null:
+		v.set_auras(GameState.auras_of(entity_id))
 
 
 func _on_entity_despawn(d: Dictionary) -> void:

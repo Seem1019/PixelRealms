@@ -97,7 +97,7 @@
 
 ### HU-097 · Historial del chat
 **Como** jugador **quiero** subir en el chat **para** leer mensajes que ya pasaron.
-- Prioridad: Should · Estimación: S · Estado: En curso
+- Prioridad: Should · Estimación: S · Estado: Hecha
 - Dependencias: HU-060
 - Skills: `godot-client`
 

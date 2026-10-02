@@ -291,7 +291,7 @@
 
 ### HU-094 · Ataque básico con Espacio
 **Como** jugador **quiero** atacar con la barra espaciadora **para** no depender del clic derecho en mitad del combate.
-- Prioridad: Must · Estimación: S · Estado: En curso
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-032
 - Skills: `godot-client`, `combat-system`
 
@@ -302,7 +302,7 @@
 
 ### HU-095 · Acercarse solo al objetivo fuera de alcance
 **Como** jugador **quiero** que mi personaje camine hasta el objetivo cuando ataco o lanzo un hechizo fuera de alcance **para** no recibir "Fuera de alcance" y tener que acercarme a mano.
-- Prioridad: Should · Estimación: M · Estado: En curso
+- Prioridad: Should · Estimación: M · Estado: Hecha
 - Dependencias: HU-094, HU-021
 - Skills: `godot-client`, `combat-system`
 
@@ -317,7 +317,7 @@
 
 ### HU-096 · Ver el alcance al mantener la tecla
 **Como** jugador **quiero** ver hasta dónde llega mi básico o un hechizo mientras mantengo su tecla **para** saber si necesito acercarme.
-- Prioridad: Should · Estimación: S · Estado: En curso
+- Prioridad: Should · Estimación: S · Estado: Hecha
 - Dependencias: HU-094
 - Skills: `godot-client`
 
@@ -328,7 +328,7 @@
 
 ### HU-098 · Estados (buffos, perjuicios y control) legibles
 **Como** jugador **quiero** distinguir a simple vista quién está aturdido, inmovilizado, ralentizado, protegido o recibiendo daño o curación en el tiempo **para** reaccionar en combate.
-- Prioridad: Must · Estimación: M · Estado: En curso
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-035
 - Skills: `godot-client`, `combat-system`
 
@@ -337,3 +337,8 @@
 2. **Dado** una entidad visible con un aura de control **entonces** se ve sobre ella sin seleccionarla: aturdido → estrellas sobre la cabeza; inmovilizado → anillo de hielo en los pies; ralentizado → tinte azul; escudo → burbuja.
 3. **Dado** cualquier aura **entonces** aparece un mini-ícono junto a la placa de nombre de la entidad (beneficiosas y perjudiciales separadas por color de marco).
 4. **Dado** que el aura termina **entonces** su indicador desaparece.
+
+**Notas de implementación**
+- `AuraStyle` (puro) da categoría, color de marco e insignia de 5×5; `AuraIndicator` dibuja estrellas, hielo y burbuja; `EntityVisual.set_auras` aplica además el tinte de ralentizado y los mini-íconos de `Nameplate` (máx. 6, perjudiciales primero, cuentan en `plate_size` para no pisarse). El mundo escucha `GameState.auras_changed` para cualquier entidad.
+- Limitación: `EntitySpawn` no trae auras, así que una entidad que entra en tu AOI con un aura ya puesta no la muestra hasta el siguiente `AuraApplied`.
+- Tests: `test_status_display.gd`. Capturas: `docs/screenshots/combat/status_*.png`, `range_ring.png`.

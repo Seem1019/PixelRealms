@@ -126,7 +126,7 @@
 
 ### HU-092 · Fuente HD para la interfaz
 **Como** jugador **quiero** leer la interfaz con una letra nítida y suave **para** no forzar la vista con la fuente pixel, sin perder el estilo de madera y pixel art.
-- Prioridad: Should · Estimación: S · Estado: En curso
+- Prioridad: Should · Estimación: S · Estado: Hecha
 - Dependencias: —
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -137,7 +137,7 @@
 
 ### HU-093 · Guerrero y mago con hojas dibujadas
 **Como** jugador **quiero** que el guerrero y el mago tengan el aspecto de las hojas de referencia **para** que los héroes se vean más detallados.
-- Prioridad: Should · Estimación: M · Estado: En curso
+- Prioridad: Should · Estimación: M · Estado: Hecha
 - Dependencias: HU-090
 - Skills: `pixel-art-assets`, `godot-client`
 

@@ -8,7 +8,7 @@ extends Node
 
 const OUT := "res://../docs/screenshots/redesign/"
 const OUT_COMBAT := "res://../docs/screenshots/combat/"
-const COMBAT_SHOTS := ["attack_classes", "monster_attacks", "cast_glow", "projectile", "impact", "area_resolve", "dead_monster", "esc_menu", "logout_in_combat"]
+const COMBAT_SHOTS := ["status_effects", "range_ring", "attack_classes", "monster_attacks", "cast_glow", "projectile", "impact", "area_resolve", "dead_monster", "esc_menu", "logout_in_combat"]
 const WORLD := "res://scenes/world/world.tscn"
 
 var _only: PackedStringArray = []
@@ -232,6 +232,28 @@ func _combat_shots() -> void:
 	await _wait_ms(100)
 	w.set("_zone_fade_left", 0.0)  # el rótulo "Campos" tapaba el centro de las capturas
 	(w.get("_zone_group") as CanvasGroup).self_modulate.a = 0.0
+	if _wanted("status_effects"):
+		# HU-098: estados sobre cada entidad sin seleccionarla (aturdido, inmovilizado, ralentizado, escudo, curación).
+		var states := [[40, "slime", "Slime", Vector2(700, 600), "warrior_charge_stun"], [41, "boar", "Jabalí", Vector2(860, 600), "mage_frost_nova_root"],
+			[42, "wolf", "Lobo", Vector2(700, 690), "mage_chill"], [43, "priest", "Lumen", Vector2(860, 690), "priest_power_shield_aura"]]
+		for e: Array in states:
+			_spawn(int(e[0]), "player" if e[1] == "priest" else "monster", str(e[1]), str(e[2]), e[3] as Vector2, "w", 3)
+			_dispatch("AuraApplied", {"targetId": e[0], "auraId": e[4], "casterId": 1, "stacks": 1, "durationMs": 8000})
+		_dispatch("AuraApplied", {"targetId": 43, "auraId": "priest_renew_hot", "casterId": 43, "stacks": 1, "durationMs": 8000})
+		_dispatch("AuraApplied", {"targetId": 40, "auraId": "rogue_poison", "casterId": 1, "stacks": 1, "durationMs": 8000})
+		await _wait_ms(150)
+		var img := await _shot("status_effects", OUT_COMBAT, 2)
+		for e: Array in states:
+			_crop(img, w, (e[3] as Vector2) + Vector2(0, -14), "status_" + str(e[1]), Vector2(30, 26))
+		await _clear(w)
+	if _wanted("range_ring"):
+		# HU-096: mantener Espacio muestra el alcance del básico (varita, 7 casillas); el objetivo está fuera: rojo.
+		_spawn(44, "monster", "slime", "Slime", self_at + Vector2(140, 0), "w", 2)
+		w.call("_select", 44)
+		Input.action_press("basic_attack")
+		await _shot("range_ring", OUT_COMBAT, 3)
+		Input.action_release("basic_attack")
+		await _clear(w)
 	if _wanted("attack_classes"):
 		# Las cuatro clases golpeando a la vez (ataque básico cuerpo a cuerpo; el mago con su bastón a 1 casilla).
 		var attackers := {"warrior": Vector2(700, 600), "rogue": Vector2(845, 600), "mage": Vector2(700, 690), "priest": Vector2(845, 690)}
