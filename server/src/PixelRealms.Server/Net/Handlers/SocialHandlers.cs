@@ -205,10 +205,8 @@ public sealed class LogoutHandler(WorldSession session) : IMessageHandler<Logout
 {
     public void Handle(Logout msg, HandlerContext ctx)
     {
-        var p = ctx.Player;
-        if (p is null) return;
-        var error = session.Logout(p, ctx.Tick);
-        if (error is not null) { ctx.SendError(error, msg.ReqId); return; }
+        // Sin jugador (antes del Welcome o ya fuera) no hay nada que guardar: se confirma igual para que el cliente no espere.
+        if (ctx.Player is { } p && session.Logout(p, ctx.Tick) is { } error) { ctx.SendError(error, msg.ReqId); return; }
         ctx.Send(new LoggedOut());
         ctx.CloseAfterFlush(WorldSession.LogoutReason);
     }

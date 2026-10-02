@@ -81,11 +81,18 @@ public sealed class WebSocketSession : IDisposable
         _closeSignal.TrySetResult();
     }
 
-    /// <summary>Cierra cuando ya se escribió todo lo encolado antes (p. ej. `LoggedOut`, HU-015): marca de fin vacía en la cola.</summary>
+    /// <summary>Marca de fin en la cola de salida: la compara por referencia, ningún mensaje real la puede imitar.</summary>
+    private static readonly ReadOnlyMemory<byte> FlushCloseMarker = new byte[] { 0 };
+
+    /// <summary>Si el cliente deja de leer, la marca no llega nunca: se cierra igual pasado este plazo.</summary>
+    public static readonly TimeSpan FlushCloseTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>Cierra cuando ya se escribió todo lo encolado antes (p. ej. `LoggedOut`, HU-015): marca de fin en la cola.</summary>
     public void CloseAfterFlush(string reason)
     {
         CloseReason = reason;
-        if (!_outbound.Writer.TryWrite(ReadOnlyMemory<byte>.Empty)) _closeSignal.TrySetResult();
+        if (!_outbound.Writer.TryWrite(FlushCloseMarker)) { _closeSignal.TrySetResult(); return; }
+        _ = Task.Delay(FlushCloseTimeout).ContinueWith(_ => _closeSignal.TrySetResult(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
 
     /// <summary>Ejecuta lectura, escritura y vigilancia de inactividad hasta que la conexión termina.</summary>
@@ -221,7 +228,7 @@ public sealed class WebSocketSession : IDisposable
         {
             await foreach (var bytes in _outbound.Reader.ReadAllAsync(ct))
             {
-                if (bytes.IsEmpty) { _closeSignal.TrySetResult(); return; } // CloseAfterFlush: lo anterior ya salió
+                if (bytes.Equals(FlushCloseMarker)) { _closeSignal.TrySetResult(); return; } // CloseAfterFlush: lo anterior ya salió
                 if (_socket.State != WebSocketState.Open) return;
                 await _socket.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
                 Metrics?.RecordOut(bytes.Length);

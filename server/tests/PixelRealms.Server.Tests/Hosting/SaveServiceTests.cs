@@ -200,4 +200,35 @@ public sealed class SaveServiceTests
             await svc.StopAsync(CancellationToken.None);
         }
     }
+    [Fact]
+    public async Task Generations_GrowPerCharacter_AndOnlyWrittenSavesCount() // HU-015 CA5
+    {
+        var svc = new SaveService(new FlakyRepo(0), NullLogger<SaveService>.Instance);
+        var dto = Dto();
+        svc.WrittenGeneration(dto.Id).ShouldBe(0);
+        await svc.StartAsync(CancellationToken.None);
+        try
+        {
+            svc.Enqueue(dto).ShouldBe(1);
+            svc.Enqueue(dto).ShouldBe(2);
+            await WaitUntil(() => svc.WrittenGeneration(dto.Id) == 2); // `Saved` sube un instante antes de marcarlo escrito
+            svc.Saved.ShouldBe(2);
+        }
+        finally
+        {
+            await svc.StopAsync(CancellationToken.None);
+        }
+        var failing = new SaveService(new FlakyRepo(99), NullLogger<SaveService>.Instance);
+        await failing.StartAsync(CancellationToken.None);
+        try
+        {
+            failing.Enqueue(dto).ShouldBe(1);
+            await WaitUntil(() => failing.Failed == 1 && failing.Pending == 0, 5000);
+            failing.WrittenGeneration(dto.Id).ShouldBe(0, "un guardado fallido no está en la BD");
+        }
+        finally
+        {
+            await failing.StopAsync(CancellationToken.None);
+        }
+    }
 }

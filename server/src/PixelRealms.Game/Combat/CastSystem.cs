@@ -43,6 +43,12 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
 
     public int PendingImpacts(MapInstance map) => _impacts.TryGetValue(map.Id, out var l) ? l.Count : 0;
 
+    /// <summary>Descarta los impactos en vuelo de quien sale del mundo (HU-015): no resuelven a nombre de un ausente.</summary>
+    public void ForgetCaster(Actor caster, MapInstance map)
+    {
+        if (_impacts.TryGetValue(map.Id, out var list)) list.RemoveAll(i => i.Caster.Id == caster.Id);
+    }
+
     /// <summary>Intenta lanzar; devuelve el código de error o null si el hechizo empezó (o se resolvió si es instantáneo).</summary>
     public string? TryBeginCast(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, MapInstance map, TickContext ctx, bool cancelCurrent = true)
     {

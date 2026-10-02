@@ -20,7 +20,8 @@ namespace PixelRealms.Server.Hosting;
 /// </summary>
 public static class ServerApp
 {
-    public static WebApplication? Build(string[] args, Action<WebApplicationBuilder>? configure = null)
+    /// <param name="overrideServices">Solo tests: reemplaza registros ya hechos (se aplica justo antes de construir).</param>
+    public static WebApplication? Build(string[] args, Action<WebApplicationBuilder>? configure = null, Action<IServiceCollection>? overrideServices = null)
     {
         var builder = WebApplication.CreateBuilder(args);
         if (builder.Environment.IsProduction())
@@ -118,6 +119,7 @@ public static class ServerApp
         builder.Services.AddSingleton<GameLoopService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
 
+        overrideServices?.Invoke(builder.Services);
         var app = builder.Build();
         // HU-002 CA3: migraciones automáticas al arrancar (Development y producción, con log de cuáles).
         PersistenceModule.MigrateAsync(app.Services, app.Configuration).GetAwaiter().GetResult();

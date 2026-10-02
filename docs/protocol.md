@@ -49,7 +49,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo activo |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
 | `ChangeClass` | `{ npcId, classId, reqId? }` | NPC `class_change` a ≤ `vendorRangeTiles`, vivo, fuera de combate, sin duelo ni intercambio, clase distinta (HU-044); responde con `Welcome` + `StatsUpdate` por la misma conexión |
-| `Logout` | `{ reqId? }` | volver a la selección de personaje o salir del juego (HU-015). En combate (`Actor.IsInCombat`) → `Error{in_combat}` y el jugador sigue dentro. Si no: cancela el casteo, cancela duelo e intercambio como al desconectarse, guarda, saca al jugador del mundo (los demás reciben `EntityDespawn{reason:"left"}`), responde `LoggedOut` y cierra la conexión con motivo `logout` cuando la respuesta ya salió. Ejemplo: `{"t":"Logout","d":{"reqId":12}}` |
+| `Logout` | `{ reqId? }` | volver a la selección de personaje o salir del juego (HU-015). En combate (`Actor.IsInCombat`) → `Error{in_combat}` y el jugador sigue dentro. Si no: cancela el casteo, cancela duelo e intercambio como al desconectarse, guarda, saca al jugador del mundo (los demás reciben `EntityDespawn{reason:"left"}`), responde `LoggedOut` y cierra la conexión con motivo `logout` cuando la respuesta ya salió (si el cliente deja de leer, se cierra igual a los 2 s). Sin personaje en el mundo (antes del `Welcome`) también responde `LoggedOut` y cierra. Ejemplo: `{"t":"Logout","d":{"reqId":12}}` |
 | `AdminCommand` | `{ text }` | `accounts.is_admin` (si no, `forbidden`); `text` = `/tp x y`, `/tpto Nombre`, `/spawn id [n]`, `/give id [qty] [Nombre]`, `/level n`, `/heal`, `/kill`, `/gold n`, `/god`, `/debug move on\|off`, `/announce texto`; la respuesta llega como `ChatMessage{channel:"system"}` (HU-070) |
 
 ## Servidor → Cliente
@@ -78,7 +78,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Died` | `{ killerId? , respawnInMs }` | |
 | `Error` | `{ code, message?, reqId? }` | códigos abajo |
 | `Pong` | `{ clientTime, serverTick }` | |
-| `LoggedOut` | `{}` | `Logout` aceptado: el personaje ya está guardado (encolado) y fuera del mundo; el servidor cierra después la conexión. El cliente cierra con `disconnect_from_server()` (sin reconexión) y vuelve a la selección de personaje con el mismo token. Un `Hello` posterior del mismo personaje espera (máx. 3 s) a que ese guardado esté escrito antes de leerlo de la BD |
+| `LoggedOut` | `{}` | `Logout` aceptado: el personaje ya está guardado (encolado) y fuera del mundo; el servidor cierra después la conexión. El cliente cierra con `disconnect_from_server()` (sin reconexión) y vuelve a la selección de personaje con el mismo token. Un `Hello` posterior del mismo personaje espera (máx. 3 s) a que ese guardado esté escrito antes de leerlo de la BD; si aún no lo está, entra con el estado con el que salió (el servidor lo guarda en memoria hasta escribirlo). Un `Hello` del mismo personaje mientras sigue dentro toma ese personaje vivo (la conexión anterior se cierra con `replaced`) en vez de recargarlo |
 
 `EntState` (en `Snapshot`) = `{ id, x, y, dir, hpPct, anim: "idle"|"walk"|"cast"|"attack"|"dead", tgt? }`
 — solo campos que cambian con frecuencia. Los estáticos van en `EntitySpawn`.

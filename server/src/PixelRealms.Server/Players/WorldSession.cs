@@ -35,18 +35,42 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
 
     public void OnConnected(int connectionId, HandlerContext ctx) { }
 
+    /// <summary>
+    /// Último guardado de cada personaje que salió del mundo, con su generación, hasta que la BD lo tenga (estado del tick).
+    /// Un Hello que leyó la BD antes de ese guardado entra con este DTO y no con el leído: así salir y volver a entrar enseguida
+    /// no devuelve items ya entregados ni pisa el guardado bueno (HU-015 CA5).
+    /// </summary>
+    private readonly Dictionary<Guid, (CharacterSaveDto Dto, long Gen)> _departed = new();
+
+    public int DepartedCount => _departed.Count;
+
     public void OnPlayerJoin(int connectionId, object? attachment, HandlerContext ctx)
     {
-        if (attachment is not CharacterSaveDto dto) { ctx.SendError(ErrorCodes.BadTicket); ctx.Close("bad_ticket"); return; }
+        var (dto, writtenGen) = attachment switch
+        {
+            LoadedCharacter lc => (lc.Dto, lc.WrittenGen),
+            CharacterSaveDto plain => (plain, 0L),
+            _ => (null, 0L),
+        };
+        if (dto is null) { ctx.SendError(ErrorCodes.BadTicket); ctx.Close("bad_ticket"); return; }
 
         var previous = players.ByAccount(dto.AccountId);
-        if (previous is not null && previous.CharacterId == dto.Id && previous.IsLinkdead)
+        if (previous is not null && previous.CharacterId == dto.Id)
         {
+            // El mismo personaje sigue en el mundo (linkdead o en otra conexión): la conexión nueva toma ese Player. Nunca se
+            // recarga de la BD con él dentro: lo leído puede ser anterior a un intercambio o una venta ya hechos.
+            var prevConn = previous.ConnectionId;
+            if (!previous.IsLinkdead && prevConn >= 0 && prevConn != connectionId)
+            {
+                Save(previous, ctx.Tick.NowMs, "replaced"); // HU-014 CA5: la sesión anterior se guarda y se desconecta
+                ctx.Connections.Close(prevConn, "replaced");
+            }
             Reconnect(previous, connectionId, ctx);
             return;
         }
+        if (_departed.Remove(dto.Id, out var departed) && departed.Gen > writtenGen) dto = departed.Dto;
 
-        // HU-014 CA5: la cuenta ya tiene un personaje dentro → la sesión anterior se guarda y se desconecta primero.
+        // HU-014 CA5: la cuenta ya tiene otro personaje dentro → la sesión anterior se guarda y se desconecta primero.
         if (previous is not null)
         {
             var prevConn = previous.ConnectionId;
@@ -126,8 +150,20 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             if (LinkdeadPolicy.ShouldRemove(p, ctx.NowMs, ctx.Rules)) { (expired ??= new List<Player>()).Add(p); continue; }
             if (p.Dirty && ctx.NowMs - p.LastSaveAtMs >= _autosaveMs) Save(p, ctx.NowMs, "autosave");
         }
+        PruneDeparted();
         if (expired is null) return;
         foreach (var p in expired) Leave(p, "linkdead");
+    }
+
+    /// <summary>Olvida los guardados de salida que ya están en la BD.</summary>
+    private void PruneDeparted()
+    {
+        if (_departed.Count == 0) return;
+        List<Guid>? written = null;
+        foreach (var (id, d) in _departed)
+            if (saver.WrittenGeneration(id) >= d.Gen) (written ??= new List<Guid>()).Add(id);
+        if (written is null) return;
+        foreach (var id in written) _departed.Remove(id);
     }
 
     /// <summary>Guardado por evento (ADR-018 / HU-026 CA6): salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir.</summary>
@@ -151,7 +187,6 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         var rules = content.Current.Rules;
         if (player.IsInCombat(tick.NowMs, rules.Combat.InCombatWindowSec)) return ErrorCodes.InCombat;
         if (world.GetInstance(player.MapInstanceId) is { } map) Combat?.Casts.Cancel(player, map, tick);
-        player.LastSaveAtMs = tick.NowMs;
         Leave(player, LogoutReason, tick);
         return null;
     }
@@ -168,11 +203,20 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             Combat.Trades.CancelBy(player, reason, instance, tick);
             if (Combat.Parties.SetOnline(player.CharacterId, false, tick.NowMs) is { } party) tick.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
         }
-        saver.Enqueue(mapper.ToSave(player));
+        var save = mapper.ToSave(player);
+        _departed[player.CharacterId] = (save, saver.Enqueue(save));
         player.Dirty = false;
         players.Remove(player);
         if (instance is not null)
         {
+            // Lo que dejó en marcha no sigue a su nombre: proyectiles en vuelo, amenaza y monstruos marcados (sin XP ni botín
+            // para un ausente).
+            Combat?.Casts.ForgetCaster(player, instance);
+            foreach (var m in instance.Monsters.Values)
+            {
+                m.Threat.Remove(player.Id);
+                if (m.TaggedBy == player.Id) m.TaggedBy = null;
+            }
             instance.Remove(player.Id);
             PlayerLeft?.Invoke(player, new MapInstanceRef(instance));
         }
