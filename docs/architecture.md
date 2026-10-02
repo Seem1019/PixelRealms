@@ -115,10 +115,14 @@ sequenceDiagram
 ## 6. Cliente Godot
 - Autoloads: `Net` (WebSocketPeer, cola, reconexión, dispatch por `t` a señales), `Content` (carga JSON de
   `res://content`), `GameState` (personaje propio, inventario, target, party — **solo reflejo** del servidor),
-  `Settings`.
+  `Settings`, `UiStyle` (tema de la interfaz).
 - Escenas: `Boot` → `Login` → `CharacterSelect` → `World` (TileMapLayer por Tiled/YATI, `Entities` YSort,
   `Camera2D` pixel-perfect) + `HUD` (CanvasLayer: barras, hotbar, target frame, cast bar, chat, party, ventanas).
-- Resolución lógica 480×270 (16:9), escalado entero (`stretch mode = viewport`, `scale mode = integer`).
+- Resolución lógica 480×270 (16:9), escalado entero (`stretch mode = canvas_items`, `scale mode = integer`, ADR-025): el 2D
+  se dibuja a la resolución de la ventana, así que el texto sale nítido a su tamaño y el mundo conserva la escala entera.
+- Un único `Theme` creado por código (`scripts/ui/ui_theme.gd`; el autoload `UiStyle` lo fusiona con el tema por defecto
+  del motor, porque los `Control` dentro de un `CanvasLayer` no heredan el de la ventana):
+  tamaños de letra, espaciados, colores y estilos. Tooltips propios (`RichTooltip`) de ancho contenido.
 
 ## 7. Despliegue (amigos)
 - VPS Linux (2 vCPU / 2–4 GB). `docker compose`: `server`, `postgres`, `caddy` (TLS automático → `wss://`).

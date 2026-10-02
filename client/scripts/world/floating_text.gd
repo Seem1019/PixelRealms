@@ -18,7 +18,7 @@ var _per_entity: Dictionary = {}  # entity_id → {windowStart, count, pending}
 func _ready() -> void:
 	for i: int in POOL_SIZE:
 		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 8)
+		l.add_theme_font_size_override("font_size", UiTheme.FONT_BODY)
 		l.visible = false
 		l.z_index = 50
 		add_child(l)

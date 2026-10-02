@@ -9,6 +9,9 @@ signal command(name: String, args: String)
 
 const COLORS := {"say": "#ffffff", "global": "#ffa040", "party": "#5b9bff", "whisper": "#ff80d0", "system": "#ffe066"}
 const MAX_LINES := 60
+const WIDTH := 200
+const LOG_HEIGHT := 64
+const INPUT_HEIGHT := 14
 
 var _log: RichTextLabel
 var _input: LineEdit
@@ -20,23 +23,25 @@ func is_typing() -> bool:
 
 
 func _ready() -> void:
-	position = Vector2(4, 150)
-	custom_minimum_size = Vector2(220, 84)
-	size = custom_minimum_size
+	custom_minimum_size = Vector2(WIDTH, LOG_HEIGHT + INPUT_HEIGHT + UiTheme.GAP)
 	mouse_filter = Control.MOUSE_FILTER_PASS
+	# Abajo a la izquierda, encima de la barra rápida (CombatHud).
+	UiTheme.dock(self, Control.PRESET_BOTTOM_LEFT, UiTheme.SCREEN_MARGIN, -(CombatHud.HOTBAR_HEIGHT + 2 * UiTheme.PADDING + UiTheme.GAP))
 	var v := VBoxContainer.new()
-	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	v.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(v)
 	_log = RichTextLabel.new()
 	_log.bbcode_enabled = true
 	_log.scroll_following = true
-	_log.custom_minimum_size = Vector2(220, 70)
-	_log.add_theme_font_size_override("normal_font_size", 7)
+	_log.custom_minimum_size = Vector2(WIDTH, LOG_HEIGHT)
+	_log.add_theme_font_size_override("normal_font_size", UiTheme.FONT_SMALL)
 	_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(_log)
 	_input = LineEdit.new()
 	_input.placeholder_text = "Enter para escribir"
-	_input.add_theme_font_size_override("font_size", 7)
+	_input.custom_minimum_size = Vector2(WIDTH, INPUT_HEIGHT)
+	_input.add_theme_font_size_override("font_size", UiTheme.FONT_SMALL)
 	_input.max_length = 200
 	_input.text_submitted.connect(_on_submitted)
 	_input.gui_input.connect(_on_input_gui)

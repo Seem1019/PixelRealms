@@ -553,7 +553,7 @@ func _show_bubble(from: String, text: String) -> void:
 		return
 	var label := Label.new()
 	label.text = text.substr(0, 60)
-	label.add_theme_font_size_override("font_size", 7)
+	label.add_theme_font_size_override("font_size", UiTheme.FONT_SMALL)
 	label.position = Vector2(-40, -40)
 	label.custom_minimum_size = Vector2(80, 10)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

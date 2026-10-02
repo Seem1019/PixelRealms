@@ -7,6 +7,9 @@ extends PanelContainer
 signal sell_requested(item: Dictionary)
 signal offer_requested(item: Dictionary)
 
+## Las ventanas empiezan debajo de los marcos de vida (UiTheme).
+const WINDOW_TOP := 52
+
 var vendor_mode: bool = false
 
 var _slots: Array[ItemSlot] = []
@@ -20,17 +23,14 @@ var _destroy_item: Dictionary = {}
 
 func _ready() -> void:
 	visible = false
-	position = Vector2(300, 60)
 	var v := VBoxContainer.new()
 	add_child(v)
 	var title := Label.new()
 	title.text = "Bolsa"
-	title.add_theme_font_size_override("font_size", 8)
+	title.theme_type_variation = "TitleLabel"
 	v.add_child(title)
 	var grid := GridContainer.new()
 	grid.columns = 6
-	grid.add_theme_constant_override("h_separation", 1)
-	grid.add_theme_constant_override("v_separation", 1)
 	v.add_child(grid)
 	for i: int in 24:
 		var s := ItemSlot.new()
@@ -42,7 +42,6 @@ func _ready() -> void:
 		grid.add_child(s)
 		_slots.append(s)
 	_gold = Label.new()
-	_gold.add_theme_font_size_override("font_size", 8)
 	v.add_child(_gold)
 
 	_split_dialog = ConfirmationDialog.new()
@@ -58,6 +57,7 @@ func _ready() -> void:
 
 	GameState.inventory_changed.connect(refresh)
 	refresh()
+	UiTheme.dock(self, Control.PRESET_TOP_RIGHT, UiTheme.SCREEN_MARGIN, WINDOW_TOP - UiTheme.SCREEN_MARGIN)
 
 
 func refresh() -> void:
@@ -71,6 +71,7 @@ func toggle() -> void:
 	visible = not visible
 	if visible:
 		refresh()
+		UiTheme.bring_to_front(self)
 
 
 func _on_dropped(from: Dictionary, to: Dictionary, qty: int) -> void:

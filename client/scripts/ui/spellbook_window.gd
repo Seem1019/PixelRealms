@@ -9,12 +9,11 @@ var _list: VBoxContainer
 
 func _ready() -> void:
 	visible = false
-	position = Vector2(280, 40)
 	var v := VBoxContainer.new()
 	add_child(v)
 	var title := Label.new()
 	title.text = "Libro de hechizos (arrastra a 1–4)"
-	title.add_theme_font_size_override("font_size", 8)
+	title.theme_type_variation = "TitleLabel"
 	v.add_child(title)
 	_list = VBoxContainer.new()
 	v.add_child(_list)
@@ -26,6 +25,8 @@ func toggle() -> void:
 	visible = not visible
 	if visible:
 		refresh()
+		UiTheme.dock(self, Control.PRESET_CENTER)
+		UiTheme.bring_to_front(self)
 
 
 func refresh() -> void:
@@ -45,7 +46,8 @@ func refresh() -> void:
 		entry.spell_id = id
 		entry.known = known
 		entry.text = "%s%s" % [str(sd.get("name", id)), "" if known else "  (Nivel %d)" % int(sd.get("levelReq", 1))]
-		entry.tooltip_text = str(sd.get("description", ""))
+		entry.tooltip_bbcode = TooltipBuilder.build_spell(sd)
+		entry.tooltip_text = str(sd.get("name", id))
 		entry.modulate = Color.WHITE if known else Color(0.5, 0.5, 0.5)
 		_list.add_child(entry)
 
@@ -54,9 +56,12 @@ func refresh() -> void:
 class SpellEntry extends Button:
 	var spell_id: String = ""
 	var known: bool = false
+	var tooltip_bbcode: String = ""
+
+	func _make_custom_tooltip(_for_text: String) -> Object:
+		return RichTooltip.make(tooltip_bbcode) if not tooltip_bbcode.is_empty() else null
 
 	func _ready() -> void:
-		add_theme_font_size_override("font_size", 7)
 		alignment = HORIZONTAL_ALIGNMENT_LEFT
 		focus_mode = Control.FOCUS_NONE
 

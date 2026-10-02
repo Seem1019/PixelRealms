@@ -12,7 +12,6 @@ var _stats: Label
 
 func _ready() -> void:
 	visible = false
-	position = Vector2(40, 40)
 	var h := HBoxContainer.new()
 	add_child(h)
 	var grid := GridContainer.new()
@@ -28,30 +27,31 @@ func _ready() -> void:
 		grid.add_child(s)
 		_slots.append(s)
 	_stats = Label.new()
-	_stats.add_theme_font_size_override("font_size", 7)
+	_stats.mouse_filter = Control.MOUSE_FILTER_PASS
 	h.add_child(_stats)
 	GameState.inventory_changed.connect(refresh)
 	GameState.stats_changed.connect(refresh)
 	GameState.vitals_changed.connect(refresh)
+	UiTheme.dock(self, Control.PRESET_TOP_LEFT, UiTheme.SCREEN_MARGIN, InventoryWindow.WINDOW_TOP - UiTheme.SCREEN_MARGIN)
 
 
 func toggle() -> void:
 	visible = not visible
 	if visible:
 		refresh()
+		UiTheme.bring_to_front(self)
 
 
 func refresh() -> void:
 	for i: int in _slots.size():
 		var it: Variant = GameState.equipment[i] if i < GameState.equipment.size() else null
+		_slots[i].set_placeholder(SLOT_NAMES[i])
 		_slots[i].set_item(it if it is Dictionary else {})
-		if _slots[i].item.is_empty():
-			_slots[i].text = SLOT_NAMES[i].substr(0, 5)
 	var d: Dictionary = GameState.stats.get("derived", {}) if not GameState.stats.is_empty() else {}
 	var primary: Dictionary = GameState.stats.get("stats", {}) if not GameState.stats.is_empty() else {}
-	var lines: Array[String] = ["%s · %s · nv %d" % [GameState.character_name, GameState.class_id, GameState.level]]
+	var lines: Array[String] = ["%s · %s · nv %d" % [GameState.character_name, UiText.class_name_of(GameState.class_id), GameState.level]]
 	lines.append("Vida %d / %d" % [GameState.hp, GameState.max_hp])
-	lines.append("%s %d / %d" % [GameState.resource_kind.capitalize(), GameState.resource, GameState.max_resource])
+	lines.append("%s %d / %d" % [UiText.resource(GameState.resource_kind), GameState.resource, GameState.max_resource])
 	for k: String in STAT_KEYS:
 		lines.append("%s %d" % [str(TooltipBuilder.STAT_NAMES.get(k, k)), int(primary.get(k, 0))])
 	if not d.is_empty():

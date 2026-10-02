@@ -12,22 +12,19 @@ var _title: Label
 
 func _ready() -> void:
 	visible = false
-	position = Vector2(60, 60)
 	var v := VBoxContainer.new()
 	add_child(v)
 	_title = Label.new()
-	_title.add_theme_font_size_override("font_size", 8)
+	_title.theme_type_variation = "TitleLabel"
 	v.add_child(_title)
 	_list = VBoxContainer.new()
 	v.add_child(_list)
 	var junk := Button.new()
 	junk.text = "Vender basura"
-	junk.add_theme_font_size_override("font_size", 8)
 	junk.pressed.connect(func() -> void: sell_junk_requested.emit())
 	v.add_child(junk)
 	var close := Button.new()
 	close.text = "Cerrar"
-	close.add_theme_font_size_override("font_size", 8)
 	close.pressed.connect(close_window)
 	v.add_child(close)
 
@@ -42,7 +39,6 @@ func show_window(d: Dictionary, vendor_name: String) -> void:
 		var tpl := Content.item(str(e.get("templateId", "")))
 		var row := HBoxContainer.new()
 		var name := Label.new()
-		name.add_theme_font_size_override("font_size", 8)
 		name.text = "%s · %s" % [str(tpl.get("name", "?")), MoneyFormat.format(int(e.get("price", 0)))]
 		name.tooltip_text = ItemSlot._strip_bbcode(TooltipBuilder.build(tpl, 1, GameState.class_id, GameState.level))
 		name.modulate = ItemSlot.RARITY_COLORS.get(str(tpl.get("rarity", "common")), Color.WHITE)
@@ -51,11 +47,12 @@ func show_window(d: Dictionary, vendor_name: String) -> void:
 		for qty: int in [1, 5]:
 			var b := Button.new()
 			b.text = "x%d" % qty
-			b.add_theme_font_size_override("font_size", 8)
 			b.pressed.connect(func() -> void: Net.send("VendorBuy", {"npcId": npc_id, "templateId": template_id, "qty": qty}))
 			row.add_child(b)
 		_list.add_child(row)
 	visible = true
+	UiTheme.dock(self, Control.PRESET_TOP_LEFT, UiTheme.SCREEN_MARGIN, InventoryWindow.WINDOW_TOP - UiTheme.SCREEN_MARGIN)
+	UiTheme.bring_to_front(self)
 
 
 func close_window() -> void:

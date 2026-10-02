@@ -51,7 +51,7 @@ func _ready() -> void:
 	_label.offset_right = 32.0
 	_label.offset_bottom = -14.0
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.add_theme_font_size_override("font_size", 8)
+	_label.add_theme_font_size_override("font_size", UiTheme.FONT_BODY)
 	_label.add_theme_color_override("font_color", Color.WHITE)
 	_label.text = display_name
 	add_child(_label)
@@ -61,7 +61,7 @@ func _ready() -> void:
 	_level_label.offset_right = 32.0
 	_level_label.offset_bottom = -24.0
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_level_label.add_theme_font_size_override("font_size", 7)
+	_level_label.add_theme_font_size_override("font_size", UiTheme.FONT_SMALL)
 	add_child(_level_label)
 	_cast_bar = ColorRect.new()
 	_cast_bar.offset_left = -8.0

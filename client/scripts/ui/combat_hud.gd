@@ -9,6 +9,9 @@ signal hotbar_pressed(slot: int)
 const ERROR_SECONDS := 2.0
 const RESOURCE_COLORS := {"mana": Color(0.25, 0.45, 1.0), "rage": Color(0.55, 0.05, 0.05), "energy": Color(1.0, 0.85, 0.2)}
 const HP_COLOR := Color(0.85, 0.15, 0.15)
+const FRAME_WIDTH := 120
+const HOTBAR_SLOT_WIDTH := 46
+const HOTBAR_HEIGHT := 28
 
 var _self_name: Label
 var _self_hp: ProgressBar
@@ -23,6 +26,7 @@ var _target_hp: ProgressBar
 var _target_auras: HBoxContainer
 var _cast_bar: ProgressBar
 var _cast_label: Label
+var _hotbar_panel: PanelContainer
 var _hotbar: HBoxContainer
 var _slots: Array[Button] = []
 var _slot_sweeps: Array[ProgressBar] = []
@@ -64,15 +68,16 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	var m := UiTheme.SCREEN_MARGIN
 	# Marco propio (arriba izquierda)
 	var self_frame := PanelContainer.new()
-	self_frame.position = Vector2(4, 4)
-	self_frame.custom_minimum_size = Vector2(120, 0)
+	self_frame.position = Vector2(m, m)
+	self_frame.custom_minimum_size = Vector2(FRAME_WIDTH, 0)
 	add_child(self_frame)
 	var sv := VBoxContainer.new()
 	sv.add_theme_constant_override("separation", 1)
 	self_frame.add_child(sv)
-	_self_name = _label("", 8)
+	_self_name = _label("")
 	sv.add_child(_self_name)
 	_self_hp = _bar(HP_COLOR)
 	sv.add_child(_self_hp)
@@ -85,16 +90,16 @@ func _build() -> void:
 	_self_auras.add_theme_constant_override("separation", 1)
 	sv.add_child(_self_auras)
 
-	# Marco de objetivo (arriba centro-derecha)
+	# Marco de objetivo (arriba a la derecha del propio)
 	_target_frame = PanelContainer.new()
-	_target_frame.position = Vector2(300, 4)
-	_target_frame.custom_minimum_size = Vector2(120, 0)
+	_target_frame.position = Vector2(m + FRAME_WIDTH + 2 * m, m)
+	_target_frame.custom_minimum_size = Vector2(FRAME_WIDTH, 0)
 	_target_frame.visible = false
 	add_child(_target_frame)
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 1)
 	_target_frame.add_child(tv)
-	_target_name = _label("", 8)
+	_target_name = _label("")
 	tv.add_child(_target_name)
 	_target_hp = _bar(HP_COLOR)
 	tv.add_child(_target_hp)
@@ -102,35 +107,36 @@ func _build() -> void:
 	_target_auras.add_theme_constant_override("separation", 1)
 	tv.add_child(_target_auras)
 
-	# Barra de casteo (centro bajo)
+	# Barra de casteo (centrada, justo encima de la barra rápida)
+	var base := UiTheme.base_size()
+	var cast_top := base.y - m - HOTBAR_HEIGHT - 2 * m - 10
 	_cast_bar = _bar(Color(0.9, 0.7, 0.2))
-	_cast_bar.position = Vector2(160, 200)
-	_cast_bar.custom_minimum_size = Vector2(160, 10)
+	_cast_bar.position = Vector2((base.x - 160) / 2.0, cast_top)
+	_cast_bar.custom_minimum_size = Vector2(160, 6)
 	_cast_bar.visible = false
 	add_child(_cast_bar)
-	_cast_label = _label("", 8)
-	_cast_label.position = Vector2(160, 188)
+	_cast_label = _label("")
+	_cast_label.position = Vector2((base.x - 160) / 2.0, cast_top - 11)
 	_cast_label.custom_minimum_size = Vector2(160, 10)
 	_cast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_cast_label.visible = false
 	add_child(_cast_label)
 
-	# Hotbar 4 + 4 (abajo centro)
-	_hotbar = HBoxContainer.new()
-	_hotbar.add_theme_constant_override("separation", 2)
+	# Barra rápida 4 + 4 (abajo centro) sobre su propio panel
 	var spell_slots := int(Content.rule("loadout", "spellSlots", 4))
 	var usable_slots := int(Content.rule("loadout", "usableSlots", 4))
 	var total := spell_slots + usable_slots
-	_hotbar.position = Vector2(240 - total * 13, 240)
-	add_child(_hotbar)
+	_hotbar_panel = PanelContainer.new()
+	add_child(_hotbar_panel)
+	_hotbar = HBoxContainer.new()
+	_hotbar.add_theme_constant_override("separation", UiTheme.GAP)
+	_hotbar_panel.add_child(_hotbar)
 	for i: int in total:
 		var b := HotSlot.new()
 		b.slot = i
 		b.is_spell_slot = i < spell_slots
-		b.custom_minimum_size = Vector2(24, 24)
+		b.custom_minimum_size = Vector2(HOTBAR_SLOT_WIDTH, HOTBAR_HEIGHT)
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 8)
-		b.text = str(i + 1)
 		b.pressed.connect(_on_slot_pressed.bind(i))
 		b.assign_requested.connect(_assign_slot)
 		var sweep := ProgressBar.new()
@@ -149,48 +155,49 @@ func _build() -> void:
 			var sep := Control.new()
 			sep.custom_minimum_size = Vector2(6, 0)
 			_hotbar.add_child(sep)
+	var bar_width := total * HOTBAR_SLOT_WIDTH + (total - 1) * UiTheme.GAP + 6 + UiTheme.GAP + 2 * UiTheme.PADDING
+	_hotbar_panel.position = Vector2((base.x - bar_width) / 2.0, base.y - m - HOTBAR_HEIGHT - 2 * UiTheme.PADDING)
 
 	# Error del servidor (centro arriba, rojo)
-	_error_label = _label("", 8)
-	_error_label.position = Vector2(120, 30)
+	_error_label = _label("")
+	_error_label.position = Vector2((base.x - 240) / 2.0, 30)
 	_error_label.custom_minimum_size = Vector2(240, 12)
 	_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_error_label.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
+	_error_label.add_theme_color_override("font_color", UiTheme.ERROR)
 	add_child(_error_label)
 
 	# Avisos (nivel, hechizo nuevo)
-	_notice_label = _label("", 10)
-	_notice_label.position = Vector2(120, 60)
+	_notice_label = _label("", "TitleLabel")
+	_notice_label.position = Vector2((base.x - 240) / 2.0, 60)
 	_notice_label.custom_minimum_size = Vector2(240, 14)
 	_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_notice_label.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
 	add_child(_notice_label)
 
-	# Pantalla de muerte
+	# Pantalla de muerte (centro)
 	_death_panel = PanelContainer.new()
-	_death_panel.position = Vector2(170, 100)
 	_death_panel.custom_minimum_size = Vector2(140, 60)
+	_death_panel.position = (base - _death_panel.custom_minimum_size) / 2.0
 	_death_panel.visible = false
 	add_child(_death_panel)
 	var dv := VBoxContainer.new()
 	_death_panel.add_child(dv)
-	var title := _label("Has muerto", 16)
+	var title := _label("Has muerto", "HeadlineLabel")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dv.add_child(title)
-	_death_killer = _label("", 8)
+	_death_killer = _label("")
 	_death_killer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dv.add_child(_death_killer)
 	var respawn := Button.new()
 	respawn.text = "Reaparecer"
-	respawn.add_theme_font_size_override("font_size", 8)
 	respawn.pressed.connect(func() -> void: respawn_requested.emit())
 	dv.add_child(respawn)
 
 
-func _label(text: String, size: int) -> Label:
+## Etiqueta con el tamaño del tema; `variation`: "SmallLabel", "TitleLabel" o "HeadlineLabel" (UiTheme).
+func _label(text: String, variation: String = "") -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.theme_type_variation = variation
 	return l
 
 
@@ -326,16 +333,15 @@ func _refresh_hotbar() -> void:
 		var b := _slots[i]
 		var entry := _slot_entry(i)
 		if entry.is_empty():
-			b.text = str(i + 1)
+			b.show_entry("", -1, "")
 			b.disabled = true
-			b.tooltip_text = ""
+			b.modulate = Color.WHITE
 			continue
 		b.disabled = false
 		var ref := str(entry.get("ref", ""))
 		if str(entry.get("kind", "spell")) == "spell":
 			var spell := Content.spell(ref)
-			b.text = "%d\n%s" % [i + 1, _short(str(spell.get("name", ref)))]
-			b.tooltip_text = str(spell.get("description", ""))
+			b.show_entry(str(spell.get("name", ref)), -1, TooltipBuilder.build_spell(spell))
 			var cost: Dictionary = spell.get("cost", {})
 			var lacks := not cost.is_empty() and int(cost.get("amount", 0)) > GameState.resource
 			var out_of_range := in_range_check.is_valid() and not bool(in_range_check.call(spell))
@@ -343,7 +349,7 @@ func _refresh_hotbar() -> void:
 		else:
 			var item := Content.item(ref)
 			var count := GameState.bag_count(ref)  # HU-043 CA3: cantidad total en bolsa
-			b.text = "%d\n%s %d" % [i + 1, _short(str(item.get("name", ref))).substr(0, 4), count]
+			b.show_entry(str(item.get("name", ref)), count, TooltipBuilder.build(item, count, GameState.class_id, GameState.level))
 			b.modulate = Color.WHITE if count > 0 else Color(0.45, 0.45, 0.45)
 
 
@@ -387,10 +393,6 @@ func _refresh_sweeps() -> void:
 		_slot_sweeps[i].value = frac
 
 
-static func _short(name: String) -> String:
-	return name.substr(0, 6)
-
-
 # --- Auras ---------------------------------------------------------------------------------------------------------------------
 
 func _on_auras_changed(entity_id: int) -> void:
@@ -408,9 +410,10 @@ func _rebuild_auras(box: HBoxContainer, entity_id: int) -> void:
 	for a: Variant in list:
 		var ad: Dictionary = a
 		var def := Content.aura(str(ad["auraId"]))
-		var l := _label("", 7)
-		l.custom_minimum_size = Vector2(26, 10)
+		var l := _label("", "SmallLabel")
 		l.set_meta("aura", ad)
+		l.mouse_filter = Control.MOUSE_FILTER_PASS
+		l.tooltip_text = "%s\n%s" % [str(def.get("name", ad["auraId"])), str(def.get("description", ""))]
 		var is_dominant: bool = dominant.has(str(ad["auraId"]))
 		l.modulate = Color.WHITE if is_dominant else Color(0.55, 0.55, 0.55)
 		if bool(def.get("isDebuff", false)):
@@ -460,7 +463,7 @@ func _refresh_aura_times(box: HBoxContainer, _entity_id: int) -> void:
 		var def := Content.aura(str(ad["auraId"]))
 		var remaining := maxi(0, int(ad["endsMs"]) - now)
 		var stacks := int(ad.get("stacks", 1))
-		l.text = "%s %ds%s" % [_short(str(def.get("name", ad["auraId"]))).substr(0, 4), ceili(remaining / 1000.0), "x%d" % stacks if stacks > 1 else ""]
+		l.text = "%s %ds%s" % [UiText.short_name(str(def.get("name", ad["auraId"]))), ceili(remaining / 1000.0), " x%d" % stacks if stacks > 1 else ""]
 
 
 # --- Errores y muerte -----------------------------------------------------------------------------------------------------------
@@ -490,6 +493,55 @@ class HotSlot extends Button:
 
 	var slot: int = 0
 	var is_spell_slot: bool = true
+	## Tooltip propio (RichTooltip): nombre completo, coste, recarga, descripción.
+	var tooltip_bbcode: String = ""
+	var _name: Label
+	var _key: Label
+	var _count: Label
+
+	func _ready() -> void:
+		_name = Label.new()
+		_name.theme_type_variation = "SmallLabel"
+		_name.add_theme_color_override("font_color", UiTheme.TEXT)
+		_name.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_name.offset_top = 5
+		_name.offset_left = 2
+		_name.offset_right = -2
+		_name.add_theme_constant_override("line_spacing", 0)  # dos líneas caben bajo el número de la tecla
+		_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_name.max_lines_visible = 2
+		_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_name)
+		_key = Label.new()
+		_key.theme_type_variation = "SmallLabel"
+		_key.text = str(slot + 1)
+		_key.position = Vector2(2, -1)
+		_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_key)
+		_count = Label.new()
+		_count.theme_type_variation = "SmallLabel"
+		_count.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		_count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		_count.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		_count.offset_right = -2
+		_count.offset_bottom = 1
+		_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_count)
+
+	## Nombre completo en la casilla (dos líneas), cantidad abajo a la derecha (-1 = sin cantidad) y tooltip.
+	func show_entry(entry_name: String, count: int, bbcode: String) -> void:
+		if _name != null:
+			_name.text = entry_name
+		if _count != null:
+			_count.text = str(count) if count >= 0 else ""
+		tooltip_bbcode = bbcode
+		tooltip_text = entry_name  # Godot solo pide el tooltip propio si hay texto
+
+	func _make_custom_tooltip(_for_text: String) -> Object:
+		return RichTooltip.make(tooltip_bbcode) if not tooltip_bbcode.is_empty() else null
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
 		if not (data is Dictionary):
@@ -514,6 +566,6 @@ class HotSlot extends Button:
 		if not Input.is_key_pressed(KEY_SHIFT):
 			return null
 		var preview := Label.new()
-		preview.text = text
+		preview.text = _name.text
 		set_drag_preview(preview)
 		return {"hotbarSlot": slot}

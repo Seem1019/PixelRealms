@@ -28,7 +28,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frames = VBoxContainer.new()
-	_frames.position = Vector2(4, 60)
+	_frames.position = Vector2(UiTheme.SCREEN_MARGIN, InventoryWindow.WINDOW_TOP)
 	add_child(_frames)
 	_prompt = ConfirmationDialog.new()
 	_prompt.ok_button_text = "Aceptar"
@@ -37,10 +37,10 @@ func _ready() -> void:
 	_prompt.canceled.connect(func() -> void: _respond(false))
 	add_child(_prompt)
 	_duel_label = Label.new()
-	_duel_label.position = Vector2(120, 90)
 	_duel_label.custom_minimum_size = Vector2(240, 20)
+	_duel_label.position = Vector2((UiTheme.base_size().x - 240) / 2.0, 90)
 	_duel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_duel_label.add_theme_font_size_override("font_size", 14)
+	_duel_label.theme_type_variation = "HeadlineLabel"
 	_duel_label.add_theme_color_override("font_color", Color(1, 0.6, 0.2))
 	add_child(_duel_label)
 	_build_trade()
@@ -102,11 +102,11 @@ func _refresh_party() -> void:
 	for m: Variant in _other_members():
 		var md: Dictionary = m
 		var b := Button.new()
-		b.add_theme_font_size_override("font_size", 7)
+		b.theme_type_variation = "SmallButton"
 		b.custom_minimum_size = Vector2(110, 22)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var online := bool(md.get("online", true))
-		b.text = "%s %s nv%d  %d%%%s" % [str(md.get("name", "")), str(md.get("classId", "")).substr(0, 3), int(md.get("level", 0)), int(md.get("hpPct", 0)), "" if online else " (desc.)"]
+		b.text = "%s %s nv%d  %d%%%s" % [str(md.get("name", "")), UiText.class_name_of(str(md.get("classId", ""))), int(md.get("level", 0)), int(md.get("hpPct", 0)), "" if online else " (desc.)"]
 		b.tooltip_text = "Mapa: %s" % str(md.get("mapId", "?"))
 		b.modulate = Color.WHITE if online else Color(0.6, 0.6, 0.6)
 		var ent: Variant = md.get("entityId")
@@ -162,25 +162,21 @@ func _respond(accept: bool) -> void:
 
 func _build_trade() -> void:
 	_trade = PanelContainer.new()
-	_trade.position = Vector2(140, 50)
 	_trade.visible = false
 	add_child(_trade)
 	var v := VBoxContainer.new()
 	_trade.add_child(v)
 	var title := Label.new()
 	title.text = "Intercambio (clic derecho en la bolsa para ofrecer)"
-	title.add_theme_font_size_override("font_size", 7)
+	title.theme_type_variation = "TitleLabel"
 	v.add_child(title)
 	_trade_mine = Label.new()
-	_trade_mine.add_theme_font_size_override("font_size", 7)
 	v.add_child(_trade_mine)
 	_trade_theirs = Label.new()
-	_trade_theirs.add_theme_font_size_override("font_size", 7)
 	v.add_child(_trade_theirs)
 	var gold_row := HBoxContainer.new()
 	var gl := Label.new()
 	gl.text = "Oro:"
-	gl.add_theme_font_size_override("font_size", 7)
 	gold_row.add_child(gl)
 	_trade_gold = SpinBox.new()
 	_trade_gold.min_value = 0
@@ -189,17 +185,14 @@ func _build_trade() -> void:
 	gold_row.add_child(_trade_gold)
 	v.add_child(gold_row)
 	_trade_status = Label.new()
-	_trade_status.add_theme_font_size_override("font_size", 7)
 	v.add_child(_trade_status)
 	var buttons := HBoxContainer.new()
 	_trade_confirm = Button.new()
 	_trade_confirm.text = "Confirmar"
-	_trade_confirm.add_theme_font_size_override("font_size", 8)
 	_trade_confirm.pressed.connect(func() -> void: Net.send("TradeConfirm", {"version": int(GameState.trade.get("version", 0))}))
 	buttons.add_child(_trade_confirm)
 	var cancel := Button.new()
 	cancel.text = "Cancelar"
-	cancel.add_theme_font_size_override("font_size", 8)
 	cancel.pressed.connect(func() -> void: Net.send("TradeCancel"))
 	buttons.add_child(cancel)
 	v.add_child(buttons)
@@ -240,6 +233,8 @@ func _on_trade(d: Dictionary) -> void:
 				_trade_offer_items.clear()
 				_trade_gold.set_value_no_signal(0)
 			_trade.visible = true
+			UiTheme.dock(_trade, Control.PRESET_CENTER)
+			UiTheme.bring_to_front(_trade)
 			_refresh_trade_offer_text()
 			var mine_ok := bool(d.get("confirmedMine", false))
 			var theirs_ok := bool(d.get("confirmedTheirs", false))
@@ -275,7 +270,6 @@ static func _offer_text(offer: Dictionary) -> String:
 
 func _build_class_window() -> void:
 	_class_window = PanelContainer.new()
-	_class_window.position = Vector2(120, 40)
 	_class_window.visible = false
 	add_child(_class_window)
 
@@ -289,7 +283,7 @@ func open_class_change(npc_id: int) -> void:
 	_class_window.add_child(v)
 	var title := Label.new()
 	title.text = "Cambiar de clase (conservas nivel, objetos y oro)"
-	title.add_theme_font_size_override("font_size", 8)
+	title.theme_type_variation = "TitleLabel"
 	v.add_child(title)
 	for c: Variant in Content.classes():
 		var cd: Dictionary = c
@@ -297,15 +291,19 @@ func open_class_change(npc_id: int) -> void:
 		if id == GameState.class_id:
 			continue
 		var b := Button.new()
-		b.add_theme_font_size_override("font_size", 7)
-		b.text = "%s · %s · %s\n%s" % [str(cd.get("name", id)), str(cd.get("role", "")), str(cd.get("resource", "")), str(cd.get("description", "")).substr(0, 60)]
+		b.theme_type_variation = "SmallButton"
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.custom_minimum_size = Vector2(220, 0)
+		b.text = "%s · %s · %s\n%s" % [str(cd.get("name", id)), UiText.role(str(cd.get("role", ""))), UiText.resource(str(cd.get("resource", ""))), str(cd.get("description", ""))]
 		b.pressed.connect(func() -> void:
 			Net.send("ChangeClass", {"npcId": _class_npc_id, "classId": id, "reqId": Net.next_req_id()})
 			_class_window.visible = false)
 		v.add_child(b)
 	var close := Button.new()
 	close.text = "Cerrar"
-	close.add_theme_font_size_override("font_size", 8)
 	close.pressed.connect(func() -> void: _class_window.visible = false)
 	v.add_child(close)
 	_class_window.visible = true
+	UiTheme.dock(_class_window, Control.PRESET_CENTER)
+	UiTheme.bring_to_front(_class_window)

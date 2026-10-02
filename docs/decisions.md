@@ -235,3 +235,19 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   cooldowns y duraciones no cambian. Como en la Fase 1 solo existe un rango, queda para antes de la Fase 2 decidir si escala
   también los coeficientes y si los rangos se acumulan de forma lineal (+15 / +30 / +45 %) o compuesta; el modelo de
   `tools/balance/` lo incorporará entonces.
+
+## ADR-025 · Escala de la interfaz con `stretch mode = canvas_items`
+- **Contexto:** con `stretch mode = viewport` todo, texto incluido, se dibujaba a 480×270 y luego se ampliaba la imagen. La
+  fuente por defecto de Godot a 7–8 px quedaba pixelada y los tooltips nativos (letra de 16 px sobre 270 de alto) ocupaban
+  media pantalla. La fuente pixel prevista en HU-005 seguía sin elegir.
+- **Decisión:** `stretch mode = canvas_items` con la misma resolución lógica (480×270), `aspect = keep` y escala entera. El 2D
+  se dibuja a la resolución real: el texto se rasteriza a su tamaño final y el mundo y la interfaz crecen por factor entero
+  (×3 a 1440×810, ×4 a 1920×1080). Un único `Theme` por código (`UiTheme`) fija tamaños de letra, espaciados y colores, y
+  los tooltips son propios (`RichTooltip`) con ancho máximo.
+- **Alternativas descartadas:** seguir con `viewport` y añadir una fuente pixel (m5x7/m6x11): estética coherente con el
+  pixel art, pero con solo tamaños ×1/×2, unas 25 líneas de texto en pantalla y caracteres del español por comprobar; una
+  sub-vista de 480×270 solo para el mundo con la interfaz encima a resolución real: lo mejor de ambas, pero cambia la cámara y
+  la conversión de coordenadas del ratón.
+- **Consecuencias:** cambia `docs/architecture.md` §6. Con sprites reales (HU-081) los objetos pueden quedar entre píxeles
+  lógicos al moverse; si se nota, se redondean las posiciones al dibujar. Una fuente pixel sigue siendo posible encima de
+  este modo.

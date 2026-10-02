@@ -36,9 +36,10 @@ static func build(item: Dictionary, qty: int, class_id: String, level: int, equi
 	lines.append("[color=%s][b]%s[/b][/color]%s" % [color, name, (" ×%d" % qty) if qty > 1 else ""])
 	var kind := str(item.get("type", ""))
 	if item.has("slot"):
-		lines.append("%s · %s" % [str(SLOT_NAMES.get(str(item["slot"]), str(item["slot"]))), str(item.get("weaponType", item.get("armorType", kind)))])
+		var gear := str(item.get("weaponType", item.get("armorType", "")))
+		lines.append("%s · %s" % [str(SLOT_NAMES.get(str(item["slot"]), str(item["slot"]))), UiText.gear_type(gear) if not gear.is_empty() else UiText.item_type(kind)])
 	else:
-		lines.append(kind)
+		lines.append(UiText.item_type(kind))
 
 	var affinity := affinity_of(class_id, item)
 	var mult := affinity_mult(affinity)
@@ -71,6 +72,27 @@ static func build(item: Dictionary, qty: int, class_id: String, level: int, equi
 
 	if not equipped.is_empty() and equipped.get("id") != item.get("id"):
 		lines.append_array(compare(item, equipped, class_id))
+	return "\n".join(lines)
+
+
+## Tooltip de hechizo: nombre, coste, lanzamiento, recarga, alcance, radio y descripción. Texto BBCode.
+static func build_spell(spell: Dictionary) -> String:
+	if spell.is_empty():
+		return ""
+	var lines: Array[String] = ["[color=#ffdb6b][b]%s[/b][/color]" % str(spell.get("name", spell.get("id", "")))]
+	var facts: Array[String] = []
+	var cost: Dictionary = spell.get("cost", {}) if spell.get("cost") != null else {}
+	if int(cost.get("amount", 0)) > 0:
+		facts.append("%d de %s" % [int(cost["amount"]), UiText.resource(str(cost.get("resource", ""))).to_lower()])
+	var cast_ms := int(spell.get("castMs", 0))
+	facts.append("Instantáneo" if cast_ms <= 0 else "Lanzamiento %s s" % _num(cast_ms / 1000.0))
+	if int(spell.get("cooldownMs", 0)) > 0:
+		facts.append("Recarga %s s" % _num(int(spell["cooldownMs"]) / 1000.0))
+	lines.append(" · ".join(facts))
+	if float(spell.get("range", 0)) > 0.0:
+		lines.append("Alcance %s casillas%s" % [_num(float(spell["range"])), (" · radio %s" % _num(float(spell["aoeRadius"]))) if spell.get("aoeRadius") != null else ""])
+	if spell.has("description"):
+		lines.append("[i]%s[/i]" % str(spell["description"]))
 	return "\n".join(lines)
 
 
