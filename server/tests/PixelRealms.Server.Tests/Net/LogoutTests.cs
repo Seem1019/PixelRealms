@@ -104,35 +104,50 @@ public sealed class LogoutTests
     }
 
     [Fact]
-    public async Task Logout_CancelsTheCast_TheTradeAndTheDuel_ForEveryoneInvolved() // CA3
+    public async Task Logout_CancelsTheCastAndTheTrade_ForThePartner() // CA3 (un duelo y un intercambio ya no pueden coincidir)
     {
         await using var server = await TestServer.StartAsync();
         var (anaApi, _, ana, anaId) = await Enter(server, "ana", "Ana", "priest");
-        var (bobApi, _, bob, bobId) = await Enter(server, "bob", "Bob", "mage");
-        var (calApi, _, cal, _) = await Enter(server, "cal", "Cal", "rogue");
-        using (anaApi) using (bobApi) using (calApi)
+        var (bobApi, _, bob, _) = await Enter(server, "bob", "Bob", "mage");
+        using (anaApi) using (bobApi)
         {
             await bob.ExpectForIdAsync("EntitySpawn", anaId);
             await ana.SendAsync("TradeRequest", """{"name":"Bob"}""");
             await bob.ExpectAsync("TradeUpdate", x => x.GetProperty("state").GetString() == "requested");
             await bob.SendAsync("TradeRespond", """{"accept":true}""");
             await bob.ExpectAsync("TradeUpdate", x => x.GetProperty("state").GetString() == "open");
-            await ana.SendAsync("DuelRequest", """{"name":"Cal"}""");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "requested");
-            await cal.SendAsync("DuelRespond", """{"accept":true}""");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "countdown");
             await ana.SendAsync("CastSpell", """{"spellId":"priest_heal","reqId":3}""");
             await bob.ExpectAsync("CastStarted", x => x.GetProperty("casterId").GetInt32() == anaId);
 
             await ana.SendAsync("Logout");
             await ana.ExpectAsync("LoggedOut");
             await bob.ExpectAsync("TradeUpdate", x => x.GetProperty("state").GetString() == "cancelled");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended");
             // El casteo se cancela sin coste: los demás la ven salir (EntityDespawn quita su barra) y la cura nunca se resuelve.
             await bob.ExpectForIdAsync("EntityDespawn", anaId);
             (await bob.ArrivesAsync("CastEnded", x => x.GetProperty("casterId").GetInt32() == anaId && x.GetProperty("result").GetString() == "done", 1800)).ShouldBeFalse();
-            server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(2);
-            await ana.DisposeAsync(); await bob.DisposeAsync(); await cal.DisposeAsync();
+            server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(1);
+            await ana.DisposeAsync(); await bob.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_EndsTheDuel_ForTheOpponent() // CA3
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, _, ana, anaId) = await Enter(server, "ana", "Ana", "priest");
+        var (calApi, _, cal, _) = await Enter(server, "cal", "Cal", "rogue");
+        using (anaApi) using (calApi)
+        {
+            await cal.ExpectForIdAsync("EntitySpawn", anaId);
+            await ana.SendAsync("DuelRequest", """{"name":"Cal"}""");
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "requested");
+            await cal.SendAsync("DuelRespond", """{"accept":true}""");
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "countdown");
+
+            await ana.SendAsync("Logout");
+            await ana.ExpectAsync("LoggedOut");
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended");
+            await ana.DisposeAsync(); await cal.DisposeAsync();
         }
     }
 

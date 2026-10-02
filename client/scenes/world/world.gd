@@ -363,6 +363,8 @@ func _on_entity_spawn(d: Dictionary) -> void:
 		_entities.add_child(r)
 		_remotes[id] = r
 	r.setup(d)
+	if id == GameState.duel_opponent_id and GameState.duel_state == "active":
+		r.hostile = true  # vuelve a entrar en la AOI en pleno duelo
 
 
 func _on_entity_despawn(d: Dictionary) -> void:
@@ -709,6 +711,10 @@ func _show_bubble(from: String, text: String) -> void:
 func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
 	for r: RemoteEntity in _remotes.values():
 		r.set_name_color(Color(1, 0.6, 0.2) if r.entity_id == opponent_id and state in ["countdown", "active"] else Color.WHITE)
+		# En pleno duelo el rival es enemigo: clic derecho lo autoataca (no abre el menú), Tab lo selecciona, anillo rojo.
+		if r.kind == "player":
+			r.hostile = r.entity_id == opponent_id and state == "active"
+			r.queue_redraw()
 
 
 func _sell_item(item: Dictionary) -> void:

@@ -51,6 +51,9 @@ public sealed class TradeService(CombatServices services)
 
     private readonly Dictionary<int, List<TradeSession>> _trades = new();
 
+    /// <summary>¿El jugador está retando o en un duelo? No se intercambia en pleno duelo (lo rellena CombatModule).</summary>
+    public Func<Player, bool> InDuel { get; set; } = static _ => false;
+
     public TradeSession? TradeOf(Player p)
     {
         if (!_trades.TryGetValue(p.MapInstanceId, out var list)) return null;
@@ -65,6 +68,7 @@ public sealed class TradeService(CombatServices services)
         if (ReferenceEquals(from, to) || from.MapInstanceId != to.MapInstanceId) return "invalid_target";
         if (Vec2.Distance(from.Position, to.Position) > RangeTiles) return "out_of_range";
         if (TradeOf(from) is not null || TradeOf(to) is not null) return "trade_busy";
+        if (InDuel(from) || InDuel(to)) return "duel_busy";
         var trade = new TradeSession(from, to, ctx.NowMs);
         if (!_trades.TryGetValue(map.Id, out var list)) _trades[map.Id] = list = new List<TradeSession>();
         list.Add(trade);
@@ -77,6 +81,7 @@ public sealed class TradeService(CombatServices services)
         var trade = TradeOf(target);
         if (trade is null || trade.State != TradeState.Requested || !ReferenceEquals(trade.B, target)) return "not_found";
         if (!accept) { Cancel(trade, "declined", map, ctx); return null; }
+        if (InDuel(trade.A) || InDuel(trade.B)) { Cancel(trade, "duel_busy", map, ctx); return "duel_busy"; }
         trade.State = TradeState.Open;
         ctx.Emit(new TradeChangedEvent(map.Id, trade, "open", null));
         return null;

@@ -42,6 +42,22 @@ func _frames(n: int) -> void:
 		await get_tree().process_frame
 
 
+# --- 4: en duelo el rival es un objetivo enemigo -------------------------------------------------------------------------
+
+func test_duel_opponent_is_hostile_only_while_the_duel_is_active() -> void:
+	_welcome()
+	_dispatch("EntitySpawn", {"id": 8, "kind": "player", "templateId": "warrior", "name": "Bob", "x": 110.0, "y": 100.0, "dir": "s", "level": 2, "classId": "warrior", "hpPct": 100, "flags": 0})
+	await _frames(1)
+	var bob: RemoteEntity = _world._remotes[8]
+	assert_false(bob.hostile)
+	_dispatch("DuelUpdate", {"state": "active", "opponentId": 8})
+	assert_true(bob.hostile, "clic derecho abría el menú de jugador en vez de autoatacar")
+	_world._cycle_target()
+	assert_eq(GameState.target_id, 8, "Tab también lo selecciona")
+	_dispatch("DuelUpdate", {"state": "ended", "opponentId": 8, "winnerId": 1})
+	assert_false(bob.hostile)
+
+
 # --- 1: el círculo de área se quedaba pintado al cancelar o lanzar -------------------------------------------------------
 
 func test_area_circle_is_erased_when_aiming_stops() -> void:

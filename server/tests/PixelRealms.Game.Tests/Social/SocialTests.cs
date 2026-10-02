@@ -134,6 +134,70 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void Duel_And_Trade_ExcludeEachOther() // prueba de juego: se podía intercambiar en pleno duelo
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Trades.Request(bob, ana, w.Map, w.Begin()).ShouldBe("duel_busy"); // reto pendiente
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Pvp.InActiveDuel(ana).ShouldBeTrue();
+        w.Combat.Trades.Request(ana, bob, w.Map, w.Begin()).ShouldBe("duel_busy"); // en pleno duelo
+        w.Combat.Trades.TradeOf(ana).ShouldBeNull();
+        w.Combat.Pvp.Forfeit(bob, w.Map, w.Begin()).ShouldBeNull();
+
+        // Y al revés: con un intercambio en curso no se puede retar a duelo.
+        w.Combat.Trades.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Trades.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Request(bob, ana, w.Map, w.Begin()).ShouldBe("trade_busy");
+        w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Duel_AcceptedAfterTheChallengerDied_IsDeclined_AndNobodyIsRevived() // revisión de autoridad: resurrección gratis
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        ana.Hp = 0; // la mata un monstruo antes de que Bob acepte
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBe("is_dead");
+        w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
+        TickRunner.RunMs(w, 5000);
+        ana.Hp.ShouldBe(0); // antes: viva y con la vida al máximo al terminar el duelo, sin pasar por Respawn
+    }
+
+    [Fact]
+    public void Duel_WhereSomeoneDiesDuringTheCountdown_IsCancelled_AndTheDeadStayDead()
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        ana.Hp = 0;
+        TickRunner.Run(w, 1).OfType<DuelChangedEvent>().ShouldContain(e => e.State == "declined");
+        w.Combat.Pvp.DuelOf(bob).ShouldBeNull();
+        ana.Hp.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Duel_EndingBecauseSomeoneDied_DoesNotRestoreTheDead()
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Pvp.InActiveDuel(ana).ShouldBeTrue();
+        ana.Hp = 0; // muere por otra causa en pleno duelo
+        TickRunner.Run(w, 1).OfType<DuelChangedEvent>().ShouldContain(e => e.State == "ended");
+        ana.Hp.ShouldBe(0);
+        bob.Hp.ShouldBe(bob.MaxHp); // al vivo sí se le restaura
+    }
+
+    [Fact]
     public void Duel_Forfeit_Distance_Expiry() // HU-064 CA4
     {
         var w = Arena();
