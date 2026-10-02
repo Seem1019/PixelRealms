@@ -1,32 +1,63 @@
 class_name CharacterPanel
 extends PanelContainer
-## Panel de personaje (HU-042): tecla C; muñeco de equipo (9 slots, arrastrar desde la bolsa para equipar, clic derecho
-## desequipa), stats primarios y derivados (StatsUpdate) con tooltip de procedencia (base + equipo×afinidad + auras).
+## Panel de personaje (HU-042): tecla C; muñeco de equipo (9 slots alrededor del sprite, arrastrar desde la bolsa para
+## equipar, clic derecho desequipa) y stats agrupados (Recursos, Atributos, Combate) con la etiqueta a la izquierda y el
+## valor alineado a la derecha; tooltip de procedencia (base + equipo×afinidad + auras). Cabe entre los marcos y la barra.
 
 const SLOT_NAMES := ["Cabeza", "Cuello", "Pecho", "Manos", "Piernas", "Pies", "Anillo", "Mano ppal.", "Mano sec."]
+const SLOT_KEYS := ["head", "neck", "chest", "hands", "legs", "feet", "ring", "main_hand", "off_hand"]
 const STAT_KEYS := ["str", "agi", "int", "spi", "sta"]
+## Posición de cada hueco en el muñeco (columna, fila): cabeza, cuello y pecho a la izquierda; manos, piernas y pies a la
+## derecha; anillo y armas abajo. El sprite ocupa el centro.
+const DOLL := [Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2), Vector2i(2, 0), Vector2i(2, 1), Vector2i(2, 2), Vector2i(0, 3), Vector2i(1, 3), Vector2i(2, 3)]
+const STATS_WIDTH := 96
 
 var _slots: Array[ItemSlot] = []
-var _stats: Label
+var _header: Label
+var _stats: GridContainer
+var _figure: TextureRect
 
 
 func _ready() -> void:
 	visible = false
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	add_child(v)
+	v.add_child(InventoryWindow.title_row("Personaje", "C"))
+	_header = Label.new()
+	_header.theme_type_variation = "SmallLabel"
+	v.add_child(_header)
 	var h := HBoxContainer.new()
-	add_child(h)
-	var grid := GridContainer.new()
-	grid.columns = 3
-	h.add_child(grid)
+	h.add_theme_constant_override("separation", 6)
+	v.add_child(h)
+	var doll := Control.new()
+	var cell := ItemSlot.SIZE.x + 1
+	doll.custom_minimum_size = Vector2(cell * 3 - 1, cell * 4 - 1)
+	h.add_child(doll)
+	var stage := PanelContainer.new()
+	stage.theme_type_variation = "SlotPanel"
+	stage.position = Vector2(cell, 0)
+	stage.size = Vector2(cell - 1, cell * 3 - 1)
+	doll.add_child(stage)
+	_figure = TextureRect.new()
+	_figure.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	_figure.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(_figure)
 	for i: int in 9:
 		var s := ItemSlot.new()
 		s.container = "equip"
 		s.index = i
 		s.tooltip_text = SLOT_NAMES[i]
+		s.position = Vector2(DOLL[i].x * cell, DOLL[i].y * cell)
 		s.dropped.connect(_on_dropped)
 		s.right_clicked.connect(_on_right_click)
-		grid.add_child(s)
+		doll.add_child(s)
 		_slots.append(s)
-	_stats = Label.new()
+	_stats = GridContainer.new()
+	_stats.columns = 2
+	_stats.custom_minimum_size = Vector2(STATS_WIDTH, 0)
+	_stats.add_theme_constant_override("v_separation", 0)
+	_stats.add_theme_constant_override("h_separation", 4)
 	_stats.mouse_filter = Control.MOUSE_FILTER_PASS
 	h.add_child(_stats)
 	GameState.inventory_changed.connect(refresh)
@@ -45,24 +76,60 @@ func toggle() -> void:
 func refresh() -> void:
 	for i: int in _slots.size():
 		var it: Variant = GameState.equipment[i] if i < GameState.equipment.size() else null
-		_slots[i].set_placeholder(SLOT_NAMES[i])
+		_slots[i].set_placeholder(SLOT_NAMES[i], SLOT_KEYS[i])
 		_slots[i].set_item(it if it is Dictionary else {})
+	_header.text = "%s · %s · Nv %d" % [GameState.character_name, UiText.class_name_of(GameState.class_id), GameState.level]
+	_figure.texture = EntitySprites.portrait(EntitySprites.ref_for("player", GameState.class_id, GameState.class_id), false)
 	var d: Dictionary = GameState.stats.get("derived", {}) if not GameState.stats.is_empty() else {}
 	var primary: Dictionary = GameState.stats.get("stats", {}) if not GameState.stats.is_empty() else {}
-	var lines: Array[String] = ["%s · %s · nv %d" % [GameState.character_name, UiText.class_name_of(GameState.class_id), GameState.level]]
-	lines.append("Vida %d / %d" % [GameState.hp, GameState.max_hp])
-	lines.append("%s %d / %d" % [UiText.resource(GameState.resource_kind), GameState.resource, GameState.max_resource])
+	var rows: Array = []
+	rows.append(["Recursos", ""])
+	rows.append(["Vida", "%d/%d" % [GameState.hp, GameState.max_hp]])
+	rows.append([UiText.resource(GameState.resource_kind), "%d/%d" % [GameState.resource, GameState.max_resource]])
+	rows.append(["Atributos", ""])
 	for k: String in STAT_KEYS:
-		lines.append("%s %d" % [str(TooltipBuilder.STAT_NAMES.get(k, k)), int(primary.get(k, 0))])
+		rows.append([str(TooltipBuilder.STAT_NAMES.get(k, k)), "%d" % int(primary.get(k, 0))])
 	if not d.is_empty():
-		lines.append("Poder de ataque %.1f" % float(d.get("attackPower", 0)))
-		lines.append("Poder de hechizo %.1f" % float(d.get("spellPower", 0)))
-		lines.append("Crítico %.1f %%" % (float(d.get("critChance", 0)) * 100.0))
-		lines.append("Esquiva %.1f %%" % (float(d.get("dodgeChance", 0)) * 100.0))
-		lines.append("Armadura %.0f (%.0f %% mitigación)" % [float(d.get("armor", 0)), float(d.get("mitigation", 0)) * 100.0])
-		lines.append("Velocidad de ataque ×%.2f" % float(d.get("haste", 1.0)))
-	_stats.text = "\n".join(lines)
+		rows.append(["Combate", ""])
+		rows.append(["P. ataque", "%.1f" % float(d.get("attackPower", 0))])
+		rows.append(["P. hechizo", "%.1f" % float(d.get("spellPower", 0))])
+		rows.append(["Crítico", "%.1f%%" % (float(d.get("critChance", 0)) * 100.0)])
+		rows.append(["Esquiva", "%.1f%%" % (float(d.get("dodgeChance", 0)) * 100.0)])
+		rows.append(["Armadura", "%.0f (%.0f%%)" % [float(d.get("armor", 0)), float(d.get("mitigation", 0)) * 100.0]])
+		rows.append(["Vel. ataque", "×%.2f" % float(d.get("haste", 1.0))])
+	_fill_stats(rows)
 	_stats.tooltip_text = _origin_tooltip(primary)
+
+
+func _fill_stats(rows: Array) -> void:
+	for c: Node in _stats.get_children():
+		_stats.remove_child(c)
+		c.queue_free()
+	for r: Variant in rows:
+		var row: Array = r
+		var name := Label.new()
+		name.text = str(row[0])
+		name.mouse_filter = Control.MOUSE_FILTER_PASS
+		var value := Label.new()
+		value.text = str(row[1])
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		value.mouse_filter = Control.MOUSE_FILTER_PASS
+		if str(row[1]).is_empty():
+			name.theme_type_variation = "TitleLabel"  # cabecera de grupo
+		else:
+			name.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+		_stats.add_child(name)
+		_stats.add_child(value)
+
+
+## Texto de los stats ("Vida 80/100\nFuerza 12…"), para los tests y lectores.
+func stats_text() -> String:
+	var parts: Array[String] = []
+	var kids := _stats.get_children()
+	for i: int in range(0, kids.size() - 1, 2):
+		parts.append(("%s %s" % [(kids[i] as Label).text, (kids[i + 1] as Label).text]).strip_edges())
+	return "\n".join(parts)
 
 
 ## HU-042 CA2: de dónde sale cada stat: base de clase + nivel, equipo × afinidad, auras (texto).

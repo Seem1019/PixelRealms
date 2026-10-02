@@ -12,21 +12,31 @@ var _title: Label
 
 func _ready() -> void:
 	visible = false
+	custom_minimum_size = Vector2(200, 0)
 	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
 	add_child(v)
 	_title = Label.new()
 	_title.theme_type_variation = "TitleLabel"
 	v.add_child(_title)
+	var hint := Label.new()
+	hint.text = "Clic derecho en la bolsa para vender"
+	hint.theme_type_variation = "SmallLabel"
+	v.add_child(hint)
 	_list = VBoxContainer.new()
+	_list.add_theme_constant_override("separation", 1)
 	v.add_child(_list)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
 	var junk := Button.new()
 	junk.text = "Vender basura"
 	junk.pressed.connect(func() -> void: sell_junk_requested.emit())
-	v.add_child(junk)
+	buttons.add_child(junk)
 	var close := Button.new()
 	close.text = "Cerrar"
 	close.pressed.connect(close_window)
-	v.add_child(close)
+	buttons.add_child(close)
+	v.add_child(buttons)
 
 
 func show_window(d: Dictionary, vendor_name: String) -> void:
@@ -39,15 +49,15 @@ func show_window(d: Dictionary, vendor_name: String) -> void:
 		var tpl := Content.item(str(e.get("templateId", "")))
 		var row := HBoxContainer.new()
 		var name := ItemRowLabel.new()
-		name.text = "%s · %s" % [str(tpl.get("name", "?")), MoneyFormat.format(int(e.get("price", 0)))]
+		name.setup(tpl, int(e.get("price", 0)))
 		name.tooltip_bbcode = TooltipBuilder.build(tpl, 1, GameState.class_id, GameState.level, _equipped_for(tpl), int(e.get("price", 0)))
 		name.tooltip_text = ItemSlot._strip_bbcode(name.tooltip_bbcode)
-		name.add_theme_color_override("font_color", ItemSlot.RARITY_COLORS.get(str(tpl.get("rarity", "common")), Color.WHITE))
 		row.add_child(name)
 		var template_id := str(e.get("templateId", ""))
 		for qty: int in [1, 5]:
 			var b := Button.new()
 			b.text = "x%d" % qty
+			b.theme_type_variation = "SmallButton"
 			b.pressed.connect(func() -> void: Net.send("VendorBuy", {"npcId": npc_id, "templateId": template_id, "qty": qty}))
 			row.add_child(b)
 		_list.add_child(row)
@@ -71,13 +81,39 @@ static func _equipped_for(tpl: Dictionary) -> Dictionary:
 	return Content.item(str((GameState.equipment[index] as Dictionary).get("templateId", "")))
 
 
-## Nombre y precio de un item de la tienda con el tooltip del item al pasar el ratón (HU-053 en la tienda).
-class ItemRowLabel extends Label:
+## Ícono, nombre (color de rareza) y precio de un item de la tienda, con el tooltip del item al pasar el ratón (HU-053).
+class ItemRowLabel extends HBoxContainer:
 	var tooltip_bbcode: String = ""
+	var text: String = ""
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		add_theme_constant_override("separation", 3)
+
+	func setup(tpl: Dictionary, price: int) -> void:
+		var pic := PanelContainer.new()
+		pic.theme_type_variation = "SlotPanel"
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var tex := TextureRect.new()
+		tex.texture = UiTheme.icon(str(tpl.get("icon", "")))
+		tex.custom_minimum_size = Vector2(16, 16)
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pic.add_child(tex)
+		add_child(pic)
+		var name := Label.new()
+		name.text = str(tpl.get("name", "?"))
+		name.add_theme_color_override("font_color", ItemSlot.RARITY_COLORS.get(str(tpl.get("rarity", "common")), Color.WHITE))
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(name)
+		var cost := Label.new()
+		cost.text = MoneyFormat.format(price)
+		cost.add_theme_color_override("font_color", UiTheme.ACCENT)
+		cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(cost)
+		text = "%s · %s" % [name.text, cost.text]
 
 	func _make_custom_tooltip(_for_text: String) -> Object:
 		return RichTooltip.make(tooltip_bbcode) if not tooltip_bbcode.is_empty() else null

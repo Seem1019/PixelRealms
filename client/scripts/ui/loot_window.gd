@@ -11,20 +11,28 @@ var _names: Dictionary = {}  # entity_id → nombre (lo rellena el mundo)
 
 func _ready() -> void:
 	visible = false
+	custom_minimum_size = Vector2(170, 0)
 	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
 	add_child(v)
+	v.add_child(InventoryWindow.title_row("Botín"))
 	_gold = Label.new()
+	_gold.add_theme_color_override("font_color", UiTheme.ACCENT)
 	v.add_child(_gold)
 	_list = VBoxContainer.new()
+	_list.add_theme_constant_override("separation", 1)
 	v.add_child(_list)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
 	var all := Button.new()
 	all.text = "Tomar todo"
 	all.pressed.connect(func() -> void: Net.send("LootTakeAll", {"lootId": loot_id}))
-	v.add_child(all)
+	buttons.add_child(all)
 	var close := Button.new()
 	close.text = "Cerrar"
 	close.pressed.connect(func() -> void: visible = false)
-	v.add_child(close)
+	buttons.add_child(close)
+	v.add_child(buttons)
 
 
 func show_window(d: Dictionary, names: Dictionary) -> void:
@@ -44,6 +52,8 @@ func show_window(d: Dictionary, names: Dictionary) -> void:
 		var free := int(e.get("freeInMs", 0)) <= 0
 		var owner_name: String = str(_names.get(owner_id, "#%d" % owner_id)) if owner_id > 0 else "—"
 		b.text = "%s ×%d  (%s)" % [str(tpl.get("name", "?")), int(e.get("qty", 1)), "tuyo" if mine else owner_name]
+		b.icon = UiTheme.icon(str(tpl.get("icon", "")))
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_color_override("font_color", ItemSlot.RARITY_COLORS.get(str(tpl.get("rarity", "common")), Color.WHITE))
 		if not mine and not free:
 			b.modulate.a = 0.45

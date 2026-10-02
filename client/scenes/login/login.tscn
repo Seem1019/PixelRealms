@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://login0000000001"]
+[gd_scene load_steps=4 format=3 uid="uid://login0000000001"]
 
 [ext_resource type="Script" path="res://scenes/login/login.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/world_backdrop.gd" id="2"]
+[ext_resource type="Texture2D" path="res://assets/ui/logo.png" id="3"]
 
 [node name="Login" type="Control"]
 layout_mode = 3
@@ -9,94 +11,120 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.117647, 0.164706, 0.227451, 1)
+script = ExtResource("2")
 
-[node name="Panel" type="VBoxContainer" parent="."]
+[node name="Logo" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -154.0
+offset_top = 14.0
+offset_right = 154.0
+offset_bottom = 56.0
+texture = ExtResource("3")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Tagline" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 58.0
+offset_right = 120.0
+offset_bottom = 67.0
+theme_type_variation = &"OutlinedLabel"
+theme_override_colors/font_color = Color(0.780392, 0.721569, 0.627451, 1)
+text = "Un pequeño mundo para jugar con amigos"
+horizontal_alignment = 1
+
+[node name="Frame" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -90.0
-offset_right = 100.0
-offset_bottom = 90.0
+offset_left = -84.0
+offset_top = -36.0
+offset_right = 84.0
+offset_bottom = 84.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="VBoxContainer" parent="Frame"]
+layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Title" type="Label" parent="Panel"]
+[node name="Title" type="Label" parent="Frame/Panel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "PixelRealms"
+theme_type_variation = &"TitleLabel"
+text = "Entrar al reino"
 horizontal_alignment = 1
 
-[node name="UsernameLabel" type="Label" parent="Panel"]
+[node name="UsernameLabel" type="Label" parent="Frame/Panel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_type_variation = &"SmallLabel"
 text = "Usuario"
 
-[node name="Username" type="LineEdit" parent="Panel"]
+[node name="Username" type="LineEdit" parent="Frame/Panel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
 placeholder_text = "3-20 letras, números o _"
 max_length = 20
 
-[node name="UsernameError" type="Label" parent="Panel"]
+[node name="UsernameError" type="Label" parent="Frame/Panel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.917647, 0.309804, 0.211765, 1)
+autowrap_mode = 2
 
-[node name="PasswordLabel" type="Label" parent="Panel"]
+[node name="PasswordLabel" type="Label" parent="Frame/Panel"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_type_variation = &"SmallLabel"
 text = "Contraseña"
 
-[node name="Password" type="LineEdit" parent="Panel"]
+[node name="Password" type="LineEdit" parent="Frame/Panel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
 placeholder_text = "mínimo 8 caracteres"
 secret = true
 
-[node name="PasswordError" type="Label" parent="Panel"]
+[node name="PasswordError" type="Label" parent="Frame/Panel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.917647, 0.309804, 0.211765, 1)
+autowrap_mode = 2
 
-[node name="Remember" type="CheckBox" parent="Panel"]
+[node name="Remember" type="CheckBox" parent="Frame/Panel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
 text = "Recordar usuario"
 
-[node name="Buttons" type="HBoxContainer" parent="Panel"]
+[node name="Buttons" type="HBoxContainer" parent="Frame/Panel"]
 layout_mode = 2
 alignment = 1
 
-[node name="LoginButton" type="Button" parent="Panel/Buttons"]
+[node name="LoginButton" type="Button" parent="Frame/Panel/Buttons"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
 text = "Entrar"
 
-[node name="RegisterButton" type="Button" parent="Panel/Buttons"]
+[node name="RegisterButton" type="Button" parent="Frame/Panel/Buttons"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
 text = "Crear cuenta"
 
-[node name="Status" type="Label" parent="Panel"]
+[node name="Status" type="Label" parent="Frame/Panel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.976471, 0.760784, 0.168627, 1)
 horizontal_alignment = 1
 autowrap_mode = 2

@@ -19,13 +19,15 @@ var _trade_confirm: Button
 var _trade_status: Label
 var _trade_offer_items: Array[Dictionary] = []  # [{itemId, qty}]
 var _class_window: PanelContainer
+## Ancho del diálogo del maestro de clases: cabe con margen en 480 px y deja leer la descripción en 2–3 líneas.
+const CLASS_WINDOW_WIDTH := 250
 var _class_npc_id: int = -1
 ## Solicitudes que envié yo (el protocolo no distingue quién pidió): no mostrar el diálogo de aceptar.
 var _outgoing: Dictionary = {}  # "duel" | "trade" → ms de envío
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)  # tamaño de la pantalla: los hijos se centran respecto a él
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frames = VBoxContainer.new()
 	_frames.position = Vector2(UiTheme.SCREEN_MARGIN, InventoryWindow.WINDOW_TOP)
@@ -103,7 +105,8 @@ func _refresh_party() -> void:
 		var md: Dictionary = m
 		var b := Button.new()
 		b.theme_type_variation = "SmallButton"
-		b.custom_minimum_size = Vector2(110, 22)
+		b.custom_minimum_size = Vector2(110, 16)
+		b.icon = UiTheme.icon("classes/" + str(md.get("classId", "")))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var online := bool(md.get("online", true))
 		b.text = "%s %s nv%d  %d%%%s" % [str(md.get("name", "")), UiText.class_name_of(str(md.get("classId", ""))), int(md.get("level", 0)), int(md.get("hpPct", 0)), "" if online else " (desc.)"]
@@ -239,7 +242,7 @@ func _on_trade(d: Dictionary) -> void:
 			var mine_ok := bool(d.get("confirmedMine", false))
 			var theirs_ok := bool(d.get("confirmedTheirs", false))
 			var reason := str(d.get("reason", "")) if d.get("reason") != null else ""
-			_trade_status.text = "Tú: %s · Él: %s%s" % ["✔" if mine_ok else "…", "✔" if theirs_ok else "…", ("  (%s)" % ApiMessages.text_for(reason)) if not reason.is_empty() else ""]
+			_trade_status.text = "Tú: %s · Él: %s%s" % ["listo" if mine_ok else "…", "listo" if theirs_ok else "…", ("  (%s)" % ApiMessages.text_for(reason)) if not reason.is_empty() else ""]
 			_trade_confirm.disabled = mine_ok
 		"completed", "cancelled":
 			_trade.visible = false
@@ -278,13 +281,18 @@ func _build_class_window() -> void:
 func open_class_change(npc_id: int) -> void:
 	_class_npc_id = npc_id
 	for c: Node in _class_window.get_children():
+		_class_window.remove_child(c)
 		c.queue_free()
 	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
 	_class_window.add_child(v)
-	var title := Label.new()
-	title.text = "Cambiar de clase (conservas nivel, objetos y oro)"
-	title.theme_type_variation = "TitleLabel"
-	v.add_child(title)
+	v.add_child(InventoryWindow.title_row("Maestro de clases"))
+	var intro := Label.new()
+	intro.text = "Cambia de clase: conservas nivel, objetos y oro."
+	intro.theme_type_variation = "SmallLabel"
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	intro.custom_minimum_size = Vector2(CLASS_WINDOW_WIDTH, 0)
+	v.add_child(intro)
 	for c: Variant in Content.classes():
 		var cd: Dictionary = c
 		var id := str(cd.get("id", ""))
@@ -294,7 +302,8 @@ func open_class_change(npc_id: int) -> void:
 		b.theme_type_variation = "SmallButton"
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.custom_minimum_size = Vector2(220, 0)
+		b.icon = UiTheme.icon("classes/" + id)
+		b.custom_minimum_size = Vector2(CLASS_WINDOW_WIDTH, 0)
 		b.text = "%s · %s · %s\n%s" % [str(cd.get("name", id)), UiText.role(str(cd.get("role", ""))), UiText.resource(str(cd.get("resource", ""))), str(cd.get("description", ""))]
 		b.pressed.connect(func() -> void:
 			Net.send("ChangeClass", {"npcId": _class_npc_id, "classId": id, "reqId": Net.next_req_id()})
@@ -302,8 +311,20 @@ func open_class_change(npc_id: int) -> void:
 		v.add_child(b)
 	var close := Button.new()
 	close.text = "Cerrar"
+	close.size_flags_horizontal = Control.SIZE_SHRINK_END
 	close.pressed.connect(func() -> void: _class_window.visible = false)
 	v.add_child(close)
 	_class_window.visible = true
-	UiTheme.dock(_class_window, Control.PRESET_CENTER)
+	_dock_class_window()
 	UiTheme.bring_to_front(_class_window)
+	# El tamaño mínimo de los textos con salto de línea se conoce un cuadro después: se vuelve a centrar entonces.
+	_dock_class_window.call_deferred()
+
+
+## Centrado con su tamaño real y siempre dentro de los 480×270 (antes quedaba fuera por arriba a la izquierda).
+func _dock_class_window() -> void:
+	if not is_instance_valid(_class_window):
+		return
+	_class_window.reset_size()
+	UiTheme.dock(_class_window, Control.PRESET_CENTER)
+	UiTheme.clamp_to_screen(_class_window)
