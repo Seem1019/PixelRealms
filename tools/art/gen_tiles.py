@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import random
+import zlib
 
 import numpy as np
 
@@ -574,7 +575,7 @@ def crown(seed: int, base: str, light: str, dark: str, highlight: str) -> np.nda
 def ruin_tile(kind: str) -> np.ndarray:
     """Muro de piedra en ruinas: 'top' (cara superior con musgo) o 'front' (cara de sillares)."""
     t = tile()
-    rnd = random.Random(hash(kind) & 0xFFFF)
+    rnd = random.Random(zlib.crc32(kind.encode()) & 0xFFFF)
     if kind == "top":
         t[:, :] = rgba("lavgray")
         for y in range(T):
