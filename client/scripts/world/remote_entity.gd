@@ -1,7 +1,8 @@
 class_name RemoteEntity
 extends Node2D
 ## Entidad remota (jugador, monstruo, NPC) dibujada a partir de EntitySpawn + Snapshot (HU-023, HU-024).
-## Posición interpolada 100 ms atrás con InterpolationBuffer; nombre encima (blanco; azul para el grupo, HU-061).
+## Posición interpolada 100 ms atrás con InterpolationBuffer; nombre encima (blanco; azul para el grupo, HU-061) y barra de
+## vida entre el nombre y el cuerpo (jugadores y monstruos vivos; los NPC no combaten).
 
 const PLAYER_COLOR := Color(0.55, 0.75, 1.0)
 const MONSTER_COLOR := Color(0.9, 0.35, 0.3)
@@ -27,6 +28,7 @@ var _body: ColorRect
 var _label: Label
 var _level_label: Label
 var _cast_bar: ColorRect
+var health_bar: HealthBar
 
 
 func _ready() -> void:
@@ -64,6 +66,10 @@ func _ready() -> void:
 	_cast_bar.color = Color(0.9, 0.7, 0.2)
 	_cast_bar.visible = false
 	add_child(_cast_bar)
+	health_bar = HealthBar.new()
+	health_bar.position = Vector2(0, -14)
+	add_child(health_bar)
+	_refresh_health_bar()
 	refresh_level_color()
 
 
@@ -86,6 +92,7 @@ func setup(d: Dictionary) -> void:
 	if _body != null:
 		_body.color = _color_for_kind()
 	hostile = kind == "monster"
+	_refresh_health_bar()
 	refresh_level_color()
 
 
@@ -95,6 +102,7 @@ func apply_state(e: Dictionary, now_ms: float) -> void:
 	dir = str(e.get("dir", dir))
 	hp_pct = int(e.get("hpPct", hp_pct))
 	anim = str(e.get("anim", anim))
+	_refresh_health_bar()
 
 
 func _process(_delta: float) -> void:
@@ -112,6 +120,13 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if selected:
 		draw_arc(Vector2(0, 3), 7.0, 0, TAU, 24, Color(1, 0.2, 0.2) if hostile else Color(0.2, 1, 0.3), 1.0)
+
+
+func _refresh_health_bar() -> void:
+	if health_bar == null:
+		return
+	health_bar.pct = hp_pct
+	health_bar.visible = kind != "npc" and anim != "dead" and hp_pct > 0
 
 
 ## HU-031 CA4: nivel coloreado según la diferencia con el mío (gris ≤ −5, verde −3..−4, amarillo ±2, naranja +3..+4, rojo ≥ +5).

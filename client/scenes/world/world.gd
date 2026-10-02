@@ -30,6 +30,8 @@ const ZONE_FADE_SEC := 2.0
 var map: TmjMap
 var prediction: Prediction = Prediction.new()
 var _movement: MovementDriver = MovementDriver.new()
+## Barra de vida sobre el personaje propio (las remotas las lleva RemoteEntity).
+var _self_health: HealthBar
 var in_world: bool = false
 
 var _remotes: Dictionary = {}  # id → RemoteEntity
@@ -71,6 +73,10 @@ func _ready() -> void:
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
+	_self_health = HealthBar.new()
+	_self_health.position = Vector2(0, -14)
+	_player.add_child(_self_health)
+	GameState.vitals_changed.connect(_refresh_self_health)
 	_player.visible = false
 	_zone_label.modulate.a = 0.0
 	_fade.modulate.a = 0.0
@@ -124,6 +130,11 @@ func _on_welcome(d: Dictionary) -> void:
 	_camera.position = Vector2.ZERO
 	_camera.reset_smoothing()
 	in_world = true
+
+
+func _refresh_self_health() -> void:
+	_self_health.pct = roundi(100.0 * GameState.hp / maxf(1.0, GameState.max_hp))
+	_self_health.visible = not GameState.is_dead
 
 
 func _load_map(map_id: String) -> void:

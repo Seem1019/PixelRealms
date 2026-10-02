@@ -74,6 +74,30 @@ func test_class_change_welcome_keeps_the_world_and_applies_the_new_class() -> vo
 	assert_eq(GameState.auras_of(7).size(), 1, "las auras de otros no cambian con mi clase")
 
 
+# --- Punto 2: barras de vida sobre las entidades ---------------------------------------------------------------------
+
+func test_health_bars_follow_hp_for_monsters_players_and_self() -> void:
+	_welcome()
+	_dispatch("EntitySpawn", {"id": 7, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 120.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 60, "flags": 0})
+	_dispatch("EntitySpawn", {"id": 8, "kind": "player", "templateId": "warrior", "name": "Bob", "x": 90.0, "y": 100.0, "dir": "s", "level": 2, "classId": "warrior", "hpPct": 100, "flags": 0})
+	_dispatch("EntitySpawn", {"id": 9, "kind": "npc", "templateId": "vendor", "name": "Marta", "x": 110.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	await get_tree().process_frame
+	var slime: RemoteEntity = _world._remotes[7]
+	assert_true(slime.health_bar.visible)
+	assert_eq(slime.health_bar.pct, 60)
+	assert_true((_world._remotes[8] as RemoteEntity).health_bar.visible)
+	assert_false((_world._remotes[9] as RemoteEntity).health_bar.visible, "los NPC no combaten")
+	_dispatch("Snapshot", {"tick": 12, "ackSeq": 0, "self": {"x": 100.0, "y": 100.0, "speed": 4.0, "hp": 25, "maxHp": 100, "res": 40, "maxRes": 60},
+		"ents": [{"id": 7, "x": 120.0, "y": 100.0, "dir": "w", "hpPct": 30, "anim": "idle"}]})
+	await get_tree().process_frame
+	assert_eq(slime.health_bar.pct, 30)
+	assert_eq(_world._self_health.pct, 25, "la propia también, encima del personaje")
+	_dispatch("Snapshot", {"tick": 14, "ackSeq": 0, "self": {"x": 100.0, "y": 100.0, "speed": 4.0, "hp": 25, "maxHp": 100, "res": 40, "maxRes": 60},
+		"ents": [{"id": 7, "x": 120.0, "y": 100.0, "dir": "w", "hpPct": 0, "anim": "dead"}]})
+	await get_tree().process_frame
+	assert_false(slime.health_bar.visible, "el cadáver no muestra barra")
+
+
 # --- Punto 5: círculos de área que no desaparecían -------------------------------------------------------------------
 
 func _welcome_with_area_spell() -> void:
