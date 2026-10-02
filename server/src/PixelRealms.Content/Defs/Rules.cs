@@ -127,6 +127,10 @@ public sealed record CombatRules
     public required double MitigationCap { get; init; }
     public required double BasicAttackPowerDivisor { get; init; }
     public required double CastRangeToleranceTiles { get; init; }
+    /// <summary>Cuadro del cuerpo (el que dibuja el cliente) respecto a los pies: un área alcanza a quien lo toque.</summary>
+    public required double BodyHalfWidthTiles { get; init; }
+    public required double BodyHeightAboveFeetTiles { get; init; }
+    public required double BodyDepthBelowFeetTiles { get; init; }
     public required double InCombatWindowSec { get; init; }
     public required double HpRegenDelaySec { get; init; }
     public required double HpRegenPerSpi { get; init; }

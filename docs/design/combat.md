@@ -18,7 +18,12 @@ aquí se citan los valores por defecto para poder leer las fórmulas. Cambio de 
   `rules.combat.interruptLockoutMs`.
 - El punto se fija en `CastStarted` (todos ven la marca en el suelo) y el área se resuelve al terminar el casteo con los
   objetivos que estén dentro en ese tick. Salir de la marca esquiva el golpe; los monstruos siguen la misma regla.
-- Sin fuego amigo. `maxTargets` elige los más cercanos al centro del área.
+- "Dentro" = el círculo toca el **cuadro del cuerpo** de la entidad, no solo el punto de sus pies: `bodyHalfWidthTiles`
+  (0,375) a cada lado, `bodyHeightAboveFeetTiles` (0,75) hacia arriba y `bodyDepthBelowFeetTiles` (0,25) hacia abajo
+  (`rules.combat`). Es el mismo cuadro que dibuja el cliente y que resalta al apuntar. La línea de visión se sigue midiendo
+  del centro a los pies (si fuera al punto del cuadro, la cabeza de quien está pegado a un muro se podría golpear a través de
+  él), y un punto apuntado dentro de una casilla que tapa la vista se rechaza con `no_los`.
+- Sin fuego amigo. `maxTargets` elige los más cercanos al centro del área (distancia al cuadro del cuerpo).
 - **Formas** (`shape`): `circle` (`aoeRadius`), `cone` (`aoeRadius` + `aoeAngleDeg`) y `line` (`aoeLength` + `aoeWidth`); el
   cono y la línea salen del lanzador en la dirección de `targetPos`. Las tres están en el schema; el círculo se implementa en
   la Fase 1 (HU-086) y el cono y la línea cuando un hechizo los use (hasta entonces, los hechizos que los usan quedan **no disponibles**: ver §Contenido no disponible).

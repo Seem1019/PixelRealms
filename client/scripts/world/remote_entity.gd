@@ -19,6 +19,12 @@ var dir: String = "down"
 var anim: String = "idle"
 
 var selected: bool = false
+## Mientras se apunta un área: esta entidad entraría (contorno blanco). Solo visual.
+var area_hint: bool = false:
+	set(value):
+		if value != area_hint:
+			area_hint = value
+			queue_redraw()
 var hostile: bool = false
 var cast_started_ms: int = -1
 var cast_duration_ms: int = 0
@@ -34,10 +40,9 @@ var health_bar: HealthBar
 func _ready() -> void:
 	y_sort_enabled = true
 	_body = ColorRect.new()
-	_body.offset_left = -6.0
-	_body.offset_top = -12.0
-	_body.offset_right = 6.0
-	_body.offset_bottom = 4.0
+	var body_rect := BodyShape.rect_px(Vector2.ZERO)  # el mismo cuadro con el que el servidor resuelve las áreas
+	_body.position = body_rect.position
+	_body.size = body_rect.size
 	_body.color = _color_for_kind()
 	add_child(_body)
 	_label = Label.new()
@@ -120,6 +125,8 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if selected:
 		draw_arc(Vector2(0, 3), 7.0, 0, TAU, 24, Color(1, 0.2, 0.2) if hostile else Color(0.2, 1, 0.3), 1.0)
+	if area_hint:
+		draw_rect(BodyShape.rect_px(Vector2.ZERO).grow(1.0), Color(1, 1, 1, 0.9), false, 1.0)
 
 
 func _refresh_health_bar() -> void:

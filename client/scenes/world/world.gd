@@ -73,6 +73,10 @@ func _ready() -> void:
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
+	var self_body := _player.get_node("Body") as ColorRect
+	var body_rect := BodyShape.rect_px(Vector2.ZERO)
+	self_body.position = body_rect.position
+	self_body.size = body_rect.size
 	_self_health = HealthBar.new()
 	_self_health.position = Vector2(0, -14)
 	_player.add_child(_self_health)
@@ -174,6 +178,7 @@ func _process(delta: float) -> void:
 		if not _aiming_spell.is_empty():
 			var mouse := get_global_mouse_position()
 			_reticle.aim_pos = mouse
+			_update_area_preview(mouse)
 			var tolerance := float(Content.rule("combat", "castRangeToleranceTiles", 0.0))
 			_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
 		_overlay.pending_inputs = prediction.pending.size()
@@ -401,6 +406,23 @@ func _start_aiming(spell: Dictionary) -> void:
 func _stop_aiming() -> void:
 	_aiming_spell = {}
 	_reticle.aiming = false
+	for r: RemoteEntity in _remotes.values():
+		r.area_hint = false
+
+
+## Mientras se apunta: marca a quién alcanzaría el área en `center` con la misma cuenta que el servidor (solo visual: las
+## posiciones de los demás llegan con ~100 ms de retraso).
+func _update_area_preview(center: Vector2) -> void:
+	var targeting := str(_aiming_spell.get("targeting", ""))
+	var candidates: Array[Dictionary] = []
+	for r: RemoteEntity in _remotes.values():
+		var affected := r.hostile if targeting == "ground_aoe_enemies" else (not r.hostile if targeting == "ground_aoe_allies" else targeting == "ground_aoe_all")
+		if affected and r.kind != "npc" and r.anim != "dead":
+			candidates.append({"id": r.entity_id, "feet_px": r.position})
+	var max_targets := mini(int(_aiming_spell.get("maxTargets", 99)), int(Content.rule("limits", "aoeMaxTargetsCap", 10)))
+	var hits := BodyShape.area_hits(center, _reticle.aim_radius_px, max_targets, candidates, map.collision if map != null else null)
+	for r: RemoteEntity in _remotes.values():
+		r.area_hint = hits.has(r.entity_id)
 
 
 func _cast_ground(spell: Dictionary, world_pos: Vector2) -> void:

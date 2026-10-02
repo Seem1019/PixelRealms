@@ -45,6 +45,33 @@ public sealed class TargetingAndEffectsTests
     }
 
     [Fact]
+    public void GroundArea_HitsWhenTheCircleTouchesTheDrawnBody_NotOnlyTheFeet()
+    {
+        // Estallido de llamas: radio 2,5 en (10, 10). El cuadro del cuerpo sube 0,75 casillas desde los pies y mide 0,75 de ancho.
+        var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "mage", 5, (4, 4))
+            .WithMonster("slime", (10, 12.6f), wanderRadius: 0)   // pies a 2,6: fuera; la parte de arriba del cuadro, dentro
+            .WithMonster("boar", (12.8f, 10), wanderRadius: 0)    // pies a 2,8: fuera; el lado izquierdo del cuadro, dentro
+            .WithMonster("wolf", (10, 7.2f), wanderRadius: 0)     // pies a 2,8 por arriba: el cuadro queda más arriba, fuera
+            .BuildWithCombat();
+        var t = Targets(w, "mage_flame_burst", pos: new Vec2(10, 10));
+        t.ShouldContain(w.Monster("slime"));
+        t.ShouldContain(w.Monster("boar"));
+        t.ShouldNotContain(w.Monster("wolf"));
+    }
+
+    [Fact]
+    public void GroundArea_TouchingTheTopOfABodyBehindAWall_DoesNotHit()
+    {
+        // El jabalí está justo al sur de un muro: la parte de arriba de su cuadro entra en la casilla del muro y el círculo la
+        // toca, pero la línea de visión se mide del centro a los pies, y el muro la corta.
+        var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "mage", 5, (4, 4))
+            .WithMonster("boar", (10.5f, 12.1f), wanderRadius: 0)
+            .BuildWithCombat();
+        w.Map.Data.Collision.SetBlocksSight(10, 11);
+        Targets(w, "mage_flame_burst", pos: new Vec2(10.5f, 9.0f)).ShouldNotContain(w.Monster("boar"));
+    }
+
+    [Fact]
     public void SelfAoeAllies_IncludesCaster_And_GroundAll_SplitsByRelation()
     {
         var w = Arena("priest");

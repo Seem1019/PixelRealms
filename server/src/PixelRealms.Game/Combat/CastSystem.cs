@@ -110,6 +110,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                     if (hasLeap) break;
                     if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
                     if (!LineOfSight.Has(map.Data.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
+                    // LineOfSight no mira la casilla de destino: apuntar dentro de un muro alcanzaría a quien está detrás.
+                    if (map.Data.Collision.BlocksSight((int)MathF.Floor(targetPos.Value.X), (int)MathF.Floor(targetPos.Value.Y))) return CastErrors.NoLos;
                 }
                 break;
         }

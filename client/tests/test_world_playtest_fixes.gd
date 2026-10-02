@@ -98,6 +98,30 @@ func test_health_bars_follow_hp_for_monsters_players_and_self() -> void:
 	assert_false(slime.health_bar.visible, "el cadáver no muestra barra")
 
 
+# --- Punto 4: el cuadro dibujado es el que alcanza el área --------------------------------------------------------------
+
+func test_drawn_body_matches_the_rules_body_box() -> void:
+	_welcome()
+	_dispatch("EntitySpawn", {"id": 7, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 120.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	await get_tree().process_frame
+	var slime: RemoteEntity = _world._remotes[7]
+	var drawn := Rect2(slime._body.position + slime.position, slime._body.size)
+	assert_eq(drawn, BodyShape.rect_px(slime.position))
+
+
+func test_aiming_highlights_who_the_area_would_hit() -> void:
+	_welcome({"hotbar": [{"slot": 0, "kind": "spell", "ref": "mage_flame_burst"}], "knownSpells": ["mage_flame_burst"]})
+	_dispatch("EntitySpawn", {"id": 7, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 160.0, "y": 201.6, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	_dispatch("EntitySpawn", {"id": 8, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 160.0, "y": 115.2, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	await get_tree().process_frame
+	_world._use_slot(0)
+	_world._update_area_preview(Vector2(160, 160))  # radio 2,5 casillas = 40 px
+	assert_true((_world._remotes[7] as RemoteEntity).area_hint, "pies a 41,6 px pero el cuadro entra")
+	assert_false((_world._remotes[8] as RemoteEntity).area_hint)
+	_world._stop_aiming()
+	assert_false((_world._remotes[7] as RemoteEntity).area_hint, "al dejar de apuntar se quita el resaltado")
+
+
 # --- Punto 5: círculos de área que no desaparecían -------------------------------------------------------------------
 
 func _welcome_with_area_spell() -> void:
