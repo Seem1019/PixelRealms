@@ -6,6 +6,8 @@ class_name TooltipBuilder
 const RARITY_COLORS := {"junk": "#9d9d9d", "common": "#ffffff", "uncommon": "#1eff00", "rare": "#0070dd", "epic": "#a335ee"}
 const AFFINITY_COLORS := {"alta": "#44dd44", "media": "#ffd54a", "baja": "#ff5555"}
 const STAT_NAMES := {"str": "Fuerza", "agi": "Agilidad", "int": "Intelecto", "spi": "Espíritu", "sta": "Aguante"}
+## La fuente pixel no tiene cursiva: las descripciones van en un color atenuado.
+const MUTED := "#c7b8a0"
 const SLOT_NAMES := {"head": "Cabeza", "neck": "Cuello", "chest": "Pecho", "hands": "Manos", "legs": "Piernas", "feet": "Pies", "ring": "Anillo", "main_hand": "Mano principal", "off_hand": "Mano secundaria"}
 
 
@@ -67,7 +69,7 @@ static func build(item: Dictionary, qty: int, class_id: String, level: int, equi
 	if level_req > 1:
 		lines.append(("[color=#ff5555]Requiere nivel %d[/color]" if level < level_req else "Requiere nivel %d") % level_req)
 	if item.has("description"):
-		lines.append("[i]%s[/i]" % str(item["description"]))
+		lines.append("[color=%s]%s[/color]" % [MUTED, str(item["description"])])
 	if buy_price >= 0:
 		lines.append("[color=#ffdb6b]Compra: %s[/color]" % MoneyFormat.format(buy_price))
 	var sell := int(item.get("sellPrice", 0))
@@ -95,7 +97,7 @@ static func build_spell(spell: Dictionary) -> String:
 	if float(spell.get("range", 0)) > 0.0:
 		lines.append("Alcance %s casillas%s" % [_num(float(spell["range"])), (" · radio %s" % _num(float(spell["aoeRadius"]))) if spell.get("aoeRadius") != null else ""])
 	if spell.has("description"):
-		lines.append("[i]%s[/i]" % str(spell["description"]))
+		lines.append("[color=%s]%s[/color]" % [MUTED, str(spell["description"])])
 	return "\n".join(lines)
 
 
