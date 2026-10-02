@@ -6,6 +6,7 @@ extends Control
 
 signal respawn_requested
 signal hotbar_pressed(slot: int)
+signal menu_requested  ## engranaje de arriba a la derecha (HU-015)
 
 const ERROR_SECONDS := 2.0
 const ERROR_FADE := 0.4
@@ -45,6 +46,7 @@ var _toast: PanelContainer
 var _error_label: Label
 var _death_panel: PanelContainer
 var _death_killer: Label
+var _menu_button: Button
 ## Capa propia por encima de las ventanas para los avisos (errores, nivel), siempre en el mismo sitio.
 var _top_layer: CanvasLayer
 
@@ -193,6 +195,18 @@ func _build() -> void:
 	_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_top_layer.add_child(_notice_label)
+
+	# Botón de menú (arriba a la derecha): engranaje sobre el mismo tablón que el resto de botones.
+	_menu_button = Button.new()
+	_menu_button.icon = UiTheme.texture("icon_menu.png")
+	_menu_button.tooltip_text = "Menú (Esc)"
+	_menu_button.focus_mode = Control.FOCUS_NONE
+	_menu_button.add_theme_constant_override("h_separation", 0)
+	_menu_button.custom_minimum_size = Vector2(18, 18)
+	_menu_button.size = Vector2(18, 18)
+	_menu_button.position = Vector2(base.x - m - 18, m)
+	_menu_button.pressed.connect(func() -> void: menu_requested.emit())
+	add_child(_menu_button)
 
 	# Pantalla de muerte (centro).
 	_death_panel = PanelContainer.new()

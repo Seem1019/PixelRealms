@@ -53,6 +53,14 @@ var _self_dir: String = "s"
 ## Animaciones y efectos de combate (HU-090, HU-091).
 var _presenter: CombatPresenter
 var _vfx: VfxLayer
+## Menú de Esc (HU-015) y qué hacer cuando el servidor confirme el Logout ("select" | "quit"; vacío = no se pidió).
+var _game_menu: GameMenu
+var _logout_after: String = ""
+var _logout_req_id: int = -1
+const CHARACTER_SELECT_SCENE := "res://scenes/character_select/character_select.tscn"
+const LOGOUT_IN_COMBAT_TEXT := "No puedes salir en combate"
+## Cambio de escena tras el Logout (los tests lo sustituyen para no salir de la escena de prueba).
+var change_scene: Callable = func(path: String) -> void: get_tree().change_scene_to_file(path)
 
 
 func _ready() -> void:
@@ -60,6 +68,7 @@ func _ready() -> void:
 	Net.register_handler("EntitySpawn", _on_entity_spawn)
 	Net.register_handler("EntityDespawn", _on_entity_despawn)
 	Net.register_handler("ChangeMap", _on_change_map)
+	Net.register_handler("LoggedOut", _on_logged_out)
 	Net.message_received.connect(_on_message)
 	Net.combat_events.connect(_on_combat_events)
 	Net.snapshot.connect(_on_snapshot)
@@ -85,6 +94,7 @@ func _ready() -> void:
 	_player.add_child(_self_visual)
 	_self_health = _self_visual.plate.health_bar
 	_setup_combat_presenter()
+	_setup_game_menu()
 	GameState.vitals_changed.connect(_refresh_self_health)
 	_player.visible = false
 	# El rótulo de zona se desvanece dentro de un CanvasGroup: así el contorno y la letra se funden juntos (sin dobles).
@@ -175,6 +185,58 @@ func _setup_combat_presenter() -> void:
 	add_child(_presenter)
 
 
+## Menú de Esc encima de las ventanas del HUD (los avisos van en una capa aún más alta, por encima del velo).
+func _setup_game_menu() -> void:
+	_game_menu = GameMenu.new()
+	_game_menu.name = "GameMenu"
+	_hud.get_parent().add_child(_game_menu)
+	_game_menu.resume_requested.connect(_game_menu.close)
+	_game_menu.character_select_requested.connect(request_logout.bind("select"))
+	_game_menu.quit_requested.connect(request_logout.bind("quit"))
+	_hud.menu_requested.connect(_toggle_game_menu)
+
+
+func _toggle_game_menu() -> void:
+	if _game_menu.is_open():
+		_game_menu.close()
+	else:
+		_open_game_menu()
+
+
+func _open_game_menu() -> void:
+	_stop_aiming()
+	_game_menu.open()
+
+
+## HU-015: pide `Logout`; la escena cambia (o el juego se cierra) cuando llega `LoggedOut`. Sin conexión no hay nada que
+## guardar en el servidor: se sale directamente.
+func request_logout(after: String) -> void:
+	if not Net.is_connected:
+		_finish_logout(after)
+		return
+	_logout_after = after
+	_logout_req_id = Net.next_req_id()
+	_game_menu.waiting = true
+	Net.send("Logout", {"reqId": _logout_req_id})
+
+
+func _on_logged_out(_d: Dictionary) -> void:
+	_finish_logout(_logout_after if not _logout_after.is_empty() else "select")
+
+
+func _finish_logout(after: String) -> void:
+	_logout_after = ""
+	in_world = false
+	Net.disconnect_from_server()  # sin reconexión: el servidor ya nos sacó
+	Net.ticket_refresher = Callable()
+	_presenter.clear()
+	GameState.reset()
+	if after == "quit":
+		get_tree().quit()
+		return
+	change_scene.call(CHARACTER_SELECT_SCENE)  # el token sigue en Api: la lista se carga sin volver a entrar
+
+
 func _entity_feet(id: int) -> Vector2:
 	if id == GameState.self_id and _player.visible:
 		return _player.position
@@ -226,7 +288,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var dx := int(Input.is_action_pressed("move_right")) - int(Input.is_action_pressed("move_left"))
 	var dy := int(Input.is_action_pressed("move_down")) - int(Input.is_action_pressed("move_up"))
-	if GameState.is_dead or _chat.is_typing():
+	if GameState.is_dead or _chat.is_typing() or _game_menu.is_open():
 		dx = 0
 		dy = 0
 	# Ticks fijos de 50 ms como el servidor (los frames físicos van a 60 Hz): un MoveInput por tick con movimiento.
@@ -322,7 +384,7 @@ func _clear_remotes() -> void:
 # --- Objetivo y combate (HU-030, HU-032, HU-033, HU-086) -------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not in_world or _chat.is_typing():
+	if not in_world or _chat.is_typing() or _game_menu.is_open():
 		return
 	if event is InputEventMouseButton and event.is_pressed():
 		var mb := event as InputEventMouseButton
@@ -363,15 +425,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("ui_cancel"):
 		if not _aiming_spell.is_empty():
 			_stop_aiming()
-		elif _loot.visible or _vendor.visible or _inventory.visible:
+		elif _loot.visible or _vendor.visible or _inventory.visible or _spellbook.visible or _character.visible:
 			_loot.visible = false
 			_vendor.close_window()
 			_inventory.visible = false
 			_inventory.vendor_mode = false
+			_spellbook.visible = false
+			_character.visible = false
 		elif not GameState.own_cast.is_empty():
 			Net.send("CancelCast")
-		else:
+		elif GameState.target_id > 0:
 			_select(-1)
+		else:
+			_open_game_menu()  # HU-015: Esc sin nada que cerrar ni cancelar abre el menú
 	elif event.is_action_pressed("target_next"):
 		_cycle_target()
 	else:
@@ -432,6 +498,8 @@ func _slot_entry(slot: int) -> Dictionary:
 
 
 func _use_slot(slot: int) -> void:
+	if _game_menu.is_open():
+		return
 	var entry := _slot_entry(slot)
 	if entry.is_empty():
 		return
@@ -742,7 +810,12 @@ func _on_disconnected(reason: String) -> void:
 	_hud_status.text = "Reconectando… (intento %d/%d)" % [Net.reconnect_attempt(), Net.MAX_ATTEMPTS] if Net.reconnect_attempt() > 0 else "Desconectado: %s" % reason
 
 
-func _on_ui_error(code: String, _req_id: int) -> void:
+func _on_ui_error(code: String, req_id: int) -> void:
+	if code == "in_combat" and req_id > 0 and req_id == _logout_req_id:
+		_logout_after = ""
+		_game_menu.waiting = false
+		_hud.show_error(LOGOUT_IN_COMBAT_TEXT)  # el menú sigue abierto para Continuar
+		return
 	match code:
 		"bad_version", "bad_ticket", "disconnected":
 			get_tree().set_meta("login_notice", ApiMessages.text_for(code))

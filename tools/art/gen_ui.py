@@ -220,6 +220,25 @@ def checkbox(checked: bool) -> np.ndarray:
     return img
 
 
+def gear_icon() -> np.ndarray:
+    """Engranaje de 12×12 para el botón de menú del HUD: latón con luz arriba a la izquierda y agujero central."""
+    img = canvas(12, 12)
+    body = [(x, y) for y in range(12) for x in range(12) if (x - 5.5) ** 2 + (y - 5.5) ** 2 <= 3.6 ** 2]
+    teeth = [(5, 0), (6, 0), (5, 11), (6, 11), (0, 5), (0, 6), (11, 5), (11, 6), (2, 1), (1, 2), (9, 1), (10, 2), (1, 9), (2, 10), (10, 9), (9, 10)]
+    for (x, y) in body + teeth:
+        put(img, x, y, "amber")
+    for (x, y) in body:
+        if x + y <= 8:
+            put(img, x, y, "gold")
+        elif x + y >= 14:
+            put(img, x, y, "clay")
+    for (x, y) in [(5, 5), (6, 5), (5, 6), (6, 6)]:
+        put(img, x, y, "ink")
+    put(img, 4, 3, "cream")
+    put(img, 3, 4, "cream")
+    return outline(img)
+
+
 def build() -> None:
     parts = {
         "ui/panel.png": (frame(24, 24, ("grape_d", "outline"), 255), 7),
@@ -249,6 +268,7 @@ def build() -> None:
         "ui/separator.png": (separator(), 0),
         "ui/check_on.png": (checkbox(True), 0),
         "ui/check_off.png": (checkbox(False), 0),
+        "ui/icon_menu.png": (gear_icon(), 0),
     }
     for rel, (img, margin) in parts.items():
         save(img, rel)
