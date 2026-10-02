@@ -68,5 +68,5 @@
    "loop": false
   }
  },
- "note": "w = e espejado; hurt y death por direcci\u00f3n; generado por tools/art/gen_chars.py"
+ "note": "w = e espejado; importado de tools/art/refs/mage_sheet.webp por tools/art/import_heroes.py"
 }
