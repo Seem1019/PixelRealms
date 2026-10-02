@@ -97,6 +97,23 @@ func test_logout_in_combat_shows_the_toast_and_keeps_the_menu() -> void:
 	assert_eq(str(w.get("_logout_after")), "", "ya no espera el LoggedOut")
 
 
+func test_logout_rejected_without_req_id_releases_the_menu() -> void:
+	# Un servidor que no conoce Logout responde invalid_payload sin reqId: el menú no puede quedarse esperando para siempre.
+	var w := await _world()
+	var menu: GameMenu = w.get("_game_menu")
+	var hud: CombatHud = w.get("_hud")
+	menu.open()
+	w.set("_logout_req_id", 78)
+	w.set("_logout_after", "quit")
+	menu.waiting = true
+	Net._dispatch(JSON.stringify({"t": "Error", "d": {"code": "invalid_payload"}}))
+	await get_tree().process_frame
+	assert_true(menu.is_open())
+	assert_false(menu.button("Salir del juego").disabled, "se puede volver a intentar")
+	assert_eq(str(w.get("_logout_after")), "", "ya no espera el LoggedOut")
+	assert_eq((hud.get("_error_label") as Label).text, "No se pudo salir: el servidor rechazó la petición")
+
+
 func test_reset_clears_the_previous_character() -> void:
 	await _world()
 	GameState.set_target(9)
