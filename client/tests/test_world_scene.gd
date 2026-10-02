@@ -113,7 +113,8 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 
 	# Social: chat, grupo, duelo, intercambio, cambio de clase, libro y panel.
 	_dispatch("ChatMessage", {"channel": "say", "from": "Bob", "text": "hola [b]x[/b]", "ts": 1})
-	assert_string_contains(_world._chat._log.text, "[lb]b]x[lb]/b]")
+	assert_string_contains(_world._chat._lines[-1], "[lb]b]x[lb]/b]")
+	assert_string_contains(_world._chat._log.get_parsed_text(), "hola [b]x[/b]", "se ve tal cual, sin negrita")
 	_dispatch("PartyUpdate", {"leader": "Bob", "members": []})
 	assert_true(_world._social._prompt.visible)
 	_world._social._prompt.hide()
