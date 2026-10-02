@@ -71,7 +71,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `LootWindow` | `{ lootId, gold, items: { index, templateId, qty, ownerId, freeInMs }[] }` | tras `LootOpen` |
 | `ChangeMap` | `{ mapId, x, y }` | tras `UsePortal`; sigue una AOI nueva completa |
 | `DuelUpdate` | `{ state: "requested"\|"countdown"\|"active"\|"ended"\|"declined", opponentId, winnerId?, startsInMs? }` | ciclo de vida del duelo |
-| `TradeUpdate` | `{ state: "requested"\|"open"\|"completed"\|"cancelled", partnerId, version, mine: Offer, theirs: Offer, confirmedMine, confirmedTheirs, reason? }` | ciclo de vida del intercambio |
+| `TradeUpdate` | `{ state: "requested"\|"open"\|"completed"\|"cancelled", partnerId, version, mine: Offer, theirs: Offer, confirmedMine, confirmedTheirs, reason? }` con `Offer = { items: {itemId, templateId, qty}[], gold }` | ciclo de vida del intercambio; `templateId` (aditivo) dice qué objeto ofrece cada uno. No se puede intercambiar en un duelo ni retar a duelo en un intercambio (`duel_busy` / `trade_busy`) |
 | `VendorWindow` | `{ npcId, items: { templateId, price }[] }` | |
 | `ChatMessage` | `{ channel, from, text, ts }` | |
 | `PartyUpdate` | `{ leader, members: { name, entityId?, classId, level, hpPct, online }[] }` | |

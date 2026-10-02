@@ -42,6 +42,61 @@ func _frames(n: int) -> void:
 		await get_tree().process_frame
 
 
+# --- 3: ventana de intercambio con casillas ------------------------------------------------------------------------------
+
+const PELT := "0192f0aa-0000-7000-8000-0000000000aa"
+const BREAD := "0192f0aa-0000-7000-8000-0000000000bb"
+
+
+func _open_trade(mine_items: Array, theirs_items: Array, version: int = 1) -> void:
+	_dispatch("TradeUpdate", {"state": "open", "partnerId": 8, "version": version, "mine": {"items": mine_items, "gold": 0},
+		"theirs": {"items": theirs_items, "gold": 150}, "confirmedMine": false, "confirmedTheirs": true})
+
+
+func test_trade_window_shows_both_offers_in_item_slots() -> void:
+	_welcome({"inventory": [{"id": BREAD, "templateId": "bread", "qty": 20}]})
+	_dispatch("EntitySpawn", {"id": 8, "kind": "player", "templateId": "warrior", "name": "Bob", "x": 110.0, "y": 100.0, "dir": "s", "level": 2, "classId": "warrior", "hpPct": 100, "flags": 0})
+	await _frames(1)
+	_open_trade([{"itemId": BREAD, "templateId": "bread", "qty": 20}], [{"itemId": PELT, "templateId": "wolf_pelt", "qty": 2}])
+	await _frames(2)
+	var trade: TradeWindow = _world._social._trade
+	assert_true(trade.visible)
+	assert_string_contains(trade.title_text(), "Bob", "el título dice con quién comercias")
+	assert_eq(trade.mine_slots().size(), 6)
+	assert_eq(trade.theirs_slots().size(), 6)
+	var received: ItemSlot = trade.theirs_slots()[0]
+	assert_eq(str(received.item.get("templateId", "")), "wolf_pelt", "antes solo se leía «item ×2»")
+	assert_eq(received._qty.text, "2")
+	assert_string_contains(received.tooltip_bbcode, "Piel de lobo")
+	assert_eq(str(trade.mine_slots()[0].item.get("templateId", "")), "bread")
+	assert_string_contains(trade.status_text(), "Bob")
+
+
+func test_trade_window_never_covers_the_bag() -> void:
+	_welcome()
+	await _frames(1)
+	_world._inventory.toggle()
+	_open_trade([], [])
+	await _frames(3)
+	var trade: Control = _world._social._trade
+	assert_false(trade.get_global_rect().intersects(_world._inventory.get_global_rect()), "la ventana tapaba la bolsa")
+	assert_lt(trade.size.y, UiTheme.base_size().y * 0.75, "una etiqueta con autoajuste sin ancho estiraba el panel a toda la altura")
+
+
+func test_items_are_offered_by_dragging_from_the_bag_and_removed_with_right_click() -> void:
+	_welcome({"inventory": [{"id": BREAD, "templateId": "bread", "qty": 20}]})
+	await _frames(1)
+	_open_trade([], [])
+	await _frames(1)
+	var trade: TradeWindow = _world._social._trade
+	trade._on_mine_dropped({"c": "bag", "i": 0}, {"c": "trade", "i": 0}, 0)  # soltar la casilla 0 de la bolsa
+	assert_eq(trade.offered_ids(), [BREAD] as Array[String])
+	_open_trade([{"itemId": BREAD, "templateId": "bread", "qty": 20}], [], 2)
+	trade._on_mine_right_clicked(trade.mine_slots()[0])
+	assert_true(trade.offered_ids().is_empty(), "clic derecho en tu casilla la retira")
+	assert_false(trade.mine_slots()[0].draggable, "las casillas del intercambio no se arrastran a la bolsa")
+
+
 # --- 4: en duelo el rival es un objetivo enemigo -------------------------------------------------------------------------
 
 func test_duel_opponent_is_hostile_only_while_the_duel_is_active() -> void:

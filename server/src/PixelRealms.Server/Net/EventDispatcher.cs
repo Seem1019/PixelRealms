@@ -150,7 +150,7 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     {
                         if (p.ConnectionId < 0) continue;
                         var mine = tr.Trade.OfferOf(p); var theirs = tr.Trade.OfferOf(tr.Trade.Partner(p));
-                        connections.Send(p.ConnectionId, new TradeUpdate(tr.State, tr.Trade.Partner(p).Id.Value, tr.Trade.Version, ToOffer(mine), ToOffer(theirs),
+                        connections.Send(p.ConnectionId, new TradeUpdate(tr.State, tr.Trade.Partner(p).Id.Value, tr.Trade.Version, ToOffer(mine, p), ToOffer(theirs, tr.Trade.Partner(p)),
                             tr.Trade.ConfirmedBy(p), tr.Trade.ConfirmedBy(tr.Trade.Partner(p)), tr.Reason));
                     }
                     break;
@@ -168,7 +168,9 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
     }
 
-    private static OfferDto ToOffer(TradeOfferState o) => new(o.Items.Select(i => new TradeItemDto(i.ItemId.ToString(), i.Qty)).ToList(), o.Gold);
+    /// <summary>La plantilla sale del inventario de quien ofrece: el otro no tiene el objeto y no sabría qué recibe.</summary>
+    private static OfferDto ToOffer(TradeOfferState o, Game.Entities.Player owner) =>
+        new(o.Items.Select(i => new OfferedItemDto(i.ItemId.ToString(), Game.Items.InventoryOps.Find(owner.Inventory, i.ItemId)?.TemplateId ?? "", i.Qty)).ToList(), o.Gold);
 
     private void SendPartyUpdate(Party party)
     {

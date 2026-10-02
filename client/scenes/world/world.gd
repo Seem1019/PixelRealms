@@ -86,6 +86,7 @@ func _ready() -> void:
 	_chat.bubble_requested.connect(_show_bubble)
 	_chat.command.connect(_on_chat_command)
 	_social.party_member_selected.connect(_select)
+	_social.entity_name = func(entity_id: int) -> String: return (_remotes[entity_id] as RemoteEntity).display_name if _remotes.has(entity_id) else ""
 	_inventory.offer_requested.connect(_social.offer_item)
 	GameState.duel_changed.connect(_on_duel_changed)
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)

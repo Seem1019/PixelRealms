@@ -61,7 +61,10 @@ public sealed record ChangeMap(string MapId, float X, float Y) : IServerMessage;
 
 public sealed record DuelUpdate(string State, int OpponentId, int? WinnerId, int? StartsInMs) : IServerMessage;
 
-public sealed record OfferDto(IReadOnlyList<TradeItemDto> Items, long Gold);
+/// <summary>Objeto de una oferta de intercambio tal como lo ven los dos: id de la instancia, plantilla y cantidad.</summary>
+public sealed record OfferedItemDto(string ItemId, string TemplateId, int Qty);
+
+public sealed record OfferDto(IReadOnlyList<OfferedItemDto> Items, long Gold);
 
 public sealed record TradeUpdate(string State, int PartnerId, int Version, OfferDto Mine, OfferDto Theirs, bool ConfirmedMine, bool ConfirmedTheirs, string? Reason) : IServerMessage;
 
