@@ -5,6 +5,8 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
+# .editorconfig de la raíz: sin él, los analizadores que el repo silencia (CA1716, CA1720…) rompen el build.
+COPY .editorconfig ./
 COPY server/PixelRealms.sln server/Directory.Build.props* server/Directory.Packages.props* ./server/
 COPY server/src ./server/src
 COPY server/tools ./server/tools
@@ -19,7 +21,7 @@ COPY --from=build /out ./
 COPY content ./content
 COPY maps ./maps
 ENV ASPNETCORE_ENVIRONMENT=Production \
-    ASPNETCORE_URLS=http://0.0.0.0:5080 \
+    Urls=http://0.0.0.0:5080 \
     Content__Dir=/app/content \
     Maps__Dir=/app/maps \
     DOTNET_gcServer=0
