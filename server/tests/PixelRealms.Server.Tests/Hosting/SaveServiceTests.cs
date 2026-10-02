@@ -114,8 +114,9 @@ public sealed class SaveServiceTests
         {
             var first = Dto() with { Audit = [new AuditEntry(Guid.NewGuid(), "loot", "potion_minor", 1)] };
             svc.Enqueue(first);
-            await WaitUntil(() => svc.Failed == 1);
-            svc.UnwrittenAuditCount(first.Id).ShouldBe(1);
+            // Failed sube dentro del guardado y la auditoría se aparta justo después: se espera a esto último.
+            await WaitUntil(() => svc.UnwrittenAuditCount(first.Id) == 1);
+            svc.Failed.ShouldBe(1);
 
             var next = first with { Audit = [new AuditEntry(Guid.NewGuid(), "sell", "potion_minor", 1)] };
             svc.Enqueue(next);
