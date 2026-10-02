@@ -162,7 +162,11 @@ func test_ranged_basic_attack_flies_and_shows_the_number_on_arrival() -> void:
 	assert_eq((t["a"] as EntityVisual).current_base, "attack", "el src ataca con el evento")
 	assert_eq(floating.get("_active").size(), 0, "el número espera al proyectil")
 	assert_false((t["b"] as EntityVisual).is_flashing())
-	await get_tree().create_timer(0.3).timeout
+	# El vuelo se mide con el reloj real (Time.get_ticks_msec); un create_timer cuenta tiempo de juego, que en headless
+	# avanza más rápido y llegaba antes que el proyectil. Se espera por el mismo reloj, con el tope de la HU más margen.
+	var deadline := Time.get_ticks_msec() + VfxCatalog.BASIC_TRAVEL_MAX_MS + 50
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
 	assert_eq(floating.get("_active").size(), 1, "llegó: número")
 	assert_eq((t["b"] as EntityVisual).current_base, "hurt")
 

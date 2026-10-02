@@ -20,6 +20,12 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     /// <summary>Generación más alta ya escrita en la BD por personaje.</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, long> _writtenGen = new();
 
+    /// <summary>
+    /// Auditoría de guardados que fallaron del todo, por personaje: se escribe con el siguiente guardado de ese personaje. Los
+    /// items van en el estado completo de cada guardado y no se pierden, pero la auditoría solo viaja una vez (HU-015, HU-057).
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, IReadOnlyList<AuditEntry>> _unwrittenAudit = new();
+
     private readonly record struct Queued(CharacterSaveDto Dto, long Gen);
 
     /// <summary>Plazo para vaciar la cola al apagar (HU-026 CA2).</summary>
@@ -55,6 +61,9 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     /// <summary>¿Queda algún guardado de este personaje sin escribir?</summary>
     public bool HasPending(Guid characterId) => _pendingByCharacter.TryGetValue(characterId, out var n) && n > 0;
 
+    /// <summary>Entradas de auditoría que esperan al siguiente guardado de este personaje.</summary>
+    public int UnwrittenAuditCount(Guid characterId) => _unwrittenAudit.TryGetValue(characterId, out var a) ? a.Count : 0;
+
     /// <summary>
     /// Espera (fuera del tick) a que se escriban los guardados encolados de un personaje, como mucho `timeout`: así quien sale
     /// a la selección y vuelve a entrar enseguida lee de la BD el estado con el que salió (HU-015 CA5).
@@ -78,7 +87,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         {
             await foreach (var item in _queue.Reader.ReadAllAsync(stoppingToken))
             {
-                Done(item, await SaveWithRetryAsync(item.Dto, CancellationToken.None));
+                Done(item, await WriteAsync(item.Dto, CancellationToken.None));
                 // ReadAllAsync no mira el token entre elementos ya encolados: al apagar, el resto lo vacía StopAsync.
                 if (stoppingToken.IsCancellationRequested) break;
             }
@@ -111,7 +120,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             while (!cts.IsCancellationRequested && _queue.Reader.TryRead(out var next))
             {
                 current = next;
-                Done(next, await SaveWithRetryAsync(next.Dto, cts.Token));
+                Done(next, await WriteAsync(next.Dto, cts.Token));
                 current = null;
                 drained++;
             }
@@ -130,7 +139,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         }
     }
 
-    /// <summary>Saca y loguea lo que quede en la cola; solo cuando ya no hay otro lector.</summary>
+    /// <summary>Saca y loguea lo que quede en la cola, y la auditoría que esperaba otro guardado; solo cuando ya no hay otro lector.</summary>
     private void LogRemaining(string reason)
     {
         while (_queue.Reader.TryRead(out var left))
@@ -138,12 +147,28 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             Done(left, written: false);
             LogLost(left.Dto, reason);
         }
+        foreach (var characterId in _unwrittenAudit.Keys)
+            if (_unwrittenAudit.TryRemove(characterId, out var audit))
+                logger.LogError("Auditoría del personaje {CharacterId} no escrita ({Reason}): {Audit}", characterId, reason, System.Text.Json.JsonSerializer.Serialize(audit));
     }
 
     private void LogLost(CharacterSaveDto dto, string reason)
     {
         Interlocked.Increment(ref _failed);
         logger.LogError("Guardado de {Name} no escrito ({Reason}). DTO: {Dto}", dto.Name, reason, System.Text.Json.JsonSerializer.Serialize(dto));
+    }
+
+    /// <summary>Guarda un DTO de la cola sumándole la auditoría de guardados fallidos anteriores; si falla, la conserva para el siguiente.</summary>
+    private async Task<bool> WriteAsync(CharacterSaveDto dto, CancellationToken ct)
+    {
+        if (_unwrittenAudit.TryRemove(dto.Id, out var carried)) dto = dto with { Audit = [.. carried, .. dto.Audit] };
+        var written = false;
+        try { written = await SaveWithRetryAsync(dto, ct); }
+        finally
+        {
+            if (!written && dto.Audit.Count > 0) _unwrittenAudit[dto.Id] = dto.Audit;
+        }
+        return written;
     }
 
     /// <summary>Guarda de inmediato (uso en tests y en el apagado). Devuelve si quedó escrito.</summary>

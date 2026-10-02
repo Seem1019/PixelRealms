@@ -104,35 +104,96 @@ public sealed class LogoutTests
     }
 
     [Fact]
-    public async Task Logout_CancelsTheCast_TheTradeAndTheDuel_ForEveryoneInvolved() // CA3
+    public async Task Logout_CancelsTheCastAndTheTrade_ForThePartner() // CA3 (un duelo y un intercambio ya no pueden coincidir)
     {
         await using var server = await TestServer.StartAsync();
         var (anaApi, _, ana, anaId) = await Enter(server, "ana", "Ana", "priest");
-        var (bobApi, _, bob, bobId) = await Enter(server, "bob", "Bob", "mage");
-        var (calApi, _, cal, _) = await Enter(server, "cal", "Cal", "rogue");
-        using (anaApi) using (bobApi) using (calApi)
+        var (bobApi, _, bob, _) = await Enter(server, "bob", "Bob", "mage");
+        using (anaApi) using (bobApi)
         {
             await bob.ExpectForIdAsync("EntitySpawn", anaId);
             await ana.SendAsync("TradeRequest", """{"name":"Bob"}""");
             await bob.ExpectAsync("TradeUpdate", x => x.GetProperty("state").GetString() == "requested");
             await bob.SendAsync("TradeRespond", """{"accept":true}""");
             await bob.ExpectAsync("TradeUpdate", x => x.GetProperty("state").GetString() == "open");
-            await ana.SendAsync("DuelRequest", """{"name":"Cal"}""");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "requested");
-            await cal.SendAsync("DuelRespond", """{"accept":true}""");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "countdown");
             await ana.SendAsync("CastSpell", """{"spellId":"priest_heal","reqId":3}""");
             await bob.ExpectAsync("CastStarted", x => x.GetProperty("casterId").GetInt32() == anaId);
 
             await ana.SendAsync("Logout");
             await ana.ExpectAsync("LoggedOut");
             await bob.ExpectAsync("TradeUpdate", x => x.GetProperty("state").GetString() == "cancelled");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended");
             // El casteo se cancela sin coste: los demás la ven salir (EntityDespawn quita su barra) y la cura nunca se resuelve.
             await bob.ExpectForIdAsync("EntityDespawn", anaId);
             (await bob.ArrivesAsync("CastEnded", x => x.GetProperty("casterId").GetInt32() == anaId && x.GetProperty("result").GetString() == "done", 1800)).ShouldBeFalse();
-            server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(2);
-            await ana.DisposeAsync(); await bob.DisposeAsync(); await cal.DisposeAsync();
+            server.Services.GetRequiredService<PlayerRegistry>().Count.ShouldBe(1);
+            await ana.DisposeAsync(); await bob.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_EndsTheDuel_ForTheOpponent() // CA3
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, _, ana, anaId) = await Enter(server, "ana", "Ana", "priest");
+        var (calApi, _, cal, _) = await Enter(server, "cal", "Cal", "rogue");
+        using (anaApi) using (calApi)
+        {
+            await cal.ExpectForIdAsync("EntitySpawn", anaId);
+            await ana.SendAsync("DuelRequest", """{"name":"Cal"}""");
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "requested");
+            await cal.SendAsync("DuelRespond", """{"accept":true}""");
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "countdown");
+
+            await ana.SendAsync("Logout");
+            await ana.ExpectAsync("LoggedOut");
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended");
+            await ana.DisposeAsync(); await cal.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_ThenReentry_KeepsTheSpellCooldownRunning() // HU-015 pendiente: los cooldowns no se reiniciaban
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, anaChar, ana, _) = await Enter(server, "ana", "Ana", "warrior");
+        using (anaApi)
+        {
+            var registry = server.Services.GetRequiredService<PlayerRegistry>();
+            await server.RunOnTickAsync(tick => registry.All.Single().Combat.CooldownEndsAtMs["warrior_charge"] = tick.NowMs + 12_000); // recarga de 16 s
+
+            await ana.SendAsync("Logout");
+            await ana.ExpectAsync("LoggedOut");
+            await using var again = await Connect(server, anaApi, anaChar);
+            await again.ExpectAsync("Welcome");
+            var cd = await again.ExpectAsync("Cooldown", x => x.GetProperty("spellId").GetString() == "warrior_charge");
+            cd.GetProperty("remainingMs").GetInt32().ShouldBeInRange(8_000, 12_000);
+            await ana.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_DropsThePlayersThreatAndTagsOnMonsters() // HU-015: sin XP ni botín para un ausente
+    {
+        await using var server = await TestServer.StartAsync();
+        var (anaApi, _, ana, _) = await Enter(server, "ana", "Ana", "warrior");
+        using (anaApi)
+        {
+            var session = server.Services.GetRequiredService<WorldSession>();
+            var registry = server.Services.GetRequiredService<PlayerRegistry>();
+            var world = server.Services.GetRequiredService<PixelRealms.Game.Core.World>();
+            await server.RunOnTickAsync(tick =>
+            {
+                var p = registry.All.Single();
+                var monster = world.GetInstance(p.MapInstanceId)!.Monsters.Values.First();
+                monster.Threat.Add(p.Id, 50);
+                monster.TaggedBy = p.Id;
+
+                session.Logout(p, tick).ShouldBeNull(); // en el mismo tick: el monstruo no llega a meterla en combate
+
+                monster.Threat.Contains(p.Id).ShouldBeFalse();
+                monster.TaggedBy.ShouldBeNull();
+            });
+            await ana.DisposeAsync();
         }
     }
 

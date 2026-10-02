@@ -18,6 +18,8 @@ var container: String = "bag"
 var index: int = 0
 var item: Dictionary = {}  # {id, templateId, qty} o vacío
 var accepts_drops: bool = true
+## false en casillas que solo muestran (intercambio): arrastrarlas a la bolsa no significa nada.
+var draggable: bool = true
 ## Cantidad fijada por Shift+clic para el próximo arrastre (0 = todo).
 var pending_split_qty: int = 0
 ## Tooltip propio (RichTooltip) con colores de rareza y comparación.
@@ -154,7 +156,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _get_drag_data(_at: Vector2) -> Variant:
-	if item.is_empty():
+	if item.is_empty() or not draggable:
 		return null
 	set_drag_preview(ItemSlot.drag_preview(_icon.texture))
 	var qty := pending_split_qty if pending_split_qty > 0 else 0

@@ -126,6 +126,7 @@ public static class ServerApp
         var router = app.Services.GetRequiredService<MessageRouter>();
         var worldSession = app.Services.GetRequiredService<WorldSession>();
         app.Services.GetRequiredService<PlayerMapper>().MapIdOf = worldSession.MapIdOf;
+        app.Services.GetRequiredService<PlayerMapper>().NowMs = () => simulation.Clock.NowMs;
         worldSession.Combat = app.Services.GetRequiredService<CombatModule>();
         router.AddObserver(worldSession);
         router.Register(new PingHandler());

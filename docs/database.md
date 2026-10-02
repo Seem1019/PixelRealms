@@ -9,6 +9,7 @@ erDiagram
   accounts ||--o{ characters : tiene
   characters ||--o{ character_items : posee
   characters ||--o{ character_hotbar : configura
+  characters ||--o{ character_cooldowns : recarga
   characters ||--o{ item_audit_log : genera
   accounts {
     uuid id PK
@@ -48,6 +49,12 @@ erDiagram
     smallint slot PK "0..7 (0–3 hechizos, 4–7 utilizables)"
     smallint kind "0=spell 1=item"
     text ref
+  }
+  character_cooldowns {
+    uuid character_id PK,FK
+    smallint kind PK "0=spell 1=item (plantilla de consumible)"
+    varchar48 ref PK
+    timestamptz ends_at "fin en reloj real: sigue corriendo desconectado (HU-015)"
   }
   item_audit_log {
     bigint id PK

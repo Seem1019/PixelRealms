@@ -109,6 +109,7 @@ public sealed class InMemoryCharacterRepository(InMemoryStore store) : ICharacte
             c.UpdatedAt = DateTime.UtcNow;
             c.Items = character.Items.Select(i => new CharacterItem { Id = i.Id, CharacterId = c.Id, TemplateId = i.TemplateId, Quantity = i.Quantity, Container = i.Container, Slot = i.Slot }).ToList();
             c.Hotbar = character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = c.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }).ToList();
+            c.Cooldowns = (character.Cooldowns ?? []).Select(x => new CharacterCooldown { CharacterId = c.Id, Kind = x.Kind, Ref = x.Ref, EndsAt = x.EndsAtUtc }).ToList();
             foreach (var a in character.Audit)
                 store.Audit.Enqueue(new ItemAuditLog { Id = store.NextAuditId(), ItemId = a.ItemId, CharacterId = c.Id, Action = a.Action, TemplateId = a.TemplateId, Quantity = a.Quantity, At = DateTime.UtcNow, CounterpartyCharacterId = a.CounterpartyCharacterId });
         }
@@ -128,5 +129,6 @@ public sealed class InMemoryCharacterRepository(InMemoryStore store) : ICharacte
 
     private static CharacterSaveDto Map(Character c) => new(c.Id, c.AccountId, c.Name, c.ClassId, c.Level, c.Xp, c.Gold, c.MapId, c.X, c.Y, c.Hp, c.Resource,
         c.Items.Select(i => new SavedItem(i.Id, i.TemplateId, i.Quantity, i.Container, i.Slot)).ToList(),
-        c.Hotbar.Select(h => new SavedHotbarSlot(h.Slot, h.Kind, h.Ref)).ToList(), []);
+        c.Hotbar.Select(h => new SavedHotbarSlot(h.Slot, h.Kind, h.Ref)).ToList(), [],
+        c.Cooldowns.Select(x => new SavedCooldown(x.Kind, x.Ref, x.EndsAt)).ToList());
 }

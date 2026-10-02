@@ -67,6 +67,7 @@ var _range_ring: RangeRing
 const STUCK_TEXT := "No puedes llegar hasta el objetivo"
 ## Envío de mensajes (los tests lo sustituyen para ver qué se manda sin servidor).
 var send_fn: Callable = func(type: String, data: Dictionary) -> void: Net.send(type, data)
+const LOGOUT_REJECTED_TEXT := "No se pudo salir: el servidor rechazó la petición"
 ## Cambio de escena tras el Logout (los tests lo sustituyen para no salir de la escena de prueba).
 var change_scene: Callable = func(path: String) -> void: get_tree().change_scene_to_file(path)
 
@@ -96,6 +97,7 @@ func _ready() -> void:
 	_chat.bubble_requested.connect(_show_bubble)
 	_chat.command.connect(_on_chat_command)
 	_social.party_member_selected.connect(_select)
+	_social.entity_name = func(entity_id: int) -> String: return (_remotes[entity_id] as RemoteEntity).display_name if _remotes.has(entity_id) else ""
 	_inventory.offer_requested.connect(_social.offer_item)
 	GameState.duel_changed.connect(_on_duel_changed)
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
@@ -392,6 +394,8 @@ func _on_auras_changed(entity_id: int) -> void:
 	var v := _entity_visual(entity_id)
 	if v != null:
 		v.set_auras(GameState.auras_of(entity_id))
+	if id == GameState.duel_opponent_id and GameState.duel_state == "active":
+		r.hostile = true  # vuelve a entrar en la AOI en pleno duelo
 
 
 func _on_entity_despawn(d: Dictionary) -> void:
@@ -842,6 +846,10 @@ func _show_bubble(from: String, text: String) -> void:
 func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
 	for r: RemoteEntity in _remotes.values():
 		r.set_name_color(Color(1, 0.6, 0.2) if r.entity_id == opponent_id and state in ["countdown", "active"] else Color.WHITE)
+		# En pleno duelo el rival es enemigo: clic derecho lo autoataca (no abre el menú), Tab lo selecciona, anillo rojo.
+		if r.kind == "player":
+			r.hostile = r.entity_id == opponent_id and state == "active"
+			r.queue_redraw()
 
 
 func _sell_item(item: Dictionary) -> void:
@@ -945,10 +953,12 @@ func _on_disconnected(reason: String) -> void:
 
 
 func _on_ui_error(code: String, req_id: int) -> void:
-	if code == "in_combat" and req_id > 0 and req_id == _logout_req_id:
+	if not _logout_after.is_empty() and (req_id == _logout_req_id or (req_id <= 0 and code == "invalid_payload")):
+		# El Logout no salió: en combate, o un servidor que no lo entiende (invalid_payload sin reqId). El menú queda
+		# abierto y usable para Continuar o volver a intentarlo.
 		_logout_after = ""
 		_game_menu.waiting = false
-		_hud.show_error(LOGOUT_IN_COMBAT_TEXT)  # el menú sigue abierto para Continuar
+		_hud.show_error(LOGOUT_IN_COMBAT_TEXT if code == "in_combat" else LOGOUT_REJECTED_TEXT)
 		return
 	match code:
 		"bad_version", "bad_ticket", "disconnected":

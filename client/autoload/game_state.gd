@@ -37,6 +37,7 @@ var duel_opponent_id: int = -1
 var duel_state: String = ""
 var trade: Dictionary = {}  # último TradeUpdate o vacío
 var cooldowns: Dictionary = {}  # spellId → msec de fin (predicho por el cliente, corregido por `Cooldown`)
+var item_cooldowns: Dictionary = {}  # templateId → msec de fin (`Cooldown{templateId}`, compartida por plantilla)
 var gcd_end_ms: int = 0
 var rules_hash: String = ""
 ## Vida y recurso propios (espejo del Snapshot.self y del Welcome.self).
@@ -124,6 +125,7 @@ func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	is_dead = hp <= 0
 	own_cast = {}
 	cooldowns.clear()
+	item_cooldowns.clear()
 	gcd_end_ms = 0
 	if not same_connection:
 		auras.clear()
@@ -237,7 +239,13 @@ func _on_cooldown(d: Dictionary) -> void:
 		gcd_end_ms = Time.get_ticks_msec() + int(d["gcdMs"])
 	if d.get("spellId") != null and d.get("remainingMs") != null:
 		cooldowns[str(d["spellId"])] = Time.get_ticks_msec() + int(d["remainingMs"])
+	if d.get("templateId") != null and d.get("remainingMs") != null:
+		item_cooldowns[str(d["templateId"])] = Time.get_ticks_msec() + int(d["remainingMs"])
 	cooldowns_changed.emit()
+
+
+func item_cooldown_remaining_ms(template_id: String) -> int:
+	return maxi(0, int(item_cooldowns.get(template_id, 0)) - Time.get_ticks_msec())
 
 
 func cooldown_remaining_ms(spell_id: String) -> int:

@@ -11,13 +11,13 @@ var _prompt: ConfirmationDialog
 var _prompt_kind: String = ""
 var _duel_label: Label
 var _duel_until: float = 0.0
-var _trade: PanelContainer
-var _trade_mine: Label
-var _trade_theirs: Label
-var _trade_gold: SpinBox
-var _trade_confirm: Button
-var _trade_status: Label
-var _trade_offer_items: Array[Dictionary] = []  # [{itemId, qty}]
+var _trade: TradeWindow
+## Nombre de una entidad por id (lo rellena el mundo): para los avisos y la ventana de intercambio.
+var entity_name: Callable = Callable():
+	set(value):
+		entity_name = value
+		if _trade != null:
+			_trade.entity_name = value
 var _class_window: PanelContainer
 ## Ancho del diálogo del maestro de clases: cabe con margen en 480 px y deja leer la descripción en 2–3 líneas.
 const CLASS_WINDOW_WIDTH := 250
@@ -51,7 +51,6 @@ func _ready() -> void:
 	GameState.party_invited.connect(_on_party_invited)
 	GameState.duel_changed.connect(_on_duel)
 	GameState.trade_changed.connect(_on_trade)
-	GameState.inventory_changed.connect(_refresh_trade_offer_text)
 	_refresh_party()
 
 
@@ -137,7 +136,7 @@ func _on_duel(state: String, opponent_id: int, winner_id: int, starts_in_ms: int
 				return
 			_prompt_kind = "duel"
 			_prompt.title = "Duelo"
-			_prompt.dialog_text = "#%d te reta a un duelo" % opponent_id
+			_prompt.dialog_text = "%s te reta a un duelo" % _name_of(opponent_id)
 			_prompt.popup_centered()
 		"countdown":
 			_duel_label.text = "Duelo en %d…" % ceili(starts_in_ms / 1000.0)
@@ -164,59 +163,14 @@ func _respond(accept: bool) -> void:
 # --- Intercambio -------------------------------------------------------------------------------------------------------------
 
 func _build_trade() -> void:
-	_trade = PanelContainer.new()
-	_trade.visible = false
+	_trade = TradeWindow.new()
+	_trade.entity_name = entity_name
 	add_child(_trade)
-	var v := VBoxContainer.new()
-	_trade.add_child(v)
-	var title := Label.new()
-	title.text = "Intercambio (clic derecho en la bolsa para ofrecer)"
-	title.theme_type_variation = "TitleLabel"
-	v.add_child(title)
-	_trade_mine = Label.new()
-	v.add_child(_trade_mine)
-	_trade_theirs = Label.new()
-	v.add_child(_trade_theirs)
-	var gold_row := HBoxContainer.new()
-	var gl := Label.new()
-	gl.text = "Oro:"
-	gold_row.add_child(gl)
-	_trade_gold = SpinBox.new()
-	_trade_gold.min_value = 0
-	_trade_gold.max_value = 1000000000
-	_trade_gold.value_changed.connect(func(_v: float) -> void: _send_offer())
-	gold_row.add_child(_trade_gold)
-	v.add_child(gold_row)
-	_trade_status = Label.new()
-	v.add_child(_trade_status)
-	var buttons := HBoxContainer.new()
-	_trade_confirm = Button.new()
-	_trade_confirm.text = "Confirmar"
-	_trade_confirm.pressed.connect(func() -> void: Net.send("TradeConfirm", {"version": int(GameState.trade.get("version", 0))}))
-	buttons.add_child(_trade_confirm)
-	var cancel := Button.new()
-	cancel.text = "Cancelar"
-	cancel.pressed.connect(func() -> void: Net.send("TradeCancel"))
-	buttons.add_child(cancel)
-	v.add_child(buttons)
 
 
-## Añade un item de la bolsa a mi oferta (hasta 6) y la reenvía.
+## Añade un item de la bolsa a mi oferta (clic derecho en la bolsa, HU-059 CA2).
 func offer_item(item: Dictionary) -> void:
-	if not _trade.visible or _trade_offer_items.size() >= 6:
-		return
-	var id := str(item.get("id", ""))
-	for o: Dictionary in _trade_offer_items:
-		if str(o["itemId"]) == id:
-			return
-	_trade_offer_items.append({"itemId": id, "qty": int(item.get("qty", 1))})
-	_send_offer()
-
-
-func _send_offer() -> void:
-	if not _trade.visible:
-		return
-	Net.send("TradeOffer", {"items": _trade_offer_items, "gold": int(_trade_gold.value)})
+	_trade.offer_item(item)
 
 
 func _on_trade(d: Dictionary) -> void:
@@ -229,44 +183,19 @@ func _on_trade(d: Dictionary) -> void:
 			elif not _prompt.visible:
 				_prompt_kind = "trade"
 				_prompt.title = "Intercambio"
-				_prompt.dialog_text = "#%d quiere intercambiar contigo" % int(d.get("partnerId", -1))
+				_prompt.dialog_text = "%s quiere intercambiar contigo" % _name_of(int(d.get("partnerId", -1)))
 				_prompt.popup_centered()
 		"open":
-			if not _trade.visible:
-				_trade_offer_items.clear()
-				_trade_gold.set_value_no_signal(0)
-			_trade.visible = true
-			UiTheme.dock(_trade, Control.PRESET_CENTER)
-			UiTheme.bring_to_front(_trade)
-			_refresh_trade_offer_text()
-			var mine_ok := bool(d.get("confirmedMine", false))
-			var theirs_ok := bool(d.get("confirmedTheirs", false))
-			var reason := str(d.get("reason", "")) if d.get("reason") != null else ""
-			_trade_status.text = "Tú: %s · Él: %s%s" % ["listo" if mine_ok else "…", "listo" if theirs_ok else "…", ("  (%s)" % ApiMessages.text_for(reason)) if not reason.is_empty() else ""]
-			_trade_confirm.disabled = mine_ok
+			_trade.show_update(d)
 		"completed", "cancelled":
-			_trade.visible = false
-			_trade_offer_items.clear()
-			GameState.notice.emit("Intercambio completado" if state == "completed" else "Intercambio cancelado")
+			_trade.close()
+			var reason := str(d.get("reason", "")) if d.get("reason") != null else ""
+			GameState.notice.emit("Intercambio completado" if state == "completed" else ("Intercambio cancelado" + ((": %s" % ApiMessages.text_for(reason)) if reason == "duel_busy" else "")))
 
 
-func _refresh_trade_offer_text() -> void:
-	if not _trade.visible:
-		return
-	var d := GameState.trade
-	_trade_mine.text = "Ofreces: " + _offer_text(d.get("mine", {}))
-	_trade_theirs.text = "Recibes: " + _offer_text(d.get("theirs", {}))
-
-
-static func _offer_text(offer: Dictionary) -> String:
-	var parts: Array[String] = []
-	for it: Variant in offer.get("items", []):
-		var itd: Dictionary = it
-		var bag_item := GameState.bag_item(str(itd.get("itemId", "")))
-		var name := str(Content.item(str(bag_item.get("templateId", ""))).get("name", "item")) if not bag_item.is_empty() else "item"
-		parts.append("%s ×%d" % [name, int(itd.get("qty", 1))])
-	parts.append(MoneyFormat.format(int(offer.get("gold", 0))))
-	return ", ".join(parts)
+func _name_of(entity_id: int) -> String:
+	var name := str(entity_name.call(entity_id)) if entity_name.is_valid() else ""
+	return name if not name.is_empty() else "#%d" % entity_id
 
 
 # --- Cambio de clase ----------------------------------------------------------------------------------------------------------

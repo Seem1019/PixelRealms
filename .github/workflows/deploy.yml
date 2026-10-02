@@ -1,31 +1,82 @@
-# HU-073 CA4: despliegue manual → construye la imagen del servidor, la sube a GHCR y actualiza el VPS por SSH.
-# Secrets necesarios: VPS_HOST, VPS_USER, VPS_SSH_KEY (clave privada), opcional VPS_PATH (por defecto ~/pixelrealms).
-name: Deploy servidor
+# HU-073 CA4: despliegue continuo. Cuando el CI pasa en main, despliega en el VPS solo lo que cambió desde el último
+# despliegue (el VPS guarda los SHA en .deployed-server-sha y .deployed-web-sha):
+#   - server/, content/, maps/, docker-compose.prod.yml, deploy/ → nueva imagen en GHCR + reinicio del servidor
+#   - client/, content/, maps/                                      → export Web de Godot → deploy/play (/play/)
+# También se lanza a mano (Run workflow) con "force" para desplegar todo.
+# Secrets (environment production): VPS_HOST, VPS_USER, VPS_SSH_KEY (clave privada solo para deploy),
+#   VPS_KNOWN_HOSTS (líneas de known_hosts del VPS). Variables: SERVER_URL (https://<dominio>), opcional VPS_PATH.
+name: Deploy
 
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Tag de la imagen (por defecto el SHA corto)"
-        required: false
-        default: ""
+      force:
+        description: "Desplegar servidor y web aunque no haya cambios"
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/pixelrealms-server
+  # GHCR exige minúsculas y el dueño es "Seem1019": las expresiones no tienen lower(), así que va fijo.
+  IMAGE: ghcr.io/seem1019/pixelrealms-server
+  GODOT_VERSION: 4.7.2
+  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
-  build-push:
-    name: Construir y publicar imagen
+  plan:
+    name: ¿Qué cambió?
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+      VPS_PATH: ${{ vars.VPS_PATH || format('/home/{0}/pixelrealms', secrets.VPS_USER) }}
+    outputs:
+      server: ${{ steps.diff.outputs.server }}
+      web: ${{ steps.diff.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ env.SHA }}", fetch-depth: 0 }
+      - name: SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - id: diff
+        run: |
+          changed() {  # $1 = SHA desplegado (vacío = nunca), resto = rutas que cuentan
+            local base="$1"; shift
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then echo true; return; fi
+            if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then echo true; return; fi
+            if git diff --quiet "$base" "$SHA" -- "$@"; then echo false; else echo true; fi
+          }
+          srv=$(ssh "$VPS" "cat $VPS_PATH/.deployed-server-sha 2>/dev/null || true")
+          web=$(ssh "$VPS" "cat $VPS_PATH/.deployed-web-sha 2>/dev/null || true")
+          echo "server=$(changed "$srv" server content maps docker-compose.prod.yml deploy)" | tee -a "$GITHUB_OUTPUT"
+          echo "web=$(changed "$web" client content maps tools/sync_content.gd)" | tee -a "$GITHUB_OUTPUT"
+
+  server:
+    name: Servidor → GHCR → VPS
+    needs: plan
+    if: needs.plan.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write
-    outputs:
-      tag: ${{ steps.meta.outputs.tag }}
+    env:
+      VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+      VPS_PATH: ${{ vars.VPS_PATH || format('/home/{0}/pixelrealms', secrets.VPS_USER) }}
     steps:
       - uses: actions/checkout@v4
-      - id: meta
-        run: echo "tag=${{ github.event.inputs.tag != '' && github.event.inputs.tag || github.sha }}" | cut -c1-44 >> "$GITHUB_OUTPUT"
+        with: { ref: "${{ env.SHA }}" }
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -38,44 +89,89 @@ jobs:
           file: server/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:${{ env.SHA }}
             ${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Tamaño de la imagen (< 150 MB, HU-073 CA1)
+      - name: SSH
         run: |
-          docker pull ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
-          docker image inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }} --format '{{.Size}}' | awk '{ printf "imagen: %.1f MB\n", $1/1024/1024; if ($1 > 150*1024*1024) { print "supera 150 MB"; exit 1 } }'
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Copiar compose, Caddyfile y scripts
+        run: |
+          scp docker-compose.prod.yml "$VPS:$VPS_PATH/"
+          scp deploy/Caddyfile deploy/backup.sh deploy/restore.sh "$VPS:$VPS_PATH/deploy/"
+      - name: Actualizar y reiniciar
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # La primera línea de stdin es el token de GHCR (no va en la línea de comandos); el resto, el script.
+          { echo "$TOKEN"; cat <<'EOF'
+          set -euo pipefail
+          cd "$VPS_PATH"
+          test -f .env || { echo "Falta .env en el VPS"; exit 1; }
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin >/dev/null
+          sed -i "s|^SERVER_IMAGE=.*|SERVER_IMAGE=$IMG|" .env
+          grep -q '^SERVER_IMAGE=' .env || echo "SERVER_IMAGE=$IMG" >> .env
+          docker compose -f docker-compose.prod.yml pull server
+          docker logout ghcr.io >/dev/null
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          for i in $(seq 1 30); do
+            if docker compose -f docker-compose.prod.yml exec -T caddy wget -qO- http://server:5080/health; then
+              echo; echo "$SHA" > .deployed-server-sha; docker image prune -f >/dev/null; exit 0
+            fi
+            sleep 2
+          done
+          echo "El servidor no responde en /health"; docker compose -f docker-compose.prod.yml logs --tail 50 server; exit 1
+          EOF
+          } | ssh "$VPS" "read -r TOKEN && export TOKEN VPS_PATH=$VPS_PATH IMG=$IMAGE:$SHA SHA=$SHA ACTOR=${{ github.actor }} && bash -s"
 
-  deploy:
-    name: Desplegar en el VPS
-    needs: build-push
+  web:
+    name: Cliente Web → /play
+    needs: [plan, server]
+    # Después del servidor (misma versión de protocolo), y también cuando el servidor no hacía falta.
+    if: always() && needs.plan.outputs.web == 'true' && needs.server.result != 'failure' && needs.server.result != 'cancelled'
     runs-on: ubuntu-latest
     environment: production
+    env:
+      VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+      VPS_PATH: ${{ vars.VPS_PATH || format('/home/{0}/pixelrealms', secrets.VPS_USER) }}
     steps:
       - uses: actions/checkout@v4
-      - name: Copiar compose, Caddyfile y scripts
-        uses: appleboy/scp-action@v0.1.7
+        with: { ref: "${{ env.SHA }}" }
+      - name: Godot y plantillas Web (en caché)
+        id: cache
+        uses: actions/cache@v4
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml,deploy/Caddyfile,deploy/backup.sh,deploy/restore.sh"
-          target: ${{ secrets.VPS_PATH || '~/pixelrealms' }}
-      - name: Actualizar y reiniciar
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd ${{ secrets.VPS_PATH || '~/pixelrealms' }}
-            test -f .env || { echo "Falta .env en el VPS (copiar de .env.example)"; exit 1; }
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            sed -i "s|^SERVER_IMAGE=.*|SERVER_IMAGE=${{ env.IMAGE }}:${{ needs.build-push.outputs.tag }}|" .env
-            grep -q '^SERVER_IMAGE=' .env || echo "SERVER_IMAGE=${{ env.IMAGE }}:${{ needs.build-push.outputs.tag }}" >> .env
-            docker compose -f docker-compose.prod.yml pull server
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            sleep 5
-            docker compose -f docker-compose.prod.yml exec -T caddy wget -qO- http://server:5080/health
+          path: |
+            godot
+            ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-web-${{ env.GODOT_VERSION }}
+      - name: Descargar Godot y plantillas
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot && chmod +x godot && rm godot.zip
+          curl -sSL -o tpl.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$dest" && unzip -q -j tpl.tpz 'templates/web_*' 'templates/version.txt' -d "$dest" && rm tpl.tpz
+      - name: Contenido, URL del servidor y export
+        run: |
+          ./godot --path client --headless -s ../tools/sync_content.gd
+          sed -i "s|const DEFAULT_SERVER_URL := \".*\"|const DEFAULT_SERVER_URL := \"${{ vars.SERVER_URL }}\"|" client/autoload/settings.gd
+          ./godot --path client --headless --import || true
+          mkdir -p builds/web
+          ./godot --path client --headless --export-release "Web" ../builds/web/index.html
+          test -s builds/web/index.wasm
+      - name: SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Subir a deploy/play
+        run: |
+          rsync -az --delete builds/web/ "$VPS:$VPS_PATH/deploy/play/"
+          ssh "$VPS" "echo $SHA > $VPS_PATH/.deployed-web-sha"
+          curl -sf -o /dev/null "${{ vars.SERVER_URL }}/play/index.html"

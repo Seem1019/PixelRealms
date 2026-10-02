@@ -64,14 +64,14 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `CastEnded` | `{ casterId, spellId, result: "done"|"interrupted"|"cancelled"|"failed", reason? }` | `failed` con `reason: out_of_range\|no_los` si al terminar el objetivo quedó fuera (sin coste) |
 | `CombatEvents` | `{ tick, e: { src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }[] }` | una vez por tick y observador con todos los resultados que ve (máx. 64 entradas; si hay más, se parte). Reemplaza al antiguo `CombatEvent` por golpe (ADR-018) |
 | `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, casterId?, stacks, durationMs }` / `{ targetId, auraId, casterId? }` | `casterId` distingue instancias del mismo aura de lanzadores distintos (ADR-022) |
-| `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
+| `Cooldown` | `{ spellId, remainingMs }` / `{ templateId, remainingMs }` / `{ gcdMs }` | al castear; al usar un consumible con `useCooldownMs` (`templateId`: la recarga es compartida por plantilla); y tras cada `Welcome` uno por hechizo o consumible aún en recarga (guardados al salir, HU-015). `templateId` es opcional y aditivo: un cliente que no lo conozca lo ignora |
 | `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | tras cada `Welcome` (por la misma conexión, después de él) y al cambiar |
 | `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[], rankUps?: { spellId, rank }[] }` | `rankUps`: hechizos que subieron de rango (ADR-014) |
 | `InventoryUpdate` | `{ bag: (ItemStack|null)[24], equipment: (ItemStack|null)[9], gold, reqId? }` | tras cualquier op (estado completo v1) |
 | `LootWindow` | `{ lootId, gold, items: { index, templateId, qty, ownerId, freeInMs }[] }` | tras `LootOpen` |
 | `ChangeMap` | `{ mapId, x, y }` | tras `UsePortal`; sigue una AOI nueva completa |
 | `DuelUpdate` | `{ state: "requested"\|"countdown"\|"active"\|"ended"\|"declined", opponentId, winnerId?, startsInMs? }` | ciclo de vida del duelo |
-| `TradeUpdate` | `{ state: "requested"\|"open"\|"completed"\|"cancelled", partnerId, version, mine: Offer, theirs: Offer, confirmedMine, confirmedTheirs, reason? }` | ciclo de vida del intercambio |
+| `TradeUpdate` | `{ state: "requested"\|"open"\|"completed"\|"cancelled", partnerId, version, mine: Offer, theirs: Offer, confirmedMine, confirmedTheirs, reason? }` con `Offer = { items: {itemId, templateId, qty}[], gold }` | ciclo de vida del intercambio; `templateId` (aditivo) dice qué objeto ofrece cada uno. No se puede intercambiar en un duelo ni retar a duelo en un intercambio (`duel_busy` / `trade_busy`) |
 | `VendorWindow` | `{ npcId, items: { templateId, price }[] }` | |
 | `ChatMessage` | `{ channel, from, text, ts }` | |
 | `PartyUpdate` | `{ leader, members: { name, entityId?, classId, level, hpPct, online }[] }` | |
