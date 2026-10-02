@@ -11,6 +11,35 @@ env:
   GODOT_VERSION: 4.7.2
 
 jobs:
+  commit-authors:
+    # Los commits los firman las personas del equipo, nunca Claude (sesiones de Claude Code en la web incluidas).
+    name: Autoría de los commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rechazar commits firmados por Claude o con sus trailers
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ -n "$PR_BASE" ]; then range="$PR_BASE..$PR_HEAD"
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then range="origin/main..$AFTER"
+          else range="$BEFORE..$AFTER"; fi
+          echo "Revisando $range"
+          bad_authors=$(git log --no-merges --format='%h %an <%ae> / %cn <%ce>' "$range" | grep -iE 'claude|noreply@anthropic\.com' || true)
+          bad_trailers=$(git log --no-merges --format='%h%n%B' "$range" | grep -iE '^(co-authored-by:.*(claude|anthropic)|claude-session:)' || true)
+          if [ -n "$bad_authors$bad_trailers" ]; then
+            echo "::error::Hay commits firmados por Claude o con sus trailers. Reescríbelos con tu identidad antes de fusionar."
+            [ -n "$bad_authors" ] && echo "$bad_authors"
+            [ -n "$bad_trailers" ] && echo "$bad_trailers"
+            exit 1
+          fi
+          echo "Autoría correcta"
+
   dotnet:
     name: Servidor .NET (build + tests + validador)
     runs-on: ubuntu-latest

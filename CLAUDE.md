@@ -76,6 +76,10 @@ godot --path client                                  # abrir/ejecutar
 - Antes de cerrar: `dotnet test`, tests GUT, validador de contenido y el subagente `server-authority-reviewer`
   si tocaste servidor. Marca la HU como `Hecha` en su archivo y en `docs/backlog/README.md`.
 - Commits pequeños con Conventional Commits: `feat(combat): ...`, `fix(net): ...`, `content(items): ...`.
+- **Los commits los firma una persona del equipo, nunca Claude**, también en sesiones de Claude Code en la web: sin
+  autor/committer `Claude <noreply@anthropic.com>` y sin trailers `Co-Authored-By: Claude…` ni `Claude-Session:`. Si
+  `git var GIT_AUTHOR_IDENT` muestra a Claude, no hagas commit y pide al usuario su identidad. Lo hacen cumplir el hook
+  `tools/hooks/guard-commit-author.sh` (`.claude/settings.json`) y el job `commit-authors` del CI.
 
 ## Skills del proyecto (`.claude/skills/`)
 | Skill | Úsala cuando… |
