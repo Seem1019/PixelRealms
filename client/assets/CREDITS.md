@@ -3,7 +3,7 @@
 | Recurso | Versión | Origen | Licencia |
 |---|---|---|---|
 | GUT (Godot Unit Test) | 9.6.1 | https://github.com/bitwes/Gut | MIT (`addons/gut/LICENSE.md`) |
-| Fuente **Tiny5** (`assets/fonts/Tiny5-Regular.ttf`) | 2024 | The Tiny5 Project Authors (Stefan Schmidt), https://github.com/Gissio/font_tiny5 — copia de https://github.com/google/fonts/tree/main/ofl/tiny5 | SIL OFL 1.1 (`assets/fonts/OFL.txt`) |
+| Fuentes **Alegreya Sans** (Medium, Bold) y **Alegreya SC** (Bold) (`assets/fonts/Alegreya*.ttf`) | 2.x | Juan Pablo del Peral / Huerta Tipográfica — copia de https://github.com/google/fonts/tree/main/ofl/alegreyasans y .../ofl/alegreyasc | SIL OFL 1.1 (`assets/fonts/OFL-Alegreya.txt`) |
 | Fuente **Departure Mono** (solo para dibujar el logo `assets/ui/logo.png`; no se distribuye con el juego) | 1.x | Helena Zhang, https://departuremono.com — `tools/art/fonts/DepartureMono-Regular.otf` | SIL OFL 1.1 (`tools/art/fonts/OFL-DepartureMono.txt`) |
 | Paleta **Resurrect 64** (`assets/palette.png`) | — | Kerrie Lake, https://lospec.com/palette-list/resurrect-64 | Libre (paleta publicada para uso libre en Lospec) |
 | YATI (importador Tiled) | — | **pendiente**: no se pudo descargar en la sesión sin red; instalar desde https://github.com/Skoti/YATI | MIT |

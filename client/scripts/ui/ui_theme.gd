@@ -1,13 +1,18 @@
 class_name UiTheme
-## Tema único de la interfaz: fuente pixel, tamaños de letra, espaciados, colores y estilos 9-slice (marco de madera,
+## Tema único de la interfaz: fuente HD (Alegreya Sans / Alegreya SC), tamaños de letra, espaciados, colores y estilos 9-slice (marco de madera,
 ## botones de tablón, casillas hundidas, barras con marco, campo de texto y tooltip). Todo en píxeles lógicos de la
-## resolución base (480×270). Con `stretch/mode="canvas_items"` y escala entera, la fuente se rasteriza a su tamaño nativo
-## (8 px por em) a escala entera y sin suavizado, así que se ve nítida. Las texturas salen de tools/art/gen_ui.py.
+## resolución base (480×270). Con `stretch/mode="canvas_items"` el texto se rasteriza al tamaño real de pantalla (×3 a
+## 1440×810) con suavizado: letra nítida sobre paneles y sprites pixel art. Las texturas salen de tools/art/gen_ui.py.
 ## Variaciones de Label: "SmallLabel", "TitleLabel", "HeadlineLabel" y "OutlinedLabel" (`theme_type_variation`).
 
-## Tiny5 (OFL) tiene una rejilla de 8 px por em: 8 es su tamaño nativo y 16 su doble exacto.
-const FONT_PATH := "res://assets/fonts/Tiny5-Regular.ttf"
-const FONT_NATIVE := 8
+## Alegreya Sans (OFL) para el texto y Alegreya SC (versalitas) para títulos (HU-092). Los tamaños están en píxeles
+## lógicos: a 8 px la altura de mayúscula es la misma que tenía la fuente pixel, así que los paneles no cambian de tamaño.
+const FONT_PATH := "res://assets/fonts/AlegreyaSans-Medium.ttf"
+const FONT_BOLD_PATH := "res://assets/fonts/AlegreyaSans-Bold.ttf"
+const FONT_TITLE_PATH := "res://assets/fonts/AlegreyaSC-Bold.ttf"
+## Contorno en píxeles lógicos (×3 en pantalla): fino en paneles, grueso en el texto sobre el mundo.
+const OUTLINE_THIN := 1
+const OUTLINE_THICK := 2
 const FONT_SMALL := 8
 const FONT_BODY := 8
 const FONT_TITLE := 8
@@ -38,6 +43,8 @@ const TOOLTIP_MAX_WIDTH := 150
 const UI_DIR := "res://assets/ui/"
 
 static var _font: FontFile
+static var _font_bold: FontFile
+static var _font_title: FontFile
 static var _textures: Dictionary = {}
 
 
@@ -84,18 +91,34 @@ static func clamp_to_screen(c: Control, margin: int = SCREEN_MARGIN) -> void:
 	c.position = p.round()
 
 
-## Fuente pixel con la rejilla exacta: sin antialias, sin hinting y sin posiciones subpíxel. Con `canvas_items` y escala
-## entera se rasteriza a 8×N px reales (N = 3 a 1440×810), es decir, N px por píxel de la fuente: nítida y con un contorno
-## correcto. (Con `fixed_size` el contorno rellenaba los huecos de las letras.)
+## Fuente del texto: suavizado en gris, hinting ligero y posiciones subpíxel (se ve igual de nítida a cualquier escala).
 static func font() -> Font:
-	if _font == null and ResourceLoader.exists(FONT_PATH):
-		var f := (load(FONT_PATH) as FontFile).duplicate() as FontFile
-		f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-		f.hinting = TextServer.HINTING_NONE
-		f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-		f.generate_mipmaps = false
-		_font = f
+	if _font == null:
+		_font = _load_font(FONT_PATH)
 	return _font
+
+
+static func font_bold() -> Font:
+	if _font_bold == null:
+		_font_bold = _load_font(FONT_BOLD_PATH)
+	return _font_bold if _font_bold != null else font()
+
+
+static func font_title() -> Font:
+	if _font_title == null:
+		_font_title = _load_font(FONT_TITLE_PATH)
+	return _font_title if _font_title != null else font()
+
+
+static func _load_font(path: String) -> FontFile:
+	if not ResourceLoader.exists(path):
+		return null
+	var f := (load(path) as FontFile).duplicate() as FontFile
+	f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	f.hinting = TextServer.HINTING_LIGHT
+	f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_AUTO
+	f.generate_mipmaps = false
+	return f
 
 
 static func texture(rel: String) -> Texture2D:
@@ -140,7 +163,7 @@ static func panel_style() -> StyleBox:
 static func outlined(label: Label, color: Color = TEXT, size: int = FONT_BODY) -> void:
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", OUTLINE)
-	label.add_theme_constant_override("outline_size", 2 if size <= FONT_NATIVE else 4)
+	label.add_theme_constant_override("outline_size", OUTLINE_THICK if size <= FONT_BODY else OUTLINE_THICK * 2)
 	label.add_theme_font_size_override("font_size", size)
 
 
@@ -201,7 +224,7 @@ static func build() -> Theme:
 		t.set_color("font_color", type, TEXT)
 		t.set_font_size("font_size", type, FONT_BODY)
 	t.set_color("font_outline_color", "Button", OUTLINE)
-	t.set_constant("outline_size", "Button", 2)
+	t.set_constant("outline_size", "Button", OUTLINE_THIN)
 	t.set_color("font_hover_color", "Button", Color.WHITE)
 	t.set_color("font_pressed_color", "Button", ACCENT)
 	t.set_color("font_disabled_color", "Button", TEXT_DISABLED)
@@ -209,7 +232,7 @@ static func build() -> Theme:
 	t.set_color("font_selected_color", "ItemList", ACCENT)
 	t.set_color("font_hovered_color", "ItemList", Color.WHITE)
 	t.set_color("font_outline_color", "ItemList", OUTLINE)
-	t.set_constant("outline_size", "ItemList", 2)
+	t.set_constant("outline_size", "ItemList", OUTLINE_THIN)
 	t.set_constant("v_separation", "ItemList", 2)
 	t.set_constant("icon_margin", "ItemList", 4)
 	t.set_color("font_hover_color", "PopupMenu", Color.WHITE)
@@ -217,9 +240,11 @@ static func build() -> Theme:
 	for key: String in ["normal_font_size", "bold_font_size", "italics_font_size", "bold_italics_font_size", "mono_font_size"]:
 		t.set_font_size(key, "RichTextLabel", FONT_BODY)
 	if f != null:
-		# La fuente pixel no tiene negrita ni cursiva: misma fuente (el tooltip usa color para destacar).
-		for key: String in ["normal_font", "bold_font", "italics_font", "bold_italics_font"]:
-			t.set_font(key, "RichTextLabel", f)
+		# Sin cursiva: la cursiva usa la normal; la negrita, Alegreya Sans Bold.
+		t.set_font("normal_font", "RichTextLabel", f)
+		t.set_font("italics_font", "RichTextLabel", f)
+		t.set_font("bold_font", "RichTextLabel", font_bold())
+		t.set_font("bold_italics_font", "RichTextLabel", font_bold())
 	t.set_color("default_color", "RichTextLabel", TEXT)
 	t.set_color("font_outline_color", "RichTextLabel", OUTLINE)
 	t.set_constant("line_separation", "RichTextLabel", 1)
@@ -231,14 +256,16 @@ static func build() -> Theme:
 	t.set_font_size("font_size", "SmallButton", FONT_SMALL)
 	_label_variation(t, "SmallLabel", FONT_SMALL, TEXT_MUTED)
 	_label_variation(t, "TitleLabel", FONT_TITLE, ACCENT)
+	t.set_font("font", "TitleLabel", font_title())
 	t.set_color("font_outline_color", "TitleLabel", OUTLINE)
-	t.set_constant("outline_size", "TitleLabel", 2)
+	t.set_constant("outline_size", "TitleLabel", OUTLINE_THIN)
 	_label_variation(t, "HeadlineLabel", FONT_HEADLINE, TEXT)
+	t.set_font("font", "HeadlineLabel", font_title())
 	t.set_color("font_outline_color", "HeadlineLabel", OUTLINE)
-	t.set_constant("outline_size", "HeadlineLabel", 4)
+	t.set_constant("outline_size", "HeadlineLabel", OUTLINE_THICK)
 	_label_variation(t, "OutlinedLabel", FONT_BODY, TEXT)
 	t.set_color("font_outline_color", "OutlinedLabel", OUTLINE)
-	t.set_constant("outline_size", "OutlinedLabel", 2)
+	t.set_constant("outline_size", "OutlinedLabel", OUTLINE_THICK)
 	return t
 
 

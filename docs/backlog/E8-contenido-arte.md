@@ -123,3 +123,28 @@
 - `VfxLayer`: reserva de 64 nodos, tope de 48 activos (recicla el más viejo y entrega su número), recorte por la vista; brillos en `VfxGround` (z −4, bajo los cuerpos) y el resto en `Vfx` (z 12, bajo placas z 40, números y HUD).
 - Tests: `test_combat_animations.gd` (todas las hojas existen, tope y recorte de la reserva, número al llegar el proyectil, brillo y ataque al soltar, casteo interrumpido). Capturas en `docs/screenshots/combat/`.
 
+
+### HU-092 · Fuente HD para la interfaz
+**Como** jugador **quiero** leer la interfaz con una letra nítida y suave **para** no forzar la vista con la fuente pixel, sin perder el estilo de madera y pixel art.
+- Prioridad: Should · Estimación: S · Estado: En curso
+- Dependencias: —
+- Skills: `godot-client`, `pixel-art-assets`
+
+**Criterios de aceptación**
+1. **Dado** el tema de la interfaz **entonces** el texto usa Alegreya Sans (Medium; Bold en negritas) con suavizado y los títulos (`TitleLabel`, `HeadlineLabel`) Alegreya SC; licencia OFL anotada en `assets/CREDITS.md`.
+2. **Dado** el cambio **entonces** paneles 9-slice, paleta, sprites y tamaños de panel siguen igual (la altura de mayúscula a 8 px lógicos es la de la fuente anterior).
+3. **Dado** texto sobre el mundo (nombres, números, chat) **entonces** lleva contorno oscuro proporcionado a la letra suave (`OUTLINE_THIN` / `OUTLINE_THICK`).
+
+### HU-093 · Guerrero y mago con hojas dibujadas
+**Como** jugador **quiero** que el guerrero y el mago tengan el aspecto de las hojas de referencia **para** que los héroes se vean más detallados.
+- Prioridad: Should · Estimación: M · Estado: En curso
+- Dependencias: HU-090
+- Skills: `pixel-art-assets`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** `tools/art/refs/{warrior,mage}_sheet.webp` **cuando** se ejecuta `tools/art/import_heroes.py` (también desde `generate_all.py`, después de `gen_chars`) **entonces** escribe `characters/{warrior,mage}.png/.json` con el mismo formato: 32×32, 19 columnas (reposo, caminar, ataque, casteo, golpe, muerte) × filas s, n, e; pies en y=28.
+2. **Dado** cada cuadro **entonces** el fondo negro es transparente, el personaje mide 26 px de pie, los pies están centrados y lleva contorno de 1 px `#2e222f`.
+3. **Dado** que las hojas no traen ataque ni casteo de espaldas **entonces** el norte repite cuadros de espaldas (limitación conocida).
+
+**Notas de implementación**
+- La asignación cuadro → animación está en la tabla `FRAMES` de `import_heroes.py`; los colores son los de la hoja, no Resurrect 64.

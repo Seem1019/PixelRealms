@@ -83,6 +83,13 @@
 | HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Parcial |
 | HU-090 | Animaciones de combate del cuerpo | E8 | Should | L | Hecha |
 | HU-091 | Efectos visuales de hechizos | E8 | Should | M | Hecha |
+| HU-092 | Fuente HD para la interfaz | E8 | Should | S | En curso |
+| HU-093 | Guerrero y mago con hojas dibujadas | E8 | Should | M | En curso |
+| HU-094 | Ataque básico con Espacio | E3 | Must | S | En curso |
+| HU-095 | Acercarse solo al objetivo fuera de alcance | E3 | Should | M | En curso |
+| HU-096 | Ver el alcance al mantener la tecla | E3 | Should | S | En curso |
+| HU-097 | Historial del chat | E6 | Should | S | En curso |
+| HU-098 | Estados (buffos, perjuicios y control) legibles | E3 | Must | M | En curso |
 
 ## Pendiente de diseño
 - **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).

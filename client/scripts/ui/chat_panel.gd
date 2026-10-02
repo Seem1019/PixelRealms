@@ -48,7 +48,7 @@ func _ready() -> void:
 	_log.scroll_following = true
 	_log.custom_minimum_size = Vector2(WIDTH, LOG_HEIGHT)
 	_log.add_theme_font_size_override("normal_font_size", UiTheme.FONT_SMALL)
-	_log.add_theme_constant_override("outline_size", 2)
+	_log.add_theme_constant_override("outline_size", UiTheme.OUTLINE_THICK)
 	_log.add_theme_constant_override("line_separation", 0)
 	_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(_log)
