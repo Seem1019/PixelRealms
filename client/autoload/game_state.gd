@@ -86,7 +86,9 @@ func set_target(entity_id: int) -> void:
 	EventBus.target_changed.emit(entity_id)
 
 
-func _on_welcome(d: Dictionary) -> void:
+## `same_connection`: Welcome reenviado en una conexión ya dentro del mundo (cambio de clase, HU-044). Cambian clase,
+## hechizos, barra y vitales; se conservan el objetivo y las auras (el servidor no las toca al cambiar de clase).
+func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	self_id = int(d.get("selfId", -1))
 	map_id = str(d.get("mapId", ""))
 	var self_state: Dictionary = d.get("self", {})
@@ -102,10 +104,11 @@ func _on_welcome(d: Dictionary) -> void:
 	resource_kind = str(self_state.get("resource", "mana"))
 	is_dead = hp <= 0
 	own_cast = {}
-	auras.clear()
 	cooldowns.clear()
 	gcd_end_ms = 0
-	target_id = -1
+	if not same_connection:
+		auras.clear()
+		target_id = -1
 	vitals_changed.emit()
 	inventory = d.get("inventory", [])
 	equipment = d.get("equipment", [])

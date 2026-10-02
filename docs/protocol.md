@@ -48,13 +48,14 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `UsePortal` | `{ portalId }` | a ≤ 1 tile, vivo, fuera de combate, `minLevel` |
 | `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo activo |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
+| `ChangeClass` | `{ npcId, classId, reqId? }` | NPC `class_change` a ≤ `vendorRangeTiles`, vivo, fuera de combate, sin duelo ni intercambio, clase distinta (HU-044); responde con `Welcome` + `StatsUpdate` por la misma conexión |
 | `AdminCommand` | `{ text }` | `accounts.is_admin` (si no, `forbidden`); `text` = `/tp x y`, `/tpto Nombre`, `/spawn id [n]`, `/give id [qty] [Nombre]`, `/level n`, `/heal`, `/kill`, `/gold n`, `/god`, `/debug move on\|off`, `/announce texto`; la respuesta llega como `ChatMessage{channel:"system"}` (HU-070) |
 
 ## Servidor → Cliente
 
 | t | d | Cuándo |
 |---|---|---|
-| `Welcome` | `{ selfId, tick, tickRate:20, snapshotRate:10, mapId: "meadow", self: SelfState, inventory, equipment, hotbar, knownSpells: string[], rulesHash }` | tras `Hello` válido (`rulesHash` permite al cliente detectar un `rules.json` distinto) |
+| `Welcome` | `{ selfId, tick, tickRate:20, snapshotRate:10, mapId: "meadow", self: SelfState, inventory, equipment, hotbar, knownSpells: string[], rulesHash }` | tras `Hello` válido (`rulesHash` permite al cliente detectar un `rules.json` distinto), seguido siempre de un `StatsUpdate`. Tras `ChangeClass` se reenvía por la misma conexión: el cliente solo actualiza clase, hechizos, barra y vitales (no es una entrada nueva: sin AOI reenviada ni `seq` reiniciado) |
 | `Snapshot` | `{ tick, ackSeq, self: { x, y, speed, hp, maxHp, res, maxRes }, ents: EntState[] }` (`speed` en tiles/s, incluye auras) | cada 2 ticks |
 | `EntitySpawn` | `{ id, kind, templateId, name, x, y, dir, level, classId?, hpPct, flags }` | entra a tu AOI |
 | `EntityDespawn` | `{ id, reason: "left"|"died"|"despawn" }` | sale de tu AOI |
@@ -63,7 +64,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `CombatEvents` | `{ tick, e: { src, dst, spellId?, kind: "dmg"\|"heal"\|"miss"\|"dodge"\|"absorb"\|"immune", amount, crit, school: "physical"\|"magic" }[] }` | una vez por tick y observador con todos los resultados que ve (máx. 64 entradas; si hay más, se parte). Reemplaza al antiguo `CombatEvent` por golpe (ADR-018) |
 | `AuraApplied` / `AuraRemoved` | `{ targetId, auraId, casterId?, stacks, durationMs }` / `{ targetId, auraId, casterId? }` | `casterId` distingue instancias del mismo aura de lanzadores distintos (ADR-022) |
 | `Cooldown` | `{ spellId, remainingMs }` / `{ gcdMs }` | al castear |
-| `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | al cambiar |
+| `StatsUpdate` | `{ level, xp, xpNext, stats, derived, gold }` | tras cada `Welcome` (por la misma conexión, después de él) y al cambiar |
 | `XpGain` / `LevelUp` | `{ amount, sourceId? }` / `{ level, newSpells: string[], rankUps?: { spellId, rank }[] }` | `rankUps`: hechizos que subieron de rango (ADR-014) |
 | `InventoryUpdate` | `{ bag: (ItemStack|null)[24], equipment: (ItemStack|null)[9], gold, reqId? }` | tras cualquier op (estado completo v1) |
 | `LootWindow` | `{ lootId, gold, items: { index, templateId, qty, ownerId, freeInMs }[] }` | tras `LootOpen` |

@@ -94,14 +94,19 @@ public sealed class PlayerMapper(ReloadableContent content)
     public InventoryUpdate ToInventoryUpdate(Player p, int? reqId) =>
         new(p.Inventory.Bag.Select(ToDto).ToList(), p.Equipment.Slots.Select(ToDto).ToList(), p.Inventory.Gold, reqId);
 
-    /// <summary>StatsUpdate (docs/protocol.md): nivel, XP, stats primarios redondeados, derivados y oro.</summary>
+    /// <summary>StatsUpdate (docs/protocol.md): nivel, XP, stats primarios redondeados, derivados y oro. Solo lee: los máximos
+    /// vivos los mantiene CombatServices.Recalculate (con auras) y se envían tal cual, como en los Snapshot.</summary>
     public StatsUpdate ToStatsUpdate(Player p)
     {
         var db = content.Current;
-        var d = Recalculate(p);
+        var cls = db.Class(p.ClassId);
+        var equipped = new List<ItemTemplate>(Equipment.SlotCount);
+        foreach (var slot in p.Equipment.Slots)
+            if (slot is not null && db.TryGetItem(slot.TemplateId, out var tpl) && tpl is not null) equipped.Add(tpl);
+        var d = StatCalculator.Derive(cls, p.Level, db.Rules, equipped, PrimaryStats.From(p.Auras.StatMods()));
         var pr = d.Primary;
         var stats = new StatsDto((int)Math.Round(pr.Str), (int)Math.Round(pr.Agi), (int)Math.Round(pr.Int), (int)Math.Round(pr.Spi), (int)Math.Round(pr.Sta));
-        var derived = new DerivedStatsDto(d.MaxHp, p.MaxResource, (float)d.AttackPower, (float)d.SpellPower, (float)d.CritChancePhysical, (float)d.DodgeChance, (float)d.Armor, (float)d.Haste, (float)d.MitigationAgainst(p.Level, db.Rules.Combat));
+        var derived = new DerivedStatsDto(p.MaxHp, p.MaxResource, (float)d.AttackPower, (float)d.SpellPower, (float)d.CritChancePhysical, (float)d.DodgeChance, (float)d.Armor, (float)d.Haste, (float)d.MitigationAgainst(p.Level, db.Rules.Combat));
         return new StatsUpdate(p.Level, p.Xp, XpCurve.XpToNextLevel(db.Rules.Progression, p.Level), stats, derived, p.Gold);
     }
 

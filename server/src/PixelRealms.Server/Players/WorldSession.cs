@@ -69,6 +69,8 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         logger.LogInformation("{Name} entró en {Map} (conexión {Conn})", player.Name, mapId, connectionId);
         if (Combat?.Parties.SetOnline(player.CharacterId, true, ctx.Tick.NowMs) is { } party) ctx.Tick.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "online"));
         PlayerEntered?.Invoke(player, new MapInstanceRef(instance));
+        // Welcome no trae stats primarios ni oro: sin esto el cliente los ve a 0. Va al final para no dejar la entrada a medias.
+        ctx.Send(mapper.ToStatsUpdate(player));
     }
 
     /// <summary>HU-025 CA2: la conexión nueva toma el personaje que seguía en el mundo; se reenvía Welcome y la AOI completa.</summary>
@@ -80,6 +82,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         var mapId = instance?.MapId ?? content.Current.Rules.World.StartMapId;
         ctx.Send(mapper.ToWelcome(player, mapId, ctx.Tick.Tick));
         if (instance is not null) interest.ResetObserver(instance, player);
+        ctx.Send(mapper.ToStatsUpdate(player)); // stats y oro tras el Welcome (ver OnPlayerJoin)
         logger.LogInformation("{Name} reconectó (conexión {Conn})", player.Name, connectionId);
     }
 

@@ -78,6 +78,7 @@ public sealed class LinkdeadTests
             await using var ana2 = await Connect(server, anaApi, anaId);
             var welcome2 = await ana2.ExpectAsync("Welcome");
             welcome2.GetProperty("selfId").GetInt32().ShouldBe(selfId);          // mismo personaje vivo, no uno nuevo
+            (await ana2.ExpectAsync("StatsUpdate", 1000)).GetProperty("stats").GetProperty("str").GetInt32().ShouldBeGreaterThan(0); // stats y oro tras el Welcome
             welcome2.GetProperty("self").GetProperty("x").GetSingle().ShouldBeGreaterThanOrEqualTo(before); // posición del mundo, no de BD
             (await ana2.ExpectForIdAsync("EntitySpawn", bobId)).GetProperty("name").GetString().ShouldBe("Bob"); // AOI reenviada
             (await bob.ArrivesAsync("EntityDespawn", m => m.GetProperty("id").GetInt32() == selfId, 300)).ShouldBeFalse(); // Bob nunca dejó de verla

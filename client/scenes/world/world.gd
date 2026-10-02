@@ -36,6 +36,8 @@ var _remotes: Dictionary = {}  # id → RemoteEntity
 var _current_zone: String = ""
 var _zone_fade_left: float = 0.0
 var _character_id: String = ""
+## ¿Ya llegó el Welcome de esta conexión? Uno posterior no es una entrada nueva al mundo (HU-044).
+var _welcomed_on_connection: bool = false
 var _status_clear_at: int = -1
 ## Apuntado de área (HU-086 CA1): hechizo en curso de apuntar o vacío.
 var _aiming_spell: Dictionary = {}
@@ -83,6 +85,7 @@ func _ready() -> void:
 
 func _on_connected(_ticket: String) -> void:
 	_movement.reset()  # el seq es por conexión: el servidor lo reinicia con cada Hello
+	_welcomed_on_connection = false
 	Net.send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": Net.current_ticket()})
 
 
@@ -98,6 +101,14 @@ func _refresh_ticket() -> String:
 
 
 func _on_welcome(d: Dictionary) -> void:
+	# Welcome reenviado en la misma conexión (cambio de clase): el mundo sigue igual y el servidor no reenvía la AOI.
+	if _welcomed_on_connection and str(d.get("mapId", "")) == GameState.map_id:
+		GameState._on_welcome(d, true)
+		_player_name.text = GameState.character_name
+		if GameState.target_id > 0:
+			Net.send("SelectTarget", {"targetId": GameState.target_id})  # el servidor limpia el objetivo al cambiar de clase
+		return
+	_welcomed_on_connection = true
 	GameState._on_welcome(d)
 	_hud_status.text = ""
 	_clear_remotes()
