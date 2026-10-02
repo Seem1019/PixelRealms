@@ -79,6 +79,24 @@ func _ready() -> void:
 	Net.snapshot.connect(_on_snapshot)
 
 
+## HU-015: al volver a la selección de personaje no queda nada del anterior (ni objetivo, ni bolsa, ni grupo, ni duelo…):
+## cada variable vuelve a su valor inicial. El token de la sesión vive en Api y no se toca.
+func reset() -> void:
+	# Los valores iniciales se leen de una instancia nueva sin añadir al árbol (fuera del editor el script no los expone).
+	var script: Script = get_script()
+	var fresh: Node = script.new()
+	for prop: Dictionary in script.get_script_property_list():
+		if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		var name := str(prop["name"])
+		var current: Variant = get(name)
+		if current is Array or current is Dictionary:
+			current.clear()  # en sitio: conserva el tipo (Array[String]) y las referencias de quien lo lea
+		else:
+			set(name, fresh.get(name))
+	fresh.free()
+
+
 func set_target(entity_id: int) -> void:
 	if target_id == entity_id:
 		return

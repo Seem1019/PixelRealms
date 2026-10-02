@@ -46,6 +46,8 @@ var _last_pos: Vector2 = Vector2.INF
 ## Capa por encima del sprite para el contorno de "te alcanzaría el área".
 var _hint: Node2D
 var _still_frames: int = 0
+## ¿La hemos visto viva? Si aparece ya muerta (cadáver en la AOI) no se reproduce la caída (HU-090).
+var _seen_alive: bool = false
 
 
 func _ready() -> void:
@@ -77,6 +79,7 @@ func setup(d: Dictionary) -> void:
 	_buffer.clear()
 	_buffer.push(float(Time.get_ticks_msec()), pos)
 	hostile = kind == "monster"
+	_seen_alive = hp_pct > 0
 	_apply_identity()
 	_refresh_health_bar()
 	refresh_level_color()
@@ -106,7 +109,8 @@ func _process(_delta: float) -> void:
 	_still_frames = 0 if moving else _still_frames + 1
 	_last_pos = position
 	if visual != null:
-		visual.set_dead(anim == "dead")
+		visual.set_dead(anim == "dead", not _seen_alive)
+		_seen_alive = _seen_alive or anim != "dead"
 		visual.set_motion(dir, anim == "walk" or _still_frames < 4)
 		if cast_started_ms >= 0:
 			visual.plate.cast_frac = clampf(float(Time.get_ticks_msec() - cast_started_ms) / float(maxi(1, cast_duration_ms)), 0.0, 1.0)

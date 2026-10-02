@@ -49,6 +49,10 @@ public sealed record PartyRespond(bool Accept) : IClientMessage;
 
 public sealed record PartyLeave : IClientMessage;
 
+/// <summary>HU-015: salir del mundo a la selección de personaje o para cerrar el juego. Fuera de combate guarda y saca al
+/// jugador y responde `LoggedOut`; en combate responde `Error{in_combat}` y el jugador sigue dentro.</summary>
+public sealed record Logout(int? ReqId = null) : IClientMessage;
+
 public sealed record PartyKick(string Name) : IClientMessage;
 
 public sealed record SetHotbar(int Slot, string? Kind = null, string? Ref = null) : IClientMessage;

@@ -19,7 +19,7 @@ public sealed class TestServer : IAsyncDisposable
 
     public IServiceProvider Services => _app.Services;
 
-    public static async Task<TestServer> StartAsync(Dictionary<string, string?>? settings = null)
+    public static async Task<TestServer> StartAsync(Dictionary<string, string?>? settings = null, Action<IServiceCollection>? overrideServices = null)
     {
         var app = ServerApp.Build([], b =>
         {
@@ -33,7 +33,7 @@ public sealed class TestServer : IAsyncDisposable
             });
             if (settings is not null) b.Configuration.AddInMemoryCollection(settings);
             b.Logging.ClearProviders();
-        }) ?? throw new InvalidOperationException("content inválido");
+        }, overrideServices) ?? throw new InvalidOperationException("content inválido");
         await app.StartAsync();
         return new TestServer(app);
     }

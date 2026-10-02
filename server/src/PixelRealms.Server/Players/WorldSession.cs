@@ -35,18 +35,51 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
 
     public void OnConnected(int connectionId, HandlerContext ctx) { }
 
+    /// <summary>
+    /// Último guardado de cada personaje que salió del mundo, con su generación, hasta que vuelve a entrar (estado del tick).
+    /// Un Hello que leyó la BD antes de ese guardado entra con este DTO y no con el leído: así salir y volver a entrar enseguida
+    /// no devuelve items ya entregados ni pisa el guardado bueno (HU-015 CA5). No se borra al quedar escrito: un Hello con una
+    /// lectura anterior puede seguir en camino al tick. Tras salir nadie más escribe el personaje, así que este DTO es la verdad;
+    /// el tamaño lo acota el número de personajes que han salido desde el arranque.
+    /// </summary>
+    private readonly Dictionary<Guid, (CharacterSaveDto Dto, long Gen)> _departed = new();
+
+    public int DepartedCount => _departed.Count;
+
     public void OnPlayerJoin(int connectionId, object? attachment, HandlerContext ctx)
     {
-        if (attachment is not CharacterSaveDto dto) { ctx.SendError(ErrorCodes.BadTicket); ctx.Close("bad_ticket"); return; }
+        var (dto, writtenGen) = attachment switch
+        {
+            LoadedCharacter lc => (lc.Dto, lc.WrittenGen),
+            CharacterSaveDto plain => (plain, 0L),
+            _ => (null, 0L),
+        };
+        if (dto is null) { ctx.SendError(ErrorCodes.BadTicket); ctx.Close("bad_ticket"); return; }
 
         var previous = players.ByAccount(dto.AccountId);
-        if (previous is not null && previous.CharacterId == dto.Id && previous.IsLinkdead)
+        if (previous is not null && previous.CharacterId == dto.Id)
         {
+            // El mismo personaje sigue en el mundo (linkdead o en otra conexión): la conexión nueva toma ese Player. Nunca se
+            // recarga de la BD con él dentro: lo leído puede ser anterior a un intercambio o una venta ya hechos.
+            var prevConn = previous.ConnectionId;
+            if (!previous.IsLinkdead && prevConn >= 0 && prevConn != connectionId)
+            {
+                // El cliente nuevo no conoce el intercambio ni el duelo de la conexión anterior: se cancelan como al desconectarse.
+                if (world.GetInstance(previous.MapInstanceId) is { } prevMap && Combat is not null)
+                {
+                    Combat.Pvp.Abandon(previous, "replaced", prevMap, ctx.Tick);
+                    Combat.Trades.CancelBy(previous, "replaced", prevMap, ctx.Tick);
+                }
+                Save(previous, ctx.Tick.NowMs, "replaced"); // HU-014 CA5: la sesión anterior se guarda y se desconecta
+                ctx.Connections.Close(prevConn, "replaced");
+            }
             Reconnect(previous, connectionId, ctx);
             return;
         }
+        var hadDeparted = _departed.TryGetValue(dto.Id, out var departed);
+        if (hadDeparted && departed.Gen > writtenGen) dto = departed.Dto;
 
-        // HU-014 CA5: la cuenta ya tiene un personaje dentro → la sesión anterior se guarda y se desconecta primero.
+        // HU-014 CA5: la cuenta ya tiene otro personaje dentro → la sesión anterior se guarda y se desconecta primero.
         if (previous is not null)
         {
             var prevConn = previous.ConnectionId;
@@ -63,6 +96,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         if (instance.Data.Collision.IsSolidAt(player.Position.X, player.Position.Y)) player.Position = instance.Data.DefaultGraveyard.Position;
         instance.Add(player);
         players.Add(player, connectionId);
+        if (hadDeparted) _departed.Remove(dto.Id); // ya está dentro: lo siguiente que salga lo vuelve a apuntar
         player.LastSaveAtMs = ctx.Tick.NowMs;
         player.Dirty = false;
         ctx.Send(mapper.ToWelcome(player, mapId, ctx.Tick.Tick));
@@ -130,6 +164,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         foreach (var p in expired) Leave(p, "linkdead");
     }
 
+
     /// <summary>Guardado por evento (ADR-018 / HU-026 CA6): salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir.</summary>
     public void Save(Player player, long nowMs, string reason)
     {
@@ -139,21 +174,48 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         logger.LogDebug("{Name} guardado ({Reason})", player.Name, reason);
     }
 
+    /// <summary>Motivo con el que `Logout` saca al jugador (HU-015).</summary>
+    public const string LogoutReason = "logout";
+
+    /// <summary>
+    /// HU-015: `Logout` del cliente. En combate devuelve `in_combat` y no cambia nada; si no, cancela el casteo, guarda, saca al
+    /// jugador como un cierre normal (duelo e intercambio se cancelan) y devuelve null. El handler responde y cierra.
+    /// </summary>
+    public string? Logout(Player player, TickContext tick)
+    {
+        var rules = content.Current.Rules;
+        if (player.IsInCombat(tick.NowMs, rules.Combat.InCombatWindowSec)) return ErrorCodes.InCombat;
+        if (world.GetInstance(player.MapInstanceId) is { } map) Combat?.Casts.Cancel(player, map, tick);
+        Leave(player, LogoutReason, tick);
+        return null;
+    }
+
     /// <summary>Saca al jugador del mundo y encola su guardado.</summary>
-    public void Leave(Player player, string reason)
+    public void Leave(Player player, string reason) => Leave(player, reason, _sweepCtx);
+
+    private void Leave(Player player, string reason, TickContext? tick)
     {
         var instance = world.GetInstance(player.MapInstanceId);
-        if (instance is not null && Combat is not null && _sweepCtx is not null)
+        if (instance is not null && Combat is not null && tick is not null)
         {
-            Combat.Pvp.Abandon(player, reason, instance, _sweepCtx);
-            Combat.Trades.CancelBy(player, reason, instance, _sweepCtx);
-            if (Combat.Parties.SetOnline(player.CharacterId, false, _sweepCtx.NowMs) is { } party) _sweepCtx.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
+            Combat.Pvp.Abandon(player, reason, instance, tick);
+            Combat.Trades.CancelBy(player, reason, instance, tick);
+            if (Combat.Parties.SetOnline(player.CharacterId, false, tick.NowMs) is { } party) tick.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
         }
-        saver.Enqueue(mapper.ToSave(player));
+        var save = mapper.ToSave(player);
+        _departed[player.CharacterId] = (save, saver.Enqueue(save));
         player.Dirty = false;
         players.Remove(player);
         if (instance is not null)
         {
+            // Lo que dejó en marcha no sigue a su nombre: proyectiles en vuelo, amenaza y monstruos marcados (sin XP ni botín
+            // para un ausente).
+            Combat?.Casts.ForgetCaster(player, instance);
+            foreach (var m in instance.Monsters.Values)
+            {
+                m.Threat.Remove(player.Id);
+                if (m.TaggedBy == player.Id) m.TaggedBy = null;
+            }
             instance.Remove(player.Id);
             PlayerLeft?.Invoke(player, new MapInstanceRef(instance));
         }

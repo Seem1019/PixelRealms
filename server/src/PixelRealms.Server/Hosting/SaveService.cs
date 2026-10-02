@@ -9,10 +9,18 @@ namespace PixelRealms.Server.Hosting;
 /// </summary>
 public sealed class SaveService(ICharacterRepository characters, ILogger<SaveService> logger) : BackgroundService
 {
-    private readonly Channel<CharacterSaveDto> _queue = Channel.CreateUnbounded<CharacterSaveDto>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<Queued> _queue = Channel.CreateUnbounded<Queued>(new UnboundedChannelOptions { SingleReader = true });
     private int _saved;
     private int _failed;
     private int _pending;
+    /// <summary>Guardados pendientes por personaje: HelloGate espera a que se escriban antes de leerlo (HU-015 CA5).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> _pendingByCharacter = new();
+    /// <summary>Generación del último guardado encolado por personaje (crece en 1 con cada Enqueue).</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, long> _enqueuedGen = new();
+    /// <summary>Generación más alta ya escrita en la BD por personaje.</summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, long> _writtenGen = new();
+
+    private readonly record struct Queued(CharacterSaveDto Dto, long Gen);
 
     /// <summary>Plazo para vaciar la cola al apagar (HU-026 CA2).</summary>
     public TimeSpan DrainTimeout { get; init; } = TimeSpan.FromSeconds(10);
@@ -24,23 +32,53 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     /// <summary>Guardados encolados y aún no terminados.</summary>
     public int Pending => _pending;
 
-    public void Enqueue(CharacterSaveDto dto)
+    /// <summary>Encola el guardado y devuelve su generación (monótona por personaje).</summary>
+    public long Enqueue(CharacterSaveDto dto)
     {
         Interlocked.Increment(ref _pending);
-        if (_queue.Writer.TryWrite(dto)) return;
+        _pendingByCharacter.AddOrUpdate(dto.Id, 1, (_, n) => n + 1);
+        var gen = _enqueuedGen.AddOrUpdate(dto.Id, 1, (_, g) => g + 1);
+        var item = new Queued(dto, gen);
+        if (_queue.Writer.TryWrite(item)) return gen;
         // La cola ya se cerró al apagar: nadie lo va a escribir.
-        Interlocked.Decrement(ref _pending);
+        Done(item, written: false);
         LogLost(dto, "encolado después del apagado");
+        return gen;
+    }
+
+    /// <summary>
+    /// Generación más alta de este personaje que ya está en la BD (0 = ninguna en esta ejecución). HelloGate la lee antes de
+    /// cargar: si el tick tiene en memoria un guardado más nuevo, la BD que leyó está atrasada (HU-015 CA5).
+    /// </summary>
+    public long WrittenGeneration(Guid characterId) => _writtenGen.GetValueOrDefault(characterId);
+
+    /// <summary>¿Queda algún guardado de este personaje sin escribir?</summary>
+    public bool HasPending(Guid characterId) => _pendingByCharacter.TryGetValue(characterId, out var n) && n > 0;
+
+    /// <summary>
+    /// Espera (fuera del tick) a que se escriban los guardados encolados de un personaje, como mucho `timeout`: así quien sale
+    /// a la selección y vuelve a entrar enseguida lee de la BD el estado con el que salió (HU-015 CA5).
+    /// </summary>
+    public async Task WaitForCharacterAsync(Guid characterId, TimeSpan timeout, CancellationToken ct)
+    {
+        var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        while (HasPending(characterId) && Environment.TickCount64 < deadline) await Task.Delay(20, ct);
+    }
+
+    private void Done(Queued item, bool written)
+    {
+        if (written) _writtenGen.AddOrUpdate(item.Dto.Id, item.Gen, (_, g) => Math.Max(g, item.Gen));
+        Interlocked.Decrement(ref _pending);
+        _pendingByCharacter.AddOrUpdate(item.Dto.Id, 0, (_, n) => Math.Max(0, n - 1));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
-            await foreach (var dto in _queue.Reader.ReadAllAsync(stoppingToken))
+            await foreach (var item in _queue.Reader.ReadAllAsync(stoppingToken))
             {
-                await SaveWithRetryAsync(dto, CancellationToken.None);
-                Interlocked.Decrement(ref _pending);
+                Done(item, await SaveWithRetryAsync(item.Dto, CancellationToken.None));
                 // ReadAllAsync no mira el token entre elementos ya encolados: al apagar, el resto lo vacía StopAsync.
                 if (stoppingToken.IsCancellationRequested) break;
             }
@@ -66,15 +104,15 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         // Vacía la cola antes de salir: lo que el tick encoló al apagar debe llegar a la BD.
         using var cts = new CancellationTokenSource(DrainTimeout);
         var drained = 0;
-        CharacterSaveDto? current = null;
+        Queued? current = null;
         try
         {
             // El plazo se mira antes de sacar el siguiente: un DTO leído nunca se descarta sin guardarlo o loguearlo.
-            while (!cts.IsCancellationRequested && _queue.Reader.TryRead(out current))
+            while (!cts.IsCancellationRequested && _queue.Reader.TryRead(out var next))
             {
-                await SaveWithRetryAsync(current, cts.Token);
+                current = next;
+                Done(next, await SaveWithRetryAsync(next.Dto, cts.Token));
                 current = null;
-                Interlocked.Decrement(ref _pending);
                 drained++;
             }
         }
@@ -82,11 +120,11 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         finally
         {
             if (drained > 0) logger.LogInformation("Guardados {Count} personajes al apagar", drained);
-            if (current is not null)
+            if (current is { } cur)
             {
                 // Puede que la BD sí lo confirmara antes de reaccionar al token: Failed sobra como mucho, y el DTO queda en el log.
-                Interlocked.Decrement(ref _pending);
-                LogLost(current, "plazo de apagado agotado durante el guardado");
+                Done(cur, written: false);
+                LogLost(cur.Dto, "plazo de apagado agotado durante el guardado");
             }
             LogRemaining("plazo de apagado agotado");
         }
@@ -97,8 +135,8 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     {
         while (_queue.Reader.TryRead(out var left))
         {
-            Interlocked.Decrement(ref _pending);
-            LogLost(left, reason);
+            Done(left, written: false);
+            LogLost(left.Dto, reason);
         }
     }
 
@@ -108,8 +146,8 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         logger.LogError("Guardado de {Name} no escrito ({Reason}). DTO: {Dto}", dto.Name, reason, System.Text.Json.JsonSerializer.Serialize(dto));
     }
 
-    /// <summary>Guarda de inmediato (uso en tests y en el apagado).</summary>
-    public async Task SaveWithRetryAsync(CharacterSaveDto dto, CancellationToken ct)
+    /// <summary>Guarda de inmediato (uso en tests y en el apagado). Devuelve si quedó escrito.</summary>
+    public async Task<bool> SaveWithRetryAsync(CharacterSaveDto dto, CancellationToken ct)
     {
         var delay = TimeSpan.FromMilliseconds(200);
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -118,7 +156,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             {
                 await characters.SaveAsync(dto, ct);
                 Interlocked.Increment(ref _saved);
-                return;
+                return true;
             }
             // Solo se propaga la cancelación pedida por `ct`; otra (p. ej. un timeout interno del driver) es un fallo más y se reintenta.
             catch (Exception ex) when (!ct.IsCancellationRequested && attempt < 3)
@@ -131,8 +169,9 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             {
                 Interlocked.Increment(ref _failed);
                 logger.LogError(ex, "Guardado de {Name} falló definitivamente. DTO: {Dto}", dto.Name, System.Text.Json.JsonSerializer.Serialize(dto));
-                return;
+                return false;
             }
         }
+        return false;
     }
 }

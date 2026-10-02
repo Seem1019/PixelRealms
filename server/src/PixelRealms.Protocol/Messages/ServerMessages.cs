@@ -81,6 +81,10 @@ public sealed record Error(string Code, string? Message, int? ReqId) : IServerMe
 
 public sealed record Pong(long ClientTime, long ServerTick) : IServerMessage;
 
+/// <summary>HU-015: respuesta a `Logout` aceptado; el personaje ya está guardado (encolado) y fuera del mundo. Después el
+/// servidor cierra la conexión con motivo "logout".</summary>
+public sealed record LoggedOut : IServerMessage;
+
 /// <summary>Códigos de error de docs/protocol.md §Códigos de error.</summary>
 public static class ErrorCodes
 {

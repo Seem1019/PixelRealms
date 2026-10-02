@@ -47,6 +47,8 @@ namespace PixelRealms.Protocol;
 [JsonSerializable(typeof(TradeCancel))]
 [JsonSerializable(typeof(AdminCommand))]
 [JsonSerializable(typeof(ChangeClass))]
+[JsonSerializable(typeof(Logout))]
+[JsonSerializable(typeof(LoggedOut))]
 [JsonSerializable(typeof(Welcome))]
 [JsonSerializable(typeof(Snapshot))]
 [JsonSerializable(typeof(EntitySpawn))]

@@ -104,6 +104,22 @@ public sealed class SaveServiceTests
         svc.Failed.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task WaitForCharacter_ReturnsOnceThatCharactersSaveIsWritten() // HU-015 CA5
+    {
+        var repo = new SlowRepo(TimeSpan.FromMilliseconds(300), honorCancel: false);
+        var svc = new SaveService(repo, NullLogger<SaveService>.Instance);
+        await svc.StartAsync(TestContext.Current.CancellationToken);
+        var dto = Dto();
+        svc.Enqueue(dto);
+        svc.HasPending(dto.Id).ShouldBeTrue();
+        svc.HasPending(Guid.NewGuid()).ShouldBeFalse(); // otro personaje no espera
+        await svc.WaitForCharacterAsync(dto.Id, TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        repo.Saves.ShouldBe(1); // al volver, el guardado ya está escrito
+        svc.HasPending(dto.Id).ShouldBeFalse();
+        await svc.StopAsync(TestContext.Current.CancellationToken);
+    }
+
     // Sin StartAsync el servicio no consume en segundo plano: todo lo encolado lo vacía StopAsync.
 
     [Fact]
@@ -182,6 +198,37 @@ public sealed class SaveServiceTests
         finally
         {
             await svc.StopAsync(CancellationToken.None);
+        }
+    }
+    [Fact]
+    public async Task Generations_GrowPerCharacter_AndOnlyWrittenSavesCount() // HU-015 CA5
+    {
+        var svc = new SaveService(new FlakyRepo(0), NullLogger<SaveService>.Instance);
+        var dto = Dto();
+        svc.WrittenGeneration(dto.Id).ShouldBe(0);
+        await svc.StartAsync(CancellationToken.None);
+        try
+        {
+            svc.Enqueue(dto).ShouldBe(1);
+            svc.Enqueue(dto).ShouldBe(2);
+            await WaitUntil(() => svc.WrittenGeneration(dto.Id) == 2); // `Saved` sube un instante antes de marcarlo escrito
+            svc.Saved.ShouldBe(2);
+        }
+        finally
+        {
+            await svc.StopAsync(CancellationToken.None);
+        }
+        var failing = new SaveService(new FlakyRepo(99), NullLogger<SaveService>.Instance);
+        await failing.StartAsync(CancellationToken.None);
+        try
+        {
+            failing.Enqueue(dto).ShouldBe(1);
+            await WaitUntil(() => failing.Failed == 1 && failing.Pending == 0, 5000);
+            failing.WrittenGeneration(dto.Id).ShouldBe(0, "un guardado fallido no está en la BD");
+        }
+        finally
+        {
+            await failing.StopAsync(CancellationToken.None);
         }
     }
 }

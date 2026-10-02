@@ -26,6 +26,9 @@ public sealed class HandlerContext(ConnectionManager connections, TickContext ti
     public void SendError(string code, int? reqId = null, string? message = null) => Send(new Error(code, message, reqId));
 
     public void Close(string reason) => Connections.Close(ConnectionId, reason);
+
+    /// <summary>Cierra tras enviar lo ya encolado para esta conexión (la respuesta llega antes del cierre).</summary>
+    public void CloseAfterFlush(string reason) => Connections.CloseAfterFlush(ConnectionId, reason);
 }
 
 /// <summary>Handler de un mensaje del cliente; se ejecuta en el hilo del tick (paso 2 de docs/architecture.md §3).</summary>

@@ -196,3 +196,18 @@ public sealed class ChangeClassHandler(CombatHandlerDeps deps, WorldSession sess
         ctx.Tick.Emit(new Game.Items.InventoryChangedEvent(map.Id, p, msg.ReqId));
     }
 }
+
+/// <summary>
+/// HU-015: `Logout{reqId?}`. En combate → `Error{in_combat}` y sigue dentro (no sirve para escapar de una pelea). Si no,
+/// WorldSession guarda y lo saca del mundo; se confirma con `LoggedOut` y se cierra la conexión cuando ese mensaje ya salió.
+/// </summary>
+public sealed class LogoutHandler(WorldSession session) : IMessageHandler<Logout>
+{
+    public void Handle(Logout msg, HandlerContext ctx)
+    {
+        // Sin jugador (antes del Welcome o ya fuera) no hay nada que guardar: se confirma igual para que el cliente no espere.
+        if (ctx.Player is { } p && session.Logout(p, ctx.Tick) is { } error) { ctx.SendError(error, msg.ReqId); return; }
+        ctx.Send(new LoggedOut());
+        ctx.CloseAfterFlush(WorldSession.LogoutReason);
+    }
+}

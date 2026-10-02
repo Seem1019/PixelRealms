@@ -5,13 +5,14 @@
     godot --path client --headless --import   # crea los .import de los PNG nuevos
 
 Escribe: palette.png, tiles/ (terreno, placeholder.png y collision.png que usan los .tsj), sprites/ (personajes, NPC,
-monstruos y sombras), icons/ (items, hechizos, siluetas de equipo, clases) y ui/ (9-slice, barras, logo).
+monstruos, sombras y efectos de hechizo en sprites/vfx/), icons/ (items, hechizos, siluetas de equipo, clases) y ui/ (9-slice, barras, logo).
 Todo es determinista: la misma versión del script da los mismos píxeles.
 """
 import gen_chars
 import gen_icons
 import gen_tiles
 import gen_ui
+import gen_vfx
 from pix import palette_png
 
 if __name__ == "__main__":
@@ -20,4 +21,5 @@ if __name__ == "__main__":
     gen_chars.build()
     gen_icons.build()
     gen_ui.build()
+    gen_vfx.build()
     print("arte regenerado en client/assets/")
