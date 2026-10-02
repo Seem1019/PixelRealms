@@ -166,6 +166,26 @@ func test_remote_mark_goes_away_when_the_caster_leaves_or_the_cast_should_have_e
 	assert_false(_world._reticle._marks.has(8))
 
 
+# --- Punto 7: el chat se desvanece -------------------------------------------------------------------------------------
+
+func test_chat_fades_when_idle_and_comes_back_on_message_or_enter() -> void:
+	_welcome()
+	var chat: ChatPanel = _world._chat
+	var t0 := Time.get_ticks_msec()
+	chat.add_message("say", "Bob", "hola")
+	chat.update_fade(t0)
+	assert_almost_eq(chat.modulate.a, 1.0, 0.01)
+	chat.update_fade(t0 + int((ChatPanel.FADE_DELAY_SEC + ChatPanel.FADE_SEC) * 1000) + 100)
+	assert_almost_eq(chat.modulate.a, 0.0, 0.01, "sin mensajes nuevos se desvanece")
+	chat.add_message("global", "Bob", "¿alguien?")
+	chat.update_fade(Time.get_ticks_msec())
+	assert_almost_eq(chat.modulate.a, 1.0, 0.01, "vuelve al llegar un mensaje")
+	chat.update_fade(Time.get_ticks_msec() + 60_000)
+	chat.open_input()  # Enter
+	chat.update_fade(Time.get_ticks_msec() + 120_000)
+	assert_almost_eq(chat.modulate.a, 1.0, 0.01, "mientras escribes no se esconde")
+
+
 # --- Punto 11: a quién alcanza un área ----------------------------------------------------------------------------------
 
 func test_every_target_of_an_area_flashes_and_gets_its_own_number() -> void:

@@ -2,7 +2,8 @@ class_name ChatPanel
 extends Control
 ## Chat (HU-060): Enter enfoca, Enter envía, Esc cancela; sin prefijo → say; `/g`, `/w Nombre`, `/p`, `/invite`, `/leave`,
 ## `/kick`, `/duel`, `/rendirse`, `/trade`, `/who`; colores por canal; BBCode escapado; burbuja 4 s sobre la cabeza (el mundo la dibuja).
-## Mientras la caja tiene el foco, el mundo no mueve al personaje (`is_typing`).
+## Mientras la caja tiene el foco, el mundo no mueve al personaje (`is_typing`). Tras FADE_DELAY_SEC sin mensajes se
+## desvanece en FADE_SEC; vuelve al llegar un mensaje o al pulsar Enter, y no se esconde mientras escribes.
 
 signal bubble_requested(from: String, text: String)
 signal command(name: String, args: String)
@@ -12,10 +13,13 @@ const MAX_LINES := 60
 const WIDTH := 200
 const LOG_HEIGHT := 64
 const INPUT_HEIGHT := 14
+const FADE_DELAY_SEC := 8.0
+const FADE_SEC := 1.0
 
 var _log: RichTextLabel
 var _input: LineEdit
 var _lines: Array[String] = []
+var _last_activity_ms: int = 0
 
 
 func is_typing() -> bool:
@@ -48,11 +52,30 @@ func _ready() -> void:
 	v.add_child(_input)
 	GameState.chat_received.connect(add_message)
 	GameState.notice.connect(func(t: String) -> void: add_message("system", "", t))
+	_last_activity_ms = Time.get_ticks_msec()
+
+
+func _process(_delta: float) -> void:
+	update_fade(Time.get_ticks_msec())
+
+
+## Opacidad del chat según el tiempo desde el último mensaje o desde que se dejó de escribir.
+func update_fade(now_ms: int) -> void:
+	if is_typing():
+		_last_activity_ms = now_ms
+	var idle_sec := (now_ms - _last_activity_ms) / 1000.0
+	modulate.a = clampf(1.0 - (idle_sec - FADE_DELAY_SEC) / FADE_SEC, 0.0, 1.0)
+
+
+## Enter: enfoca la caja y muestra el chat.
+func open_input() -> void:
+	_last_activity_ms = Time.get_ticks_msec()
+	_input.grab_focus()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("chat_focus") and not is_typing():
-		_input.grab_focus()
+		open_input()
 		get_viewport().set_input_as_handled()
 
 
@@ -109,5 +132,6 @@ func add_message(channel: String, from: String, text: String) -> void:
 	while _lines.size() > MAX_LINES:
 		_lines.remove_at(0)
 	_log.text = "\n".join(_lines)
+	_last_activity_ms = Time.get_ticks_msec()
 	if channel == "say" and not from.is_empty() and from != GameState.character_name:
 		bubble_requested.emit(from, text)
