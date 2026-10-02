@@ -3,6 +3,8 @@ class_name EntitySprites
 ## columnas según la tabla `anims` del .json junto al PNG ({nombre: {column, frames, fps, loop}}: idle, walk, attack, cast,
 ## hurt, death; HU-090) más el tamaño del cuadro y la fila de los pies. Una hoja sin `anims` (formato anterior) solo trae
 ## idle0, idle1, walk0..walk3. Construye y guarda en caché un SpriteFrames por hoja con `<anim>_<dir>` (skill pixel-art-assets).
+## Hojas HD (HU-099, tools/art/import_heroes.py): `pixelScale` > 1 = píxeles de la hoja por píxel lógico; quien la dibuja
+## la escala a 1/pixelScale, así mide lo mismo en el mundo pero conserva el detalle de la ventana (×3).
 
 const DIRS := ["s", "n", "e"]
 ## Hojas sin tabla `anims`: idle en las columnas 0-1 y walk en 2-5.
@@ -37,11 +39,11 @@ static func sheet(ref: String) -> Texture2D:
 	return load(path) as Texture2D if not ref.is_empty() and ResourceLoader.exists(path) else null
 
 
-## Tamaño del cuadro y fila de los pies (por defecto 32 y 28).
+## Tamaño del cuadro y fila de los pies en píxeles de la hoja (por defecto 32 y 28) y su escala (`pixelScale`, 1 por defecto).
 static func meta(ref: String) -> Dictionary:
 	if _meta.has(ref):
 		return _meta[ref]
-	var m := {"frame": 32, "feet": 28, "anims": LEGACY_ANIMS}
+	var m := {"frame": 32, "feet": 28, "scale": 1, "anims": LEGACY_ANIMS}
 	var path := "res://assets/sprites/%s.json" % ref
 	if FileAccess.file_exists(path):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -49,6 +51,7 @@ static func meta(ref: String) -> Dictionary:
 			var size: Array = (parsed as Dictionary).get("frameSize", [32, 32])
 			m["frame"] = int(size[0])
 			m["feet"] = int((parsed as Dictionary).get("feetY", int(size[1]) - 4))
+			m["scale"] = maxi(1, int((parsed as Dictionary).get("pixelScale", 1)))
 			var anims: Variant = (parsed as Dictionary).get("anims")
 			if anims is Dictionary and not (anims as Dictionary).is_empty():
 				m["anims"] = anims
@@ -89,17 +92,30 @@ static func frames_for(ref: String) -> SpriteFrames:
 	return sf
 
 
-## Primer cuadro mirando al sur (cuerpo entero) o solo la cara (16×16, para los retratos de los marcos).
+## Píxeles de la hoja por píxel lógico (1 en las hojas normales, 3 en las HD).
+static func scale_of(ref: String) -> int:
+	return int(meta(ref)["scale"])
+
+
+## Primer cuadro mirando al sur: el cuerpo (32×32 lógicos alrededor de los pies) o solo la cara (16×16, retratos de los
+## marcos). En una hoja HD el recorte mide ×pixelScale: quien lo muestra fija su tamaño lógico (32 o 16) y gana detalle.
 static func portrait(ref: String, head_only: bool) -> Texture2D:
 	var tex := sheet(ref)
 	if tex == null:
 		return null
 	var size := int(meta(ref)["frame"])
+	var feet := int(meta(ref)["feet"])
+	var s := scale_of(ref)
 	var at := AtlasTexture.new()
 	at.atlas = tex
 	if head_only:
 		var k := size / 32
-		at.region = Rect2(size / 2 - 8 * k, size - 28 * k + 1, 16 * k, 16 * k) if k <= 1 else Rect2(size / 2 - 8, size - 52, 16, 16)
+		if s > 1:
+			at.region = Rect2(size / 2 - 8 * s, feet - 27 * s, 16 * s, 16 * s)
+		else:
+			at.region = Rect2(size / 2 - 8 * k, size - 28 * k + 1, 16 * k, 16 * k) if k <= 1 else Rect2(size / 2 - 8, size - 52, 16, 16)
+	elif s > 1:
+		at.region = Rect2(size / 2 - 16 * s, feet - 28 * s, 32 * s, 32 * s)
 	else:
 		at.region = Rect2(0, 0, size, size)
 	return at

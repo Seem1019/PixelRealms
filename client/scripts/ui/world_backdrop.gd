@@ -47,8 +47,10 @@ func _ready() -> void:
 			spr.play("idle_" + str(facing[0]))
 			spr.flip_h = bool(facing[1])
 			spr.centered = false
-			var feet := float(EntitySprites.meta(str(f[0]))["feet"])
-			spr.position = (f[1] as Vector2) - Vector2(region.position) - Vector2(16, feet)
+			var m := EntitySprites.meta(str(f[0]))
+			var s := float(m["scale"])
+			spr.scale = Vector2.ONE / s  # hojas HD (HU-099)
+			spr.position = (f[1] as Vector2) - Vector2(region.position) - Vector2(float(m["frame"]) / 2.0, float(m["feet"])) / s
 			_scene.add_child(spr)
 		var above_tex := Sprite2D.new()
 		above_tex.centered = false

@@ -60,6 +60,7 @@ func _reload() -> void:
 func show_characters(characters: Array) -> void:
 	_characters = characters
 	_list.clear()
+	_list.fixed_icon_size = Vector2i(32, 32)  # retrato del cuerpo en tamaño lógico aunque la hoja sea HD (HU-099)
 	for c: Variant in _characters:
 		var d: Dictionary = c
 		var class_id := str(d.get("classId", ""))

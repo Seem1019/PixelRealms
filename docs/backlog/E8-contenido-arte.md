@@ -148,3 +148,19 @@
 
 **Notas de implementación**
 - La asignación cuadro → animación está en la tabla `FRAMES` de `import_heroes.py`; los colores son los de la hoja, no Resurrect 64.
+
+### HU-099 · Héroes en alta resolución
+**Como** jugador **quiero** que los cuatro héroes se vean con el detalle y las animaciones de sus hojas dibujadas **para** que no pierdan calidad al reducirlos a 32 px.
+- Prioridad: Should · Estimación: M · Estado: En curso
+- Dependencias: HU-093
+- Skills: `pixel-art-assets`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** `tools/art/refs/<clase>_sheet.webp` **cuando** se ejecuta `import_heroes.py` **entonces** escribe una hoja HD: cuadros de 120×120 (40×40 lógicos), pies en y=108, personaje de 78 px (26 lógicos) y `pixelScale: 3` en el `.json`.
+2. **Dado** una hoja con `pixelScale` **entonces** el cliente la dibuja a 1/3: mide lo mismo en el mundo que antes, con el detalle de la ventana de 1440×810; la placa queda a la altura de siempre y los retratos cubren el mismo área lógica.
+3. **Dado** cada héroe **entonces** tiene reposo (4 cuadros), caminar (8), ataque (6), casteo (6), golpe (2) y muerte (4) en s, n y e.
+4. **Dado** una clase sin hoja de referencia **entonces** sigue con la procedural a escala 1.
+
+**Notas de implementación**
+- Detección de cuadros robusta a brillos que unen cuadros vecinos (parte el tramo por su línea menos densa) y fondo encerrado por efectos (negro casi puro y grande) transparente.
+- El sacerdote no trae vista de espaldas: el norte repite la de frente. Falta la hoja del pícaro.

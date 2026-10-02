@@ -90,6 +90,7 @@
 | HU-096 | Ver el alcance al mantener la tecla | E3 | Should | S | Hecha |
 | HU-097 | Historial del chat | E6 | Should | S | Hecha |
 | HU-098 | Estados (buffos, perjuicios y control) legibles | E3 | Must | M | Hecha |
+| HU-099 | Héroes en alta resolución | E8 | Should | M | En curso |
 
 ## Pendiente de diseño
 - **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).

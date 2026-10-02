@@ -1,72 +1,52 @@
 {
  "frameSize": [
-  32,
-  32
+  120,
+  120
  ],
+ "pixelScale": 3,
  "rows": [
   "s",
   "n",
   "e"
  ],
- "columns": [
-  "idle0",
-  "idle1",
-  "walk0",
-  "walk1",
-  "walk2",
-  "walk3",
-  "attack0",
-  "attack1",
-  "attack2",
-  "attack3",
-  "cast0",
-  "cast1",
-  "cast2",
-  "hurt0",
-  "hurt1",
-  "death0",
-  "death1",
-  "death2",
-  "death3"
- ],
- "feetY": 28,
+ "feetY": 108,
  "anims": {
   "idle": {
    "column": 0,
-   "frames": 2,
-   "fps": 3,
+   "frames": 4,
+   "fps": 5,
    "loop": true
   },
   "walk": {
-   "column": 2,
-   "frames": 4,
-   "fps": 8,
+   "column": 4,
+   "frames": 8,
+   "fps": 12,
    "loop": true
   },
   "attack": {
-   "column": 6,
-   "frames": 4,
-   "fps": 12,
+   "column": 12,
+   "frames": 6,
+   "fps": 18,
    "loop": false
   },
   "cast": {
-   "column": 10,
-   "frames": 3,
-   "fps": 6,
+   "column": 18,
+   "frames": 6,
+   "fps": 10,
    "loop": true
   },
   "hurt": {
-   "column": 13,
+   "column": 24,
    "frames": 2,
    "fps": 10,
    "loop": false
   },
   "death": {
-   "column": 15,
+   "column": 26,
    "frames": 4,
    "fps": 8,
    "loop": false
   }
  },
- "note": "w = e espejado; hurt y death por direcci\u00f3n; generado por tools/art/gen_chars.py"
+ "note": "w = e espejado; hoja HD (pixelScale 3) importada de tools/art/refs/priest_sheet.webp por tools/art/import_heroes.py"
 }

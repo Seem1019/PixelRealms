@@ -80,11 +80,16 @@ func set_sprite(ref: String, fallback_color: Color, display_name: String) -> voi
 		sprite.visible = true
 		sprite.sprite_frames = frames
 		var m := EntitySprites.meta(ref)
-		var size := float(m["frame"])
-		_sprite_base = Vector2(-size / 2.0, -float(m["feet"]))
+		# Hoja HD (pixelScale 3): se dibuja a 1/3 y todo lo demás va en píxeles lógicos.
+		var s := float(m["scale"])
+		sprite.scale = Vector2.ONE / s
+		var size := float(m["frame"]) / s
+		var feet := float(m["feet"]) / s
+		_sprite_base = Vector2(-size / 2.0, -feet)
 		sprite.position = _sprite_base
-		body_height = float(m["feet"]) - (4.0 if size <= 32.0 else 8.0)
-		var big := size > 32.0
+		# El cuadro HD mide 40 lógicos para que quepan los tajos, pero el cuerpo es el de un personaje de 32.
+		var big := s <= 1.0 and size > 32.0
+		body_height = feet - (8.0 if big else 4.0) - (size - 32.0 if s > 1.0 else 0.0)
 		shadow.texture = UiTheme.texture("res://assets/sprites/shadow_big.png" if big else "res://assets/sprites/shadow.png")
 		_play()
 	plate.position = Vector2(0, -body_height - PLATE_GAP)
