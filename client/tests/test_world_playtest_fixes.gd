@@ -166,6 +166,22 @@ func test_remote_mark_goes_away_when_the_caster_leaves_or_the_cast_should_have_e
 	assert_false(_world._reticle._marks.has(8))
 
 
+# --- Punto 10: tooltip en la tienda ------------------------------------------------------------------------------------
+
+func test_vendor_rows_show_the_item_tooltip_with_the_buy_price() -> void:
+	_welcome()
+	_dispatch("EntitySpawn", {"id": 9, "kind": "npc", "templateId": "vendor", "name": "Marta", "x": 100.0, "y": 110.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	_dispatch("VendorWindow", {"npcId": 9, "items": [{"templateId": "novice_wand", "price": 60}]})
+	await get_tree().process_frame
+	var row_name: Control = (_world._vendor._list.get_child(0) as Control).get_child(0)
+	assert_ne(row_name.mouse_filter, Control.MOUSE_FILTER_IGNORE, "un Label ignora el ratón: el tooltip nunca salía")
+	var tip := row_name.call("_make_custom_tooltip", "") as RichTextLabel
+	assert_not_null(tip)
+	assert_string_contains(tip.text, "Varita de novicio")
+	assert_string_contains(tip.text, "Compra: 60c")
+	assert_string_contains(tip.text, "Daño")
+
+
 # --- Punto 6: poción desde la barra ----------------------------------------------------------------------------------
 
 func test_hotbar_item_sends_the_bag_instance_id_not_the_template() -> void:

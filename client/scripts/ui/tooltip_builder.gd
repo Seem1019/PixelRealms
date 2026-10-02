@@ -26,7 +26,8 @@ static func affinity_mult(affinity: String) -> float:
 	return float(mults.get(affinity, 0.7))
 
 
-static func build(item: Dictionary, qty: int, class_id: String, level: int, equipped: Dictionary = {}) -> String:
+## `buy_price` ≥ 0 añade el precio de compra (tienda, HU-055).
+static func build(item: Dictionary, qty: int, class_id: String, level: int, equipped: Dictionary = {}, buy_price: int = -1) -> String:
 	if item.is_empty():
 		return ""
 	var lines: Array[String] = []
@@ -67,6 +68,8 @@ static func build(item: Dictionary, qty: int, class_id: String, level: int, equi
 		lines.append(("[color=#ff5555]Requiere nivel %d[/color]" if level < level_req else "Requiere nivel %d") % level_req)
 	if item.has("description"):
 		lines.append("[i]%s[/i]" % str(item["description"]))
+	if buy_price >= 0:
+		lines.append("[color=#ffdb6b]Compra: %s[/color]" % MoneyFormat.format(buy_price))
 	var sell := int(item.get("sellPrice", 0))
 	lines.append("Venta: %s" % (MoneyFormat.format(sell) if sell > 0 else "no se puede vender"))
 
