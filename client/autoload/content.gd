@@ -56,6 +56,11 @@ func monster(id: String) -> Dictionary:
 	return _lookup("monsters", id)
 
 
+## ¿Existe ese monstruo? Sin aviso: para ids que pueden ser de un jugador (su clase) o de un monstruo.
+func has_monster(id: String) -> bool:
+	return (_by_id.get("monsters", {}) as Dictionary).has(id)
+
+
 func character_class(id: String) -> Dictionary:
 	return _lookup("classes", id)
 

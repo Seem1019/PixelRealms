@@ -20,3 +20,9 @@ func test_unknown_id_is_empty() -> void:
 
 func test_four_classes() -> void:
 	assert_eq(Content.classes().size(), 4)
+
+
+func test_has_monster_tells_player_classes_apart_without_warning() -> void:
+	# El presentador de combate pregunta por el arquetipo del atacante: de un jugador llega su clase ("rogue").
+	assert_true(Content.has_monster("slime"))
+	assert_false(Content.has_monster("rogue"))
