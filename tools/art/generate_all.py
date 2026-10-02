@@ -13,12 +13,14 @@ import gen_icons
 import gen_tiles
 import gen_ui
 import gen_vfx
+import import_heroes
 from pix import palette_png
 
 if __name__ == "__main__":
     palette_png()
     gen_tiles.build()
     gen_chars.build()
+    import_heroes.build()  # guerrero y mago: hojas dibujadas a mano (HU-093)
     gen_icons.build()
     gen_ui.build()
     gen_vfx.build()

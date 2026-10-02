@@ -51,14 +51,15 @@ func test_slot_labels_never_cut_words() -> void:
 	assert_string_contains(slot.tooltip_bbcode, "Poción menor de vida")
 
 
-func test_theme_uses_the_pixel_font_at_native_size() -> void:
+func test_theme_uses_the_hd_font_smoothed() -> void:
+	# HU-092: Alegreya Sans con suavizado en vez de la fuente pixel; los títulos en Alegreya SC.
 	var font := ThemeDB.get_default_theme().default_font as FontFile
-	assert_not_null(font, "la fuente por defecto de Godot es una sans suave")
-	assert_eq(font.antialiasing, TextServer.FONT_ANTIALIASING_NONE)
-	assert_eq(font.hinting, TextServer.HINTING_NONE)
-	assert_eq(font.subpixel_positioning, TextServer.SUBPIXEL_POSITIONING_DISABLED)
-	for size: int in [UiTheme.FONT_SMALL, UiTheme.FONT_BODY, UiTheme.FONT_TITLE, UiTheme.FONT_HEADLINE]:
-		assert_eq(size % UiTheme.FONT_NATIVE, 0, "%d no es múltiplo entero de %d: se vería borrosa" % [size, UiTheme.FONT_NATIVE])
+	assert_not_null(font, "la fuente por defecto de Godot es otra sans")
+	assert_string_contains(font.resource_path if not font.resource_path.is_empty() else font.get_font_name(), "Alegreya")
+	assert_eq(font.antialiasing, TextServer.FONT_ANTIALIASING_GRAY)
+	var title := ThemeDB.get_default_theme().get_font("font", "TitleLabel") as FontFile
+	assert_not_null(title)
+	assert_string_contains(title.get_font_name(), "Alegreya SC")
 
 
 func test_panels_and_buttons_are_9_slice_textures() -> void:

@@ -496,7 +496,8 @@ func _on_auras_changed(entity_id: int) -> void:
 		_rebuild_auras(_target_auras, entity_id)
 
 
-## Ícono de 16×16 del aura con el tiempo restante debajo (y las cargas); borde rojo si es perjudicial.
+## Ícono de 16×16 del aura con el tiempo restante debajo (y las cargas); marco verde si beneficia y rojo si perjudica, e
+## insignia de tipo arriba a la izquierda (aturdido, inmovilizado, ralentizado, daño o curación en el tiempo, escudo…).
 func _rebuild_auras(box: HBoxContainer, entity_id: int) -> void:
 	for c: Node in box.get_children():
 		c.queue_free()
@@ -509,24 +510,31 @@ func _rebuild_auras(box: HBoxContainer, entity_id: int) -> void:
 		cell.custom_minimum_size = Vector2(16, 16)
 		cell.set_meta("aura", ad)
 		cell.mouse_filter = Control.MOUSE_FILTER_PASS
-		cell.tooltip_text = "%s\n%s" % [str(def.get("name", ad["auraId"])), str(def.get("description", ""))]
+		var cat := AuraStyle.category(def)
+		cell.tooltip_text = "%s (%s)\n%s" % [str(def.get("name", ad["auraId"])), AuraStyle.CATEGORY_NAMES.get(cat, ""), str(def.get("description", ""))]
 		var pic := TextureRect.new()
 		pic.texture = UiTheme.icon(str(def.get("icon", "")))
 		pic.size = Vector2(16, 16)
 		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(pic)
-		if bool(def.get("isDebuff", false)):
-			var ring := NinePatchRect.new()
-			ring.texture = UiTheme.texture("slot_frame.png")
-			ring.patch_margin_left = 2
-			ring.patch_margin_top = 2
-			ring.patch_margin_right = 2
-			ring.patch_margin_bottom = 2
-			ring.size = Vector2(16, 16)
-			ring.self_modulate = UiTheme.ERROR
-			ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			cell.add_child(ring)
+		var ring := NinePatchRect.new()
+		ring.texture = UiTheme.texture("slot_frame.png")
+		ring.patch_margin_left = 2
+		ring.patch_margin_top = 2
+		ring.patch_margin_right = 2
+		ring.patch_margin_bottom = 2
+		ring.size = Vector2(16, 16)
+		ring.self_modulate = AuraStyle.frame_color(def)
+		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(ring)
+		var badge := Control.new()
+		badge.name = "Badge"
+		badge.size = Vector2(7, 7)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.draw.connect(func() -> void: AuraStyle.draw_badge(badge, Vector2(1, 1), cat))
+		badge.set_meta("category", cat)
+		cell.add_child(badge)
 		var time := Label.new()
 		time.name = "Time"
 		time.theme_type_variation = "OutlinedLabel"

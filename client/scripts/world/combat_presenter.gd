@@ -176,9 +176,9 @@ func _ranged_basic(src: int, dst: int) -> bool:
 	var b := _pos(dst)
 	if a == Vector2.INF or b == Vector2.INF:
 		return false
-	var monster := Content.monster(str(archetype_of.call(src))) if archetype_of.is_valid() else {}
-	if not monster.is_empty():
-		return float(monster.get("attackRange", 1.0)) > VfxCatalog.RANGED_BASIC_MIN_TILES
+	var arch := str(archetype_of.call(src)) if archetype_of.is_valid() else ""
+	if Content.has_monster(arch):  # de un jugador llega su clase: no es un monstruo y no hay que avisar
+		return float(Content.monster(arch).get("attackRange", 1.0)) > VfxCatalog.RANGED_BASIC_MIN_TILES
 	return a.distance_to(b) > VfxCatalog.RANGED_BASIC_MIN_TILES * 16.0
 
 

@@ -48,6 +48,8 @@ var _aiming_spell: Dictionary = {}
 ## Último CastStarted propio de un salto/Carga: la corrección grande siguiente se suaviza en vez de saltar (HU-087 CA4).
 var _forced_move_until_ms: int = -1
 const TARGET_CYCLE_RANGE_TILES := 12.0
+## Índice de la mano principal en `equipment` (EquipSlot del protocolo).
+const MAIN_HAND_SLOT := 7
 ## Hacia dónde mira el personaje propio (última tecla de movimiento).
 var _self_dir: String = "s"
 ## Animaciones y efectos de combate (HU-090, HU-091).
@@ -59,6 +61,12 @@ var _logout_after: String = ""
 var _logout_req_id: int = -1
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select/character_select.tscn"
 const LOGOUT_IN_COMBAT_TEXT := "No puedes salir en combate"
+## Acercarse solo al objetivo fuera de alcance (HU-095) y círculo del alcance al mantener la tecla (HU-096).
+var _approach: Approach = Approach.new()
+var _range_ring: RangeRing
+const STUCK_TEXT := "No puedes llegar hasta el objetivo"
+## Envío de mensajes (los tests lo sustituyen para ver qué se manda sin servidor).
+var send_fn: Callable = func(type: String, data: Dictionary) -> void: Net.send(type, data)
 const LOGOUT_REJECTED_TEXT := "No se pudo salir: el servidor rechazó la petición"
 ## Cambio de escena tras el Logout (los tests lo sustituyen para no salir de la escena de prueba).
 var change_scene: Callable = func(path: String) -> void: get_tree().change_scene_to_file(path)
@@ -74,10 +82,13 @@ func _ready() -> void:
 	Net.combat_events.connect(_on_combat_events)
 	Net.snapshot.connect(_on_snapshot)
 	GameState.target_changed.connect(_on_target_changed)
+	GameState.auras_changed.connect(_on_auras_changed)
 	GameState.respawned.connect(func() -> void: prediction.snap_next = true)
-	GameState.died.connect(func(_killer: int) -> void: _stop_aiming())
+	GameState.died.connect(func(_killer: int) -> void:
+		_stop_aiming()
+		_approach.cancel())
 	GameState.xp_gained.connect(func(amount: int) -> void: _floating.show_event(GameState.self_id, "xp", amount, false, _player.position))
-	_hud.respawn_requested.connect(func() -> void: Net.send("Respawn"))
+	_hud.respawn_requested.connect(func() -> void: _send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
 	_inventory.sell_requested.connect(_sell_item)
@@ -95,6 +106,9 @@ func _ready() -> void:
 	_self_visual = EntityVisual.new()
 	_player.add_child(_self_visual)
 	_self_health = _self_visual.plate.health_bar
+	_range_ring = RangeRing.new()
+	_range_ring.name = "RangeRing"
+	_player.add_child(_range_ring)
 	_setup_combat_presenter()
 	_setup_game_menu()
 	GameState.vitals_changed.connect(_refresh_self_health)
@@ -119,7 +133,7 @@ func _ready() -> void:
 func _on_connected(_ticket: String) -> void:
 	_movement.reset()  # el seq es por conexión: el servidor lo reinicia con cada Hello
 	_welcomed_on_connection = false
-	Net.send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": Net.current_ticket()})
+	_send("Hello", {"protocolVersion": Protocol.VERSION, "ticket": Net.current_ticket()})
 
 
 ## HU-025 CA2: ticket nuevo con el JWT guardado para retomar el mismo personaje sin pasar por la selección.
@@ -139,7 +153,7 @@ func _on_welcome(d: Dictionary) -> void:
 		GameState._on_welcome(d, true)
 		_refresh_self_visual()
 		if GameState.target_id > 0:
-			Net.send("SelectTarget", {"targetId": GameState.target_id})  # el servidor limpia el objetivo al cambiar de clase
+			_send("SelectTarget", {"targetId": GameState.target_id})  # el servidor limpia el objetivo al cambiar de clase
 		return
 	_welcomed_on_connection = true
 	GameState._on_welcome(d)
@@ -219,7 +233,7 @@ func request_logout(after: String) -> void:
 	_logout_after = after
 	_logout_req_id = Net.next_req_id()
 	_game_menu.waiting = true
-	Net.send("Logout", {"reqId": _logout_req_id})
+	_send("Logout", {"reqId": _logout_req_id})
 
 
 func _on_logged_out(_d: Dictionary) -> void:
@@ -293,9 +307,15 @@ func _physics_process(delta: float) -> void:
 	if GameState.is_dead or _chat.is_typing() or _game_menu.is_open():
 		dx = 0
 		dy = 0
+	if dx != 0 or dy != 0 or GameState.is_dead:
+		_approach.cancel()  # moverse a mano cancela el acercamiento (HU-095 CA3)
+	elif _approach.is_active() and not _game_menu.is_open():
+		var step := _step_approach()
+		dx = step.x
+		dy = step.y
 	# Ticks fijos de 50 ms como el servidor (los frames físicos van a 60 Hz): un MoveInput por tick con movimiento.
 	for input: Dictionary in _movement.advance(delta, dx, dy, prediction):
-		Net.send("MoveInput", input)
+		_send("MoveInput", input)
 	if dx != 0 or dy != 0:
 		_self_dir = ("e" if dx > 0 else "w") if dx != 0 else ("s" if dy > 0 else "n")
 	_self_visual.set_motion(_self_dir, dx != 0 or dy != 0)
@@ -306,6 +326,7 @@ func _process(delta: float) -> void:
 		prediction.update_render(delta)
 		_player.position = prediction.render_position
 		_update_zone(delta)
+		_update_range_ring()
 		if not _aiming_spell.is_empty():
 			var mouse := get_global_mouse_position()
 			_reticle.aim_pos = mouse
@@ -366,6 +387,15 @@ func _on_entity_spawn(d: Dictionary) -> void:
 	r.setup(d)
 	if id == GameState.duel_opponent_id and GameState.duel_state == "active":
 		r.hostile = true  # vuelve a entrar en la AOI en pleno duelo
+	if r.visual != null:
+		r.visual.set_auras(GameState.auras_of(id))
+
+
+## Estados sobre cualquier entidad visible, no solo en los marcos (HU-098 CA2–CA4).
+func _on_auras_changed(entity_id: int) -> void:
+	var v := _entity_visual(entity_id)
+	if v != null:
+		v.set_auras(GameState.auras_of(entity_id))
 
 
 func _on_entity_despawn(d: Dictionary) -> void:
@@ -402,9 +432,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			if hit != null:
 				_select(hit.entity_id)
 				if hit.kind == "monster" and hit.anim == "dead":
-					Net.send("LootOpen", {"lootId": hit.entity_id})  # HU-050 CA2
+					_send("LootOpen", {"lootId": hit.entity_id})  # HU-050 CA2
 				elif hit.kind == "npc" and hit.template_id == "vendor":
-					Net.send("VendorOpen", {"npcId": hit.entity_id})  # HU-055 CA1
+					_send("VendorOpen", {"npcId": hit.entity_id})  # HU-055 CA1
 				elif hit.kind == "npc" and hit.template_id == "class_change":
 					_social.open_class_change(hit.entity_id)  # HU-044 CA1
 			else:
@@ -415,8 +445,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			var hit := _entity_at(world_pos)
 			if hit != null and hit.hostile:
-				_select(hit.entity_id)
-				Net.send("AutoAttack", {"on": true})  # HU-032 CA1
+				_select(hit.entity_id)  # HU-094: el básico va con Espacio; el clic derecho solo selecciona
 			elif hit != null and hit.kind == "player":
 				_select(hit.entity_id)
 				_open_player_menu(hit)
@@ -426,8 +455,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_spellbook.toggle()
 	elif event.is_action_pressed("toggle_character"):
 		_character.toggle()
+	elif event.is_action_pressed("basic_attack"):
+		basic_attack()
 	elif event.is_action_pressed("ui_cancel"):
-		if not _aiming_spell.is_empty():
+		if _approach.is_active():
+			_approach.cancel()
+		elif not _aiming_spell.is_empty():
 			_stop_aiming()
 		elif _loot.visible or _vendor.visible or _inventory.visible or _spellbook.visible or _character.visible:
 			_loot.visible = false
@@ -437,7 +470,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_spellbook.visible = false
 			_character.visible = false
 		elif not GameState.own_cast.is_empty():
-			Net.send("CancelCast")
+			_send("CancelCast")
 		elif GameState.target_id > 0:
 			_select(-1)
 		else:
@@ -465,26 +498,38 @@ func _entity_at(world_pos: Vector2) -> RemoteEntity:
 
 func _select(entity_id: int) -> void:
 	GameState.set_target(entity_id)
-	Net.send("SelectTarget", {"targetId": entity_id} if entity_id > 0 else {})
+	_send("SelectTarget", {"targetId": entity_id} if entity_id > 0 else {})
 
 
 func _on_target_changed(entity_id: int) -> void:
+	if _approach.is_active() and _approach.target_id != entity_id:
+		_approach.cancel()
 	for r: RemoteEntity in _remotes.values():
 		r.selected = r.entity_id == entity_id
 		if r.selected:
 			_hud.set_target_info(r.display_name, r.level, r.hp_pct, r.portrait())
 
 
-## Tab: enemigos vivos visibles a ≤ 12 casillas, del más cercano al más lejano (HU-030 CA2).
-func _cycle_target() -> void:
+## Enemigos vivos visibles a ≤ 12 casillas, del más cercano al más lejano.
+func _nearby_hostiles() -> Array[RemoteEntity]:
 	var candidates: Array[RemoteEntity] = []
 	var max_px := TARGET_CYCLE_RANGE_TILES * 16.0
 	for r: RemoteEntity in _remotes.values():
-		if r.hostile and r.anim != "dead" and r.hp_pct > 0 and r.position.distance_to(_player.position) <= max_px:
+		if _is_live_hostile(r) and r.position.distance_to(_player.position) <= max_px:
 			candidates.append(r)
+	candidates.sort_custom(func(a: RemoteEntity, b: RemoteEntity) -> bool: return a.position.distance_squared_to(_player.position) < b.position.distance_squared_to(_player.position))
+	return candidates
+
+
+static func _is_live_hostile(r: RemoteEntity) -> bool:
+	return r != null and r.hostile and r.anim != "dead" and r.hp_pct > 0
+
+
+## Tab: del más cercano al más lejano (HU-030 CA2).
+func _cycle_target() -> void:
+	var candidates := _nearby_hostiles()
 	if candidates.is_empty():
 		return
-	candidates.sort_custom(func(a: RemoteEntity, b: RemoteEntity) -> bool: return a.position.distance_squared_to(_player.position) < b.position.distance_squared_to(_player.position))
 	var idx := -1
 	for i: int in candidates.size():
 		if candidates[i].entity_id == GameState.target_id:
@@ -511,7 +556,7 @@ func _use_slot(slot: int) -> void:
 	if str(entry.get("kind", "spell")) != "spell":
 		var payload := _use_item_payload(str(entry.get("ref", "")))
 		if not payload.is_empty():
-			Net.send("UseItem", payload)  # HU-055
+			_send("UseItem", payload)  # HU-055
 		return
 	var spell := Content.spell(str(entry.get("ref", "")))
 	if spell.is_empty():
@@ -524,11 +569,100 @@ func _use_slot(slot: int) -> void:
 	if targeting.begins_with("ground_") or has_leap:
 		_start_aiming(spell)
 		return
+	var target: RemoteEntity = _remotes.get(GameState.target_id)
+	if targeting == "enemy" and _is_live_hostile(target) and not Approach.in_reach(prediction.position, target.position, _spell_reach_px(spell)):
+		_approach.start(target.entity_id, _spell_reach_px(spell), Time.get_ticks_msec(), _cast_targeted.bind(spell))  # HU-095 CA2
+		return
+	_approach.cancel()
+	_cast_targeted(spell)
+
+
+func _cast_targeted(spell: Dictionary) -> void:
 	var payload := {"spellId": str(spell["id"]), "reqId": Net.next_req_id()}
 	if GameState.target_id > 0:
 		payload["targetId"] = GameState.target_id
-	Net.send("CastSpell", payload)
+	_send("CastSpell", payload)
 	GameState.predict_gcd(str(spell["id"]))
+
+
+func _send(type: String, data: Dictionary = {}) -> void:
+	send_fn.call(type, data)
+
+
+# --- Básico con Espacio, acercamiento y alcance (HU-094, HU-095, HU-096) ------------------------------------------------
+
+## Espacio: ataca al objetivo hostil o, sin él, al enemigo vivo más cercano; si está lejos, camina hasta él.
+func basic_attack() -> void:
+	if GameState.is_dead or _game_menu.is_open():
+		return
+	var target: RemoteEntity = _remotes.get(GameState.target_id)
+	if not _is_live_hostile(target):
+		var near := _nearby_hostiles()
+		if near.is_empty():
+			return
+		target = near[0]
+		_select(target.entity_id)
+	_send("AutoAttack", {"on": true})  # el servidor pausa el básico fuera de alcance y lo reanuda al llegar
+	var reach := basic_reach_px()
+	if reach > 0.0 and not Approach.in_reach(prediction.position, target.position, reach):
+		_approach.start(target.entity_id, reach, Time.get_ticks_msec())
+
+
+## Alcance del básico del arma equipada (`rules.weapons.types[tipo].rangeTiles`) en píxeles; 0 sin arma.
+func basic_reach_px() -> float:
+	var main_hand: Variant = GameState.equipment[MAIN_HAND_SLOT] if GameState.equipment.size() > MAIN_HAND_SLOT else null
+	if not main_hand is Dictionary:
+		return 0.0
+	var weapon_type := str(Content.item(str((main_hand as Dictionary).get("templateId", ""))).get("weaponType", ""))
+	var types: Dictionary = Content.rule("weapons", "types", {})
+	return float((types.get(weapon_type, {}) as Dictionary).get("rangeTiles", 0.0)) * 16.0
+
+
+static func _spell_reach_px(spell: Dictionary) -> float:
+	return float(spell.get("range", 0)) * 16.0
+
+
+## Un tick de acercamiento: la dirección a caminar; al llegar lanza lo pendiente, y si se atasca avisa.
+func _step_approach() -> Vector2i:
+	var target: RemoteEntity = _remotes.get(_approach.target_id)
+	if not _is_live_hostile(target):
+		_approach.cancel()
+		return Vector2i.ZERO
+	var dir := _approach.update(prediction.position, target.position, Time.get_ticks_msec())
+	match _approach.state:
+		Approach.State.ARRIVED:
+			var arrive := _approach.on_arrive
+			_approach.cancel()
+			if arrive.is_valid():
+				arrive.call()
+		Approach.State.STUCK:
+			_approach.cancel()
+			_hud.show_error(STUCK_TEXT)
+	return dir
+
+
+## Mientras se mantiene Espacio o 1–4: círculo del alcance (verde dentro, rojo fuera, crema sin objetivo).
+func _update_range_ring() -> void:
+	var reach := 0.0
+	var enemy_only := true
+	if not _chat.is_typing() and not _game_menu.is_open() and not GameState.is_dead:
+		if Input.is_action_pressed("basic_attack"):
+			reach = basic_reach_px()
+		else:
+			for i: int in 4:
+				if Input.is_action_pressed("spell_%d" % (i + 1)):
+					var spell := Content.spell(str(_slot_entry(i).get("ref", "")))
+					reach = _spell_reach_px(spell)
+					enemy_only = str(spell.get("targeting", "enemy")) == "enemy"
+					break
+	if reach <= 0.0:
+		_range_ring.hide_range()
+		return
+	var target: RemoteEntity = _remotes.get(GameState.target_id)
+	var state := -1
+	if enemy_only and _is_live_hostile(target):
+		state = 1 if prediction.position.distance_to(target.position) <= reach else 0
+	_range_ring.show_range(reach, state)
 
 
 ## La barra guarda la plantilla (SetHotbar.ref) pero UseItem pide el id de una instancia de la bolsa: se usa la primera pila.
@@ -572,7 +706,7 @@ func _cast_ground(spell: Dictionary, world_pos: Vector2) -> void:
 	var payload := {"spellId": str(spell["id"]), "targetPos": {"x": snappedf(world_pos.x, 0.01), "y": snappedf(world_pos.y, 0.01)}, "reqId": Net.next_req_id()}
 	if GameState.target_id > 0:
 		payload["targetId"] = GameState.target_id
-	Net.send("CastSpell", payload)
+	_send("CastSpell", payload)
 	GameState.predict_gcd(str(spell["id"]))
 	for e: Variant in spell.get("effects", []):
 		if str((e as Dictionary).get("type", "")) == "leap":
@@ -648,13 +782,13 @@ func _open_player_menu(target: RemoteEntity) -> void:
 	menu.add_item("Susurrar", 3)
 	menu.id_pressed.connect(func(id: int) -> void:
 		match id:
-			0: Net.send("PartyInvite", {"name": target.display_name})
+			0: _send("PartyInvite", {"name": target.display_name})
 			1:
 				_social.mark_outgoing("duel")
-				Net.send("DuelRequest", {"name": target.display_name})
+				_send("DuelRequest", {"name": target.display_name})
 			2:
 				_social.mark_outgoing("trade")
-				Net.send("TradeRequest", {"name": target.display_name})
+				_send("TradeRequest", {"name": target.display_name})
 			3: _chat._input.text = "/w %s " % target.display_name; _chat._input.grab_focus()
 		menu.queue_free())
 	add_child(menu)
@@ -664,19 +798,19 @@ func _open_player_menu(target: RemoteEntity) -> void:
 
 func _on_chat_command(name: String, args: String) -> void:
 	match name:
-		"invite": Net.send("PartyInvite", {"name": args})
-		"leave": Net.send("PartyLeave")
-		"kick": Net.send("PartyKick", {"name": args})
+		"invite": _send("PartyInvite", {"name": args})
+		"leave": _send("PartyLeave")
+		"kick": _send("PartyKick", {"name": args})
 		"duel":
 			_social.mark_outgoing("duel")
-			Net.send("DuelRequest", {"name": args})
-		"rendirse": Net.send("DuelForfeit")
+			_send("DuelRequest", {"name": args})
+		"rendirse": _send("DuelForfeit")
 		"trade":
 			_social.mark_outgoing("trade")
-			Net.send("TradeRequest", {"name": args})
+			_send("TradeRequest", {"name": args})
 		"tp", "tpto", "spawn", "give", "level", "heal", "kill", "gold", "god", "debug", "announce":
 			# HU-070: comandos de administrador; el servidor responde forbidden si la cuenta no lo es.
-			Net.send("AdminCommand", {"text": ("/%s %s" % [name, args]).strip_edges()})
+			_send("AdminCommand", {"text": ("/%s %s" % [name, args]).strip_edges()})
 		_: GameState.notice.emit("Comando desconocido: /%s" % name)
 
 
@@ -712,7 +846,7 @@ func _show_bubble(from: String, text: String) -> void:
 func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
 	for r: RemoteEntity in _remotes.values():
 		r.set_name_color(Color(1, 0.6, 0.2) if r.entity_id == opponent_id and state in ["countdown", "active"] else Color.WHITE)
-		# En pleno duelo el rival es enemigo: clic derecho lo autoataca (no abre el menú), Tab lo selecciona, anillo rojo.
+		# En pleno duelo el rival es enemigo: Espacio lo ataca, el clic derecho no abre el menú, Tab lo selecciona, anillo rojo.
 		if r.kind == "player":
 			r.hostile = r.entity_id == opponent_id and state == "active"
 			r.queue_redraw()
@@ -721,7 +855,7 @@ func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_
 func _sell_item(item: Dictionary) -> void:
 	if _vendor.npc_id <= 0:
 		return
-	Net.send("VendorSell", {"npcId": _vendor.npc_id, "itemId": str(item.get("id", "")), "qty": int(item.get("qty", 1))})
+	_send("VendorSell", {"npcId": _vendor.npc_id, "itemId": str(item.get("id", "")), "qty": int(item.get("qty", 1))})
 
 
 ## Soltar un item de la bolsa fuera de cualquier casilla → confirmar destrucción (HU-056 CA2).

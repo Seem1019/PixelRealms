@@ -20,7 +20,7 @@ func _ready() -> void:
 	for i: int in POOL_SIZE:
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", UiTheme.FONT_BODY)
-		l.add_theme_constant_override("outline_size", 2)  # legible sobre cualquier suelo
+		l.add_theme_constant_override("outline_size", UiTheme.OUTLINE_THICK)  # legible sobre cualquier suelo
 		l.add_theme_color_override("font_outline_color", UiTheme.OUTLINE)
 		l.visible = false
 		l.z_index = 50
@@ -91,7 +91,7 @@ func _spawn(text: String, color: Color, world_pos: Vector2, big: bool = false) -
 	l.text = text
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", UiTheme.FONT_HEADLINE if big else UiTheme.FONT_BODY)
-	l.add_theme_constant_override("outline_size", 4 if big else 2)
+	l.add_theme_constant_override("outline_size", UiTheme.OUTLINE_THICK * 2 if big else UiTheme.OUTLINE_THICK)
 	l.modulate.a = 1.0
 	l.position = (world_pos + Vector2(-8 + randf_range(-4, 4), -50)).round()  # por encima de la placa de nombre
 	l.visible = true

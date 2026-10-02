@@ -41,7 +41,7 @@
 - Skills: `combat-system`, `net-protocol`
 
 **Criterios de aceptación**
-1. **Dado** un enemigo seleccionado **cuando** hago clic derecho sobre él o pulso la acción "Atacar" **entonces** se envía `AutoAttack{on:true}` y mi personaje golpea cada `speedMs / haste` (`rules.classScaling.<clase>.haste`) mientras esté en rango: el alcance del tipo de arma en `rules.weapons` (daga 1.25, espada/maza/hacha 1.5, varita 7, bastón 5 tiles). El básico no ocupa ninguna casilla de hechizo (ADR-019).
+1. **Dado** un enemigo seleccionado **cuando** pulso la acción "Atacar" (Espacio desde HU-094; antes clic derecho) **entonces** se envía `AutoAttack{on:true}` y mi personaje golpea cada `speedMs / haste` (`rules.classScaling.<clase>.haste`) mientras esté en rango: el alcance del tipo de arma en `rules.weapons` (daga 1.25, espada/maza/hacha 1.5, varita 7, bastón 5 tiles). El básico no ocupa ninguna casilla de hechizo (ADR-019).
 1b. **Dado** un arma con `scaling: int` **entonces** el golpe básico es de escuela `magic` (usa `spellPower`, no se mitiga por armadura) y dibuja un proyectil visual; con `str`/`agi` es `physical` con `attackPower`.
 1c. **Dado** un Sacerdote con varita **entonces** puede matar un Slime solo con básicos sin gastar maná (test de integración).
 2. **Dado** que me alejo **entonces** el swing se pausa y se reanuda al volver al rango (sin reiniciar el temporizador si no pasó el tiempo).
@@ -288,3 +288,57 @@
 - Hecho con el dominio de M2: \`CombatEvents\` agrupado por observador y tick (máx. 64 entradas, CA4); topes de `rules.limits` para objetivos por área, impactos pendientes por instancia y auras 16/16 sin controles (CA2 en parte); listas reutilizadas en `TargetResolver`/`CastSystem`/`AutoAttackSystem`.
 - 2026-10-01 (HU-089): sin asignaciones por tick en `Pathfinder` (buffers `[ThreadStatic]`), `ThreatTable.Reevaluate<TState>` sin closure e `InterestSystem` con listas reutilizadas; medición por sistema en `Simulation.SystemTimings/SystemAllocs` (LoadBot).
 - Pendiente: reservas de capacidad fija y buffer circular de eventos (CA1), áreas duraderas (no hay hechizos con área persistente en la Fase 1; CA2/CA3), búsqueda de objetivos con la rejilla AOI (hoy recorre los actores de la instancia), microbenchmarks y la medición p99 del escenario de HU-089 (CA5). Se cierra junto con HU-089.
+
+### HU-094 · Ataque básico con Espacio
+**Como** jugador **quiero** atacar con la barra espaciadora **para** no depender del clic derecho en mitad del combate.
+- Prioridad: Must · Estimación: S · Estado: Hecha
+- Dependencias: HU-032
+- Skills: `godot-client`, `combat-system`
+
+**Criterios de aceptación**
+1. **Dado** un objetivo hostil vivo **cuando** pulso Espacio (acción `basic_attack`) **entonces** se envía `AutoAttack{on:true}`.
+2. **Dado** que no tengo objetivo hostil **cuando** pulso Espacio **entonces** se selecciona el enemigo vivo más cercano (≤ 12 casillas) y se ataca; sin ninguno no pasa nada.
+3. **Dado** un enemigo **cuando** hago clic derecho sobre él **entonces** ya no ataca; sobre un jugador sigue abriendo el menú (invitar, duelo, intercambio, susurro).
+
+### HU-095 · Acercarse solo al objetivo fuera de alcance
+**Como** jugador **quiero** que mi personaje camine hasta el objetivo cuando ataco o lanzo un hechizo fuera de alcance **para** no recibir "Fuera de alcance" y tener que acercarme a mano.
+- Prioridad: Should · Estimación: M · Estado: Hecha
+- Dependencias: HU-094, HU-021
+- Skills: `godot-client`, `combat-system`
+
+**Criterios de aceptación**
+1. **Dado** un objetivo hostil más lejos que el alcance del arma equipada (`rules.weapons.types[tipo].rangeTiles`; sin arma el menor) **cuando** pulso Espacio **entonces** el personaje camina hacia él con `MoveInput` normales (predicción incluida) y al quedar en alcance envía `AutoAttack`.
+2. **Dado** un hechizo con `targeting: "enemy"` y el objetivo más lejos que su `range` **cuando** lo uso **entonces** se acerca igual y lo lanza al entrar en alcance.
+3. **Dado** que me estoy acercando **cuando** pulso WASD o Esc, cambio de objetivo, el objetivo muere o desaparece, o llevo 1 s sin avanzar (pared) **entonces** se cancela.
+4. **Dado** el acercamiento **entonces** el cliente solo envía intenciones de movimiento: el servidor sigue validando colisión, alcance y línea de visión.
+
+**Notas de implementación**
+- Lógica pura en `scripts/world/approach.gd` (dirección de 8 vías, margen de llegada, atasco) con tests GUT.
+
+### HU-096 · Ver el alcance al mantener la tecla
+**Como** jugador **quiero** ver hasta dónde llega mi básico o un hechizo mientras mantengo su tecla **para** saber si necesito acercarme.
+- Prioridad: Should · Estimación: S · Estado: Hecha
+- Dependencias: HU-094
+- Skills: `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** que mantengo Espacio o una tecla de hechizo 1–4 **entonces** se dibuja un círculo punteado del alcance alrededor de mi personaje; al soltar desaparece.
+2. **Dado** un objetivo **entonces** el círculo es verde si está dentro del alcance y rojo si no.
+3. **Dado** que pulso la tecla **entonces** el ataque o hechizo sale al pulsar, como antes (el círculo no retrasa nada). Las áreas apuntadas siguen con su retícula.
+
+### HU-098 · Estados (buffos, perjuicios y control) legibles
+**Como** jugador **quiero** distinguir a simple vista quién está aturdido, inmovilizado, ralentizado, protegido o recibiendo daño o curación en el tiempo **para** reaccionar en combate.
+- Prioridad: Must · Estimación: M · Estado: Hecha
+- Dependencias: HU-035
+- Skills: `godot-client`, `combat-system`
+
+**Criterios de aceptación**
+1. **Dado** un aura en el marco propio o del objetivo **entonces** su casilla tiene marco verde si es beneficiosa y rojo si es perjudicial, más una insignia de tipo (aturdido, inmovilizado, ralentizado, daño en el tiempo, curación en el tiempo, escudo, mejora).
+2. **Dado** una entidad visible con un aura de control **entonces** se ve sobre ella sin seleccionarla: aturdido → estrellas sobre la cabeza; inmovilizado → anillo de hielo en los pies; ralentizado → tinte azul; escudo → burbuja.
+3. **Dado** cualquier aura **entonces** aparece un mini-ícono junto a la placa de nombre de la entidad (beneficiosas y perjudiciales separadas por color de marco).
+4. **Dado** que el aura termina **entonces** su indicador desaparece.
+
+**Notas de implementación**
+- `AuraStyle` (puro) da categoría, color de marco e insignia de 5×5; `AuraIndicator` dibuja estrellas, hielo y burbuja; `EntityVisual.set_auras` aplica además el tinte de ralentizado y los mini-íconos de `Nameplate` (máx. 6, perjudiciales primero, cuentan en `plate_size` para no pisarse). El mundo escucha `GameState.auras_changed` para cualquier entidad.
+- Limitación: `EntitySpawn` no trae auras, así que una entidad que entra en tu AOI con un aura ya puesta no la muestra hasta el siguiente `AuraApplied`.
+- Tests: `test_status_display.gd`. Capturas: `docs/screenshots/combat/status_*.png`, `range_ring.png`.

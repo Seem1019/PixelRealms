@@ -94,3 +94,14 @@
 **Notas de implementación**
 - `Social/PvpService` (única puerta del PvP): `/duel` o clic derecho → `DuelUpdate{requested}` (caduca `requestExpireSec`), aceptar → `countdown` (`countdownSec`) → `active`; `CanAttack(a, b)` devuelve el ruleset o null (sin duelo, otro rival, `enabledRulesets` vacío); daño con `rules.classAdvantage`; al llegar a `endAtHpPct` el daño se recorta, nadie muere, ambos se restauran, se limpian auras y se anuncia en `say`; pierde quien se rinde, se aleja > `maxDistanceTiles`, se desconecta o cambia de mapa; los monstruos ignoran a los duelistas y estos no atacan a monstruos ni terceros; los `ally` no aceptan al rival; mismas reglas de auras (ADR-022). Cliente: diálogo, cuenta atrás, rival en naranja, resultado 3 s.
 - Tests: `SocialTests.Duel_*`, `SocialFlowTests.Duel_*`.
+
+### HU-097 · Historial del chat
+**Como** jugador **quiero** subir en el chat **para** leer mensajes que ya pasaron.
+- Prioridad: Should · Estimación: S · Estado: Hecha
+- Dependencias: HU-060
+- Skills: `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** el registro del chat **cuando** giro la rueda sobre él o pulso Re Pág / Av Pág **entonces** se desplaza por los mensajes anteriores (se guardan 200 líneas).
+2. **Dado** que estoy leyendo arriba **cuando** llega un mensaje **entonces** no salta al final y aparece el aviso "↓ nuevos"; al volver al final sigue al último mensaje.
+3. **Dado** el ratón sobre el chat o que estoy desplazado arriba **entonces** el chat no se desvanece.
