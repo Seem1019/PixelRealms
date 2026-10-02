@@ -36,9 +36,11 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
     public void OnConnected(int connectionId, HandlerContext ctx) { }
 
     /// <summary>
-    /// Último guardado de cada personaje que salió del mundo, con su generación, hasta que la BD lo tenga (estado del tick).
+    /// Último guardado de cada personaje que salió del mundo, con su generación, hasta que vuelve a entrar (estado del tick).
     /// Un Hello que leyó la BD antes de ese guardado entra con este DTO y no con el leído: así salir y volver a entrar enseguida
-    /// no devuelve items ya entregados ni pisa el guardado bueno (HU-015 CA5).
+    /// no devuelve items ya entregados ni pisa el guardado bueno (HU-015 CA5). No se borra al quedar escrito: un Hello con una
+    /// lectura anterior puede seguir en camino al tick. Tras salir nadie más escribe el personaje, así que este DTO es la verdad;
+    /// el tamaño lo acota el número de personajes que han salido desde el arranque.
     /// </summary>
     private readonly Dictionary<Guid, (CharacterSaveDto Dto, long Gen)> _departed = new();
 
@@ -62,13 +64,20 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             var prevConn = previous.ConnectionId;
             if (!previous.IsLinkdead && prevConn >= 0 && prevConn != connectionId)
             {
+                // El cliente nuevo no conoce el intercambio ni el duelo de la conexión anterior: se cancelan como al desconectarse.
+                if (world.GetInstance(previous.MapInstanceId) is { } prevMap && Combat is not null)
+                {
+                    Combat.Pvp.Abandon(previous, "replaced", prevMap, ctx.Tick);
+                    Combat.Trades.CancelBy(previous, "replaced", prevMap, ctx.Tick);
+                }
                 Save(previous, ctx.Tick.NowMs, "replaced"); // HU-014 CA5: la sesión anterior se guarda y se desconecta
                 ctx.Connections.Close(prevConn, "replaced");
             }
             Reconnect(previous, connectionId, ctx);
             return;
         }
-        if (_departed.Remove(dto.Id, out var departed) && departed.Gen > writtenGen) dto = departed.Dto;
+        var hadDeparted = _departed.TryGetValue(dto.Id, out var departed);
+        if (hadDeparted && departed.Gen > writtenGen) dto = departed.Dto;
 
         // HU-014 CA5: la cuenta ya tiene otro personaje dentro → la sesión anterior se guarda y se desconecta primero.
         if (previous is not null)
@@ -87,6 +96,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         if (instance.Data.Collision.IsSolidAt(player.Position.X, player.Position.Y)) player.Position = instance.Data.DefaultGraveyard.Position;
         instance.Add(player);
         players.Add(player, connectionId);
+        if (hadDeparted) _departed.Remove(dto.Id); // ya está dentro: lo siguiente que salga lo vuelve a apuntar
         player.LastSaveAtMs = ctx.Tick.NowMs;
         player.Dirty = false;
         ctx.Send(mapper.ToWelcome(player, mapId, ctx.Tick.Tick));
@@ -150,21 +160,10 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             if (LinkdeadPolicy.ShouldRemove(p, ctx.NowMs, ctx.Rules)) { (expired ??= new List<Player>()).Add(p); continue; }
             if (p.Dirty && ctx.NowMs - p.LastSaveAtMs >= _autosaveMs) Save(p, ctx.NowMs, "autosave");
         }
-        PruneDeparted();
         if (expired is null) return;
         foreach (var p in expired) Leave(p, "linkdead");
     }
 
-    /// <summary>Olvida los guardados de salida que ya están en la BD.</summary>
-    private void PruneDeparted()
-    {
-        if (_departed.Count == 0) return;
-        List<Guid>? written = null;
-        foreach (var (id, d) in _departed)
-            if (saver.WrittenGeneration(id) >= d.Gen) (written ??= new List<Guid>()).Add(id);
-        if (written is null) return;
-        foreach (var id in written) _departed.Remove(id);
-    }
 
     /// <summary>Guardado por evento (ADR-018 / HU-026 CA6): salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir.</summary>
     public void Save(Player player, long nowMs, string reason)

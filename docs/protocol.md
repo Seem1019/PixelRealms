@@ -78,7 +78,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Died` | `{ killerId? , respawnInMs }` | |
 | `Error` | `{ code, message?, reqId? }` | códigos abajo |
 | `Pong` | `{ clientTime, serverTick }` | |
-| `LoggedOut` | `{}` | `Logout` aceptado: el personaje ya está guardado (encolado) y fuera del mundo; el servidor cierra después la conexión. El cliente cierra con `disconnect_from_server()` (sin reconexión) y vuelve a la selección de personaje con el mismo token. Un `Hello` posterior del mismo personaje espera (máx. 3 s) a que ese guardado esté escrito antes de leerlo de la BD; si aún no lo está, entra con el estado con el que salió (el servidor lo guarda en memoria hasta escribirlo). Un `Hello` del mismo personaje mientras sigue dentro toma ese personaje vivo (la conexión anterior se cierra con `replaced`) en vez de recargarlo |
+| `LoggedOut` | `{}` | `Logout` aceptado: el personaje ya está guardado (encolado) y fuera del mundo; el servidor cierra después la conexión. El cliente cierra con `disconnect_from_server()` (sin reconexión) y vuelve a la selección de personaje con el mismo token. Un `Hello` posterior del mismo personaje espera (máx. 3 s) a que ese guardado esté escrito antes de leerlo de la BD; si aún no lo está, entra con el estado con el que salió (el servidor lo guarda en memoria hasta que el personaje vuelve a entrar). Un `Hello` del mismo personaje mientras sigue dentro toma ese personaje vivo (la conexión anterior se cierra con `replaced`) en vez de recargarlo |
 
 `EntState` (en `Snapshot`) = `{ id, x, y, dir, hpPct, anim: "idle"|"walk"|"cast"|"attack"|"dead", tgt? }`
 — solo campos que cambian con frecuencia. Los estáticos van en `EntitySpawn`.

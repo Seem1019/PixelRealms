@@ -194,6 +194,41 @@ public sealed class LogoutTests
         }
     }
 
+    [Fact]
+    public async Task Hello_WhoseReadPredatesTheLogout_ArrivingAfterTheSaveIsWritten_StillGetsTheExitState() // CA5 (revisión)
+    {
+        var saves = new HeldSaves();
+        var loads = new HeldSaves();
+        await using var server = await TestServer.StartAsync(overrideServices: s =>
+        {
+            s.AddSingleton<PixelRealms.Persistence.InMemory.InMemoryCharacterRepository>();
+            s.AddSingleton<PixelRealms.Persistence.Repositories.ICharacterRepository>(sp =>
+                new HeldCharacterRepository(sp.GetRequiredService<PixelRealms.Persistence.InMemory.InMemoryCharacterRepository>(), saves, loads));
+        });
+        var anaApi = await new ApiClient(server).RegisterAndLogin("ana");
+        var anaChar = await anaApi.CreateCharacterId("Ana", "warrior");
+        var ana = await Connect(server, anaApi, anaChar);
+        await ana.ExpectAsync("Welcome");
+        using (anaApi)
+        {
+            loads.Hold = true; // el Hello de la segunda conexión lee la BD ahora y no llega al tick hasta el final
+            var again = await Connect(server, anaApi, anaChar);
+            await Task.Delay(300, TestContext.Current.CancellationToken);
+            var (startX, x) = await WalkRight(ana);
+            Math.Abs(x - startX).ShouldBeGreaterThan(8f);
+            await ana.SendAsync("Logout");
+            await ana.ExpectAsync("LoggedOut");
+            var saver = server.Services.GetRequiredService<SaveService>();
+            await WaitUntil(() => saver.Pending == 0);
+            await Task.Delay(300, TestContext.Current.CancellationToken); // varios ticks y barridos con el guardado ya escrito
+            loads.Release();
+            var welcome = await again.ExpectAsync("Welcome");
+            welcome.GetProperty("self").GetProperty("x").GetSingle().ShouldBe(x, 0.01f); // no la lectura de antes de salir
+            await again.DisposeAsync();
+            await ana.DisposeAsync();
+        }
+    }
+
     /// <summary>Retiene los guardados mientras `Hold`: simula una BD lenta o una cola cargada.</summary>
     private sealed class HeldSaves
     {
@@ -206,13 +241,18 @@ public sealed class LogoutTests
         public void Release() { Hold = false; _released.TrySetResult(); }
     }
 
-    private sealed class HeldCharacterRepository(PixelRealms.Persistence.Repositories.ICharacterRepository inner, HeldSaves gate) : PixelRealms.Persistence.Repositories.ICharacterRepository
+    private sealed class HeldCharacterRepository(PixelRealms.Persistence.Repositories.ICharacterRepository inner, HeldSaves gate, HeldSaves? loads = null) : PixelRealms.Persistence.Repositories.ICharacterRepository
     {
         public Task<IReadOnlyList<PixelRealms.Persistence.Repositories.CharacterSummary>> ListByAccountAsync(Guid accountId, CancellationToken ct = default) => inner.ListByAccountAsync(accountId, ct);
         public Task<int> CountByAccountAsync(Guid accountId, CancellationToken ct = default) => inner.CountByAccountAsync(accountId, ct);
         public Task<bool> NameExistsAsync(string name, CancellationToken ct = default) => inner.NameExistsAsync(name, ct);
         public Task<PixelRealms.Persistence.Repositories.CreateCharacterResult> CreateAsync(PixelRealms.Persistence.Repositories.NewCharacter character, int maxPerAccount, CancellationToken ct = default) => inner.CreateAsync(character, maxPerAccount, ct);
-        public Task<PixelRealms.Persistence.Repositories.CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default) => inner.LoadAsync(id, ct);
+        public async Task<PixelRealms.Persistence.Repositories.CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default)
+        {
+            var read = await inner.LoadAsync(id, ct); // la lectura se hace ya; lo que se retiene es su llegada al tick
+            if (loads is not null) await loads.WaitAsync();
+            return read;
+        }
         public async Task SaveAsync(PixelRealms.Persistence.Repositories.CharacterSaveDto character, CancellationToken ct = default)
         {
             await gate.WaitAsync();
