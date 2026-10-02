@@ -71,6 +71,27 @@ public sealed class SaveServiceTests
         public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
+    /// <summary>Las primeras <paramref name="failures"/> llamadas fallan; anota la auditoría de cada guardado escrito.</summary>
+    private sealed class AuditRecorderRepo(int failures) : ICharacterRepository
+    {
+        private int _calls;
+        public System.Collections.Concurrent.ConcurrentQueue<AuditEntry> Written { get; } = new();
+
+        public Task SaveAsync(CharacterSaveDto dto, CancellationToken ct = default)
+        {
+            if (Interlocked.Increment(ref _calls) <= failures) throw new InvalidOperationException("bd caída");
+            foreach (var a in dto.Audit) Written.Enqueue(a);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<CharacterSummary>> ListByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> CountByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> NameExistsAsync(string name, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
     private static CharacterSaveDto Dto() => new(Guid.NewGuid(), Guid.NewGuid(), "Ana", "warrior", 1, 0, 0, "meadow", 1, 1, 10, 0, [], [], []);
 
     private static async Task WaitUntil(Func<bool> cond, int timeoutMs = 3000)
@@ -81,6 +102,29 @@ public sealed class SaveServiceTests
             if (DateTime.UtcNow > deadline) throw new TimeoutException("condición no cumplida");
             await Task.Delay(25, TestContext.Current.CancellationToken);
         }
+    }
+
+    [Fact]
+    public async Task AuditOfASaveThatFailedForGood_IsWrittenWithTheNextSaveOfThatCharacter() // HU-015 / HU-057 CA3
+    {
+        var repo = new AuditRecorderRepo(3); // el primer guardado agota sus 3 intentos
+        var svc = new SaveService(repo, NullLogger<SaveService>.Instance);
+        await svc.StartAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            var first = Dto() with { Audit = [new AuditEntry(Guid.NewGuid(), "loot", "potion_minor", 1)] };
+            svc.Enqueue(first);
+            await WaitUntil(() => svc.Failed == 1);
+            svc.UnwrittenAuditCount(first.Id).ShouldBe(1);
+
+            var next = first with { Audit = [new AuditEntry(Guid.NewGuid(), "sell", "potion_minor", 1)] };
+            svc.Enqueue(next);
+            await WaitUntil(() => svc.Saved == 1);
+
+            repo.Written.Select(a => a.Action).ShouldBe(["loot", "sell"]); // la del guardado fallido primero, sin duplicar
+            svc.UnwrittenAuditCount(first.Id).ShouldBe(0);
+        }
+        finally { await svc.StopAsync(CancellationToken.None); }
     }
 
     [Fact]
