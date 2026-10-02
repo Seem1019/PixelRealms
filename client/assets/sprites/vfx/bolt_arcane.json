@@ -1,0 +1,19 @@
+{
+ "frameSize": [
+  16,
+  16
+ ],
+ "frames": 4,
+ "fps": 12,
+ "loop": true,
+ "rows": [
+  "e",
+  "se",
+  "s",
+  "sw",
+  "w",
+  "nw",
+  "n",
+  "ne"
+ ]
+}

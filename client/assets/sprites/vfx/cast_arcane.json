@@ -1,0 +1,9 @@
+{
+ "frameSize": [
+  32,
+  16
+ ],
+ "frames": 4,
+ "fps": 8,
+ "loop": true
+}

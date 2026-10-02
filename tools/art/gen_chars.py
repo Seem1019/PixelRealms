@@ -1,8 +1,11 @@
 """Sprites de personajes, NPC y monstruos (vista 3/4, luz arriba-izquierda, contorno oscuro).
 
-Hoja por entidad: filas = direcciones s, n, e (w = e espejado en el cliente); columnas = idle0, idle1, walk0..walk3.
-Cuadro de 32×32 (pies en y=28); jefes de 48×48 o 64×64 con los pies a 4 px del borde inferior. Cada PNG va con un
-.json {frameSize, rows, columns} que lee client/scripts/world/entity_sprites.gd.
+Hoja por entidad: filas = direcciones s, n, e (w = e espejado en el cliente); columnas = idle0, idle1, walk0..walk3,
+attack0..3, cast0..2, hurt0..1, death0..3 (HU-090). Cuadro de 32×32 (pies en y=28); jefes de 64×64 con los pies a 4 px
+del borde inferior. Cada PNG va con un .json {frameSize, rows, columns, feetY, anims} que lee
+client/scripts/world/entity_sprites.gd: `anims` dice qué columnas, a cuántos fps y si repite cada animación.
+Cada clase y monstruo ataca a su manera (`ATTACK_STYLE`): tajo amplio, estocada, bastón con brillo, maza con luz, arco,
+pico, látigo, embestida, salto del slime, golpe del gólem. Todo determinista: sin azar.
 """
 from __future__ import annotations
 
@@ -14,7 +17,25 @@ import numpy as np
 from pix import (ASSETS, canvas, ellipse, flip_h, hline, line, outline, put, rect, rgba, save, vline)
 
 DIRS = ["s", "n", "e"]
-COLS = ["idle0", "idle1", "walk0", "walk1", "walk2", "walk3"]
+BASE_COLS = ["idle0", "idle1", "walk0", "walk1", "walk2", "walk3"]
+COMBAT_COLS = ["attack0", "attack1", "attack2", "attack3", "cast0", "cast1", "cast2", "hurt0", "hurt1",
+               "death0", "death1", "death2", "death3"]
+COLS = BASE_COLS + COMBAT_COLS
+# Animaciones (skill pixel-art-assets): columnas, fps y si repiten. `hurt` y `death` también existen por dirección.
+ANIMS = {
+    "idle": {"from": "idle0", "frames": 2, "fps": 3, "loop": True},
+    "walk": {"from": "walk0", "frames": 4, "fps": 8, "loop": True},
+    "attack": {"from": "attack0", "frames": 4, "fps": 12, "loop": False},
+    "cast": {"from": "cast0", "frames": 3, "fps": 6, "loop": True},
+    "hurt": {"from": "hurt0", "frames": 2, "fps": 10, "loop": False},
+    "death": {"from": "death0", "frames": 4, "fps": 8, "loop": False},
+}
+
+
+def frame_kind(frame: str) -> tuple[str, int]:
+    """'attack2' → ('attack', 2); 'idle1' → ('idle', 1)."""
+    name = frame.rstrip("0123456789")
+    return name, int(frame[len(name):] or 0)
 
 
 def mat(base: str, light: str, dark: str) -> dict:
@@ -57,9 +78,13 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
     """Dibuja un humanoide chibi. `spec`: skin, hair, top, pants, boots, head ('hair'|'hood'|'hat'|'helm'|'cap'|'bandana'|
     'crown'|'none'), weapon ('sword'|'staff'|'dagger'|'mace'|'bow'|'pick'|'whip'|'book'|None), shield, robe (bool), scale."""
     s = spec.get("scale", 1)
+    kind_name, kind_i = frame_kind(frame)
+    if kind_name in ("attack", "cast", "hurt", "death"):
+        return humanoid_combat(spec, direction, kind_name, kind_i, size)
     img = canvas(size, size)
     feet = size - 4
     cx = size // 2
+    lx, ly = spec.get("_lean", (0, 0))
     walk = COLS.index(frame) - 2 if frame.startswith("walk") else -1
     bob = 0
     if frame == "idle1":
@@ -92,43 +117,49 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
                 shaded_rect(img, x, feet - 2 * s - max(0, -lift), leg_w, 2 * s, boots)
 
     def torso():
-        x = cx - torso_w // 2
+        x = cx - torso_w // 2 + lx
         if robe:
             # Túnica larga hasta los pies, ensanchada abajo.
             for k in range(torso_h + leg_h - 1 * s):
                 widen = k // (3 * s)
-                hline(img, x - widen, x + torso_w - 1 + widen, torso_top + k, top["b"])
-                put(img, x - widen, torso_top + k, top["l"])
-                put(img, x + torso_w - 1 + widen, torso_top + k, top["d"])
+                yy = torso_top + ly + k if torso_top + ly + k < feet - 1 * s else feet - 1 * s - 1
+                hline(img, x - widen, x + torso_w - 1 + widen, yy, top["b"])
+                put(img, x - widen, yy, top["l"])
+                put(img, x + torso_w - 1 + widen, yy, top["d"])
             hline(img, x - (torso_h + leg_h) // (3 * s), x + torso_w - 1 + (torso_h + leg_h) // (3 * s), feet - 1 * s, top["d"])
             if spec.get("trim"):
                 if direction != "n":
                     vline(img, cx - (0 if direction == "e" else 0), torso_top + 1, feet - 2, spec["trim"])
                 hline(img, x, x + torso_w - 1, torso_top + torso_h - 2 * s, spec["trim"])
         else:
-            shaded_rect(img, x, torso_top, torso_w, torso_h, top)
+            shaded_rect(img, x, torso_top + ly, torso_w, torso_h, top)
             if spec.get("belt"):
-                hline(img, x, x + torso_w - 1, torso_top + torso_h - 2 * s, spec["belt"])
+                hline(img, x, x + torso_w - 1, torso_top + ly + torso_h - 2 * s, spec["belt"])
                 if direction == "s":
-                    put(img, cx, torso_top + torso_h - 2 * s, "gold")
+                    put(img, cx + lx, torso_top + ly + torso_h - 2 * s, "gold")
             if spec.get("trim") and direction == "s":
-                vline(img, cx - 1, torso_top + 1, torso_top + torso_h - 3 * s, spec["trim"])
+                vline(img, cx - 1 + lx, torso_top + ly + 1, torso_top + ly + torso_h - 3 * s, spec["trim"])
 
     def arm(side: int, front: bool):
         swing = {0: 1, 1: 0, 2: -1, 3: 0}.get(walk, 0) * side
         aw = 3 * s
         if direction == "e":
-            x = cx - aw // 2 + swing
+            x = cx - aw // 2 + swing + lx
         else:
-            x = cx + side * (torso_w // 2) + (0 if side > 0 else -aw)
-        y = torso_top + 1 * s
+            x = cx + side * (torso_w // 2) + (0 if side > 0 else -aw) + lx
+        y = torso_top + 1 * s + ly
+        if spec.get("_arms_up"):
+            # Casteo: brazos en alto, manos a la altura de la cabeza.
+            y -= 4 * s
+        if side > 0 and spec.get("_weapon_pose") is not None:
+            return (x + aw // 2, y + torso_h - 1 * s)  # el brazo del arma lo dibuja weapon_pose
         shaded_rect(img, x, y, aw, torso_h - 2 * s, spec.get("sleeve", top))
         shaded_rect(img, x, y + torso_h - 2 * s, aw, 2 * s, skin)
         return (x + aw // 2, y + torso_h - 1 * s)
 
     def head():
-        x = cx - head_w // 2 + (1 if direction == "e" else 0)
-        y = head_top
+        x = cx - head_w // 2 + (1 if direction == "e" else 0) + lx
+        y = head_top + ly
         shaded_ellipse(img, x + head_w / 2, y + head_h / 2, head_w / 2, head_h / 2, skin)
         hair = spec.get("hair")
         kind = spec.get("head", "hair")
@@ -201,7 +232,15 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         if kind == "hood" and direction != "n":
             fx = x + 1 + (1 if direction == "e" else 0)
             shaded_ellipse(img, fx + (head_w - 2) / 2, y + head_h / 2 + 1, (head_w - 2) / 2 - (1 if direction == "e" else 0), head_h / 2 - 1.5, skin)
-        if direction != "n":
+        if direction != "n" and spec.get("_eyes_closed"):
+            # Golpe recibido / caído: ojos apretados (rayitas).
+            ey = y + head_h // 2 + 1 * s + 1
+            if direction == "s":
+                rect(img, x + 2 * s - 1 * s // 2, ey, 2 * s, 1 * s, "outline")
+                rect(img, x + head_w - 3 * s - 1 * s // 2, ey, 2 * s, 1 * s, "outline")
+            else:
+                rect(img, x + head_w - 3 * s, ey, 2 * s, 1 * s, "outline")
+        elif direction != "n":
             ey = y + head_h // 2 + 1 * s
             eye = spec.get("eye", "outline")
             if direction == "s":
@@ -221,7 +260,7 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
 
     def weapon(at):
         w = spec.get("weapon")
-        if not w:
+        if not w or spec.get("_weapon_pose") is not None:
             return
         hx, hy = at
         if direction == "n":
@@ -268,10 +307,31 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         shaded_rect(img, hx - 3, hy - 6 * s, 6 * s, 7 * s, sh)
         put(img, hx - 1 + 2 * s, hy - 3 * s, "gold")
 
+    def posed_weapon():
+        """Brazo del arma y arma en la pose de ataque/casteo (`_weapon_pose` = {hand, angle, kind?, draw?})."""
+        pose = spec.get("_weapon_pose")
+        if pose is None:
+            return
+        if direction == "e":
+            shoulder = (cx + lx, torso_top + ly + 2 * s)
+        else:
+            shoulder = (cx + torso_w // 2 + lx + 1, torso_top + ly + 2 * s)
+        hx, hy = pose["hand"]
+        sleeve = spec.get("sleeve", top)
+        mx, my = (shoulder[0] + hx) // 2, (shoulder[1] + hy) // 2
+        for (ax, ay, bx, by, c) in [(shoulder[0], shoulder[1], mx, my, sleeve["b"]), (mx, my, hx, hy, sleeve["b"])]:
+            line(img, ax, ay, bx, by, c)
+            line(img, ax + 1, ay, bx + 1, by, c)
+            line(img, ax, ay + 1, bx, by + 1, sleeve["d"])
+        rect(img, hx - 1, hy - 1, 2 * s, 2 * s, skin["b"])
+        put(img, hx - 1, hy - 1, skin["l"])
+        weapon_at(img, pose.get("kind", spec.get("weapon")), hx, hy, pose["angle"], s, spec, pose)
+
     # Orden de dibujo según la dirección.
     if direction == "n":
         weapon_hand = arm(1, False) if not robe else (cx + torso_w // 2 + 1, torso_top + torso_h)
         weapon(weapon_hand)
+        posed_weapon()
         legs()
         torso()
         arm(-1, True)
@@ -284,6 +344,7 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         hand = arm(1, True)
         shield((hand[0] - 2, hand[1]))
         weapon(hand)
+        posed_weapon()
     else:
         legs()
         torso()
@@ -291,13 +352,301 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         right = arm(1, True)
         head()
         weapon(right)
+        posed_weapon()
         shield(left)
-    return outline(img)
+    img = outline(img)
+    for fx in spec.get("_fx", []):
+        fx(img)
+    return img
+
+
+# --- Combate de humanoides (HU-090) ---------------------------------------------------------------------------------------
+
+def fwd_vec(direction: str) -> tuple[int, int]:
+    return {"e": (1, 0), "s": (0, 1), "n": (0, -1)}[direction]
+
+
+def dir_angle(direction: str, a: float) -> float:
+    """Los ángulos de las tablas están pensados mirando al este (0° = delante, −90° = arriba); se adaptan a s y n."""
+    if direction == "s":
+        return a + 60
+    if direction == "n":
+        return a * 0.5 - 60
+    return a
+
+
+def weapon_at(img, kind, hx, hy, ang, s, spec, pose) -> None:
+    """Arma dibujada por vector desde la mano (sin rotar sprites: píxeles enteros con line)."""
+    if not kind:
+        return
+    a = math.radians(ang)
+    dx, dy = math.cos(a), math.sin(a)
+    px, py = -dy, dx  # perpendicular
+
+    def at(t: float, o: float = 0.0) -> tuple[int, int]:
+        return int(round(hx + dx * t + px * o)), int(round(hy + dy * t + py * o))
+
+    if kind in ("sword", "dagger"):
+        length = (10 if kind == "sword" else 6) * s
+        line(img, *at(1), *at(length), "mist")
+        line(img, *at(1, 1), *at(length - 1, 1), "silver")
+        put(img, *at(length), "white")
+        line(img, *at(0, -2), *at(0, 2), "amber")
+        put(img, *at(-2), "rust")
+    elif kind == "staff":
+        line(img, *at(-5 * s), *at(12 * s), "rust")
+        line(img, *at(-5 * s, 1), *at(11 * s, 1), "wine")
+        gx, gy = at(13 * s)
+        rect(img, gx - 1, gy - 1, 3, 3, spec.get("gem", "sky"))
+        put(img, gx - 1, gy - 1, "white")
+    elif kind == "mace":
+        line(img, *at(-1), *at(7 * s), "rust")
+        mx, my = at(8 * s)
+        rect(img, mx - 1, my - 1, 3 * s, 3 * s, "silver")
+        put(img, mx - 1, my - 1, "mist")
+    elif kind == "pick":
+        line(img, *at(-1), *at(8 * s), "rust")
+        line(img, *at(8 * s, -3), *at(8 * s, 3), "silver")
+        put(img, *at(7 * s, -3), "silver")
+        put(img, *at(7 * s, 3), "silver")
+    elif kind == "whip":
+        line(img, *at(-1), *at(3 * s), "rust")
+        reach = pose.get("lash", 7) * s
+        prev = at(3 * s)
+        for k in range(4 * s, reach + 1):
+            cur = at(k, math.sin(k / 3.0) * pose.get("wave", 1.5))
+            line(img, *prev, *cur, "wine")
+            prev = cur
+    elif kind == "bow":
+        draw = pose.get("draw", 0)
+        top_end = at(2, -6)
+        bot_end = at(2, 6)
+        for k in range(-6, 7):
+            put(img, *at(2 + 3 - (k * k) / 12.0, k), "clay")
+        mid = at(2 - draw)
+        line(img, *top_end, *mid, "mist")
+        line(img, *bot_end, *mid, "mist")
+        if pose.get("arrow"):
+            line(img, *mid, *at(10), "clay")
+            put(img, *at(10), "mist")
+            put(img, *at(11), "white")
+    elif kind == "book":
+        rect(img, hx - 2, hy - 2, 5, 4, "wine")
+        hline(img, hx - 2, hx + 2, hy - 2, "gold")
+
+
+def fx_trail(hx, hy, a0, a1, radius, colors):
+    """Estela del arma: arco de píxeles entre dos ángulos alrededor de la mano (sin contorno, encima del cuerpo)."""
+    def draw(img):
+        steps = max(3, int(abs(a1 - a0) / 9))
+        for k in range(steps + 1):
+            a = math.radians(a0 + (a1 - a0) * k / steps)
+            for j, (r, c) in enumerate([(radius, colors[0]), (radius - 2, colors[1])]):
+                if j == 1 and k % 2:
+                    continue
+                put(img, int(round(hx + math.cos(a) * r)), int(round(hy + math.sin(a) * r)), c)
+    return draw
+
+
+def fx_sparkle(x, y, size, c1, c2):
+    """Destello en cruz de `size` px de brazo con centro claro."""
+    def draw(img):
+        for k in range(1, size + 1):
+            c = c1 if k < size else c2
+            for (ox, oy) in ((k, 0), (-k, 0), (0, k), (0, -k)):
+                put(img, x + ox, y + oy, c)
+        put(img, x, y, "white")
+    return draw
+
+
+def fx_speedlines(cx, top, direction, color="mist"):
+    """Rayas de velocidad detrás del cuerpo (estocada, embestida)."""
+    def draw(img):
+        fx_, fy_ = fwd_vec(direction)
+        for k, off in enumerate((-4, 0, 4)):
+            if direction == "e":
+                y = top + 6 + off
+                hline(img, cx - 12, cx - 9 + k % 2, y, color)
+            else:
+                x = cx + off
+                y0 = top + (22 if direction == "n" else -2)
+                vline(img, x, y0 - fy_ * 0, y0 + 2 + k % 2, color)
+    return draw
+
+
+def fx_dust(cx, feet, direction):
+    """Polvo y piedritas en el suelo al golpear (gólem, pico)."""
+    def draw(img):
+        fx_, _ = fwd_vec(direction)
+        bx = cx + fx_ * 8
+        for (ox, oy, c) in [(-4, 0, "taupe"), (-3, -1, "sage_p"), (3, 0, "taupe"), (4, -1, "sage_p"), (0, -2, "mist"),
+                            (-6, -1, "silver"), (6, -2, "silver"), (-1, 1, "dusty"), (2, 1, "dusty")]:
+            put(img, bx + ox, feet + oy, c)
+    return draw
+
+
+GLOWS = {"mage": ("ice", "sky"), "priest": ("cream", "gold"), "lich": ("pink_p", "lilac"), "trainer": ("lilac", "violet"),
+         "warrior": ("gold", "amber"), "rogue": ("leaf", "jade"), "default": ("gold", "amber")}
+
+# Ataque por clase o monstruo (si no se indica, sale del arma).
+ATTACK_BY_WEAPON = {"sword": "slash", "dagger": "slash", "staff": "staff", "mace": "mace", "bow": "bow", "pick": "pick",
+                    "whip": "whip", "book": "punch", None: "punch"}
+
+# Tablas de ataque mirando al este: (alcance de la mano, altura de la mano, ángulo del arma, inclinación del cuerpo).
+ATTACK_POSES = {
+    "slash": [(-2, -3, -125, 0), (0, -2, -60, 1), (3, 1, 25, 1), (2, 1, 60, 0)],
+    "thrust": [(-3, 0, -8, -1), (3, 0, 0, 1), (5, 0, 0, 2), (1, 1, 15, 0)],
+    "staff": [(-1, -4, -100, 0), (1, -3, -60, 1), (3, -1, -25, 1), (1, 0, -70, 0)],
+    "mace": [(-1, -5, -115, 0), (1, -3, -50, 1), (3, 1, 30, 1), (2, 1, 55, 0)],
+    "pick": [(-1, -5, -120, 0), (1, -3, -55, 1), (3, 1, 35, 1), (2, 1, 60, 0)],
+    "whip": [(-2, -3, -150, 0), (0, -4, -95, 0), (3, 0, 0, 1), (1, 0, 30, 0)],
+    "bow": [(2, -1, 0, 0), (2, -1, 0, 0), (2, -1, 0, -1), (2, -1, 0, 0)],
+    "punch": [(-1, 0, 0, 0), (2, 0, 0, 1), (4, 0, 0, 1), (1, 0, 0, 0)],
+}
+
+
+def humanoid_combat(spec: dict, direction: str, kind: str, i: int, size: int) -> np.ndarray:
+    s = spec.get("scale", 1)
+    feet = size - 4
+    cx = size // 2
+    torso_top = feet - 5 * s - 7 * s
+    fx_, fy_ = fwd_vec(direction)
+    glow = GLOWS.get(spec.get("glow", "default"), GLOWS["default"])
+    sp = dict(spec)
+    if kind == "attack":
+        style = spec.get("attack") or ATTACK_BY_WEAPON.get(spec.get("weapon"), "punch")
+        reach, raise_, ang, lean = ATTACK_POSES[style][i]
+        if direction == "e":
+            hand = (cx + 2 + reach + lean, torso_top + 5 + raise_)
+            sp["_lean"] = (lean, 0)
+        elif direction == "s":
+            hand = (cx + 6, torso_top + 5 + raise_ + max(0, reach))
+            sp["_lean"] = (0, 1 if lean > 0 else 0)
+        else:
+            hand = (cx + 6, torso_top + 3 + raise_ - max(0, reach) // 2)
+            sp["_lean"] = (0, -1 if lean > 0 else 0)
+        # El arco apunta recto hacia donde mira; el resto sigue la tabla.
+        a = {"e": 0, "s": 90, "n": -90}[direction] if style == "bow" else dir_angle(direction, ang)
+        pose = {"hand": hand, "angle": a}
+        fx = []
+        if style == "bow":
+            pose.update({"draw": [0, 2, 4, 0][i], "arrow": i in (1, 2)})
+            if i == 3:
+                fx.append(fx_sparkle(hand[0] + fx_ * 9, hand[1] + fy_ * 9, 1, "mist", "white"))
+        if style == "whip":
+            pose.update({"lash": [5, 6, 13, 8][i], "wave": [1.5, 2.0, 0.6, 1.2][i]})
+            if i == 2:
+                tip = (int(hand[0] + math.cos(math.radians(a)) * 13), int(hand[1] + math.sin(math.radians(a)) * 13))
+                fx.append(fx_sparkle(tip[0], tip[1], 2, "cream", "gold"))
+        if style in ("slash", "mace", "pick") and i in (1, 2):
+            prev = dir_angle(direction, ATTACK_POSES[style][i - 1][2])
+            colors = ("cream", "gold") if style == "mace" and spec.get("glow") == "priest" else ("mist", "white")
+            fx.append(fx_trail(hand[0], hand[1], prev, a, 10 * s if style == "slash" else 9 * s, colors))
+        if style == "thrust":
+            if i in (1, 2):
+                fx.append(fx_speedlines(cx, torso_top, direction))
+            if i == 2:
+                fx.append(fx_sparkle(hand[0] + fx_ * 7, hand[1] + fy_ * 7, 2, "mist", "white"))
+        if style == "staff" and i in (1, 2):
+            tip = (int(round(hand[0] + math.cos(math.radians(a)) * 13 * s)), int(round(hand[1] + math.sin(math.radians(a)) * 13 * s)))
+            fx.append(fx_sparkle(tip[0], tip[1], 2 if i == 1 else 4, glow[1], glow[0]))
+        if style == "mace" and i == 2 and spec.get("glow") == "priest":
+            mt = (int(round(hand[0] + math.cos(math.radians(a)) * 8 * s)), int(round(hand[1] + math.sin(math.radians(a)) * 8 * s)))
+            fx.append(fx_sparkle(mt[0], mt[1], 4, "gold", "cream"))
+        if style == "pick" and i == 2:
+            fx.append(fx_dust(cx, feet, direction))
+        if style == "punch" and i == 2:
+            fx.append(fx_sparkle(hand[0] + fx_ * 3, hand[1] + fy_ * 3, 2, glow[1], glow[0]))
+        sp["_weapon_pose"] = pose
+        sp["_fx"] = fx
+        return humanoid(sp, direction, "idle0", size)
+    if kind == "cast":
+        sp["_arms_up"] = True
+        sp["_lean"] = (0, [0, -1, 0][i])
+        hand = (cx + (3 if direction == "e" else 6), torso_top - 1 + [0, -1, 0][i])
+        if spec.get("weapon"):
+            sp["_weapon_pose"] = {"hand": hand, "angle": -90 if spec.get("weapon") != "bow" else 0}
+        offs = [[(-6, -4), (6, -8), (0, -12)], [(-7, -9), (7, -3), (2, -14)], [(-5, -13), (5, -11), (-1, -6)]][i]
+        sp["_fx"] = [fx_sparkle(cx + ox, torso_top + oy + 4, 1 + (k + i) % 2, glow[1], glow[0]) for k, (ox, oy) in enumerate(offs)]
+        return humanoid(sp, direction, "idle0", size)
+    if kind == "hurt":
+        sp["_lean"] = (-fx_, -fy_ if i == 0 else 0)
+        sp["_eyes_closed"] = True
+        return shift(humanoid(sp, direction, "idle0", size), -fx_ * (1 if i == 0 else 0), 0)
+    # death: tambalea, se arrodilla, cae y queda tendido.
+    sp["_eyes_closed"] = True
+    sp["_lean"] = (-fx_ * (2 if i == 0 else 1), 1)
+    standing = humanoid(sp, direction, "idle0", size)
+    if i == 0:
+        return standing
+    if i == 1:
+        return kneel(standing, feet, 3 * s)
+    return lay_down(standing, direction, feet, lift=(3 * s if i == 2 else 0))
+
+
+# --- Ayudas de cuadro --------------------------------------------------------------------------------------------------
+
+def shift(img: np.ndarray, dx: int, dy: int) -> np.ndarray:
+    """Desplaza el cuadro en píxeles enteros (lo que sale por el borde se pierde)."""
+    out = np.zeros_like(img)
+    h, w = img.shape[:2]
+    ys0, ys1 = max(0, dy), min(h, h + dy)
+    xs0, xs1 = max(0, dx), min(w, w + dx)
+    out[ys0:ys1, xs0:xs1] = img[ys0 - dy:ys1 - dy, xs0 - dx:xs1 - dx]
+    return out
+
+
+def bbox(img: np.ndarray):
+    ys, xs = np.nonzero(img[:, :, 3])
+    return xs.min(), ys.min(), xs.max(), ys.max()
+
+
+def kneel(img: np.ndarray, feet: int, drop: int) -> np.ndarray:
+    """Arrodillado: el torso baja `drop` px sobre las botas (las piernas desaparecen bajo él)."""
+    out = canvas(img.shape[1], img.shape[0])
+    boots = img[feet - 2:feet + 1]
+    upper = img[:feet - 2 - drop]
+    out[drop:feet - 2] = upper
+    m = boots[:, :, 3] > 0
+    region = out[feet - 2:feet + 1]
+    region[m] = boots[m]
+    return out
+
+
+def lay_down(img: np.ndarray, direction: str, feet: int, lift: int = 0, on_back: bool = False) -> np.ndarray:
+    """Tendido en el suelo: giro de 90° exacto (o volteo vertical si `on_back`), con el borde inferior en los pies."""
+    if on_back:
+        rot = img[::-1].copy()
+    else:
+        rot = np.rot90(img, 1 if direction in ("e", "n") else -1).copy()
+    x0, y0, x1, y1 = bbox(rot)
+    out = canvas(img.shape[1], img.shape[0])
+    cx = img.shape[1] // 2
+    dx = cx - (x0 + x1 + 1) // 2
+    dy = feet - y1 - lift
+    return np.maximum(out, shift(rot, dx, dy))
+
+
+def squash_rows(img: np.ndarray, keep_every: int, feet: int) -> np.ndarray:
+    """Aplasta el cuadro quitando una de cada `keep_every` filas (sin interpolar) y lo apoya en los pies."""
+    rows = [r for r in range(img.shape[0]) if r % keep_every != 0]
+    small = img[rows]
+    out = canvas(img.shape[1], img.shape[0])
+    x0, y0, x1, y1 = bbox(small)
+    h = small.shape[0]
+    top = feet - y1
+    for r in range(h):
+        if 0 <= r + top < out.shape[0]:
+            out[r + top] = small[r]
+    return out
 
 
 # --- Cuadrúpedos, slime y gólem ------------------------------------------------------------------------------------------
 
 def quadruped(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
+    kind, i = frame_kind(frame)
+    if kind in ("attack", "cast", "hurt", "death"):
+        return beast_combat(spec, direction, kind, i, size, lambda f: quadruped(spec, direction, f, size), quad=True)
     img = canvas(size, size)
     feet = size - 4
     fur = spec["fur"]
@@ -362,31 +711,74 @@ def quadruped(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndar
     return outline(img)
 
 
-def slime(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
+def slime_shape(spec: dict, direction: str, rx: float, ry: float, hop: float, fwd: int, eyes: str, size: int = 32) -> np.ndarray:
+    """Slime con forma dada: `eyes` = open | closed | x | none; `fwd` desplaza hacia donde mira."""
     img = canvas(size, size)
     feet = size - 4
-    walk = COLS.index(frame) - 2 if frame.startswith("walk") else -1
-    squash = {"idle0": 0, "idle1": 1}.get(frame, [0, -2, 0, 2][walk] if walk >= 0 else 0)
-    hop = [0, 3, 1, 0][walk] if walk >= 0 else 0
     m = spec["goo"]
-    rx = 8 + max(0, squash)
-    ry = 6 - squash * 0.5
-    cy = feet - ry - hop
-    shaded_ellipse(img, 16, cy, rx, ry, m)
-    shaded_ellipse(img, 16, cy - ry + 2, rx - 3, 2.5, m)
-    rect(img, 12, int(cy - ry) + 2, 2, 1, m["l"])
-    put(img, 12, int(cy - ry) + 3, "white")
-    if direction != "n":
+    fx_, fy_ = fwd_vec(direction)
+    ox, oy = fx_ * fwd, fy_ * fwd
+    cy = feet - ry - hop + oy
+    cxs = 16 + ox
+    shaded_ellipse(img, cxs, cy, rx, ry, m)
+    if ry >= 3:
+        shaded_ellipse(img, cxs, cy - ry + 2, max(1.0, rx - 3), min(2.5, ry - 1), m)
+        rect(img, int(cxs) - 4, int(cy - ry) + 2, 2, 1, m["l"])
+        put(img, int(cxs) - 4, int(cy - ry) + 3, "white")
+    if direction != "n" and eyes != "none":
         off = 3 if direction == "e" else 0
-        rect(img, 13 + off, int(cy), 2, 3, "outline")
-        rect(img, 18 + off, int(cy), 2, 3, "outline")
-        put(img, 13 + off, int(cy), "white")
-        put(img, 18 + off, int(cy), "white")
-        hline(img, 15 + off, 17 + off, int(cy) + 3, m["d"])
+        ex, ey = int(cxs) - 3 + off, int(cy) - (1 if ry < 4 else 0)
+        for e in (ex, ex + 5):
+            if eyes == "open":
+                rect(img, e, ey, 2, 3, "outline")
+                put(img, e, ey, "white")
+            elif eyes == "closed":
+                hline(img, e, e + 1, ey + 1, "outline")
+            else:  # x
+                put(img, e, ey, "outline"); put(img, e + 1, ey + 1, "outline"); put(img, e + 1, ey, "outline"); put(img, e, ey + 1, "outline")
+        if eyes == "open":
+            hline(img, ex + 2, ex + 4, ey + 3, m["d"])
     return outline(img)
 
 
-def golem(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
+def slime(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
+    kind, i = frame_kind(frame)
+    if kind == "attack":
+        # Se aplasta, se estira, salta hacia delante y cae salpicando.
+        rx, ry, hop, fwd = [(10, 4, 0, 0), (6, 8, 3, 1), (7, 7, 6, 3), (11, 4, 0, 3)][i]
+        img = slime_shape(spec, direction, rx, ry, hop, fwd, "open", size)
+        if i == 3:
+            fx_, fy_ = fwd_vec(direction)
+            for (dx, dy) in [(-13, -2), (13, -3), (-10, -6), (11, -7), (0, -10)]:
+                put(img, 16 + fx_ * 3 + dx, size - 4 + fy_ * 3 + dy, spec["goo"]["l"])
+        return img
+    if kind == "cast":
+        img = slime_shape(spec, direction, 8 + i % 2, 6 - i % 2 * 0.5, 0, 0, "open", size)
+        fx_sparkle(16 + [-6, 6, 0][i], 14 + [0, -2, -5][i], 1, "lime", "leaf")(img)
+        return img
+    if kind == "hurt":
+        return slime_shape(spec, direction, 10 - i, 4 + i, 0, -1 if i == 0 else 0, "closed", size)
+    if kind == "death":
+        # Se deshace en un charco.
+        rx, ry, eyes = [(9, 5, "closed"), (10, 3.5, "x"), (11, 2.5, "x"), (12, 1.5, "none")][i]
+        return slime_shape(spec, direction, rx, ry, 0, 0, eyes, size)
+    walk = COLS.index(frame) - 2 if frame.startswith("walk") else -1
+    squash = {"idle0": 0, "idle1": 1}.get(frame, [0, -2, 0, 2][walk] if walk >= 0 else 0)
+    hop = [0, 3, 1, 0][walk] if walk >= 0 else 0
+    return slime_shape(spec, direction, 8 + max(0, squash), 6 - squash * 0.5, hop, 0, "open", size)
+
+
+def golem(spec: dict, direction: str, frame: str, size: int = 32, arm_dy: int = 0) -> np.ndarray:
+    kind, i = frame_kind(frame)
+    if kind == "attack":
+        # Alza los brazos y golpea el suelo levantando polvo.
+        img = golem(spec, direction, "idle0", size, arm_dy=[-6, -9, 3, 0][i])
+        if i == 2:
+            fx_dust(16, size - 4, direction)(img)
+            fx_dust(16, size - 4, {"e": "e", "s": "n", "n": "s"}[direction])(img)
+        return img
+    if kind in ("cast", "hurt", "death"):
+        return beast_combat(spec, direction, kind, i, size, lambda f: golem(spec, direction, f, size), quad=False)
     img = canvas(size, size)
     feet = size - 4
     walk = COLS.index(frame) - 2 if frame.startswith("walk") else -1
@@ -398,8 +790,8 @@ def golem(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
     shaded_ellipse(img, 16, feet - 12 + bob, 9, 7, stone)
     for (x, y, r) in [(9, feet - 16, 3), (23, feet - 16, 3), (13, feet - 10, 2), (20, feet - 9, 2)]:
         shaded_ellipse(img, x, y + bob, r, r, stone)
-    shaded_rect(img, 4 - step, feet - 15 + bob, 5, 10, stone)
-    shaded_rect(img, 23 + step, feet - 15 + bob, 5, 10, stone)
+    shaded_rect(img, 4 - step, feet - 15 + bob + arm_dy, 5, 10, stone)
+    shaded_rect(img, 23 + step, feet - 15 + bob + arm_dy, 5, 10, stone)
     shaded_ellipse(img, 16, feet - 21 + bob, 5, 4, stone)
     if direction != "n":
         off = 2 if direction == "e" else 0
@@ -410,6 +802,48 @@ def golem(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
         put(img, x, y + bob, "sage")
         put(img, x + 1, y + bob, "sage_l")
     return outline(img)
+
+
+def beast_combat(spec: dict, direction: str, kind: str, i: int, size: int, base, quad: bool) -> np.ndarray:
+    """Cuadrúpedos (embestida y mordisco) y gólem (casteo, golpe recibido y derrumbe) a partir de su cuadro de reposo."""
+    feet = size - 4
+    fx_, fy_ = fwd_vec(direction)
+    idle = base("idle0")
+    if kind == "attack":
+        fwd = [-1, 2, 4, 1][i]
+        img = shift(idle, fx_ * fwd, fy_ * fwd + (1 if i == 0 else 0))
+        if i in (1, 2):
+            fx_speedlines(16 + fx_ * fwd, feet - 12, direction)(img)
+        if i == 2 and direction != "n":
+            # Boca abierta / colmillos al morder o embestir.
+            if direction == "e":
+                mx, my = 16 + 9 + fwd, feet - 10
+                hline(img, mx, mx + 3, my, "outline")
+                put(img, mx + 1, my + 1, "white"); put(img, mx + 3, my + 1, "white")
+            else:
+                mx, my = 16, feet - 6 + fwd
+                hline(img, mx - 2, mx + 2, my, "outline")
+                put(img, mx - 1, my + 1, "white"); put(img, mx + 1, my + 1, "white")
+            fx_sparkle(16 + fx_ * (fwd + 12), feet - 10 + fy_ * (fwd + 6), 2, "mist", "white")(img)
+        return img
+    if kind == "cast":
+        img = shift(idle, 0, -1 if i == 1 else 0)
+        fx_sparkle(16 + [-7, 7, 0][i], feet - [14, 16, 20][i], 1, "gold", "amber")(img)
+        return img
+    if kind == "hurt":
+        return shift(idle, -fx_ * (1 if i == 0 else 0), -fy_ * (1 if i == 0 else 0))
+    # death
+    if i == 0:
+        return shift(idle, -fx_, 1)
+    if i == 1:
+        return squash_rows(idle, 4, feet)
+    if not quad:
+        # El gólem se derrumba en un montón de piedras.
+        pile = squash_rows(squash_rows(idle, 2, feet), 3 if i == 2 else 2, feet)
+        for (ox, oy, c) in [(-9, 0, "lavgray"), (9, -1, "silver"), (-6, -1, "plum"), (7, 0, "lavgray")]:
+            rect(pile, 16 + ox, feet - 1 + oy, 2, 2, c)
+        return pile
+    return lay_down(idle, direction, feet, lift=(2 if i == 2 else 0), on_back=(direction == "e"))
 
 
 # --- Catálogo -------------------------------------------------------------------------------------------------------
@@ -426,22 +860,22 @@ CHARACTERS = {
     "characters/warrior": (humanoid, {"skin": SKIN, "hair": HAIR_BROWN, "head": "helm", "helm": STEEL, "plume": "scarlet",
                                        "top": mat("silver", "mist", "lavgray"), "sleeve": mat("red", "redl", "blood"),
                                        "pants": mat("rust", "clay", "wine"), "boots": BOOTS, "belt": "wine",
-                                       "weapon": "sword", "shield": mat("blue", "sky", "navy")}),
+                                       "weapon": "sword", "shield": mat("blue", "sky", "navy"), "attack": "slash", "glow": "warrior"}),
     "characters/mage": (humanoid, {"skin": SKIN, "hair": HAIR_BLOND, "head": "hat", "hat": mat("blue", "sky", "navy"),
                                     "hat_band": "gold", "top": mat("blue", "sky", "navy"), "robe": True, "trim": "gold",
-                                    "pants": mat("navy", "indigo", "outline"), "boots": BOOTS, "weapon": "staff", "gem": "ice"}),
+                                    "pants": mat("navy", "indigo", "outline"), "boots": BOOTS, "weapon": "staff", "gem": "ice", "glow": "mage"}),
     "characters/priest": (humanoid, {"skin": SKIN, "hair": HAIR_BLOND, "head": "crown", "crown_color": "gold", "top": mat("mist", "white", "silver"),
                                       "robe": True, "trim": "gold", "pants": mat("silver", "mist", "lavgray"), "boots": BOOTS,
-                                      "weapon": "mace"}),
+                                      "weapon": "mace", "glow": "priest"}),
     "characters/rogue": (humanoid, {"skin": SKIN, "hair": HAIR_BLACK, "head": "hood", "hood": mat("sage_d", "sage", "coal"),
                                      "mask": "ink", "top": mat("mud", "olive", "outline"), "sleeve": mat("sage_d", "sage", "coal"),
-                                     "pants": mat("ink", "plum", "outline"), "boots": BOOTS, "belt": "rust", "weapon": "dagger"}),
+                                     "pants": mat("ink", "plum", "outline"), "boots": BOOTS, "belt": "rust", "weapon": "dagger", "attack": "thrust", "glow": "rogue"}),
     "npcs/shopkeeper": (humanoid, {"skin": SKIN, "hair": HAIR_BROWN, "beard": "rust", "head": "cap", "cap": mat("aqua", "aqua_l", "teal"),
                                     "top": mat("cream", "white", "sand"), "belt": "rust", "pants": mat("rust", "clay", "wine"),
                                     "boots": BOOTS, "weapon": None}),
     "npcs/trainer": (humanoid, {"skin": SKIN, "hair": HAIR_GRAY, "beard": "mist", "head": "hair",
                                  "top": mat("grape", "violet", "grape_d"), "robe": True, "trim": "gold",
-                                 "pants": mat("grape_d", "grape", "outline"), "boots": BOOTS, "weapon": "book"}),
+                                 "pants": mat("grape_d", "grape", "outline"), "boots": BOOTS, "weapon": "book", "glow": "trainer"}),
     "monsters/slime": (slime, {"goo": mat("jade", "leaf", "green")}),
     "monsters/wolf": (quadruped, {"fur": mat("lavgray", "silver", "plum"), "belly": mat("silver", "mist", "lavgray"),
                                    "snout": mat("silver", "mist", "lavgray")}),
@@ -473,7 +907,7 @@ BOSSES = {
     "monsters/lich_king": (64, {"skin": mat("mist", "white", "silver"), "hair": None, "head": "crown", "crown_color": "gold",
                                 "top": mat("grape", "violet", "grape_d"), "robe": True, "trim": "lilac",
                                 "pants": mat("grape_d", "grape", "outline"), "boots": BOOTS, "weapon": "staff", "gem": "magenta",
-                                "eye": "aqua_l", "blush": False, "scale": 1}),
+                                "eye": "aqua_l", "blush": False, "scale": 1, "glow": "lich"}),
 }
 
 
@@ -502,8 +936,9 @@ def sheet(draw, spec: dict, size: int = 32) -> np.ndarray:
 
 
 def write_meta(rel: str, size: int) -> None:
-    meta = {"frameSize": [size, size], "rows": DIRS, "columns": COLS, "feetY": size - 4,
-            "note": "w = e espejado; generado por tools/art/gen_chars.py"}
+    anims = {name: {"column": COLS.index(a["from"]), "frames": a["frames"], "fps": a["fps"], "loop": a["loop"]} for name, a in ANIMS.items()}
+    meta = {"frameSize": [size, size], "rows": DIRS, "columns": COLS, "feetY": size - 4, "anims": anims,
+            "note": "w = e espejado; hurt y death por dirección; generado por tools/art/gen_chars.py"}
     path = ASSETS / "sprites" / (rel + ".json")
     path.write_text(json.dumps(meta, indent=1) + "\n", encoding="utf-8")
 
