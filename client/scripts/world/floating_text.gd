@@ -92,7 +92,7 @@ func _spawn(text: String, color: Color, world_pos: Vector2, big: bool = false) -
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", UiTheme.FONT_TITLE if big else UiTheme.FONT_BODY)
 	l.modulate.a = 1.0
-	l.position = world_pos + Vector2(-8 + randf_range(-4, 4), -20)
+	l.position = world_pos + Vector2(-8 + randf_range(-4, 4), -40)  # por encima del nombre y del nivel
 	l.visible = true
 	_active.append({"label": l, "t": 0.0})
 
