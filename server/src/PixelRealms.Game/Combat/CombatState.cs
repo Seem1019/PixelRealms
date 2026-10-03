@@ -21,6 +21,11 @@ public sealed class CastState(SpellDef spell, long startedAtMs, long endsAtMs, E
     public Vec2 Origin { get; } = origin;
 }
 
+/// <summary>Recuperación del perdedor de un duelo (HU-064 CA3): regenera vida × `Mult` desde `FromMs`, sin esperar
+/// `hpRegenDelaySec`, hasta `UntilHp` (la vida con que empezó el duelo: solo devuelve lo que el duelo quitó) o hasta volver a
+/// entrar en combate.</summary>
+public readonly record struct PostDuelRecovery(long FromMs, double Mult, int UntilHp);
+
 /// <summary>Salto en el aire (HU-087 CA1): de `From` a `To` en `travelMs`; los efectos se resuelven al aterrizar.</summary>
 public sealed record LeapFlight(SpellDef Spell, Vec2 From, Vec2 To, long StartMs, long EndMs);
 
@@ -42,6 +47,9 @@ public sealed class CombatState
 
     /// <summary>Salto en curso; mientras dura no se mueve por input ni actúa (HU-087 CA1).</summary>
     public LeapFlight? Flight { get; set; }
+
+    /// <summary>Perdió un duelo y se está recuperando (ResourceSystem).</summary>
+    public PostDuelRecovery? Recovery { get; set; }
 
     public long GcdEndsAtMs { get; set; } = long.MinValue;
 
@@ -99,5 +107,6 @@ public sealed class CombatState
         SwingProgressMs = 0;
         Cast = null;
         Flight = null;
+        Recovery = null;
     }
 }

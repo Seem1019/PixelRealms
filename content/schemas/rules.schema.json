@@ -290,11 +290,12 @@
       "properties": { "warrior": { "type": "number" }, "rogue": { "type": "number" }, "mage": { "type": "number" }, "priest": { "type": "number" } } },
     "pvpRuleset": {
       "type": "object", "additionalProperties": false,
-      "required": ["requiresConsent", "endAtHpPct", "restoreOnEnd", "xpLoss", "goldLoss", "itemLoss", "allowedInSafeZones", "requestExpireSec", "countdownSec", "maxDistanceTiles"],
+      "required": ["requiresConsent", "endAtHpPct", "restoreOnEnd", "loserRegenMult", "xpLoss", "goldLoss", "itemLoss", "allowedInSafeZones", "requestExpireSec", "countdownSec", "maxDistanceTiles"],
       "properties": {
         "requiresConsent": { "type": "boolean" },
         "endAtHpPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "El combate termina cuando un participante baja a este % de vida (0 = muerte real)." },
-        "restoreOnEnd": { "type": "boolean", "description": "Restaurar vida/recurso de ambos al terminar." },
+        "restoreOnEnd": { "type": "boolean", "description": "true: al terminar cada uno vuelve a la vida y el recurso con que empezó; false: se queda como acabó." },
+        "loserRegenMult": { "type": "number", "minimum": 1, "description": "Al terminar, quien pierde por vida regenera × esto y sin esperar hpRegenDelaySec, hasta la vida con que empezó el duelo o hasta entrar en combate (1 = normal)." },
         "xpLoss": { "type": "number" }, "goldLoss": { "type": "number" }, "itemLoss": { "type": "boolean" },
         "allowedInSafeZones": { "type": "boolean" },
         "requestExpireSec": { "type": "number" }, "countdownSec": { "type": "number" },

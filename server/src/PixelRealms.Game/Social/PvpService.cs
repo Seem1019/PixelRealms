@@ -160,22 +160,29 @@ public sealed class PvpService(AuraSystem auras)
         duel.State = DuelState.Ended;
         duel.Winner = winner;
         var rs = ctx.Rules.Pvp.Rulesets[duel.Ruleset];
-        if (rs.RestoreOnEnd)
+        foreach (var p in new[] { duel.A, duel.B })
         {
-            // Cada uno vuelve a la vida y el recurso con que empezó y pierde lo que le puso el rival. Restaurar al máximo convertía
-            // el duelo en una posada gratis (retar a un alt y rendirse) y en una cura completa a mitad de una pelea.
-            foreach (var p in new[] { duel.A, duel.B })
+            if (p.IsDead) continue; // un muerto no resucita por terminar el duelo: pasa por Respawn como siempre
+            // Nadie sigue atacando al ex-rival, y lo que le puso (un DoT, un aturdimiento) se va: sin el recorte del duelo lo mataría.
+            var opponentId = duel.Opponent(p).Id;
+            for (var i = p.Auras.All.Count - 1; i >= 0; i--)
+                if (i < p.Auras.All.Count && p.Auras.All[i].CasterId == opponentId) auras.Remove(p, p.Auras.All[i], map, ctx);
+            p.Combat.ResetTransient();
+            p.Dirty = true;
+            if (rs.RestoreOnEnd)
             {
-                if (p.IsDead) continue; // un muerto no resucita por terminar el duelo: pasa por Respawn como siempre
+                // Vuelve a la vida y el recurso con que empezó (nunca al máximo: sería una posada gratis). El daño que termina el
+                // duelo todavía no se ha restado: se compensa para que quede exactamente en `start`.
                 var start = ReferenceEquals(p, duel.A) ? duel.StartA : duel.StartB;
-                // El daño que termina el duelo todavía no se ha restado: se compensa para que quede exactamente en `start`.
                 p.Hp = Math.Clamp(start.Hp, 1, p.MaxHp) + (ReferenceEquals(p, duel.Opponent(winner)) ? applyAfterDamage : 0);
                 p.Resource = Math.Clamp(start.Resource, 0, p.MaxResource);
-                var opponentId = duel.Opponent(p).Id;
-                foreach (var aura in p.Auras.All.ToList())
-                    if (aura.CasterId == opponentId) auras.Remove(p, aura, map, ctx);
-                p.Combat.ResetTransient();
-                p.Dirty = true;
+            }
+            else if (!ReferenceEquals(p, winner) && reason == "hp" && rs.LoserRegenMult > 1)
+            {
+                // HU-064 CA3: cada uno se queda como acabó; quien perdió por vida (al `endAtHpPct`) recupera algo más rápido lo que el
+                // duelo le quitó, no más: rendirse o alejarse no da nada y la recuperación no sirve para curar una pelea anterior.
+                var start = ReferenceEquals(p, duel.A) ? duel.StartA : duel.StartB;
+                p.Combat.Recovery = new PostDuelRecovery(ctx.NowMs, rs.LoserRegenMult, Math.Min(start.Hp, p.MaxHp));
             }
         }
         ctx.Emit(new DuelChangedEvent(map.Id, duel, "ended", reason));
