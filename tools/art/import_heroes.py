@@ -31,12 +31,18 @@ FEET_Y = 36 * PIXEL_SCALE
 ## Altura del personaje de pie (reposo sur): 26 px lógicos, la misma que el resto de personajes.
 STAND_HEIGHT = 26 * PIXEL_SCALE
 BG_LEVEL = 40  # canal máximo por debajo del cual un píxel cuenta como fondo negro
-## Ropa casi negra (el pícaro): umbral de fondo más bajo para que botas y pantalones no se borren con él.
-BG_LEVEL_BY_CLASS = {"rogue": 12}
+## Umbral del relleno que quita el fondo (canal máximo): el fondo de las hojas está en 0–2, y el contorno y la ropa
+## oscura (túnica del guerrero, ropa del pícaro) bajan hasta ~15, así que con BG_LEVEL se borraban con él.
+CUTOUT_BG_LEVEL = 12
+## Un píxel oscuro unido al fondo se queda solo si está a ≤ HALO_REACH_PX de un color sólido (canal máximo ≥ HALO_SOLID_LEVEL).
+HALO_SOLID_LEVEL = 70
+HALO_REACH_PX = 2
 ENCLOSED_BG_MIN_PX = 300  # fondo encerrado por un efecto: al menos este tamaño (los contornos son mucho menores)
 
 ## Animaciones: cuadros (los mismos en las tres direcciones), fps y bucle. Más cuadros que las hojas procedurales;
 ## las duraciones del ataque (333 ms), el golpe y la muerte (500 ms) se mantienen.
+## Animaciones que se normalizan a STAND_HEIGHT cuadro a cuadro (las demás cambian de altura a propósito).
+STEADY_ANIMS = ("idle", "walk")
 ANIMS = {
     "idle": {"frames": 4, "fps": 5, "loop": True},
     "walk": {"frames": 8, "fps": 12, "loop": True},
@@ -68,26 +74,26 @@ FRAMES: dict[str, dict[str, dict[str, list[str]]]] = {
     "warrior": {
         "s": {"idle": keys(0, [0, 3, 6, 9]), "walk": even(2, 13, 8), "attack": ["4,3", "6,0", "6,1", "6,7", "6,8", "6,12"],
               "cast": keys(7, [2, 3, 4, 2, 3, 4]), "hurt": ["7,0", "8,1"], "death": keys(8, [2, 3, 4, 5])},
-        "n": {"idle": keys(1, [0, 3, 6, 9]), "walk": even(1, 13, 8), "attack": pl("attack", list(range(6))),
+        "n": {"idle": keys(1, [0, 2, 4, 6]), "walk": even(1, 13, 8), "attack": pl("attack", list(range(6))),
               "cast": pl("cast", list(range(6))), "hurt": keys(1, [0, 6]), "death": keys(8, [2, 3, 4, 5])},
         "e": {"idle": keys(0, [0, 3, 6, 9]), "walk": even(3, 13, 8), "attack": ["5,0", "6,0", "6,1", "6,5", "6,11", "6,12"],
               "cast": keys(7, [2, 3, 4, 2, 3, 4]), "hurt": ["7,0", "8,1"], "death": keys(8, [2, 3, 4, 5])},
     },
     "mage": {
-        "s": {"idle": keys(0, [0, 4, 9, 11]), "walk": even(2, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
+        "s": {"idle": keys(0, [4, 7, 8, 9]), "walk": even(2, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
               "cast": keys(4, [0, 2, 4, 6, 8, 4]), "hurt": keys(7, [6, 7]), "death": keys(7, [7, 8, 10, 11])},
         "n": {"idle": ["1,1", "1,6", "1,1", "1,6"], "walk": ["0,1", "1,1", "0,6", "1,6", "1,9", "1,10", "1,1", "1,6"],
               "attack": pl("attack", list(range(6))), "cast": pl("cast", list(range(6))),
               "hurt": ["1,1", "1,6"], "death": keys(7, [7, 8, 10, 11])},
-        "e": {"idle": keys(0, [0, 4, 9, 11]), "walk": even(3, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
+        "e": {"idle": keys(0, [4, 7, 8, 9]), "walk": even(3, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
               "cast": keys(4, [0, 2, 4, 6, 8, 4]), "hurt": keys(7, [6, 7]), "death": keys(7, [7, 8, 10, 11])},
     },
     "rogue": {
-        "s": {"idle": keys(0, [0, 4, 8, 12]), "walk": even(2, 16, 8), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
+        "s": {"idle": keys(0, [4, 7, 10, 13]), "walk": keys(2, [3, 5, 6, 8, 9, 11, 12, 14]), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
               "cast": keys(7, [0, 1, 2, 3, 4, 6]), "hurt": keys(8, [3, 4]), "death": keys(8, [6, 7, 8, 10])},
         "n": {"idle": keys(1, [0, 1, 2, 1]), "walk": keys(1, [0, 1, 2, 4, 5, 6, 7, 1]), "attack": keys(1, [2, 4, 5, 6, 7, 2]),
               "cast": keys(1, [0, 1, 2, 4, 5, 6]), "hurt": keys(1, [0, 1]), "death": keys(8, [6, 7, 8, 10])},
-        "e": {"idle": keys(0, [0, 4, 8, 12]), "walk": even(3, 16, 8), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
+        "e": {"idle": keys(0, [4, 7, 10, 13]), "walk": keys(3, list(range(8, 16))), "attack": keys(4, [3, 4, 6, 7, 10, 11]),
               "cast": keys(7, [0, 1, 2, 3, 4, 6]), "hurt": keys(8, [3, 4]), "death": keys(8, [6, 7, 8, 10])},
     },
     # La hoja no trae vista de espaldas: el norte sale de PixelLab (rotación v3 del reposo sur y animaciones v3 al norte).
@@ -145,7 +151,7 @@ def find_frames(img: Image.Image) -> list[list[tuple[int, int, int, int]]]:
     return out
 
 
-def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = BG_LEVEL) -> Image.Image:
+def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = CUTOUT_BG_LEVEL) -> Image.Image:
     """Recorte con el fondo negro conectado al borde transparente (el contorno oscuro interior se conserva)."""
     x0, y0, x1, y1 = box
     c = np.asarray(img.crop((x0 - 2, y0 - 2, x1 + 2, y1 + 2))).astype(np.uint8)
@@ -157,6 +163,13 @@ def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = BG
     means = ndimage.mean(darkest, lab, range(1, n + 1))  # la compresión deja bordes de hasta ~37: cuenta la media
     background |= {i + 1 for i in range(n) if sizes[i] >= ENCLOSED_BG_MIN_PX and means[i] < 12}
     alpha = np.where(np.isin(lab, list(background)), 0, 255).astype(np.uint8)
+    # Halo de los brillos sobre el negro (destellos, auras): píxeles oscuros unidos al fondo por otros oscuros y lejos
+    # de cualquier color sólido. El contorno y la ropa oscura tocan el cuerpo, así que se quedan.
+    dark = darkest < BG_LEVEL - 2
+    lab_d, n_d = ndimage.label(dark)
+    edge = set(np.unique(np.concatenate([lab_d[0], lab_d[-1], lab_d[:, 0], lab_d[:, -1]]))) - {0}
+    near_body = ndimage.binary_dilation(darkest >= HALO_SOLID_LEVEL, iterations=HALO_REACH_PX)
+    alpha[np.isin(lab_d, list(edge)) & ~near_body] = 0
     # Motas oscuras sueltas que deja la compresión alrededor de la silueta con un umbral bajo.
     solid, k = ndimage.label(alpha > 0)
     if k > 1:
@@ -180,15 +193,21 @@ def shrink(im: Image.Image, scale: float) -> Image.Image:
     return Image.fromarray(np.dstack([np.clip(rgb, 0, 255), np.where(al > 110, 255, 0)]).astype(np.uint8), "RGBA")
 
 
-def frame_cell(frame: Image.Image) -> Image.Image:
-    """Celda de SIZE×SIZE con los pies centrados en x=SIZE/2 y la planta en FEET_Y."""
+def frame_cell(frame: Image.Image, anchor: str = "torso") -> Image.Image:
+    """Celda de SIZE×SIZE con la planta en FEET_Y y centrada en x=SIZE/2: por el torso (mediana de la franja media del
+    cuerpo, estable aunque las piernas y el arma se muevan) o por los pies (muerte: el cuerpo está tendido)."""
     alpha = np.asarray(frame)[..., 3]
     # Los pies salen del cuerpo (la mancha mayor), no de destellos sueltos bajo él.
     lab, n = ndimage.label(alpha > 0)
     body = lab == (1 + int(np.argmax(ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))))) if n > 1 else alpha > 0
     ys, xs = np.where(body)
-    low = ys >= ys.max() - max(3, int(0.12 * (ys.max() - ys.min())))
-    cx = int(round(xs[low].mean()))
+    top, bottom = ys.min(), ys.max()
+    if anchor == "torso":
+        band = (ys >= top + 0.35 * (bottom - top)) & (ys <= top + 0.75 * (bottom - top))
+        cx = int(round(float(np.median(xs[band]))))
+    else:
+        low = ys >= bottom - max(3, int(0.12 * (bottom - top)))
+        cx = int(round(xs[low].mean()))
     cell = Image.new("RGBA", (SIZE, SIZE))
     cell.paste(frame, (SIZE // 2 - cx, FEET_Y - int(ys.max()) - 1), frame)
     return cell
@@ -218,11 +237,14 @@ def build_class(class_id: str) -> bool:
             assert len(frames) == a["frames"], f"{class_id}/{d}/{name}: {len(frames)} cuadros, se esperan {a['frames']}"
             anims[name] = {"column": col, **a}
             for key in frames:
-                if key.startswith("pl:"):
-                    frame = shrink(pl_frame(key), pl_scale)
-                else:
-                    frame = shrink(cut_out(img, box(key), BG_LEVEL_BY_CLASS.get(class_id, BG_LEVEL)), scale)
-                sheet.paste(frame_cell(frame), (col * SIZE, r * SIZE))
+                source = pl_frame(key) if key.startswith("pl:") else cut_out(img, box(key))
+                base = pl_scale if key.startswith("pl:") else scale
+                if name in STEADY_ANIMS:
+                    # Reposo y caminar a la misma estatura en todos los cuadros y direcciones: las hojas dibujan al
+                    # personaje unos píxeles más grande o más pequeño de un cuadro a otro y se veía "respirar" al andar.
+                    base = STAND_HEIGHT / source.crop(source.getbbox()).height
+                frame = shrink(source, base)
+                sheet.paste(frame_cell(frame, "feet" if name == "death" else "torso"), (col * SIZE, r * SIZE))
                 col += 1
     out = ASSETS / "sprites" / "characters"
     sheet.save(out / f"{class_id}.png")

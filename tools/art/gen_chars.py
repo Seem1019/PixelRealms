@@ -759,9 +759,24 @@ def slime(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarray:
     if kind == "hurt":
         return slime_shape(spec, direction, 10 - i, 4 + i, 0, -1 if i == 0 else 0, "closed", size)
     if kind == "death":
-        # Se deshace en un charco.
-        rx, ry, eyes = [(9, 5, "closed"), (10, 3.5, "x"), (11, 2.5, "x"), (12, 1.5, "none")][i]
-        return slime_shape(spec, direction, rx, ry, 0, 0, eyes, size)
+        # Se deshace en un charco irregular y más oscuro, con gotas sueltas (antes acababa en una línea plana con
+        # contorno que parecía una barra de vida tirada en el suelo).
+        if i < 2:
+            rx, ry, eyes = [(9, 5, "closed"), (10, 4, "x")][i]
+            return slime_shape(spec, direction, rx, ry, 0, 0, eyes, size)
+        img = canvas(size, size)
+        feet = size - 4
+        goo = spec["goo"]
+        dead = {"b": goo["d"], "l": goo["b"], "d": "outline"} if i == 3 else goo
+        shaded_ellipse(img, 16, feet - 3, 7, 3.5, dead)
+        shaded_ellipse(img, 10, feet - 1.5, 4, 2.5, dead)
+        shaded_ellipse(img, 21, feet - 2, 4, 2, dead)
+        for dx, dy in ([(-12, -4), (12, -5), (5, 1)] if i == 2 else [(-13, -2), (13, -4), (6, 2), (-4, 2)]):
+            rect(img, 16 + dx, feet + dy, 2, 1, dead["b"])
+        ex = 13
+        for e in (ex, ex + 5):
+            put(img, e, feet - 4, "outline"); put(img, e + 1, feet - 3, "outline"); put(img, e + 1, feet - 4, "outline"); put(img, e, feet - 3, "outline")
+        return outline(img)
     walk = COLS.index(frame) - 2 if frame.startswith("walk") else -1
     squash = {"idle0": 0, "idle1": 1}.get(frame, [0, -2, 0, 2][walk] if walk >= 0 else 0)
     hop = [0, 3, 1, 0][walk] if walk >= 0 else 0

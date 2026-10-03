@@ -242,7 +242,7 @@ func _portrait(parent: Control, at: Vector2) -> TextureRect:
 	pic.position = Vector2(3, 3)
 	pic.size = Vector2(16, 16)
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	pic.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED  # el retrato HD mide 48 px: se reduce al hueco de 16 (HU-099)
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(pic)
 	parent.add_child(frame)

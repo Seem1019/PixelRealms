@@ -29,3 +29,13 @@ func test_hd_portraits_cover_the_same_logical_area() -> void:
 	assert_eq(body.get_size(), Vector2(96, 96), "32×32 lógicos a ×3")
 	assert_eq(head.get_size(), Vector2(48, 48), "16×16 lógicos a ×3")
 	assert_eq(EntitySprites.scale_of("npcs/shopkeeper"), 1, "una hoja procedural sigue a escala 1")
+
+
+func test_target_portrait_fits_its_frame() -> void:
+	# El retrato HD de la cabeza mide 48 px: se reduce al hueco de 16 en vez de desbordar el marco por encima del mundo.
+	var hud := CombatHud.new()
+	add_child_autofree(hud)
+	await get_tree().process_frame
+	hud.set_target_info("DiegoADMIN", 4, 100, EntitySprites.portrait("characters/mage", true))
+	assert_eq(hud._target_portrait.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+	assert_eq(hud._target_portrait.size, Vector2(16, 16))
