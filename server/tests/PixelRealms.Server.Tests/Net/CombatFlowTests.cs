@@ -92,6 +92,25 @@ public sealed class CombatFlowTests
     }
 
     [Fact]
+    public async Task CastSpell_WithAPotionOrMonsterSpell_IsRejected_AndHealsNothing()
+    {
+        // Cliente tramposo: el hechizo de la poción por CastSpell no tiene recarga, coste ni GCD.
+        await using var server = await TestServer.StartAsync();
+        var (ana, selfId) = await Enter(server, "ana", "Ana", "warrior");
+        await using var _ = ana;
+        var player = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId);
+        await server.RunOnTickAsync(_ => player.Hp = 10);
+        foreach (var spellId in new[] { "item_minor_heal", "item_minor_mana", "lich_shadow_bolt", "foreman_rally" })
+        {
+            await ana.SendAsync("CastSpell", $$"""{"spellId":"{{spellId}}","targetId":{{selfId}},"reqId":1}""");
+            (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("not_found");
+        }
+        var hp = 0;
+        await server.RunOnTickAsync(_ => hp = player.Hp);
+        hp.ShouldBeLessThan(40); // como mucho la regeneración fuera de combate, nunca 4 curas de 60
+    }
+
+    [Fact]
     public async Task Death_SendsDied_RespawnRestoresAtGraveyard()
     {
         await using var server = await TestServer.StartAsync();

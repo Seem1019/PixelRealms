@@ -72,7 +72,7 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
 
     private void AfterApply(Actor target, AuraDef def, MapInstance map, TickContext ctx)
     {
-        if (def.Mods?.Stats is not null) target.MarkStatsDirty();
+        if (def.Mods?.Stats is not null) StatsChanged(target, map, ctx);
         if (def.Kind is AuraKind.Stun or AuraKind.Silence) Interrupter?.InterruptByControl(target, def.Kind, map, ctx);
     }
 
@@ -111,7 +111,7 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
     {
         if (!target.Auras.Mutable.Remove(aura)) return;
         ctx.Emit(new AuraRemovedEvent(map.Id, target, aura.AuraId, aura.CasterId));
-        if (aura.Def.Mods?.Stats is not null) target.MarkStatsDirty();
+        if (aura.Def.Mods?.Stats is not null) StatsChanged(target, map, ctx);
         if (ctx.Rules.Combat.HardControlKinds.Contains(aura.Kind) && !target.Auras.HasKind(aura.Kind))
             target.Combat.HardControlImmuneUntilMs = Math.Max(target.Combat.HardControlImmuneUntilMs, ctx.NowMs + (long)(ctx.Rules.Combat.HardControlImmunitySec * 1000));
     }
@@ -125,13 +125,23 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
     /// <summary>Muerte o evasión: se pierden todas las auras (HU-037 CA1) sin conceder inmunidad.</summary>
     public void ClearAll(Actor target, MapInstance map, TickContext ctx)
     {
+        var hadStats = false;
         for (var i = target.Auras.Mutable.Count - 1; i >= 0; i--)
         {
             var a = target.Auras.Mutable[i];
             target.Auras.Mutable.RemoveAt(i);
             ctx.Emit(new AuraRemovedEvent(map.Id, target, a.AuraId, a.CasterId));
+            hadStats |= a.Def.Mods?.Stats is not null;
         }
+        if (hadStats) StatsChanged(target, map, ctx);
+        else target.MarkStatsDirty();
+    }
+
+    /// <summary>HU-042 CA3: un aura que cambia stats primarios recalcula y el panel de personaje se actualiza en vivo (StatsUpdate).</summary>
+    private static void StatsChanged(Actor target, MapInstance map, TickContext ctx)
+    {
         target.MarkStatsDirty();
+        if (target is Player p) ctx.Emit(new Progression.StatsChangedEvent(map.Id, p));
     }
 
     /// <summary>Escudos: absorben por orden de caducidad (el que caduca antes se gasta primero). Devuelve lo absorbido.</summary>

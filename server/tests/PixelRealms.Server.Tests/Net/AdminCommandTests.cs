@@ -151,6 +151,31 @@ public sealed class AdminCommandTests
     }
 
     [Fact]
+    public async Task TpTo_AnotherMap_CancelsTheCastInProgress() // HU-027: un casteo no termina en el mapa de destino
+    {
+        await using var server = await TestServer.StartAsync();
+        var (bob, _) = await Enter(server, "bob", "Bob", "warrior", admin: true);
+        var (ana, anaId) = await Enter(server, "ana", "Ana", "priest", admin: true);
+        await using (ana) await using (bob)
+        {
+            await bob.SendAsync("AdminCommand", """{"text":"/level 4"}""");
+            await System(bob);
+            await bob.SendAsync("AdminCommand", """{"text":"/tp 243 53.5"}"""); // sobre el portal de la Mina (minLevel 4)
+            (await bob.ExpectAsync("ChangeMap")).GetProperty("mapId").GetString().ShouldBe("mine");
+
+            await ana.SendAsync("CastSpell", $$"""{"spellId":"priest_heal","targetId":{{anaId}}}""");
+            await ana.ExpectAsync("CastStarted", m => m.GetProperty("casterId").GetInt32() == anaId);
+            await ana.SendAsync("AdminCommand", """{"text":"/tpto Bob"}""");
+            var ended = await ana.ExpectAsync("CastEnded", m => m.GetProperty("casterId").GetInt32() == anaId);
+            ended.GetProperty("result").GetString().ShouldBe("cancelled");
+            (await ana.ExpectAsync("ChangeMap")).GetProperty("mapId").GetString().ShouldBe("mine");
+            server.Services.GetRequiredService<PlayerRegistry>().ByName("Ana")!.Combat.Cast.ShouldBeNull();
+            // El casteo (1,5 s) no se resuelve después en la Mina.
+            await Should.ThrowAsync<TimeoutException>(() => ana.ExpectAsync("CastEnded", m => m.GetProperty("casterId").GetInt32() == anaId, 2000));
+        }
+    }
+
+    [Fact]
     public async Task Admin_Kill_Target_And_TpTo() // CA1
     {
         await using var server = await TestServer.StartAsync();

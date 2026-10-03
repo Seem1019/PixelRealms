@@ -1,3 +1,4 @@
+using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Map;
 using PixelRealms.Game.Portals;
@@ -49,6 +50,18 @@ public sealed class PortalSystemTests
         TickRunner.Run(w, 1);
         w.Player("Ana").Position = new Vec2(11, 11);
         TickRunner.Run(w, 1).OfType<PortalRejected>().Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public void MidLeap_OverPortal_DoesNotCross_UntilLanding() // HU-087: el vuelo lleva coordenadas de este mapa
+    {
+        var w = Build(4, (11, 11));
+        var ana = w.Player("Ana");
+        ana.Combat.Flight = new LeapFlight(w.Content.Spell("rogue_shadowstep"), new Vec2(8, 11), new Vec2(14, 11), 0, 60_000);
+        ana.RequestedPortalId = "to_mine"; // ni pisándolo ni pidiéndolo
+        TickRunner.Run(w, 2).OfType<PortalUsed>().ShouldBeEmpty();
+        ana.Combat.Flight = null; // aterriza sobre el portal
+        TickRunner.Run(w, 1).OfType<PortalUsed>().Single().Portal.PortalId.ShouldBe("to_mine");
     }
 
     [Fact]

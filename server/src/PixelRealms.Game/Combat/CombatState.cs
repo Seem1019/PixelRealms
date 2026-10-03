@@ -21,6 +21,9 @@ public sealed class CastState(SpellDef spell, long startedAtMs, long endsAtMs, E
     public Vec2 Origin { get; } = origin;
 }
 
+/// <summary>Salto en el aire (HU-087 CA1): de `From` a `To` en `travelMs`; los efectos se resuelven al aterrizar.</summary>
+public sealed record LeapFlight(SpellDef Spell, Vec2 From, Vec2 To, long StartMs, long EndMs);
+
 /// <summary>
 /// Estado de combate de un actor: objetivo, ataque básico, casteo, GCD y cooldowns, bloqueos e inmunidades, acumuladores de
 /// regeneración. Lo mutan solo los sistemas del tick. Nada de aquí se guarda en BD (ADR-018).
@@ -36,6 +39,9 @@ public sealed class CombatState
     public double SwingProgressMs { get; set; }
 
     public CastState? Cast { get; set; }
+
+    /// <summary>Salto en curso; mientras dura no se mueve por input ni actúa (HU-087 CA1).</summary>
+    public LeapFlight? Flight { get; set; }
 
     public long GcdEndsAtMs { get; set; } = long.MinValue;
 
@@ -92,5 +98,6 @@ public sealed class CombatState
         AutoAttackOn = false;
         SwingProgressMs = 0;
         Cast = null;
+        Flight = null;
     }
 }

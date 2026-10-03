@@ -38,10 +38,29 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
 
     private readonly Dictionary<int, List<PendingImpact>> _impacts = new();
     private readonly List<Actor> _casting = new(32);
+    private readonly List<Actor> _flying = new(8);
 
     public string Name => "casts";
 
     public int PendingImpacts(MapInstance map) => _impacts.TryGetValue(map.Id, out var l) ? l.Count : 0;
+
+    /// <summary>
+    /// Áreas apuntadas en curso en la instancia: casteos `ground_*` con su marca en el suelo (los saltos no cuentan). Son las
+    /// "áreas" de `rules.limits.maxAreasPerInstance` y de `/admin/stats` (HU-072 CA3); en la Fase 1 no hay áreas duraderas.
+    /// </summary>
+    public int ActiveAreas(MapInstance map)
+    {
+        var n = 0;
+        foreach (var a in map.Actors.Values)
+            if (a.Combat.Cast is { } c && c.Spell.Targeting.IsGround() && !HasLeap(c.Spell)) n++;
+        return n;
+    }
+
+    private static bool HasLeap(SpellDef spell)
+    {
+        foreach (var e in spell.Effects) if (e.Type == EffectType.Leap) return true;
+        return false;
+    }
 
     /// <summary>Descarta los impactos en vuelo de quien sale del mundo (HU-015): no resuelven a nombre de un ausente.</summary>
     public void ForgetCaster(Actor caster, MapInstance map)
@@ -50,7 +69,9 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     }
 
     /// <summary>Intenta lanzar; devuelve el código de error o null si el hechizo empezó (o se resolvió si es instantáneo).</summary>
-    public string? TryBeginCast(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, MapInstance map, TickContext ctx, bool cancelCurrent = true)
+    /// <param name="viaItem">true solo desde `ItemUseService`: un jugador lanza hechizos de objeto únicamente al usar el objeto
+    /// (que paga su recarga y consume una unidad); por `CastSpell` serían curas y maná gratis y sin recarga.</param>
+    public string? TryBeginCast(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, MapInstance map, TickContext ctx, bool cancelCurrent = true, bool viaItem = false)
     {
         var rules = ctx.Rules.Combat;
         var now = ctx.NowMs;
@@ -58,6 +79,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
 
         if (caster is Player p)
         {
+            // Un jugador lanza sus hechizos de clase; los de objeto solo al usar el objeto y los de monstruo nunca.
+            if (spell.Source == SpellSource.Monster || (spell.Source == SpellSource.Item && !viaItem)) return CastErrors.NotFound;
             if (spell.Source == SpellSource.Class && !p.KnownSpells.Contains(spell.Id)) return CastErrors.NotFound;
             if (EngineCapabilities.UnavailableReason(spell) is not null) return CastErrors.NotFound;
             if (p.Level < spell.LevelReq) return CastErrors.LevelTooLow;
@@ -114,6 +137,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                 {
                     if (!ValidPoint(targetPos, map)) return CastErrors.InvalidPayload;
                     if (hasLeap) break;
+                    // HU-033 CA4 / HU-086 CA7b: tope de marcas en el suelo por instancia (rendimiento del cliente y del servidor).
+                    if (!spell.IsInstant && ActiveAreas(map) >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
                     if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
                     if (!LineOfSight.Has(map.Data.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
                     // LineOfSight no mira la casilla de destino: apuntar dentro de un muro alcanzaría a quien está detrás.
@@ -179,7 +204,13 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     {
         ResolveImpacts(map, ctx);
         _casting.Clear();
-        foreach (var a in map.Actors.Values) if (a.Combat.Cast is not null) _casting.Add(a);
+        _flying.Clear();
+        foreach (var a in map.Actors.Values)
+        {
+            if (a.Combat.Cast is not null) _casting.Add(a);
+            if (a.Combat.Flight is not null) _flying.Add(a);
+        }
+        foreach (var a in _flying) AdvanceFlight(a, map, ctx);
         foreach (var caster in _casting)
         {
             var cast = caster.Combat.Cast;
@@ -223,11 +254,50 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         {
             var travelMs = (long)Math.Round(Vec2.Distance(caster.Position, target.Position) / proj.Speed * 1000);
             if (!_impacts.TryGetValue(map.Id, out var list)) _impacts[map.Id] = list = new List<PendingImpact>();
-            if (list.Count >= ctx.Rules.Limits.MaxPendingImpactsPerInstance) list.RemoveAt(0);
+            if (list.Count >= ctx.Rules.Limits.MaxPendingImpactsPerInstance)
+            {
+                // Tope de seguridad: el más antiguo se resuelve ya en vez de perderse (su lanzador ya pagó el coste).
+                var oldest = list[0];
+                list.RemoveAt(0);
+                if (oldest.TargetId is not { } oid || map.Find(oid) is { IsDead: false }) effects.Apply(oldest.Caster, oldest.Spell, oldest.TargetId, oldest.TargetPos, oldest.Origin, map, ctx);
+            }
             list.Add(new PendingImpact(ctx.NowMs + travelMs, caster, spell, targetId, targetPos, origin));
             return;
         }
+        // HU-087 CA1: un salto con `travelMs` vuela hasta el punto (recortado ya ahora, con colisión y LOS) y resuelve al aterrizar.
+        if (LeapOf(spell) is { TravelMs: > 0 } leap && targetPos is { } aim)
+        {
+            var dest = ForcedMovement.LeapDestination(caster.Position, aim, leap.MaxRange > 0 ? leap.MaxRange : spell.Range, map.Data.Collision);
+            var end = ctx.NowMs + leap.TravelMs;
+            caster.Combat.Flight = new LeapFlight(spell, caster.Position, dest, ctx.NowMs, end);
+            caster.Combat.AbilityLockEndsAtMs = Math.Max(caster.Combat.AbilityLockEndsAtMs, end); // en el aire ni se castea ni se pega
+            return;
+        }
         effects.Apply(caster, spell, targetId, targetPos, origin, map, ctx);
+    }
+
+    private static EffectDef? LeapOf(SpellDef spell)
+    {
+        foreach (var e in spell.Effects) if (e.Type == EffectType.Leap) return e;
+        return null;
+    }
+
+    /// <summary>Mueve al saltador en línea recta hacia su destino; al llegar, aplica los efectos del hechizo en el punto de llegada.</summary>
+    private void AdvanceFlight(Actor a, MapInstance map, TickContext ctx)
+    {
+        // El aterrizaje de otro en este mismo tick puede haberlo anulado (p. ej. termina el duelo y ResetTransient).
+        if (a.Combat.Flight is not { } f) return;
+        if (a.IsDead) { a.Combat.Flight = null; return; }
+        if (a is Player p) p.Dirty = true;
+        if (ctx.NowMs >= f.EndMs)
+        {
+            a.Position = f.To;
+            a.Combat.Flight = null;
+            effects.Apply(a, f.Spell, null, f.To, f.To, map, ctx); // ya está en el destino: el salto del efecto no lo mueve más
+            return;
+        }
+        var t = (float)(ctx.NowMs - f.StartMs) / (f.EndMs - f.StartMs);
+        a.Position = f.From + (f.To - f.From) * t; // la recta ya se validó al despegar (casillas libres con LOS)
     }
 
     private void ResolveImpacts(MapInstance map, TickContext ctx)

@@ -2,6 +2,7 @@ using PixelRealms.Content.Defs;
 using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Entities;
+using PixelRealms.Game.Items;
 using PixelRealms.Game.Tests.Helpers;
 using Shouldly;
 using Xunit;
@@ -223,6 +224,43 @@ public sealed class CastSystemTests
 
         w.Combat.Death.Kill(ana, slime, w.Map, w.Begin());
         Cast(w, "mage_fireball", slime.Id).ShouldBe(CastErrors.IsDead);            // is_dead
+    }
+
+    [Fact]
+    public void GroundArea_AtTheInstanceLimit_IsAreaLimit() // HU-033 CA4, HU-086 CA7b
+    {
+        using var tmp = new TempContent();
+        tmp.Patch("rules.json", n => n["limits"]!["maxAreasPerInstance"] = 1);
+        var content = PixelRealms.Content.ContentLoader.LoadOrThrow(tmp.Path);
+        var w = new WorldBuilder(content).WithMap(40, 40).WithPlayer("Ana", "mage", 5, (10, 10)).WithPlayer("Bob", "mage", 5, (10, 14))
+            .WithMonster("slime", (14, 12), wanderRadius: 0).BuildWithCombat();
+        var burst = w.Content.Spell("mage_flame_burst"); // 1,5 s de casteo: su marca cuenta mientras dura
+        w.Combat.Casts.TryBeginCast(w.Player("Ana"), burst, null, new Vec2(13, 12), w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Casts.ActiveAreas(w.Map).ShouldBe(1);
+        w.Combat.Casts.TryBeginCast(w.Player("Bob"), burst, null, new Vec2(13, 12), w.Map, w.Begin()).ShouldBe(CastErrors.AreaLimit);
+        TickRunner.RunMs(w, burst.CastMs + 50); // la primera termina: hay sitio otra vez
+        w.Combat.Casts.ActiveAreas(w.Map).ShouldBe(0);
+        w.Combat.Casts.TryBeginCast(w.Player("Bob"), burst, null, new Vec2(13, 12), w.Map, w.Begin()).ShouldBeNull();
+    }
+
+    [Fact]
+    public void PlayerCast_ItemOrMonsterSpell_IsNotFound_ButTheItemStillWorksThroughUseItem()
+    {
+        // Cliente tramposo: CastSpell con el hechizo de la poción (cura sin recarga ni consumo) o con uno de monstruo.
+        var w = Arena(level: 3);
+        var ana = w.Player("Ana"); var slime = w.Monster("slime");
+        ana.Hp = 10;
+        Cast(w, "item_minor_heal", ana.Id).ShouldBe(CastErrors.NotFound);
+        Cast(w, "item_minor_mana", ana.Id).ShouldBe(CastErrors.NotFound);
+        Cast(w, "lich_shadow_bolt", slime.Id).ShouldBe(CastErrors.NotFound);
+        Cast(w, "foreman_rally").ShouldBe(CastErrors.NotFound);
+        ana.Hp.ShouldBe(10);
+
+        var potion = ItemInstance.New("minor_healing_potion", 1);
+        ana.Inventory.Bag[0] = potion;
+        w.Combat.ItemUse.Use(ana, potion.Id, w.Map, w.Begin()).ShouldBeNull();
+        ana.Hp.ShouldBeGreaterThan(10);
+        ana.Inventory.Bag[0].ShouldBeNull();
     }
 
     [Fact]

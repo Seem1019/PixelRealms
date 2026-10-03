@@ -148,6 +148,36 @@ public sealed class AuraSystemTests
     }
 
     [Fact]
+    public void StatAura_OnAPlayer_RecalculatesAndSendsStatsUpdate_OnApplyAndOnExpiry() // HU-042 CA3
+    {
+        var w = Arena();
+        var bob = w.Player("Bob");
+        // Ninguna aura del contenido de la Fase 1 cambia stats primarios: se construye una de prueba (+10 aguante).
+        var fortitude = w.Content.Aura("rogue_sprint_aura") with { Id = "test_fortitude", Mods = new AuraMods { Stats = new Stats { Sta = 10 } } };
+        var maxHpBefore = w.Combat.Services.StatsOf(bob).MaxHp;
+        var ctx = w.Begin();
+        w.Combat.Auras.Apply(bob, fortitude, bob, w.Map, ctx);
+        ctx.Events.OfType<PixelRealms.Game.Progression.StatsChangedEvent>().ShouldContain(e => e.Player == bob);
+        w.Combat.Services.StatsOf(bob).MaxHp.ShouldBeGreaterThan(maxHpBefore);
+        TickRunner.RunMs(w, fortitude.DurationMs + 50).OfType<PixelRealms.Game.Progression.StatsChangedEvent>().ShouldContain(e => e.Player == bob);
+        w.Combat.Services.StatsOf(bob).MaxHp.ShouldBe(maxHpBefore);
+    }
+
+    [Fact]
+    public void DamageModifiers_DoNotStack_TheStrongestRules_AndTheOtherIsNotDominant() // ADR-022, HU-038 CA4b
+    {
+        var w = Arena();
+        var bob = w.Player("Bob");
+        var block = w.Content.Aura("warrior_shield_block_aura"); // damageTakenPct −0,5
+        var weaker = block with { Id = "test_small_guard", Mods = new AuraMods { DamageTakenPct = -0.2 } };
+        var a1 = w.Combat.Auras.Apply(bob, block, bob, w.Map, w.Begin())!;
+        var a2 = w.Combat.Auras.Apply(bob, weaker, bob, w.Map, w.Begin())!;
+        bob.Auras.DamageTakenMultiplier().ShouldBe(0.5, 1e-9); // no 0,3: no se suman
+        bob.Auras.IsDominant(a1).ShouldBeTrue();
+        bob.Auras.IsDominant(a2).ShouldBeFalse(); // se muestra en gris
+    }
+
+    [Fact]
     public void Caps_16Buffs_NewOneReplacesShortest_DebuffsSeparate_ControlsDontCount() // CA7, CA8
     {
         var w = Arena();

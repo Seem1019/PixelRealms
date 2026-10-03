@@ -14,5 +14,5 @@ public static class CombatMovementRules
         return (float)mult;
     }
 
-    public static bool IsImmobilized(Actor actor) => actor.IsDead || actor.Auras.IsStunned || actor.Auras.IsRooted;
+    public static bool IsImmobilized(Actor actor) => actor.IsDead || actor.Auras.IsStunned || actor.Auras.IsRooted || actor.Combat.Flight is not null;
 }

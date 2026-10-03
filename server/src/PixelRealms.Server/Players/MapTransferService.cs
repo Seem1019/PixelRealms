@@ -1,3 +1,4 @@
+using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Entities;
 using PixelRealms.Game.Interest;
@@ -50,6 +51,13 @@ public sealed class MapTransferService(World world, InterestSystem interest, Con
         }
         if (to.Data.Collision.IsSolidAt(position.X, position.Y)) position = to.Data.DefaultGraveyard.Position;
 
+        // Un casteo o un salto llevan objetivo y coordenadas del mapa de origen: no pueden terminar en el de destino.
+        if (player.Combat.Cast is { } cast)
+        {
+            player.Combat.Cast = null;
+            if (player.ConnectionId >= 0) connections.Send(player.ConnectionId, new CastEnded(player.Id.Value, cast.Spell.Id, CastResults.Cancelled, null));
+        }
+        player.Combat.Flight = null;
         interest.ForgetEntity(from, player.Id, InterestSystem.ReasonLeft, ctx);
         from.Remove(player.Id);
         player.Position = position;

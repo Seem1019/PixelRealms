@@ -51,6 +51,8 @@ public sealed class PortalSystem : IMapSystem
         if (map.Data.Portals.Count == 0) return;
         foreach (var player in map.Players.Values)
         {
+            // En pleno salto (HU-087) no se cruza: el vuelo lleva coordenadas de este mapa. Se evalúa al aterrizar.
+            if (player.Combat.Flight is not null) continue;
             PortalDef? portal = null;
             if (player.RequestedPortalId is { } requested)
             {
