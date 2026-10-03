@@ -21,6 +21,11 @@ public sealed class DuelSession(Player a, Player b, string ruleset, long request
     /// <summary>Punto medio al activarse: quien se aleja más de él pierde por distancia.</summary>
     public Vec2 Center { get; set; }
 
+    /// <summary>Vida y recurso de cada uno al activarse: al terminar vuelven a esto, no al máximo (el duelo no cura ni hiere).</summary>
+    public (int Hp, int Resource) StartA { get; set; }
+
+    public (int Hp, int Resource) StartB { get; set; }
+
     public bool Involves(Player p) => ReferenceEquals(p, A) || ReferenceEquals(p, B);
     public Player Opponent(Player p) => ReferenceEquals(p, A) ? B : A;
 }
@@ -66,6 +71,9 @@ public sealed class PvpService(AuraSystem auras)
         if (!rules.EnabledRulesets.Contains(ruleset) || !rules.Rulesets.TryGetValue(ruleset, out var rs)) return "pvp_not_allowed";
         if (ReferenceEquals(from, to) || from.MapInstanceId != to.MapInstanceId) return "invalid_target";
         if (from.IsDead || to.IsDead) return "is_dead";
+        // El final del duelo restaura vida y recurso: retar en pleno combate sería una cura completa (y los monstruos sueltan a
+        // los duelistas). Solo se reta fuera de combate.
+        if (InCombat(from, ctx) || InCombat(to, ctx)) return "in_combat";
         if (DuelOf(from) is not null || DuelOf(to) is not null) return "duel_busy";
         if (InTrade(from) || InTrade(to)) return "trade_busy";
         if (!rs.AllowedInSafeZones && (map.Data.IsSafeZone(from.Position) || map.Data.IsSafeZone(to.Position))) return "pvp_not_allowed";
@@ -89,16 +97,18 @@ public sealed class PvpService(AuraSystem auras)
             Remove(map, duel);
             return null;
         }
-        // Entre el reto y la respuesta pueden pasar 30 s: muerto, en otro mapa o comerciando ya no vale (al terminar el duelo
-        // se restauraría a un muerto, o el duelo seguiría en un mapa donde ya no está).
+        // Entre el reto y la respuesta pueden pasar 30 s: muerto, en otro mapa, comerciando, en combate o lejos ya no vale (al
+        // terminar el duelo se restauraría a un muerto o a alguien a mitad de una pelea, o el duelo seguiría en otro mapa).
         var invalid = duel.A.IsDead || duel.B.IsDead ? "is_dead"
             : duel.A.MapInstanceId != duel.B.MapInstanceId ? "invalid_target"
-            : InTrade(duel.A) || InTrade(duel.B) ? "trade_busy" : null;
+            : InTrade(duel.A) || InTrade(duel.B) ? "trade_busy"
+            : InCombat(duel.A, ctx) || InCombat(duel.B, ctx) ? "in_combat"
+            : Vec2.Distance(duel.A.Position, duel.B.Position) > rs.MaxDistanceTiles ? "out_of_range"
+            : !rs.AllowedInSafeZones && (map.Data.IsSafeZone(duel.A.Position) || map.Data.IsSafeZone(duel.B.Position)) ? "pvp_not_allowed"
+            : null;
         if (invalid is not null)
         {
-            duel.State = DuelState.Ended;
-            ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", invalid));
-            Remove(map, duel);
+            Cancel(duel, invalid, map, ctx);
             return invalid;
         }
         duel.State = DuelState.Countdown;
@@ -111,16 +121,18 @@ public sealed class PvpService(AuraSystem auras)
     {
         var duel = DuelOf(p);
         if (duel is null) return "not_found";
+        // Antes de que empiece no hay nada que ganar ni que restaurar: rendirse retira el reto (retar y rendirse curaba al 100 %).
+        if (duel.State != DuelState.Active) { Cancel(duel, "forfeit", map, ctx); return null; }
         End(duel, duel.Opponent(p), "forfeit", map, ctx);
         return null;
     }
 
-    /// <summary>Desconexión, portal, muerte fuera del duelo: pierde.</summary>
+    /// <summary>Desconexión, portal, muerte fuera del duelo: pierde. Si aún no había empezado, el reto se retira sin restaurar.</summary>
     public void Abandon(Player p, string reason, MapInstance map, TickContext ctx)
     {
         var duel = DuelOf(p);
         if (duel is null) return;
-        if (duel.State == DuelState.Requested) { duel.State = DuelState.Ended; ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", reason)); Remove(map, duel); return; }
+        if (duel.State != DuelState.Active) { Cancel(duel, reason, map, ctx); return; }
         End(duel, duel.Opponent(p), reason, map, ctx);
     }
 
@@ -129,7 +141,11 @@ public sealed class PvpService(AuraSystem auras)
     {
         if (target is not Player tp || source is not Player sp) return dmg;
         var duel = DuelOf(tp);
-        if (duel is null || duel.State != DuelState.Active || !duel.Involves(sp)) return dmg;
+        if (duel is null || duel.State != DuelState.Active) return dmg;
+        // Un DoT cuyo lanzador ya salió del mapa llega con la víctima como origen (AuraSystem): cuenta como daño del rival, no
+        // como una victoria de la víctima sobre sí misma.
+        if (ReferenceEquals(sp, tp)) sp = duel.Opponent(tp);
+        if (!duel.Involves(sp)) return dmg;
         var rs = ctx.Rules.Pvp.Rulesets[duel.Ruleset];
         var floor = Math.Max(1, (int)Math.Ceiling(tp.MaxHp * rs.EndAtHpPct));
         var allowed = Math.Max(0, tp.Hp - floor);
@@ -146,13 +162,18 @@ public sealed class PvpService(AuraSystem auras)
         var rs = ctx.Rules.Pvp.Rulesets[duel.Ruleset];
         if (rs.RestoreOnEnd)
         {
+            // Cada uno vuelve a la vida y el recurso con que empezó y pierde lo que le puso el rival. Restaurar al máximo convertía
+            // el duelo en una posada gratis (retar a un alt y rendirse) y en una cura completa a mitad de una pelea.
             foreach (var p in new[] { duel.A, duel.B })
             {
                 if (p.IsDead) continue; // un muerto no resucita por terminar el duelo: pasa por Respawn como siempre
-                // El daño que termina el duelo todavía no se ha restado: se restaura después igualmente.
-                p.Hp = p.MaxHp + (ReferenceEquals(p, duel.Opponent(winner)) ? applyAfterDamage : 0);
-                p.Resource = p.MaxResource;
-                auras.ClearAll(p, map, ctx);
+                var start = ReferenceEquals(p, duel.A) ? duel.StartA : duel.StartB;
+                // El daño que termina el duelo todavía no se ha restado: se compensa para que quede exactamente en `start`.
+                p.Hp = Math.Clamp(start.Hp, 1, p.MaxHp) + (ReferenceEquals(p, duel.Opponent(winner)) ? applyAfterDamage : 0);
+                p.Resource = Math.Clamp(start.Resource, 0, p.MaxResource);
+                var opponentId = duel.Opponent(p).Id;
+                foreach (var aura in p.Auras.All.ToList())
+                    if (aura.CasterId == opponentId) auras.Remove(p, aura, map, ctx);
                 p.Combat.ResetTransient();
                 p.Dirty = true;
             }
@@ -160,6 +181,16 @@ public sealed class PvpService(AuraSystem auras)
         ctx.Emit(new DuelChangedEvent(map.Id, duel, "ended", reason));
         Remove(map, duel);
     }
+
+    /// <summary>Retira un reto o una cuenta atrás: nadie gana y nadie se restaura.</summary>
+    private void Cancel(DuelSession duel, string reason, MapInstance map, TickContext ctx)
+    {
+        duel.State = DuelState.Ended;
+        ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", reason));
+        Remove(map, duel);
+    }
+
+    private static bool InCombat(Player p, TickContext ctx) => p.IsInCombat(ctx.NowMs, ctx.Rules.Combat.InCombatWindowSec);
 
     private void Remove(MapInstance map, DuelSession duel)
     {
@@ -176,18 +207,19 @@ public sealed class PvpService(AuraSystem auras)
             switch (duel.State)
             {
                 case DuelState.Requested or DuelState.Countdown when duel.A.IsDead || duel.B.IsDead || duel.A.MapInstanceId != map.Id || duel.B.MapInstanceId != map.Id:
-                    duel.State = DuelState.Ended;
-                    ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", duel.A.IsDead || duel.B.IsDead ? "died" : "left_map"));
-                    Remove(map, duel);
+                    Cancel(duel, duel.A.IsDead || duel.B.IsDead ? "died" : "left_map", map, ctx);
                     break;
                 case DuelState.Requested when ctx.NowMs - duel.RequestedAtMs > rs.RequestExpireSec * 1000:
-                    duel.State = DuelState.Ended;
-                    ctx.Emit(new DuelChangedEvent(map.Id, duel, "declined", "expired"));
-                    Remove(map, duel);
+                    Cancel(duel, "expired", map, ctx);
+                    break;
+                case DuelState.Countdown when InCombat(duel.A, ctx) || InCombat(duel.B, ctx):
+                    Cancel(duel, "in_combat", map, ctx); // un monstruo los ataca durante la cuenta atrás
                     break;
                 case DuelState.Countdown when ctx.NowMs >= duel.StartsAtMs:
                     duel.State = DuelState.Active;
                     duel.Center = (duel.A.Position + duel.B.Position) * 0.5f;
+                    duel.StartA = (duel.A.Hp, duel.A.Resource);
+                    duel.StartB = (duel.B.Hp, duel.B.Resource);
                     ctx.Emit(new DuelChangedEvent(map.Id, duel, "active", null));
                     break;
                 case DuelState.Active:
@@ -195,7 +227,9 @@ public sealed class PvpService(AuraSystem auras)
                     if (duel.B.MapInstanceId != map.Id) { End(duel, duel.A, "left_map", map, ctx); break; }
                     if (duel.A.IsDead) { End(duel, duel.B, "died", map, ctx); break; }
                     if (duel.B.IsDead) { End(duel, duel.A, "died", map, ctx); break; }
-                    if (Vec2.Distance(duel.A.Position, duel.B.Position) > rs.MaxDistanceTiles)
+                    // Lejos del rival o del punto de inicio: sin el segundo, los dos podían viajar juntos ignorados por los monstruos.
+                    if (Vec2.Distance(duel.A.Position, duel.B.Position) > rs.MaxDistanceTiles
+                        || Vec2.Distance(duel.A.Position, duel.Center) > rs.MaxDistanceTiles || Vec2.Distance(duel.B.Position, duel.Center) > rs.MaxDistanceTiles)
                     {
                         // Pierde quien se alejó: el más lejos del punto medio inicial.
                         var loser = Vec2.Distance(duel.A.Position, duel.Center) >= Vec2.Distance(duel.B.Position, duel.Center) ? duel.A : duel.B;

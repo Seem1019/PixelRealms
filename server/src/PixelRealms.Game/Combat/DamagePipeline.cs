@@ -63,7 +63,12 @@ public sealed class DamagePipeline(CombatServices services)
         target.Hp += effective;
         ctx.Emit(new CombatHitEvent(map.Id, source, target, spellId, HitKinds.Heal, effective, crit, School.Magic));
         if (target is Player tp) tp.Dirty = true;
-        if (source is Player healer) healer.LastActionAtMs = ctx.NowMs;
+        if (source is Player healer)
+        {
+            healer.LastActionAtMs = ctx.NowMs;
+            // Curar a alguien que pelea mete al sanador en combate (no puede retar a duelo, salir ni cruzar portales a mitad).
+            if (!ReferenceEquals(healer, target) && target.IsInCombat(ctx.NowMs, ctx.Rules.Combat.InCombatWindowSec)) healer.EnterCombat(ctx.NowMs);
+        }
         if (effective > 0 && source is not Monster)
         {
             var threat = effective * ctx.Rules.Combat.ThreatPerHeal;

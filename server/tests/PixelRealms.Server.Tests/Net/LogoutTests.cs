@@ -146,7 +146,8 @@ public sealed class LogoutTests
 
             await ana.SendAsync("Logout");
             await ana.ExpectAsync("LoggedOut");
-            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended");
+            // En la cuenta atrás el duelo aún no empezó: se retira (declined) y nadie gana ni se restaura.
+            await cal.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "declined");
             await ana.DisposeAsync(); await cal.DisposeAsync();
         }
     }

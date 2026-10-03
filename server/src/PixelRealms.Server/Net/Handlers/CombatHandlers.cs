@@ -81,6 +81,8 @@ public sealed class AutoAttackHandler(CombatHandlerDeps deps) : IMessageHandler<
         if (!msg.On) { player.Combat.AutoAttackOn = false; return; }
         if (player.IsDead) { ctx.SendError(ErrorCodes.IsDead); return; }
         var target = player.Combat.TargetId is { } id ? map.Find(id) : null;
+        // HU-064 CA6: a otro jugador solo en duelo.
+        if (target is Game.Entities.Player && !ReferenceEquals(target, player) && !target.IsDead && !deps.Combat.Services.IsEnemy(player, target)) { ctx.SendError(ErrorCodes.PvpNotAllowed); return; }
         if (target is null || target.IsDead || !deps.Combat.Services.IsEnemy(player, target)) { ctx.SendError(ErrorCodes.InvalidTarget); return; }
         if (deps.Combat.AutoAttack.SwingMs(player) is null) { ctx.SendError(ErrorCodes.InvalidTarget, message: "Necesitas un arma"); return; }
         player.Combat.AutoAttackOn = true;

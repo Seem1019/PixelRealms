@@ -180,7 +180,7 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
                 {
                     ApplyTick(actor, a, map, ctx);
                     a.NextTickAtMs += a.Def.TickMs;
-                    if (actor.IsDead) break;
+                    if (actor.IsDead || !auras.Contains(a)) break; // el tick pudo quitarla (fin de duelo): no seguir aplicándola
                 }
                 if (actor.IsDead) break;
             }
@@ -200,7 +200,8 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
             {
                 // Los ticks no fallan ni critican; el DoT físico usa la mitigación fijada al aplicarse.
                 var school = a.Def.School ?? School.Magic;
-                var amount = (int)Math.Round(school == School.Physical ? perTick * (1 - a.Mitigation) : perTick, MidpointRounding.AwayFromZero);
+                var advantage = caster is null ? 1.0 : EffectResolver.ClassAdvantage(caster, target, ctx); // HU-064 CA2: también en duelo
+                var amount = (int)Math.Round((school == School.Physical ? perTick * (1 - a.Mitigation) : perTick) * advantage, MidpointRounding.AwayFromZero);
                 damage.Deal(source, target, amount, school, false, a.AuraId, map, ctx);
                 break;
             }

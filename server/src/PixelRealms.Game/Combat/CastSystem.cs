@@ -24,6 +24,7 @@ public static class CastErrors
     public const string NoLos = "no_los";
     public const string InvalidPayload = "invalid_payload";
     public const string AreaLimit = "area_limit";
+    public const string PvpNotAllowed = "pvp_not_allowed";
     public const string Forbidden = "forbidden";
 }
 
@@ -109,6 +110,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
             case Targeting.Enemy:
             {
                 target = targetId is { } id ? map.Find(id) : null;
+                // HU-064 CA6: a otro jugador solo se le ataca en duelo; fuera de él, pvp_not_allowed (no un objetivo inválido sin más).
+                if (target is Player && caster is Player && !ReferenceEquals(target, caster) && !target.IsDead && !services.IsEnemy(caster, target)) return CastErrors.PvpNotAllowed;
                 if (target is null || target.IsDead || target.Combat.Evading || !services.IsEnemy(caster, target)) return CastErrors.InvalidTarget;
                 if (Vec2.Distance(caster.Position, target.Position) > spell.Range + tolerance) return CastErrors.OutOfRange;
                 if (dash is not null && Vec2.Distance(caster.Position, target.Position) < dash.MinRange) return CastErrors.OutOfRange;

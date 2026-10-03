@@ -93,8 +93,8 @@ public sealed class AutoAttackSystem(CombatServices services, DamagePipeline dam
         var variance = CombatCalculator.RollVariance(ctx.Rng, rules);
         var raw = CombatCalculator.BasicAttackRaw(roll, affinity, power, swingMs, rules);
         var dmg = school == School.Physical
-            ? CombatCalculator.PhysicalDamage(raw, CombatCalculator.Mitigation(targetStats.Armor, attacker.Level, rules), crit, variance, 1.0, rules)
-            : CombatCalculator.MagicDamage(raw, crit, variance, 1.0, rules);
+            ? CombatCalculator.PhysicalDamage(raw, CombatCalculator.Mitigation(targetStats.Armor, attacker.Level, rules), crit, variance, EffectResolver.ClassAdvantage(attacker, target, ctx), rules)
+            : CombatCalculator.MagicDamage(raw, crit, variance, EffectResolver.ClassAdvantage(attacker, target, ctx), rules);
         damage.Deal(attacker, target, dmg, school, crit, null, map, ctx);
 
         // Maná por básico que impacta (ADR-014): cualquier arma, normalizado por swingMs.

@@ -79,6 +79,9 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
                 // ground_aoe_all: positivos a aliados, negativos a enemigos; nadie recibe ambos.
                 if (spell.Targeting == Targeting.GroundAoeAll && IsNegative(e) != isEnemy) continue;
                 if (target.IsDead) break;
+                // Un efecto anterior puede haber terminado un duelo: el resto de perjuicios ya no alcanza al ex-rival (un aturdimiento
+                // o un DoT sin el recorte del duelo podrían matarlo de verdad).
+                if (IsNegative(e) && isEnemy && !services.IsEnemy(caster, target)) break;
                 ApplyEffect(e, caster, target, spell, casterStats, crit, map, ctx);
             }
         }
@@ -147,10 +150,10 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
         }
     }
 
-    /// <summary>`rules.classAdvantage` solo entre jugadores (PvP); 1.0 en el resto.</summary>
-    private static double ClassAdvantage(Actor caster, Actor target, TickContext ctx)
+    /// <summary>`rules.classAdvantage` solo entre jugadores (PvP); 1.0 en el resto. Lo usan también el básico y los DoT (HU-064 CA2).</summary>
+    public static double ClassAdvantage(Actor caster, Actor target, TickContext ctx)
     {
-        if (caster is Player a && target is Player b && ctx.Rules.ClassAdvantage.TryGetValue(a.ClassId, out var row) && row.TryGetValue(b.ClassId, out var mult)) return mult;
+        if (caster is Player a && target is Player b && !ReferenceEquals(a, b) && ctx.Rules.ClassAdvantage.TryGetValue(a.ClassId, out var row) && row.TryGetValue(b.ClassId, out var mult)) return mult;
         return 1.0;
     }
 }

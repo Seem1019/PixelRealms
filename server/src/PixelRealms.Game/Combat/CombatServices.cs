@@ -101,11 +101,12 @@ public sealed class CombatServices(Func<ContentDb> content)
         return a.Kind != b.Kind && (a is Player || b is Player);
     }
 
-    /// <summary>Aliados: mismo bando (incluye a uno mismo). Los NPC no son aliados de nadie.</summary>
+    /// <summary>Aliados: mismo bando (incluye a uno mismo). Los NPC no son aliados de nadie. Un duelista en duelo activo no es
+    /// aliado de nadie más ni nadie lo es de él: un tercero no lo cura ni él cura al grupo mientras los monstruos lo ignoran.</summary>
     public bool IsAlly(Actor a, Actor b)
     {
         if (ReferenceEquals(a, b)) return true;
-        if (a is Player pa && b is Player pb) return !PvpCanAttack(pa, pb);
+        if (a is Player pa && b is Player pb) return !InDuel(pa) && !InDuel(pb) && !PvpCanAttack(pa, pb);
         return a is Monster && b is Monster;
     }
 }
