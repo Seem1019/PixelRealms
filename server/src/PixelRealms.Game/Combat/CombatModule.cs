@@ -50,7 +50,8 @@ public sealed class CombatModule
         Services.InDuel = Pvp.InActiveDuel;
         Damage.DuelClamp = Pvp.ClampDamage;
         Ai.CanBeAggroed = p => !p.IsDead && !Pvp.InActiveDuel(p);
-        ClassChange.IsBusy = p => Pvp.DuelOf(p) is not null || Trades.TradeOf(p) is not null;
+        ClassChange.InDuel = p => Pvp.DuelOf(p) is not null;
+        ClassChange.InTrade = p => Trades.TradeOf(p) is not null;
         Trades.InDuel = p => Pvp.DuelOf(p) is not null;
         Pvp.InTrade = p => Trades.TradeOf(p) is not null;
         Progression.XpRecipients = GroupRecipients;

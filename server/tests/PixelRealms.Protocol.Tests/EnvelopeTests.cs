@@ -62,8 +62,8 @@ public sealed class EnvelopeTests
         MessageRegistry.ClientMessageNames.ShouldContain("MoveInput");
         MessageRegistry.ServerMessageNames.ShouldContain("CombatEvents");
         MessageRegistry.ServerMessageNames.ShouldNotContain("CombatEvent");
-        MessageRegistry.ClientMessageNames.Count.ShouldBe(35);
-        MessageRegistry.ServerMessageNames.Count.ShouldBe(25);
+        MessageRegistry.ClientMessageNames.Count.ShouldBe(36); // + OnlineListRequest (HU-063)
+        MessageRegistry.ServerMessageNames.Count.ShouldBe(26); // + OnlineList (HU-063)
     }
 
     [Fact]
@@ -81,5 +81,13 @@ public sealed class EnvelopeTests
         r.Message.ShouldBeOfType<Logout>().ReqId.ShouldBe(4);
         MessageRegistry.Decode("""{"t":"Logout","d":{}}""").Message.ShouldBeOfType<Logout>().ReqId.ShouldBeNull();
         MessageRegistry.EncodeToString(new LoggedOut()).ShouldBe("""{"t":"LoggedOut","d":{}}""");
+    }
+
+    [Fact]
+    public void OnlineListRequest_Decodes_AndOnlineList_EncodesExactJson() // HU-063
+    {
+        MessageRegistry.Decode("""{"t":"OnlineListRequest","d":{}}""").Message.ShouldBeOfType<OnlineListRequest>();
+        MessageRegistry.EncodeToString(new OnlineList([new OnlinePlayerDto("Ana", "mage", 4, "Campos")]))
+            .ShouldBe("""{"t":"OnlineList","d":{"players":[{"name":"Ana","classId":"mage","level":4,"zone":"Campos"}]}}""");
     }
 }

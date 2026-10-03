@@ -15,7 +15,9 @@ public sealed record ClassChangedEvent(int MapInstanceId, Player Player, string 
 /// </summary>
 public sealed class ClassChangeService(CombatServices services)
 {
-    public Func<Player, bool> IsBusy { get; set; } = static _ => false;
+    public Func<Player, bool> InDuel { get; set; } = static _ => false;
+
+    public Func<Player, bool> InTrade { get; set; } = static _ => false;
 
     public bool IsAvailable(IRules rules) => rules.World.CurrentPhase <= rules.Progression.ClassChange.NpcUntilPhase;
 
@@ -27,7 +29,8 @@ public sealed class ClassChangeService(CombatServices services)
         if (Vec2.Distance(p.Position, npc.Position) > rules.Economy.VendorRangeTiles) return "out_of_range";
         if (p.IsDead) return "is_dead";
         if (p.IsInCombat(ctx.NowMs, rules.Combat.InCombatWindowSec)) return "in_combat";
-        if (IsBusy(p)) return "duel_busy";
+        if (InDuel(p)) return "duel_busy";
+        if (InTrade(p)) return "trade_busy"; // HU-044 CA3: cada caso con su código
         if (!services.Content.TryGetClass(classId, out var cls) || cls is null) return "invalid_payload";
         if (p.ClassId == classId) return "invalid_payload";
 

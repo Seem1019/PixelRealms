@@ -68,6 +68,32 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void Party_MaxFiveMembers_LeaderLeavingHandsOver_AndAStaleInviteIsRefused() // HU-061 CA2, CA3
+    {
+        var w = new WorldBuilder().WithMap(60, 60).WithPlayer("P1", "warrior", 5, (10, 10)).WithPlayer("P2", "mage", 5, (11, 10))
+            .WithPlayer("P3", "priest", 5, (12, 10)).WithPlayer("P4", "rogue", 5, (13, 10)).WithPlayer("P5", "mage", 5, (14, 10))
+            .WithPlayer("P6", "priest", 5, (15, 10)).WithPlayer("Zed", "rogue", 5, (16, 10)).BuildWithCombat();
+        var rules = w.Content.Rules.Group;
+        rules.MaxMembers.ShouldBe(5);
+        var party = MakeParty(w, "P1", "P2", "P3", "P4", "P5");
+        party.Members.Count.ShouldBe(5);
+        w.Combat.Parties.Invite(w.Player("P1"), w.Player("P6"), 0, rules).ShouldBe("forbidden"); // lleno: el 6.º no entra
+
+        // El líder se va con ≥ 3: hereda el siguiente y el grupo sigue.
+        var (after, disbanded, _) = w.Combat.Parties.Leave(w.Player("P1").CharacterId);
+        disbanded.ShouldBeFalse();
+        after!.Leader.ShouldBe(w.Player("P2").CharacterId);
+        after.Members.Count.ShouldBe(4);
+
+        // Invitación vieja: Zed invitó a P6 y luego Zed entró en el grupo de P2; aceptar no mete a P6 sin permiso de P2.
+        w.Combat.Parties.Invite(w.Player("Zed"), w.Player("P6"), 0, rules).ShouldBeNull();
+        w.Combat.Parties.Invite(w.Player("P2"), w.Player("Zed"), 0, rules).ShouldBeNull();
+        w.Combat.Parties.Respond(w.Player("Zed"), true, id => w.Map.Players.Values.FirstOrDefault(x => x.CharacterId == id), 0, rules).Error.ShouldBeNull();
+        w.Combat.Parties.Respond(w.Player("P6"), true, id => w.Map.Players.Values.FirstOrDefault(x => x.CharacterId == id), 0, rules).Error.ShouldBe("forbidden");
+        w.Combat.Parties.PartyOf(w.Player("P6").CharacterId).ShouldBeNull();
+    }
+
+    [Fact]
     public void GroupXp_Example_10_8_5_vs_Normal9() // HU-062 CA2b
     {
         var rules = TestContent.Load().Rules;
@@ -460,6 +486,36 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void Chat_AcrossMaps_SayStaysInTheMap_PartyAndGlobalArrive() // HU-027 CA5
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        // Bob cruza a otra instancia (la Mina en el juego real): misma posición, otro mapa.
+        var other = w.World.CreateInstance(w.Map.MapId);
+        w.Map.Remove(bob.Id);
+        other.Add(bob);
+        foreach (var p in new[] { ana, bob }) p.ConnectionId = p.Id.Value;
+        var all = new List<Player> { ana, bob };
+        var party = MakePartyAcrossMaps(w, ana, bob);
+        var ctx = w.Begin();
+        w.Combat.Chat.Send(ana, "say", "hola", null, w.Map, all, _ => party, ctx).ShouldBeNull();
+        ctx.Events.OfType<ChatDeliveredEvent>().Last().Recipients.ShouldNotContain(bob);
+        w.Combat.Chat.Send(ana, "party", "¿dónde estás?", null, w.Map, all, _ => party, ctx).ShouldBeNull();
+        ctx.Events.OfType<ChatDeliveredEvent>().Last().Recipients.ShouldContain(bob);
+        w.Combat.Chat.Send(ana, "global", "a todos", null, w.Map, all, _ => party, ctx).ShouldBeNull();
+        ctx.Events.OfType<ChatDeliveredEvent>().Last().Recipients.ShouldContain(bob);
+    }
+
+    private static Party MakePartyAcrossMaps(TestWorld w, Player leader, Player member)
+    {
+        var rules = w.Content.Rules.Group;
+        w.Combat.Parties.Invite(leader, member, 0, rules).ShouldBeNull();
+        var (party, err) = w.Combat.Parties.Respond(member, true, _ => leader, 0, rules);
+        err.ShouldBeNull();
+        return party!;
+    }
+
+    [Fact]
     public void ClassChange_KeepsLevelItemsGold_ChangesSpellsAndStats_Errors() // HU-044
     {
         var data = new PixelRealms.Game.Map.MapData("t", "T", new PixelRealms.Game.Map.CollisionGrid(40, 40), [], [new PixelRealms.Game.Map.NpcDef("maestro", "Maestro", null, "class_change", new Vec2(12, 10))],
@@ -492,6 +548,22 @@ public sealed class SocialTests
         w.Combat.ClassChange.Change(ana, npc.Id, "rogue", w.Map, w.Begin()).ShouldBe("is_dead");
         var later = TestContent.Load().Rules with { World = TestContent.Load().Rules.World with { CurrentPhase = 3 } };
         w.Combat.ClassChange.IsAvailable(later).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ClassChange_InADuelOrATrade_SaysWhich() // HU-044 CA3: duel_busy / trade_busy (antes ambos daban duel_busy)
+    {
+        var data = new PixelRealms.Game.Map.MapData("t", "T", new PixelRealms.Game.Map.CollisionGrid(40, 40), [], [new PixelRealms.Game.Map.NpcDef("maestro", "Maestro", null, "class_change", new Vec2(12, 10))],
+            [new PixelRealms.Game.Map.GraveyardDef("gy", new Vec2(2, 2))], [], [], "gy");
+        var w = new WorldBuilder().WithMap(data).WithPlayer("Ana", "warrior", 5, (10, 10)).WithPlayer("Bob", "mage", 5, (11, 10)).BuildWithCombat();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var npc = new Npc(w.World.EntityIds.Next(), data.Npcs[0]) { Position = data.Npcs[0].Position };
+        w.Map.Add(npc);
+        w.Combat.Trades.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.ClassChange.Change(ana, npc.Id, "mage", w.Map, w.Begin()).ShouldBe("trade_busy");
+        w.Combat.Trades.CancelBy(ana, "test", w.Map, w.Begin());
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.ClassChange.Change(ana, npc.Id, "mage", w.Map, w.Begin()).ShouldBe("duel_busy");
     }
 
     [Fact]

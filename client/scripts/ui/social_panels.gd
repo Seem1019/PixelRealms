@@ -4,6 +4,8 @@ extends Control
 ## duelo (HU-064), ventana de intercambio (HU-059) y ventana de cambio de clase (HU-044). Todo construido por código.
 
 signal party_member_selected(entity_id: int)
+## HU-063 CA2: "Susurrar" en la lista de conectados (el mundo rellena el chat con "/w Nombre ").
+signal whisper_requested(player_name: String)
 
 var _frames: VBoxContainer
 var _frame_buttons: Array[Button] = []
@@ -24,6 +26,10 @@ const CLASS_WINDOW_WIDTH := 250
 var _class_npc_id: int = -1
 ## Solicitudes que envié yo (el protocolo no distingue quién pidió): no mostrar el diálogo de aceptar.
 var _outgoing: Dictionary = {}  # "duel" | "trade" → ms de envío
+var _online_window: PanelContainer
+var _online_rows: VBoxContainer
+## Ancho de la lista de conectados (HU-063): nombre, clase, nivel y zona en una línea.
+const ONLINE_WINDOW_WIDTH := 230
 
 
 func _ready() -> void:
@@ -47,10 +53,12 @@ func _ready() -> void:
 	add_child(_duel_label)
 	_build_trade()
 	_build_class_window()
+	_build_online_window()
 	GameState.party_changed.connect(_refresh_party)
 	GameState.party_invited.connect(_on_party_invited)
 	GameState.duel_changed.connect(_on_duel)
 	GameState.trade_changed.connect(_on_trade)
+	GameState.online_list_received.connect(_show_online_list)
 	_refresh_party()
 
 
@@ -108,14 +116,28 @@ func _refresh_party() -> void:
 		b.icon = UiTheme.icon("classes/" + str(md.get("classId", "")))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var online := bool(md.get("online", true))
-		b.text = "%s %s nv%d  %d%%%s" % [str(md.get("name", "")), UiText.class_name_of(str(md.get("classId", ""))), int(md.get("level", 0)), int(md.get("hpPct", 0)), "" if online else " (desc.)"]
-		b.tooltip_text = "Mapa: %s" % str(md.get("mapId", "?"))
+		b.text = party_frame_text(md, GameState.map_id)
+		b.tooltip_text = "Mapa: %s" % UiText.map_name(str(md.get("mapId", "?")))
 		b.modulate = Color.WHITE if online else Color(0.6, 0.6, 0.6)
 		var ent: Variant = md.get("entityId")
 		if ent != null:
 			b.pressed.connect(func() -> void: party_member_selected.emit(int(ent)))
 		_frames.add_child(b)
 		_frame_buttons.append(b)
+
+
+## Texto del marco de un compañero (HU-062 CA1): nombre, clase, nivel, vida y recurso en %; su mapa si no es el mío (HU-027 CA5).
+static func party_frame_text(md: Dictionary, my_map_id: String) -> String:
+	var text := "%s %s nv%d  %d%%" % [str(md.get("name", "")), UiText.class_name_of(str(md.get("classId", ""))), int(md.get("level", 0)), int(md.get("hpPct", 0))]
+	var res: Variant = md.get("resPct")
+	if res != null:
+		text += " · %d%% %s" % [int(res), UiText.resource(str(Content.character_class(str(md.get("classId", ""))).get("resource", ""))).to_lower()]
+	var map_id := str(md.get("mapId", ""))
+	if not map_id.is_empty() and map_id != my_map_id:
+		text += " · %s" % UiText.map_name(map_id)
+	if not bool(md.get("online", true)):
+		text += " (desc.)"
+	return text
 
 
 func _on_party_invited(leader: String) -> void:
@@ -206,8 +228,18 @@ func _build_class_window() -> void:
 	add_child(_class_window)
 
 
+## HU-044 CA4: el maestro de clases solo cambia de clase hasta `progression.classChange.npcUntilPhase` (el servidor responde
+## `forbidden` después; el cliente ni siquiera ofrece la ventana).
+static func class_change_available() -> bool:
+	var until: Variant = (Content.rule("progression", "classChange", {}) as Dictionary).get("npcUntilPhase")
+	return until == null or int(Content.rule("world", "currentPhase", 1)) <= int(until)
+
+
 ## HU-044 CA1: las otras 3 clases con rol, recurso y descripción.
 func open_class_change(npc_id: int) -> void:
+	if not class_change_available():
+		GameState.notice.emit("El maestro de clases ya no enseña otras clases")
+		return
 	_class_npc_id = npc_id
 	for c: Node in _class_window.get_children():
 		_class_window.remove_child(c)
@@ -257,3 +289,87 @@ func _dock_class_window() -> void:
 	_class_window.reset_size()
 	UiTheme.dock(_class_window, Control.PRESET_CENTER)
 	UiTheme.clamp_to_screen(_class_window)
+
+
+# --- Jugadores en línea (HU-063) --------------------------------------------------------------------------------------------
+
+func _build_online_window() -> void:
+	_online_window = PanelContainer.new()
+	_online_window.visible = false
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	_online_window.add_child(v)
+	v.add_child(InventoryWindow.title_row("En línea"))
+	_online_rows = VBoxContainer.new()
+	_online_rows.add_theme_constant_override("separation", 1)
+	v.add_child(_online_rows)
+	var close := Button.new()
+	close.text = "Cerrar"
+	close.pressed.connect(close_online_list)
+	v.add_child(close)
+	add_child(_online_window)
+
+
+## Tecla O (HU-063 CA1): abre la lista pidiéndola al servidor, o la cierra si ya está abierta.
+func toggle_online_list() -> void:
+	if _online_window.visible:
+		close_online_list()
+		return
+	Net.send("OnlineListRequest")
+
+
+func is_online_list_open() -> bool:
+	return _online_window.visible
+
+
+func close_online_list() -> void:
+	_online_window.visible = false
+
+
+## Una fila de la lista: "Ana · Mago · nv 4 · Campos".
+static func online_row_text(p: Dictionary) -> String:
+	return "%s · %s · nv %d · %s" % [str(p.get("name", "")), UiText.class_name_of(str(p.get("classId", ""))), int(p.get("level", 0)), str(p.get("zone", ""))]
+
+
+func _show_online_list(players: Array) -> void:
+	for c: Node in _online_rows.get_children():
+		c.queue_free()
+	for p: Variant in players:
+		var pd: Dictionary = p
+		var player_name := str(pd.get("name", ""))
+		var b := Button.new()
+		b.theme_type_variation = "SmallButton"
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.icon = UiTheme.icon("classes/" + str(pd.get("classId", "")))
+		b.custom_minimum_size = Vector2(ONLINE_WINDOW_WIDTH, 0)
+		b.text = online_row_text(pd)
+		if player_name != GameState.character_name:
+			# HU-063 CA2: clic (o clic derecho) sobre otro jugador → susurrar o invitar al grupo, aunque esté en otro mapa.
+			b.tooltip_text = "Clic: susurrar o invitar"
+			b.button_mask = MOUSE_BUTTON_MASK_LEFT | MOUSE_BUTTON_MASK_RIGHT
+			b.pressed.connect(func() -> void: _open_online_menu(player_name))
+		_online_rows.add_child(b)
+	if players.is_empty():
+		var empty := Label.new()
+		empty.text = "Nadie conectado"
+		_online_rows.add_child(empty)
+	_online_window.visible = true
+	UiTheme.dock(_online_window, Control.PRESET_CENTER)
+	UiTheme.bring_to_front(_online_window)
+
+
+func _open_online_menu(player_name: String) -> void:
+	var menu := PopupMenu.new()
+	menu.add_item("Susurrar", 0)
+	menu.add_item("Invitar al grupo", 1)
+	menu.id_pressed.connect(func(id: int) -> void:
+		match id:
+			0:
+				whisper_requested.emit(player_name)
+				close_online_list()
+			1: Net.send("PartyInvite", {"name": player_name})
+		menu.queue_free())
+	add_child(menu)
+	menu.position = Vector2i(get_viewport().get_mouse_position())
+	menu.popup()
+

@@ -163,8 +163,9 @@ public static class ServerApp
         router.Register(new TradeOfferHandler(combatDeps));
         router.Register(new TradeConfirmHandler(combatDeps));
         router.Register(new TradeCancelHandler(combatDeps));
-        router.Register(new ChangeClassHandler(combatDeps, worldSession));
+        router.Register(new ChangeClassHandler(combatDeps, worldSession, app.Services.GetRequiredService<ILogger<ChangeClassHandler>>()));
         router.Register(new LogoutHandler(worldSession));
+        router.Register(new OnlineListHandler(combatDeps, registry0, worldSession));
         router.Register(new AdminCommandHandler(combatDeps, registry0, app.Services.GetRequiredService<MapTransferService>(), content, app.Services.GetRequiredService<ILogger<AdminCommandHandler>>()));
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
         simulation.OnPreTick(router.Drain);

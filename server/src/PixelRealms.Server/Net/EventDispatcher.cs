@@ -198,7 +198,8 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
             var p = players.ByCharacter(m.CharacterId);
             var online = p is { ConnectionId: >= 0 };
             var hpPct = p is null || p.MaxHp <= 0 ? 0 : (int)Math.Round(100.0 * p.Hp / p.MaxHp);
-            members.Add(new PartyMemberDto(m.Name, p?.Id.Value, p?.ClassId ?? m.ClassId, p?.Level ?? 0, hpPct, online, p is null ? null : session.MapIdOf(p)));
+            int? resPct = p is null || p.MaxResource <= 0 ? null : (int)Math.Round(100.0 * p.Resource / p.MaxResource);
+            members.Add(new PartyMemberDto(m.Name, p?.Id.Value, p?.ClassId ?? m.ClassId, p?.Level ?? 0, hpPct, online, p is null ? null : session.MapIdOf(p), resPct));
         }
         var msg = new PartyUpdate(leaderName, members);
         foreach (var m in party.Members)

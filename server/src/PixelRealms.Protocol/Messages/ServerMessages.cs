@@ -74,7 +74,8 @@ public sealed record VendorWindow(int NpcId, IReadOnlyList<VendorItemDto> Items)
 
 public sealed record ChatMessage(string Channel, string From, string Text, long Ts) : IServerMessage;
 
-public sealed record PartyMemberDto(string Name, int? EntityId, string ClassId, int Level, int HpPct, bool Online, string? MapId);
+/// <summary>`ResPct` (aditivo, HU-062 CA1): recurso del compañero en % (maná, ira o energía según su clase).</summary>
+public sealed record PartyMemberDto(string Name, int? EntityId, string ClassId, int Level, int HpPct, bool Online, string? MapId, int? ResPct = null);
 
 public sealed record PartyUpdate(string Leader, IReadOnlyList<PartyMemberDto> Members) : IServerMessage;
 
@@ -87,6 +88,12 @@ public sealed record Pong(long ClientTime, long ServerTick) : IServerMessage;
 /// <summary>HU-015: respuesta a `Logout` aceptado; el personaje ya está guardado (encolado) y fuera del mundo. Después el
 /// servidor cierra la conexión con motivo "logout".</summary>
 public sealed record LoggedOut : IServerMessage;
+
+/// <summary>HU-063: un jugador conectado (nombre, clase, nivel y zona donde está).</summary>
+public sealed record OnlinePlayerDto(string Name, string ClassId, int Level, string Zone);
+
+/// <summary>HU-063: respuesta a `OnlineListRequest`, ordenada por nombre.</summary>
+public sealed record OnlineList(IReadOnlyList<OnlinePlayerDto> Players) : IServerMessage;
 
 /// <summary>Códigos de error de docs/protocol.md §Códigos de error.</summary>
 public static class ErrorCodes

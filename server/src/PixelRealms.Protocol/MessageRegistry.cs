@@ -55,8 +55,10 @@ public static class MessageRegistry
         Register<AdminCommand>("AdminCommand");
         Register<ChangeClass>("ChangeClass");
         Register<Logout>("Logout");
+        Register<OnlineListRequest>("OnlineListRequest");
         RegisterServer<Welcome>("Welcome");
         RegisterServer<LoggedOut>("LoggedOut");
+        RegisterServer<OnlineList>("OnlineList");
         RegisterServer<Snapshot>("Snapshot");
         RegisterServer<EntitySpawn>("EntitySpawn");
         RegisterServer<EntityDespawn>("EntityDespawn");

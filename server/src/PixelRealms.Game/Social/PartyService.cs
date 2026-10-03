@@ -71,15 +71,18 @@ public sealed class PartyService
         if (nowMs > invite.ExpiresAtMs) return (null, "not_found");
         var inviter = findPlayer(invite.From);
         if (inviter is null) return (null, "not_found");
+        // Todo se valida antes de crear nada: si no, un rechazo dejaba al que invitó en un grupo de 1 que no podía recibir
+        // invitaciones, y si el que invitó se había unido a otro grupo, el invitado entraba sin permiso de ese líder.
+        if (PartyOf(target.CharacterId) is not null) return (null, "invalid_target");
         var party = PartyOf(invite.From);
+        if (party is not null && party.Leader != invite.From) return (null, "forbidden");
+        if (party is not null && party.Members.Count >= rules.MaxMembers) return (null, "forbidden");
         if (party is null)
         {
             party = new Party(_nextId++, invite.From);
             party.Members.Add(new PartyMember(inviter.CharacterId, inviter.Name, inviter.ClassId));
             _byMember[inviter.CharacterId] = party;
         }
-        if (party.Members.Count >= rules.MaxMembers) return (null, "forbidden");
-        if (PartyOf(target.CharacterId) is not null) return (null, "invalid_target");
         party.Members.Add(new PartyMember(target.CharacterId, target.Name, target.ClassId));
         _byMember[target.CharacterId] = party;
         return (party, null);
