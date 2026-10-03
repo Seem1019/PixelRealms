@@ -83,7 +83,7 @@ public static class ServerApp
             return null;
         }
         var rng = new SeededRng(Environment.TickCount);
-        var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>() }; // HU-072
+        var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>(), InstanceAllocs = new Dictionary<int, long>() }; // HU-072
         simulation.Context.RulesProvider = () => content.Rules; // HU-003 CA4c: `/reload rules` en caliente
         var movementSystem = new MovementSystem();
         var interestSystem = new InterestSystem();
@@ -219,6 +219,7 @@ public static class ServerApp
                     id = inst.Id, mapId = inst.MapId, players = inst.Players, monsters = inst.Monsters,
                     combatP50Ms = Math.Round(inst.CombatP50Ms, 3), combatP99Ms = Math.Round(inst.CombatP99Ms, 3),
                     areasActive = inst.AreasActive, projectilesInFlight = inst.ProjectilesInFlight, aurasActive = inst.AurasActive,
+                    allocBytesPerSec = Math.Round(inst.AllocBytesPerSec), // lo que piden los sistemas de esta instancia (hilo del tick)
                 });
                 monsters += inst.Monsters;
             }
