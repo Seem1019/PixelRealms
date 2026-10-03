@@ -4,7 +4,6 @@ namespace PixelRealms.Game.Core;
 public sealed class TickStats(int capacity = 600)
 {
     private readonly double[] _samples = new double[capacity];
-    private readonly double[] _sorted = new double[capacity];
     private int _count;
     private int _next;
 
@@ -20,12 +19,15 @@ public sealed class TickStats(int capacity = 600)
         if (ms > MaxMs) MaxMs = ms;
     }
 
+    /// <summary>Copia propia en cada llamada (no por tick): `/health`, `/admin/stats` y el log del loop la piden desde hilos distintos.</summary>
     public (double P50, double P99) Percentiles()
     {
-        if (_count == 0) return (0, 0);
-        Array.Copy(_samples, _sorted, _count);
-        Array.Sort(_sorted, 0, _count);
-        return (_sorted[Index(0.50)], _sorted[Index(0.99)]);
+        var count = _count;
+        if (count == 0) return (0, 0);
+        var sorted = new double[count];
+        Array.Copy(_samples, sorted, count);
+        Array.Sort(sorted);
+        return (sorted[Index(0.50, count)], sorted[Index(0.99, count)]);
     }
 
     public void Reset()
@@ -35,5 +37,5 @@ public sealed class TickStats(int capacity = 600)
         MaxMs = 0;
     }
 
-    private int Index(double p) => Math.Clamp((int)Math.Ceiling(p * _count) - 1, 0, _count - 1);
+    private static int Index(double p, int count) => Math.Clamp((int)Math.Ceiling(p * count) - 1, 0, count - 1);
 }

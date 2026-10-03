@@ -20,16 +20,16 @@ namespace PixelRealms.Tools.LoadBot;
 /// </summary>
 public static class CombatScenario
 {
-    // Umbrales de HU-089 CA2 (documentados en la HU, no son balance).
-    public const double TickP99LimitMs = 15, TickMaxLimitMs = 50, CombatP99LimitMs = 6, AllocLimitBytesPerSec = 2 * 1024 * 1024, MemoryGrowthLimitPct = 10;
+    // Umbrales de HU-089 CA2, HU-088 CA5 (combate ≤ 4 ms p99, ADR-018) y HU-036 CA6 (IA < 3 ms): técnicos, no de balance.
+    public const double TickP99LimitMs = 15, TickMaxLimitMs = 50, CombatP99LimitMs = 4, AiP99LimitMs = 3, AllocLimitBytesPerSec = 2 * 1024 * 1024, MemoryGrowthLimitPct = 10;
 
     private const int TicksPerSecond = 1000 / GameConstants.TickMs;
 
     public sealed record Result(int Ticks, double TickP50, double TickP99, double TickMax, double CombatP50, double CombatP99, double AllocPerSec, int Gen2,
-        long MemStart, long MemEnd, int AurasAvg, int AurasMax, int AreasAvg, int AreasMax, int Casts, int Kills, int BotDeaths, double WallSec, bool MemoryChecked)
+        long MemStart, long MemEnd, int AurasAvg, int AurasMax, int AreasAvg, int AreasMax, int Casts, int Kills, int BotDeaths, double WallSec, bool MemoryChecked, double AiP99)
     {
         /// <summary>El +10 % de memoria se evalúa en la prueba de resistencia (≥ 30 min simulados); en corridas cortas solo se informa.</summary>
-        public bool Passed => TickP99 <= TickP99LimitMs && TickMax <= TickMaxLimitMs && CombatP99 <= CombatP99LimitMs && AllocPerSec <= AllocLimitBytesPerSec && Gen2 == 0
+        public bool Passed => TickP99 <= TickP99LimitMs && TickMax <= TickMaxLimitMs && CombatP99 <= CombatP99LimitMs && AiP99 < AiP99LimitMs && AllocPerSec <= AllocLimitBytesPerSec && Gen2 == 0
                               && (!MemoryChecked || (MemEnd - MemStart) <= MemStart * MemoryGrowthLimitPct / 100.0);
 
         public string Report()
@@ -40,9 +40,9 @@ public static class CombatScenario
             {
                 $"ticks {Ticks} en {F(WallSec)} s de reloj ({F(Ticks / 20.0)} s simulados)",
                 $"tick p50 {F(TickP50)} ms · p99 {F(TickP99)} ms (≤ {TickP99LimitMs}) · máx {F(TickMax)} ms (≤ {TickMaxLimitMs})",
-                $"combate p50 {F(CombatP50)} ms · p99 {F(CombatP99)} ms (≤ {CombatP99LimitMs}) por instancia",
+                $"combate p50 {F(CombatP50)} ms · p99 {F(CombatP99)} ms (≤ {CombatP99LimitMs}) por instancia · IA de monstruos p99 {F(AiP99)} ms (< {AiP99LimitMs})",
                 $"asignación {F(AllocPerSec / 1024 / 1024)} MB/s simulado (≤ 2) · Gen2 {Gen2} (= 0) · memoria {F(MemStart / 1024.0 / 1024)} → {F(MemEnd / 1024.0 / 1024)} MB ({(MemoryChecked ? $"≤ +{MemoryGrowthLimitPct} %" : "solo informativo: < 30 min")})",
-                $"auras media {AurasAvg} máx {AurasMax} (objetivo ~200) · áreas pendientes media {AreasAvg} máx {AreasMax} (objetivo 40)",
+                $"auras media {AurasAvg} máx {AurasMax} (objetivo ~200) · áreas marcadas + proyectiles media {AreasAvg} máx {AreasMax} (objetivo 40)",
                 $"casteos {Casts} · monstruos muertos {Kills} · muertes de bots {BotDeaths}",
                 Passed ? "RESULTADO: OK" : "RESULTADO: FALLA (ver umbrales)",
             };
@@ -160,7 +160,7 @@ public static class CombatScenario
             if (t % 10 == 0)
             {
                 var auras = 0; foreach (var a in inst.Actors.Values) auras += a.Auras.Count;
-                var areas = combat.Casts.PendingImpacts(inst);
+                var areas = combat.Casts.ActiveAreas(inst) + combat.Casts.PendingImpacts(inst); // áreas marcadas + proyectiles en vuelo
                 aurasSum += auras; areasSum += areas; aurasMax = Math.Max(aurasMax, auras); areasMax = Math.Max(areasMax, areas);
             }
             if (t % (TicksPerSecond * 30) == 0 && t > 0)
@@ -177,9 +177,10 @@ public static class CombatScenario
         var memEnd = GC.GetTotalMemory(true);
         var (tp50, tp99) = tickStats.Percentiles();
         var (cp50, cp99) = sim.CombatTimings![inst.Id].Percentiles();
+        var aiP99 = sim.SystemTimings!.TryGetValue("monster_ai", out var ai) ? ai.Percentiles().P99 : 0;
         var samples = Math.Max(1, (ticks + 9) / 10);
         return new Result(ticks, tp50, tp99, tickStats.MaxMs, cp50, cp99, alloc / Math.Max(1.0, o.DurationSec), gen2, memStart, memEnd,
-            (int)(aurasSum / samples), aurasMax, (int)(areasSum / samples), areasMax, casts, kills, botDeaths, wall.Elapsed.TotalSeconds, o.DurationSec >= 1800);
+            (int)(aurasSum / samples), aurasMax, (int)(areasSum / samples), areasMax, casts, kills, botDeaths, wall.Elapsed.TotalSeconds, o.DurationSec >= 1800, aiP99);
     }
 
     private static Monster? Nearest(Player bot, List<Monster> monsters)

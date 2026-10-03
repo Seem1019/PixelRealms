@@ -116,6 +116,7 @@ public static class ServerApp
         builder.Services.AddSingleton<MapTransferService>();
         builder.Services.AddSingleton<SnapshotBuilder>();
         builder.Services.AddSingleton<EventDispatcher>();
+        builder.Services.AddSingleton<WorldStats>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SaveService>());
         builder.Services.AddSingleton<GameLoopService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
@@ -174,7 +175,8 @@ public static class ServerApp
             .OnPostTick(app.Services.GetRequiredService<MapTransferService>().OnPostTick)
             .OnPostTick(worldSession.SweepLinkdead)
             .OnPostTick(app.Services.GetRequiredService<EventDispatcher>().OnPostTick)
-            .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick);
+            .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick)
+            .OnPostTick(app.Services.GetRequiredService<WorldStats>().OnPostTick);
         // Al apagar (Ctrl+C): guardar a todos los jugadores conectados antes de salir (HU-026 CA2), en el hilo del tick.
         app.Services.GetRequiredService<GameLoopService>().OnStopping = () =>
         {
@@ -202,25 +204,22 @@ public static class ServerApp
             return Results.Ok(new { status = "ok", players = cm.Count, tickP99Ms = Math.Round(p99, 2), uptime = Math.Round(metrics.UptimeSec, 1), tick = loop.TicksRun });
         });
         // HU-072 CA3: estadísticas para administradores (JWT con claim admin).
-        app.MapGet("/admin/stats", (HttpContext http, GameLoopService loop, ConnectionManager cm, NetMetrics metrics, PlayerRegistry players, World w, CombatModule cmb) =>
+        app.MapGet("/admin/stats", (HttpContext http, GameLoopService loop, ConnectionManager cm, NetMetrics metrics, PlayerRegistry players, WorldStats worldStats) =>
         {
             if (JwtAuth.ClaimsOf(http) is not { Admin: true }) return Results.StatusCode(StatusCodes.Status403Forbidden);
             var (p50, p99) = loop.Stats.Percentiles();
             var instances = new List<object>();
-            foreach (var inst in w.Instances)
+            var monsters = 0;
+            foreach (var inst in worldStats.Latest) // recuentos y tiempos del tick (copia de hace ≤ 1 s): aquí no se toca el mundo
             {
-                var auras = 0;
-                foreach (var a in inst.Actors.Values) auras += a.Auras.Count;
-                var (cp50, cp99) = loop.Simulation.CombatTimings is { } ct && ct.TryGetValue(inst.Id, out var cs) ? cs.Percentiles() : (0, 0);
                 instances.Add(new
                 {
-                    id = inst.Id, mapId = inst.MapId, players = inst.Players.Count, monsters = inst.Monsters.Count,
-                    combatP50Ms = Math.Round(cp50, 3), combatP99Ms = Math.Round(cp99, 3),
-                    areasActive = cmb.Casts.PendingImpacts(inst), aurasActive = auras,
+                    id = inst.Id, mapId = inst.MapId, players = inst.Players, monsters = inst.Monsters,
+                    combatP50Ms = Math.Round(inst.CombatP50Ms, 3), combatP99Ms = Math.Round(inst.CombatP99Ms, 3),
+                    areasActive = inst.AreasActive, projectilesInFlight = inst.ProjectilesInFlight, aurasActive = inst.AurasActive,
                 });
+                monsters += inst.Monsters;
             }
-            var monsters = 0;
-            foreach (var inst in w.Instances) monsters += inst.Monsters.Count;
             return Results.Ok(new
             {
                 uptime = Math.Round(metrics.UptimeSec, 1), tick = loop.TicksRun, tickP50Ms = Math.Round(p50, 2), tickP99Ms = Math.Round(p99, 2), tickMaxMs = Math.Round(loop.Stats.MaxMs, 2),

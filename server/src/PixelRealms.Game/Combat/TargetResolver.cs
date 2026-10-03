@@ -63,7 +63,7 @@ public sealed class TargetResolver(CombatServices services)
         var radius = (float)spell.AoeRadius;
         var radiusSq = radius * radius;
         var max = Math.Min(spell.MaxTargets, ctx.Rules.Limits.AoeMaxTargetsCap);
-        var combat = ctx.Rules.Combat;
+        var body = BodyBox.From(ctx.Rules.Combat); // una vez por área, no por candidato
         _scratch.Clear();
         foreach (var a in map.Actors.Values)
         {
@@ -71,7 +71,7 @@ public sealed class TargetResolver(CombatServices services)
             var isEnemy = services.IsEnemy(caster, a);
             var isAlly = !isEnemy && services.IsAlly(caster, a);
             if (!((enemies && isEnemy) || (allies && isAlly))) continue;
-            var d = DistanceSquaredToBody(center, a.Position, combat);
+            var d = DistanceSquaredToBody(center, a.Position, body);
             if (d > radiusSq) continue;
             _scratch.Add((a, d, Vec2.DistanceSquared(a.Position, center)));
         }
@@ -91,11 +91,20 @@ public sealed class TargetResolver(CombatServices services)
 
     /// <summary>Distancia al cuadrado de `center` al punto más cercano del cuadro del cuerpo de quien tiene los pies en `feet`
     /// (rules.combat.body*). 0 si el centro cae dentro del cuadro.</summary>
-    public static float DistanceSquaredToBody(Vec2 center, Vec2 feet, CombatRules rules)
+    public static float DistanceSquaredToBody(Vec2 center, Vec2 feet, CombatRules rules) => DistanceSquaredToBody(center, feet, BodyBox.From(rules));
+
+    /// <summary>Lo mismo con las medidas del cuerpo ya leídas: es la prueba de forma de cada candidato (ADR-018: sin raíces).</summary>
+    public static float DistanceSquaredToBody(Vec2 center, Vec2 feet, BodyBox body)
     {
-        var halfWidth = (float)rules.BodyHalfWidthTiles;
-        var nearestX = Math.Clamp(center.X, feet.X - halfWidth, feet.X + halfWidth);
-        var nearestY = Math.Clamp(center.Y, feet.Y - (float)rules.BodyHeightAboveFeetTiles, feet.Y + (float)rules.BodyDepthBelowFeetTiles);
-        return Vec2.DistanceSquared(new Vec2(nearestX, nearestY), center);
+        // Sin ramas (max): con candidatos repartidos al azar, los if fallan la predicción y la prueba sale varias veces más lenta.
+        var dx = MathF.Max(MathF.Max(feet.X - body.HalfWidth - center.X, center.X - feet.X - body.HalfWidth), 0f);
+        var dy = MathF.Max(MathF.Max(feet.Y - body.Above - center.Y, center.Y - feet.Y - body.Below), 0f);
+        return dx * dx + dy * dy;
+    }
+
+    /// <summary>Cuadro del cuerpo (rules.combat.body*) en casillas, relativo a los pies.</summary>
+    public readonly record struct BodyBox(float HalfWidth, float Above, float Below)
+    {
+        public static BodyBox From(CombatRules rules) => new((float)rules.BodyHalfWidthTiles, (float)rules.BodyHeightAboveFeetTiles, (float)rules.BodyDepthBelowFeetTiles);
     }
 }
