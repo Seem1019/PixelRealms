@@ -165,4 +165,4 @@
 - Detección de cuadros robusta a brillos que unen cuadros vecinos (parte el tramo por su línea menos densa) y fondo encerrado por efectos (negro casi puro y grande) transparente.
 - El pícaro usa un umbral de fondo más bajo (`BG_LEVEL_BY_CLASS`): su ropa casi negra se borraba con el fondo.
 - La fila norte del sacerdote sale de PixelLab (`refs/priest_pixellab/`, cuadros `pl:` en `FRAMES`), escalada por su propio reposo.
-- Limitación: el ataque y casteo de espaldas del guerrero y el mago repiten cuadros de caminar.
+- El ataque y el casteo de espaldas del guerrero y el mago salen de PixelLab animando desde un cuadro de espaldas de su propia hoja (`custom_start_frame`), así conservan capa y sombrero; ya están a escala de la hoja HD.

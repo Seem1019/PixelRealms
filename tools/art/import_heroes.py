@@ -62,13 +62,14 @@ def pl(anim: str, frames: list[int]) -> list[str]:
 
 
 ## Cuadro de la hoja de referencia ("fila,columna") para cada animación y dirección. Las hojas traen vista 3/4 de frente
-## (sur y este usan la misma, el oeste es el este espejado) y, salvo el sacerdote, algunas de espaldas para el norte.
+## (sur y este usan la misma, el oeste es el este espejado) y, salvo el sacerdote, algunas de espaldas para el norte; lo
+## que falta de espaldas (ataque y casteo del guerrero y el mago, el norte entero del sacerdote) sale de PixelLab (`pl`).
 FRAMES: dict[str, dict[str, dict[str, list[str]]]] = {
     "warrior": {
         "s": {"idle": keys(0, [0, 3, 6, 9]), "walk": even(2, 13, 8), "attack": ["4,3", "6,0", "6,1", "6,7", "6,8", "6,12"],
               "cast": keys(7, [2, 3, 4, 2, 3, 4]), "hurt": ["7,0", "8,1"], "death": keys(8, [2, 3, 4, 5])},
-        "n": {"idle": keys(1, [0, 3, 6, 9]), "walk": even(1, 13, 8), "attack": keys(1, [2, 5, 8, 11, 1, 4]),
-              "cast": keys(1, [3, 9, 12, 3, 9, 12]), "hurt": keys(1, [0, 6]), "death": keys(8, [2, 3, 4, 5])},
+        "n": {"idle": keys(1, [0, 3, 6, 9]), "walk": even(1, 13, 8), "attack": pl("attack", list(range(6))),
+              "cast": pl("cast", list(range(6))), "hurt": keys(1, [0, 6]), "death": keys(8, [2, 3, 4, 5])},
         "e": {"idle": keys(0, [0, 3, 6, 9]), "walk": even(3, 13, 8), "attack": ["5,0", "6,0", "6,1", "6,5", "6,11", "6,12"],
               "cast": keys(7, [2, 3, 4, 2, 3, 4]), "hurt": ["7,0", "8,1"], "death": keys(8, [2, 3, 4, 5])},
     },
@@ -76,7 +77,7 @@ FRAMES: dict[str, dict[str, dict[str, list[str]]]] = {
         "s": {"idle": keys(0, [0, 4, 9, 11]), "walk": even(2, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
               "cast": keys(4, [0, 2, 4, 6, 8, 4]), "hurt": keys(7, [6, 7]), "death": keys(7, [7, 8, 10, 11])},
         "n": {"idle": ["1,1", "1,6", "1,1", "1,6"], "walk": ["0,1", "1,1", "0,6", "1,6", "1,9", "1,10", "1,1", "1,6"],
-              "attack": ["1,1", "1,6", "1,9", "1,10", "1,9", "1,6"], "cast": ["1,1", "1,6", "1,10", "1,1", "1,6", "1,10"],
+              "attack": pl("attack", list(range(6))), "cast": pl("cast", list(range(6))),
               "hurt": ["1,1", "1,6"], "death": keys(7, [7, 8, 10, 11])},
         "e": {"idle": keys(0, [0, 4, 9, 11]), "walk": even(3, 12, 8), "attack": ["5,0", "6,0", "6,1", "6,2", "6,3", "5,0"],
               "cast": keys(4, [0, 2, 4, 6, 8, 4]), "hurt": keys(7, [6, 7]), "death": keys(7, [7, 8, 10, 11])},
@@ -204,8 +205,9 @@ def build_class(class_id: str) -> bool:
     scale = STAND_HEIGHT / (ref[3] - ref[1])
     pl_dir = REFS / f"{class_id}_pixellab"
     pl_frame = lambda key: (lambda im: im.crop(im.getbbox()))(Image.open(pl_dir / key[3:]).convert("RGBA"))
-    # Los cuadros de PixelLab se escalan por su propio reposo para medir lo mismo que la vista de frente.
-    pl_scale = STAND_HEIGHT / pl_frame("pl:idle/frame_000.png").height if pl_dir.exists() else 1.0
+    # Cuadros de PixelLab: los rotados desde la referencia traen su reposo y se escalan por él; los animados desde un
+    # cuadro de la propia hoja HD (custom_start_frame, sin reposo propio) ya están a escala.
+    pl_scale = STAND_HEIGHT / pl_frame("pl:idle/frame_000.png").height if (pl_dir / "idle").exists() else 1.0
     columns = sum(a["frames"] for a in ANIMS.values())
     sheet = Image.new("RGBA", (SIZE * columns, SIZE * len(DIRS)))
     anims = {}
