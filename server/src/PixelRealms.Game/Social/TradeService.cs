@@ -17,7 +17,6 @@ public enum TradeState { Requested, Open, Completed, Cancelled }
 /// <summary>Intercambio entre dos jugadores (HU-059): ofertas versionadas, doble confirmación, commit atómico.</summary>
 public sealed class TradeSession(Player a, Player b, long requestedAtMs)
 {
-    public const int MaxItems = 6;
     public Player A { get; } = a;
     public Player B { get; } = b;
     public TradeState State { get; set; } = TradeState.Requested;
@@ -46,8 +45,6 @@ public sealed record TradeChangedEvent(int MapInstanceId, TradeSession Trade, st
 /// </summary>
 public sealed class TradeService(CombatServices services)
 {
-    public const double RangeTiles = 3.0;
-    public const int RequestExpireMs = 30_000;
 
     private readonly Dictionary<int, List<TradeSession>> _trades = new();
 
@@ -66,7 +63,7 @@ public sealed class TradeService(CombatServices services)
     public string? Request(Player from, Player to, MapInstance map, TickContext ctx)
     {
         if (ReferenceEquals(from, to) || from.MapInstanceId != to.MapInstanceId) return "invalid_target";
-        if (Vec2.Distance(from.Position, to.Position) > RangeTiles) return "out_of_range";
+        if (Vec2.Distance(from.Position, to.Position) > ctx.Rules.Social.TradeRangeTiles) return "out_of_range";
         if (TradeOf(from) is not null || TradeOf(to) is not null) return "trade_busy";
         if (InDuel(from) || InDuel(to)) return "duel_busy";
         var trade = new TradeSession(from, to, ctx.NowMs);
@@ -91,7 +88,7 @@ public sealed class TradeService(CombatServices services)
     {
         var trade = TradeOf(p);
         if (trade is null || trade.State != TradeState.Open) return "not_found";
-        if (items.Count > TradeSession.MaxItems || gold < 0 || gold > p.Inventory.Gold) return "invalid_payload";
+        if (items.Count > ctx.Rules.Social.TradeMaxItems || gold < 0 || gold > p.Inventory.Gold) return "invalid_payload";
         var seen = new HashSet<Guid>();
         foreach (var (itemId, qty) in items)
         {
@@ -214,10 +211,10 @@ public sealed class TradeService(CombatServices services)
         if (!_trades.TryGetValue(map.Id, out var list) || list.Count == 0) return;
         foreach (var t in list.ToList())
         {
-            if (t.State == TradeState.Requested && ctx.NowMs - t.RequestedAtMs > RequestExpireMs) { Cancel(t, "expired", map, ctx); continue; }
+            if (t.State == TradeState.Requested && ctx.NowMs - t.RequestedAtMs > ctx.Rules.Social.TradeRequestExpireSec * 1000) { Cancel(t, "expired", map, ctx); continue; }
             if (t.A.IsDead || t.B.IsDead) { Cancel(t, "died", map, ctx); continue; }
             if (t.A.ConnectionId < 0 || t.B.ConnectionId < 0) { Cancel(t, "disconnected", map, ctx); continue; }
-            if (t.A.MapInstanceId != map.Id || t.B.MapInstanceId != map.Id || Vec2.Distance(t.A.Position, t.B.Position) > RangeTiles) { Cancel(t, "distance", map, ctx); }
+            if (t.A.MapInstanceId != map.Id || t.B.MapInstanceId != map.Id || Vec2.Distance(t.A.Position, t.B.Position) > ctx.Rules.Social.TradeRangeTiles) { Cancel(t, "distance", map, ctx); }
         }
     }
 }

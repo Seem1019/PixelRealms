@@ -71,7 +71,7 @@ func _ready() -> void:
 	_input.placeholder_text = "Enter para escribir"
 	_input.custom_minimum_size = Vector2(WIDTH, INPUT_HEIGHT)
 	_input.add_theme_font_size_override("font_size", UiTheme.FONT_SMALL)
-	_input.max_length = 200
+	_input.max_length = int(Content.rule("social", "chatMaxLength", 200))
 	_input.text_submitted.connect(_on_submitted)
 	_input.gui_input.connect(_on_input_gui)
 	v.add_child(_input)

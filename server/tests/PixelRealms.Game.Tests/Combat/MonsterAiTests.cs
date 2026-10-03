@@ -145,15 +145,29 @@ public sealed class MonsterAiTests
         w.Map.Monsters.Values.ShouldAllBe(m => m.TemplateId == "slime" && m.Hp == db.Monster("slime").Hp && m.Level == db.Monster("slime").Level);
         var slime = w.Map.Monsters.Values.First();
         var spawnPos = slime.SpawnPosition;
-        var moved = false; var paused = false;
-        for (var i = 0; i < 400; i++)
+        var ai = db.Rules.Ai;
+        var moved = false;
+        var stillTicks = 0;
+        var pauses = new List<int>(); // duración (ticks) de cada pausa completa entre dos tramos de marcha
+        for (var i = 0; i < 800; i++)
         {
             var before = slime.Position;
             TickRunner.Run(w, 1);
-            if (slime.Position != before) moved = true; else if (moved) paused = true;
-            Vec2.Distance(slime.Position, spawnPos).ShouldBeLessThanOrEqualTo(slime.WanderRadius * 1.5f + 0.5f);
+            if (slime.Position != before)
+            {
+                if (moved && stillTicks > 0) pauses.Add(stillTicks);
+                moved = true; stillTicks = 0;
+            }
+            else if (moved) stillTicks++;
+            // CA2: dentro del círculo de radio wanderRadius (antes un cuadrado: hasta √2·r).
+            Vec2.Distance(slime.Position, spawnPos).ShouldBeLessThanOrEqualTo(slime.WanderRadius + (float)ai.ArriveToleranceTiles);
         }
-        moved.ShouldBeTrue(); paused.ShouldBeTrue();
+        moved.ShouldBeTrue();
+        pauses.ShouldNotBeEmpty();
+        // Pausas de wanderPauseMinMs a wanderPauseMaxMs (± un tick). Si el punto nuevo cae a menos de la tolerancia de llegada, el
+        // monstruo "llega" sin moverse y encadena otra pausa: por eso solo se exige el mínimo a todas y el rango a alguna.
+        pauses.ShouldAllBe(t => t * GameConstants.TickMs >= ai.WanderPauseMinMs - GameConstants.TickMs);
+        pauses.ShouldContain(t => t * GameConstants.TickMs <= ai.WanderPauseMaxMs + GameConstants.TickMs);
 
         // Respawn: reaparece respawnSec tras morir; el cadáver dura corpseLifetimeSec (HU-037 CA4), independientemente.
         var rules = db.Rules.Combat;

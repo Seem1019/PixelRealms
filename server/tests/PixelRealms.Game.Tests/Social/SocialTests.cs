@@ -245,11 +245,12 @@ public sealed class SocialTests
         w.Combat.Chat.Send(ana, "say", "4", null, w.Map, all, _ => null, ctx).ShouldBeNull();
         w.Combat.Chat.Send(ana, "say", "5", null, w.Map, all, _ => null, ctx).ShouldBeNull();
         w.Combat.Chat.Send(ana, "say", "6", null, w.Map, all, _ => null, ctx).ShouldBe("rate_limited");
-        w.Clock.Advance(ChatService.RateLimitWindowMs);
+        w.Clock.Advance((long)(w.Content.Rules.Social.ChatRateLimitWindowSec * 1000));
         w.Combat.Chat.Send(ana, "say", "7", null, w.Map, all, _ => null, w.Begin()).ShouldBeNull();
-        ChatService.Sanitize("   ").ShouldBeNull();
-        ChatService.Sanitize("ho\u0007la").ShouldBe("hola");
-        ChatService.Sanitize(new string('x', 250))!.Length.ShouldBe(200);
+        var maxLength = w.Content.Rules.Social.ChatMaxLength;
+        ChatService.Sanitize("   ", maxLength).ShouldBeNull();
+        ChatService.Sanitize("ho\u0007la", maxLength).ShouldBe("hola");
+        ChatService.Sanitize(new string('x', maxLength + 50), maxLength)!.Length.ShouldBe(maxLength);
     }
 
     [Fact]

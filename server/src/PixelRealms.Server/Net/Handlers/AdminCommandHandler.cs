@@ -49,10 +49,37 @@ public sealed class AdminCommandHandler(CombatHandlerDeps deps, PlayerRegistry p
             "god" => God(p),
             "debug" => Debug(p, args),
             "announce" => Announce(args, ctx),
+            "reload" => Reload(args, ctx),
             _ => null,
         };
         if (reply is null) { ctx.SendError(ErrorCodes.InvalidPayload, null, $"Comando desconocido: /{cmd}"); return; }
         ctx.Send(new ChatMessage("system", "", reply, ctx.Tick.NowMs));
+    }
+
+    /// <summary>
+    /// HU-003 CA4c: `/reload rules` relee content/rules.json; desde el siguiente tick los sistemas usan los números nuevos. Si el
+    /// archivo es inválido se conserva el anterior y se responde con los errores. Lee el disco en el tick: es un comando de admin,
+    /// raro y de un archivo pequeño. El cliente sigue con su copia hasta reiniciarse (Welcome.rulesHash lo delata). Las stats
+    /// derivadas cacheadas (crítico, armadura, vida máxima…) se recalculan con las reglas nuevas y cada jugador recibe su StatsUpdate.
+    /// </summary>
+    private string Reload(string[] args, HandlerContext ctx)
+    {
+        if (args.Length != 1 || args[0] != "rules") return "Uso: /reload rules";
+        var report = content.ReloadRules();
+        if (!report.IsValid)
+        {
+            logger.LogError("/reload rules rechazado: {Errors}", string.Join(" | ", report.Errors));
+            return $"rules.json inválido, se mantiene el anterior: {report.Errors[0]}";
+        }
+        foreach (var map in deps.World.Instances)
+            foreach (var actor in map.Actors.Values)
+            {
+                if (actor is not Player p) { actor.MarkStatsDirty(); continue; }
+                deps.Combat.Services.Recalculate(p);
+                ctx.Tick.Emit(new StatsChangedEvent(map.Id, p));
+            }
+        logger.LogInformation("rules.json recargado (hash {Hash})", content.Rules.Hash);
+        return $"rules.json recargado (hash {content.Rules.Hash})";
     }
 
     private static string Tp(Player p, Game.Map.MapInstance map, string[] args)

@@ -5,7 +5,7 @@
   "description": "Única fuente de constantes numéricas. El servidor las carga en RulesDb (inmutable) y el cliente las lee para predicción/UI. Cambiar un valor aquí no requiere código.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "loadout", "weapons", "limits", "balanceTargets", "boss", "movement", "world"],
+  "required": ["progression", "group", "combat", "classScaling", "affinity", "classAdvantage", "pvp", "loot", "economy", "loadout", "weapons", "limits", "balanceTargets", "boss", "movement", "world", "social", "ai"],
   "properties": {
     "$schema": { "type": "string" },
     "_doc": { "type": "string" },
@@ -242,8 +242,26 @@
     },
 
     "movement": {
-      "type": "object", "additionalProperties": false, "required": ["baseSpeedTilesPerSec", "sayRangeTiles", "aoiCellTiles"],
-      "properties": { "baseSpeedTilesPerSec": { "type": "number" }, "sayRangeTiles": { "type": "number" }, "aoiCellTiles": { "type": "integer" } }
+      "type": "object", "additionalProperties": false, "required": ["baseSpeedTilesPerSec", "sayRangeTiles", "aoiCellTiles", "inputTimeoutMs", "portalUseRangeTiles"],
+      "properties": { "baseSpeedTilesPerSec": { "type": "number" }, "sayRangeTiles": { "type": "number" }, "aoiCellTiles": { "type": "integer" },
+        "inputTimeoutMs": { "type": "integer", "minimum": 50, "description": "Sin MoveInput durante este tiempo el jugador se detiene (HU-021 CA5)." },
+        "portalUseRangeTiles": { "type": "number", "minimum": 0, "description": "Distancia al borde del portal para UsePortal (HU-027 CA1)." } }
+    },
+
+    "social": {
+      "type": "object", "additionalProperties": false, "required": ["chatMaxLength", "chatRateLimitCount", "chatRateLimitWindowSec", "tradeMaxItems", "tradeRangeTiles", "tradeRequestExpireSec"],
+      "properties": { "_doc": { "type": "string" }, "chatMaxLength": { "type": "integer", "minimum": 1 }, "chatRateLimitCount": { "type": "integer", "minimum": 1 },
+        "chatRateLimitWindowSec": { "type": "number", "minimum": 0 }, "tradeMaxItems": { "type": "integer", "minimum": 1 }, "tradeRangeTiles": { "type": "number", "minimum": 0 },
+        "tradeRequestExpireSec": { "type": "number", "minimum": 0 } }
+    },
+
+    "ai": {
+      "type": "object", "additionalProperties": false,
+      "required": ["perceptionMs", "pathRecalcMs", "pathRecalcMovedTiles", "pathMaxNodes", "wanderPauseMinMs", "wanderPauseMaxMs", "wanderSpeedMult", "arriveToleranceTiles", "rangedThreatThresholdTiles"],
+      "properties": { "_doc": { "type": "string" }, "perceptionMs": { "type": "integer", "minimum": 50 }, "pathRecalcMs": { "type": "integer", "minimum": 50 },
+        "pathRecalcMovedTiles": { "type": "number", "minimum": 0 }, "pathMaxNodes": { "type": "integer", "minimum": 1 }, "wanderPauseMinMs": { "type": "integer", "minimum": 0 },
+        "wanderPauseMaxMs": { "type": "integer", "minimum": 0 }, "wanderSpeedMult": { "type": "number", "minimum": 0 }, "arriveToleranceTiles": { "type": "number", "minimum": 0 },
+        "rangedThreatThresholdTiles": { "type": "number", "minimum": 0, "description": "attackRange a partir del cual un monstruo usa threatSwitchRanged (130 %) en vez de threatSwitchMelee (110 %)." } }
     },
 
     "world": {

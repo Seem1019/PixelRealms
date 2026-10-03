@@ -139,6 +139,8 @@ public sealed class ContentLoaderTests
     [InlineData("classes.json", "/classes/2/startingItems/0/itemId", "\"worn_sword\"", "afinidad baja, debe ser alta")]
     [InlineData("spells.json", "/spells/3/cooldownMs", "500", "minInstantSpellCooldownMs")]
     [InlineData("spells.json", "/spells/2/effects/1/auraId", "\"nope\"", "auraId 'nope' no existe")]
+    [InlineData("rules.json", "/ai/wanderPauseMinMs", "7000", "mayor que wanderPauseMaxMs")]
+    [InlineData("rules.json", "/loadout/usableSlots", "5", "más que las 8 teclas")]
     public void CrossReferenceRules_Fail(string file, string pointer, string valueJson, string expectedFragment)
     {
         using var dir = new TempContent();

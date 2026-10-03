@@ -8,6 +8,9 @@ namespace PixelRealms.Content.Validation;
 /// </summary>
 public static class CrossRefValidator
 {
+    /// <summary>Casillas de la barra (teclas 1–8 del cliente, `Player.Hotbar`): `loadout` no puede repartir más.</summary>
+    private const int HotbarKeys = 8;
+
     private static HashSet<string> ImplementedShapes => EngineCapabilities.Shapes;
     private static HashSet<string> ImplementedTargetings => EngineCapabilities.Targetings;
     private static HashSet<string> ImplementedEffects => EngineCapabilities.Effects;
@@ -310,6 +313,15 @@ public static class CrossRefValidator
         var bonusCount = group.GetProperty("bonusBySize").GetArrayLength();
         if (bonusCount != maxMembers)
             report.Error("rules.json", "/group/bonusBySize", $"tiene {bonusCount} entradas, debe tener maxMembers ({maxMembers})");
+
+        // Números que el tick usa como rango o índice: un `/reload rules` con ellos al revés rompería el bucle.
+        var ai = rules.GetProperty("ai");
+        if (ai.GetProperty("wanderPauseMinMs").GetInt32() > ai.GetProperty("wanderPauseMaxMs").GetInt32())
+            report.Error("rules.json", "/ai/wanderPauseMinMs", "wanderPauseMinMs no puede ser mayor que wanderPauseMaxMs");
+        var loadout = rules.GetProperty("loadout");
+        var slots = loadout.GetProperty("spellSlots").GetInt32() + loadout.GetProperty("usableSlots").GetInt32();
+        if (slots > HotbarKeys)
+            report.Error("rules.json", "/loadout", $"spellSlots + usableSlots = {slots}, más que las {HotbarKeys} teclas de la barra");
 
         var caps = progression.GetProperty("levelCapByPhase").EnumerateArray().Select(e => e.GetInt32()).ToList();
         if (caps.Count == 0 || caps[^1] != maxLevel)

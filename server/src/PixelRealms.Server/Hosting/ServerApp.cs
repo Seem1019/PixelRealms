@@ -84,6 +84,7 @@ public static class ServerApp
         }
         var rng = new SeededRng(Environment.TickCount);
         var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>() }; // HU-072
+        simulation.Context.RulesProvider = () => content.Rules; // HU-003 CA4c: `/reload rules` en caliente
         var movementSystem = new MovementSystem();
         var interestSystem = new InterestSystem();
         var combat = CombatModule.Create(() => content.Current, world, movementSystem, interestSystem);

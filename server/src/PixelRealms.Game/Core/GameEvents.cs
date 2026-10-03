@@ -20,7 +20,11 @@ public sealed class TickContext(IRules rulesSource, IRng rng)
 
     public List<IGameEvent> Events { get; } = new(256);
 
-    public IRules Rules { get; } = rulesSource;
+    public IRules Rules { get; private set; } = rulesSource;
+
+    /// <summary>Si está fijado, las reglas se releen al empezar cada tick: `/reload rules` surte efecto en el siguiente tick y
+    /// ningún sistema ve dos versiones a mitad de un tick (HU-003 CA4c).</summary>
+    public Func<IRules>? RulesProvider { get; set; }
 
     public IRng Rng { get; } = rng;
 
@@ -31,5 +35,6 @@ public sealed class TickContext(IRules rulesSource, IRng rng)
         Tick = tick;
         NowMs = nowMs;
         Events.Clear();
+        if (RulesProvider is not null) Rules = RulesProvider();
     }
 }

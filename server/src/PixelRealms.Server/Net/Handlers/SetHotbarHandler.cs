@@ -15,7 +15,7 @@ public sealed class SetHotbarHandler(ReloadableContent content) : IMessageHandle
         if (player is null) return;
         var rules = content.Current.Rules.Loadout;
         var total = rules.SpellSlots + rules.UsableSlots;
-        if (msg.Slot < 0 || msg.Slot >= total) { ctx.SendError(ErrorCodes.InvalidPayload); return; }
+        if (msg.Slot < 0 || msg.Slot >= total || msg.Slot >= player.Hotbar.Length) { ctx.SendError(ErrorCodes.InvalidPayload); return; }
         if (msg.Kind is null || msg.Ref is null)
         {
             player.Hotbar[msg.Slot] = null;
