@@ -88,8 +88,10 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         }
         if (caster.IsDead) return CastErrors.IsDead;
         if (caster.Auras.IsStunned) return CastErrors.Stunned;
-        if (spell.School == School.Magic && caster.Auras.IsSilenced) return CastErrors.Silenced;
-        if (combat.IsLockedOut(now)) return CastErrors.LockedOut;
+        // Silencio y bloqueo por interrupción impiden habilidades de cualquier escuela, no usar objetos: un silenciado puede beber
+        // pociones (y atacar con el arma, que no pasa por aquí).
+        if (!viaItem && caster.Auras.IsSilenced) return CastErrors.Silenced;
+        if (!viaItem && combat.IsLockedOut(now)) return CastErrors.LockedOut;
         if (combat.IsOnCooldown(spell.Id, now)) return CastErrors.OnCooldown;
         if (caster is Player && spell.Source != SpellSource.Item && ((combat.IsOnGcd(now) && spell.TriggersGcd) || combat.IsAbilityLocked(now))) return CastErrors.OnGcd;
         var hasLeap = false; EffectDef? dash = null;
@@ -194,7 +196,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     public void InterruptByControl(Actor target, AuraKind kind, MapInstance map, TickContext ctx)
     {
         if (target.Combat.Cast is not { } cast) return;
-        if (kind == AuraKind.Stun || (kind == AuraKind.Silence && cast.Spell.School == School.Magic)) Interrupt(target, map, ctx);
+        if (kind == AuraKind.Stun || (kind == AuraKind.Silence && cast.Spell.Source != SpellSource.Item)) Interrupt(target, map, ctx);
     }
 
     private static void EndCast(Actor caster, CastState cast, string result, string? reason, MapInstance map, TickContext ctx)
