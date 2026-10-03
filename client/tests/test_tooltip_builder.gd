@@ -42,3 +42,26 @@ func test_consumable_tooltip_and_money() -> void:
 func test_dps_uses_haste() -> void:
 	var dagger := Content.item("worn_dagger")  # 2–4, 1600 ms; Pícaro haste 1.15 → 3 / (1.6 / 1.15) = 2.156
 	assert_almost_eq(TooltipBuilder.dps(dagger, 1.0, 1.15), 3.0 / (1.6 / 1.15), 0.001)
+
+
+func test_medium_affinity_shows_two_decimals() -> void:
+	# HU-053 CA3b: ×0.85, no ×0.8 (antes se redondeaba a un decimal).
+	var dagger := Content.item("worn_dagger")
+	assert_string_contains(TooltipBuilder.build(dagger, 1, "warrior", 1), "Afinidad: media (×0.85)")
+
+
+func test_weapon_compare_includes_dps() -> void:
+	# HU-053 CA2: comparar armas incluye la diferencia de DPS (con afinidad y haste de la clase).
+	var iron := Content.item("iron_sword")
+	var worn := Content.item("worn_sword")
+	var cmp := TooltipBuilder.compare(iron, worn, "warrior")
+	assert_true(cmp.any(func(line: String) -> bool: return line.contains("DPS") and line.contains("▲")), str(cmp))
+
+
+## HU-042 CA2: el tooltip de cada stat de la ficha desglosa base + equipo (con la afinidad de cada pieza) + auras.
+func test_stat_origin_breaks_down_base_equipment_affinity_and_auras() -> void:
+	var equipment: Array = [{"templateId": "iron_sword"}, {"templateId": "bandit_gloves"}, null]
+	# Agilidad del guerrero nivel 3: 7 + 1 × 2 = 9; guantes de cuero (afinidad media) 2 × 0.85 = 1.7; el resto, auras.
+	assert_eq(CharacterPanel.stat_origin("agi", "warrior", 3, equipment, 11), "Base 9 + Equipo 1.7 (Guantes de bandido: afinidad media ×0.85) + Auras 0.3")
+	assert_eq(CharacterPanel.stat_origin("sta", "warrior", 3, equipment, 17), "Base 16 + Equipo 1 (Espada de hierro: afinidad alta ×1) + Auras 0")
+	assert_eq(CharacterPanel.stat_origin("int", "warrior", 1, [], 3), "Base 3 + Equipo 0 + Auras 0")

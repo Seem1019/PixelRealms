@@ -57,7 +57,8 @@ func show_window(d: Dictionary, names: Dictionary) -> void:
 		b.add_theme_color_override("font_color", ItemSlot.RARITY_COLORS.get(str(tpl.get("rarity", "common")), Color.WHITE))
 		if not mine and not free:
 			b.modulate.a = 0.45
-		b.tooltip_bbcode = TooltipBuilder.build(tpl, int(e.get("qty", 1)), GameState.class_id, GameState.level)
+		# HU-053 CA2: también aquí se compara con lo equipado en ese hueco (▲/▼).
+		b.tooltip_bbcode = TooltipBuilder.build(tpl, int(e.get("qty", 1)), GameState.class_id, GameState.level, VendorWindow._equipped_for(tpl))
 		b.tooltip_text = ItemSlot._strip_bbcode(b.tooltip_bbcode)
 		var index := int(e.get("index", 0))
 		b.pressed.connect(func() -> void: Net.send("LootTake", {"lootId": loot_id, "index": index}))

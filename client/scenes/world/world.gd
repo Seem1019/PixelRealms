@@ -737,6 +737,8 @@ func _on_message(type: String, d: Dictionary) -> void:
 				for e: Variant in spell.get("effects", []):
 					if str((e as Dictionary).get("type", "")) in ["leap", "dash"]:
 						_forced_move_until_ms = Time.get_ticks_msec() + 500
+				if int(d.get("durationMs", 0)) > 0:
+					prediction.set_casting(true, float(Content.rule("combat", "castMoveSpeedMult", 0.5)))
 			elif _remotes.has(caster):
 				(_remotes[caster] as RemoteEntity).begin_cast(int(d.get("durationMs", 0)))
 			if d.get("targetPos") != null and int(d.get("durationMs", 0)) > 0:
@@ -749,6 +751,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 			var caster := int(d.get("casterId", -1))
 			_reticle.clear_mark(caster)
 			if caster == GameState.self_id:
+				prediction.set_casting(false, float(Content.rule("combat", "castMoveSpeedMult", 0.5)))
 				_hud.show_cast_result(str(d.get("result", "")), str(d.get("reason", "")))
 			elif _remotes.has(caster):
 				(_remotes[caster] as RemoteEntity).end_cast(str(d.get("result", "")))

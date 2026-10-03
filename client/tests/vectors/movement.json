@@ -49,6 +49,27 @@
       "start": { "x": 40, "y": 40 }, "speed": 4,
       "inputs": [{ "dx": 0, "dy": 0, "ticks": 10 }],
       "expected": { "x": 40.0, "y": 40.0 }
+    },
+    {
+      "name": "casting_half_speed_east_10_ticks",
+      "grid": ["..........", "..........", "..........", "..........", "..........", ".........."],
+      "start": { "x": 40, "y": 40 }, "speed": 2,
+      "inputs": [{ "dx": 1, "dy": 0, "ticks": 10 }],
+      "expected": { "x": 56.0, "y": 40.0 }
+    },
+    {
+      "name": "casting_half_speed_diagonal_ne_10_ticks",
+      "grid": ["..........", "..........", "..........", "..........", "..........", ".........."],
+      "start": { "x": 40, "y": 40 }, "speed": 2,
+      "inputs": [{ "dx": 1, "dy": -1, "ticks": 10 }],
+      "expected": { "x": 51.3, "y": 28.7 }
+    },
+    {
+      "name": "casting_half_speed_slide_along_wall_se",
+      "grid": ["##########", "#....#...#", "#....#...#", "#....#...#", "#........#", "##########"],
+      "start": { "x": 70, "y": 40 }, "speed": 2,
+      "inputs": [{ "dx": 1, "dy": 1, "ticks": 10 }],
+      "expected": { "x": 75.0, "y": 51.3 }
     }
   ]
 }

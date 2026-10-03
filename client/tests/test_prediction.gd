@@ -43,3 +43,31 @@ func test_interpolation_buffer_lerps_between_snapshots() -> void:
 	assert_almost_eq(b.sample(250.0).x, 15.0, 0.001)  # render_time 150 → entre 100 y 200
 	assert_almost_eq(b.sample(350.0).x, 25.0, 0.001)  # 250 → extrapola 50 ms
 	assert_almost_eq(b.sample(600.0).x, 20.0, 0.001)  # > 100 ms sin datos → congela en el último
+
+
+func test_interpolation_stays_smooth_with_5_percent_snapshot_loss() -> void:
+	# HU-023 CA3: un remoto a velocidad constante (64 px/s), Snapshots a 10 Hz y un 5 % perdidos (semilla fija). Con 100 ms de
+	# retardo de render cada hueco de 200 ms se interpola en línea recta: ni retrocede ni se aleja de su trayectoria real.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42
+	var b := InterpolationBuffer.new()
+	var lost := 0
+	var last_x := -INF
+	var max_error := 0.0
+	for frame: int in range(0, 600):
+		var now := frame * 1000.0 / 60.0
+		var snapshot_t := floorf(now / 100.0) * 100.0
+		if frame == 0 or floorf((now - 1000.0 / 60.0) / 100.0) * 100.0 != snapshot_t:
+			if snapshot_t > 0.0 and rng.randf() < 0.05:
+				lost += 1
+			else:
+				b.push(snapshot_t, Vector2(snapshot_t * 0.064, 0))
+		if now < 300.0:
+			continue
+		var x := b.sample(now).x
+		assert_true(x >= last_x - 0.001, "no retrocede (t=%.0f)" % now)
+		last_x = x
+		max_error = maxf(max_error, absf(x - (now - InterpolationBuffer.RENDER_DELAY_MS) * 0.064))
+	assert_gt(lost, 0, "la simulación pierde snapshots de verdad")
+	assert_lt(max_error, 0.5, "error máx. %.2f px" % max_error)
+

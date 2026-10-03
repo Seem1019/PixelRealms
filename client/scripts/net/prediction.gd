@@ -15,6 +15,8 @@ var pending: Array[Dictionary] = []  # [{seq, dx, dy}]
 var smooth_large_corrections: bool = false
 ## Tras reaparecer: la siguiente corrección se aplica de golpe sin contar como error.
 var snap_next: bool = false
+## Castear propio en curso (HU-022 CA4b): la velocidad predicha ya lleva `castMoveSpeedMult`.
+var casting: bool = false
 
 var _grid: CollisionGrid
 var _lerp_from: Vector2 = Vector2.ZERO
@@ -35,6 +37,16 @@ func apply_input(seq: int, dx: int, dy: int) -> void:
 	position = MovementStep.step(position.x, position.y, dx, dy, speed_tiles_per_sec, _grid)
 	if _lerp_t >= 1.0:
 		render_position = position
+
+
+## HU-022 CA4b: al empezar mi casteo (mi CastStarted) se predice ya a `velocidad · castMoveSpeedMult` y al terminar (CastEnded)
+## se vuelve a la normal, sin esperar al Snapshot (100 ms + RTT). El servidor envía CastStarted/CastEnded antes que el Snapshot
+## del mismo tick por la misma conexión, así que el siguiente `reconcile` ya trae la velocidad con el cambio aplicado.
+func set_casting(on: bool, cast_move_speed_mult: float) -> void:
+	if on == casting or cast_move_speed_mult <= 0.0:
+		return
+	casting = on
+	speed_tiles_per_sec = speed_tiles_per_sec * cast_move_speed_mult if on else speed_tiles_per_sec / cast_move_speed_mult
 
 
 ## Reconcilia con la posición autoritativa del Snapshot: descarta confirmados, fija y re-simula los pendientes.

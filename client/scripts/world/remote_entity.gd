@@ -62,6 +62,12 @@ func _ready() -> void:
 	_apply_identity()
 	_refresh_health_bar()
 	refresh_level_color()
+	# HU-031 CA4: el color depende de mi nivel, así que cambia al subir aunque el monstruo no se vuelva a anunciar.
+	GameState.leveled_up.connect(_on_self_leveled_up)
+
+
+func _on_self_leveled_up(_level: int, _new_spells: Array, _rank_ups: Array) -> void:
+	refresh_level_color()
 
 
 ## Rellena desde un EntitySpawn (docs/protocol.md).

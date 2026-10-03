@@ -88,7 +88,8 @@ func refresh() -> void:
 	rows.append([UiText.resource(GameState.resource_kind), "%d/%d" % [GameState.resource, GameState.max_resource]])
 	rows.append(["Atributos", ""])
 	for k: String in STAT_KEYS:
-		rows.append([str(TooltipBuilder.STAT_NAMES.get(k, k)), "%d" % int(primary.get(k, 0))])
+		var total := int(primary.get(k, 0))
+		rows.append([str(TooltipBuilder.STAT_NAMES.get(k, k)), "%d" % total, stat_origin(k, GameState.class_id, GameState.level, GameState.equipment, total)])
 	if not d.is_empty():
 		rows.append(["Combate", ""])
 		rows.append(["P. ataque", "%.1f" % float(d.get("attackPower", 0))])
@@ -98,7 +99,6 @@ func refresh() -> void:
 		rows.append(["Armadura", "%.0f (%.0f%%)" % [float(d.get("armor", 0)), float(d.get("mitigation", 0)) * 100.0]])
 		rows.append(["Vel. ataque", "×%.2f" % float(d.get("haste", 1.0))])
 	_fill_stats(rows)
-	_stats.tooltip_text = _origin_tooltip(primary)
 
 
 func _fill_stats(rows: Array) -> void:
@@ -115,6 +115,9 @@ func _fill_stats(rows: Array) -> void:
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		value.mouse_filter = Control.MOUSE_FILTER_PASS
+		if row.size() > 2:
+			name.tooltip_text = str(row[2])
+			value.tooltip_text = str(row[2])
 		if str(row[1]).is_empty():
 			name.theme_type_variation = "TitleLabel"  # cabecera de grupo
 		else:
@@ -132,25 +135,33 @@ func stats_text() -> String:
 	return "\n".join(parts)
 
 
-## HU-042 CA2: de dónde sale cada stat: base de clase + nivel, equipo × afinidad, auras (texto).
-func _origin_tooltip(primary: Dictionary) -> String:
-	var cls := Content.character_class(GameState.class_id)
+## HU-042 CA2: de dónde sale un stat, para su tooltip: "Base 14 + Equipo 3 (Espada corta: afinidad media ×0.85) + Auras 0".
+## Cada pieza que aporta el stat nombra su afinidad; lo que no explican base y equipo lo ponen las auras (el servidor no
+## manda el desglose, solo el total).
+static func stat_origin(stat: String, class_id: String, level: int, equipment: Array, total: int) -> String:
+	var cls := Content.character_class(class_id)
 	if cls.is_empty():
 		return ""
 	var base: Dictionary = cls.get("baseStats", {})
 	var per: Dictionary = cls.get("statsPerLevel", {})
-	var out: Array[String] = []
-	for k: String in STAT_KEYS:
-		var b := int(base.get(k, 0)) + int(per.get(k, 0)) * (GameState.level - 1)
-		var equip := 0.0
-		for e: Variant in GameState.equipment:
-			if e is Dictionary:
-				var tpl := Content.item(str((e as Dictionary).get("templateId", "")))
-				var st: Dictionary = tpl.get("stats", {}) if tpl.get("stats") != null else {}
-				equip += float(st.get(k, 0)) * TooltipBuilder.affinity_mult(TooltipBuilder.affinity_of(GameState.class_id, tpl))
-		var auras := float(primary.get(k, 0)) - b - equip
-		out.append("%s: Base %d + Equipo %.1f + Auras %.1f" % [str(TooltipBuilder.STAT_NAMES.get(k, k)), b, equip, auras])
-	return "\n".join(out)
+	var b := int(base.get(stat, 0)) + int(per.get(stat, 0)) * (level - 1)
+	var equip := 0.0
+	var pieces: Array[String] = []
+	for e: Variant in equipment:
+		if not (e is Dictionary):
+			continue
+		var tpl := Content.item(str((e as Dictionary).get("templateId", "")))
+		var st: Dictionary = tpl.get("stats", {}) if tpl.get("stats") != null else {}
+		if float(st.get(stat, 0)) == 0.0:
+			continue
+		var affinity := TooltipBuilder.affinity_of(class_id, tpl)
+		var mult := TooltipBuilder.affinity_mult(affinity)
+		equip += float(st.get(stat, 0)) * mult
+		pieces.append("%s: afinidad %s ×%s" % [str(tpl.get("name", "")), affinity, TooltipBuilder._mult(mult)] if not affinity.is_empty() else str(tpl.get("name", "")))
+	var equip_text := TooltipBuilder._num(equip)
+	if not pieces.is_empty():
+		equip_text += " (%s)" % ", ".join(pieces)
+	return "Base %d + Equipo %s + Auras %s" % [b, equip_text, TooltipBuilder._num(float(total) - b - equip)]
 
 
 func _on_dropped(from: Dictionary, to: Dictionary, _qty: int) -> void:
