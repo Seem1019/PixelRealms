@@ -31,8 +31,12 @@ FEET_Y = 36 * PIXEL_SCALE
 ## Altura del personaje de pie (reposo sur): 26 px lógicos, la misma que el resto de personajes.
 STAND_HEIGHT = 26 * PIXEL_SCALE
 BG_LEVEL = 40  # canal máximo por debajo del cual un píxel cuenta como fondo negro
-## Ropa casi negra (el pícaro): umbral de fondo más bajo para que botas y pantalones no se borren con él.
-BG_LEVEL_BY_CLASS = {"rogue": 12}
+## Umbral del relleno que quita el fondo (canal máximo): el fondo de las hojas está en 0–2, y el contorno y la ropa
+## oscura (túnica del guerrero, ropa del pícaro) bajan hasta ~15, así que con BG_LEVEL se borraban con él.
+CUTOUT_BG_LEVEL = 12
+## Un píxel oscuro unido al fondo se queda solo si está a ≤ HALO_REACH_PX de un color sólido (canal máximo ≥ HALO_SOLID_LEVEL).
+HALO_SOLID_LEVEL = 70
+HALO_REACH_PX = 2
 ENCLOSED_BG_MIN_PX = 300  # fondo encerrado por un efecto: al menos este tamaño (los contornos son mucho menores)
 
 ## Animaciones: cuadros (los mismos en las tres direcciones), fps y bucle. Más cuadros que las hojas procedurales;
@@ -145,7 +149,7 @@ def find_frames(img: Image.Image) -> list[list[tuple[int, int, int, int]]]:
     return out
 
 
-def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = BG_LEVEL) -> Image.Image:
+def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = CUTOUT_BG_LEVEL) -> Image.Image:
     """Recorte con el fondo negro conectado al borde transparente (el contorno oscuro interior se conserva)."""
     x0, y0, x1, y1 = box
     c = np.asarray(img.crop((x0 - 2, y0 - 2, x1 + 2, y1 + 2))).astype(np.uint8)
@@ -157,6 +161,13 @@ def cut_out(img: Image.Image, box: tuple[int, int, int, int], bg_level: int = BG
     means = ndimage.mean(darkest, lab, range(1, n + 1))  # la compresión deja bordes de hasta ~37: cuenta la media
     background |= {i + 1 for i in range(n) if sizes[i] >= ENCLOSED_BG_MIN_PX and means[i] < 12}
     alpha = np.where(np.isin(lab, list(background)), 0, 255).astype(np.uint8)
+    # Halo de los brillos sobre el negro (destellos, auras): píxeles oscuros unidos al fondo por otros oscuros y lejos
+    # de cualquier color sólido. El contorno y la ropa oscura tocan el cuerpo, así que se quedan.
+    dark = darkest < BG_LEVEL - 2
+    lab_d, n_d = ndimage.label(dark)
+    edge = set(np.unique(np.concatenate([lab_d[0], lab_d[-1], lab_d[:, 0], lab_d[:, -1]]))) - {0}
+    near_body = ndimage.binary_dilation(darkest >= HALO_SOLID_LEVEL, iterations=HALO_REACH_PX)
+    alpha[np.isin(lab_d, list(edge)) & ~near_body] = 0
     # Motas oscuras sueltas que deja la compresión alrededor de la silueta con un umbral bajo.
     solid, k = ndimage.label(alpha > 0)
     if k > 1:
@@ -221,7 +232,7 @@ def build_class(class_id: str) -> bool:
                 if key.startswith("pl:"):
                     frame = shrink(pl_frame(key), pl_scale)
                 else:
-                    frame = shrink(cut_out(img, box(key), BG_LEVEL_BY_CLASS.get(class_id, BG_LEVEL)), scale)
+                    frame = shrink(cut_out(img, box(key)), scale)
                 sheet.paste(frame_cell(frame), (col * SIZE, r * SIZE))
                 col += 1
     out = ASSETS / "sprites" / "characters"
