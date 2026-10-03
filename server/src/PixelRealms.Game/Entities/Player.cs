@@ -44,6 +44,13 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
     /// <summary>Marca de "hay cambios sin guardar" para el autosave (HU-026).</summary>
     public bool Dirty { get; set; }
 
+    /// <summary>
+    /// Objetos guardados que no se pueden mostrar: plantilla que ya no existe o casilla repetida sin hueco en la bolsa (HU-057 CA4).
+    /// No se ven ni se usan, pero se vuelven a guardar tal cual (contenedor 2) para no borrarlos; al entrar, lo que vuelva a ser
+    /// válido pasa a la bolsa si hay hueco.
+    /// </summary>
+    public List<Items.ItemInstance> Unplaced { get; } = new();
+
     /// <summary>Entradas de auditoría de items pendientes de guardar en lote (HU-057 CA3).</summary>
     public List<PendingAudit> PendingAudit { get; } = new();
 

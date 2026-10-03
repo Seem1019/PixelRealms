@@ -49,30 +49,77 @@ public sealed class LootAndVendorTests
     }
 
     [Fact]
-    public void Assignment_UniformAcross4Eligibles_1000Kills() // CA4b
+    public void Assignment_UniformAcross4Eligibles_1000Kills() // CA4b, con LootSystem.CreateBag (antes el test reimplementaba el sorteo)
     {
-        var db = TestContent.Load();
-        var w = new WorldBuilder().WithMap(60, 60).WithPlayer("A", "warrior", 5, (10, 10)).WithPlayer("B", "rogue", 5, (11, 10))
+        using var tmp = new TempContent();
+        tmp.Patch("loot_tables.json", n =>
+        {
+            foreach (var t in n["lootTables"]!.AsArray())
+                if (t!["id"]!.GetValue<string>() == "lt_slime")
+                    t["entries"] = System.Text.Json.Nodes.JsonNode.Parse("""[{"itemId":"slime_goo","chance":1},{"itemId":"bread","chance":1},{"itemId":"copper_ore","chance":1}]""");
+        });
+        var content = PixelRealms.Content.ContentLoader.LoadOrThrow(tmp.Path);
+        var w = new WorldBuilder(content).WithMap(60, 60).WithPlayer("A", "warrior", 5, (10, 10)).WithPlayer("B", "rogue", 5, (11, 10))
             .WithPlayer("C", "mage", 5, (10, 11)).WithPlayer("D", "priest", 5, (11, 11)).WithMonster("slime", (12, 10), wanderRadius: 0).BuildWithCombat();
         var players = new[] { w.Player("A"), w.Player("B"), w.Player("C"), w.Player("D") };
         w.Combat.Loot.EligibleFor = (_, _, _) => players;
         var slime = w.Monster("slime");
         var counts = new Dictionary<Guid, int>();
-        var allThree = 0; var bagsWith3 = 0;
-        var table = db.LootTable("lt_slime") with { Entries = [new LootEntry { ItemId = "slime_goo", Chance = 1 }, new LootEntry { ItemId = "bread", Chance = 1 }, new LootEntry { ItemId = "copper_ore", Chance = 1 }] };
+        var allThree = 0;
         for (var i = 0; i < 1000; i++)
         {
-            var ctx = w.Begin();
-            var (_, items) = LootSystem.Roll(table, ctx.Rng, db);
-            items.Count.ShouldBe(3);
-            var owners = new List<Guid>();
-            foreach (var _ in items) { var owner = players[ctx.Rng.Next(0, players.Length)]; owners.Add(owner.CharacterId); counts[owner.CharacterId] = counts.GetValueOrDefault(owner.CharacterId) + 1; }
-            bagsWith3++;
-            if (owners.Distinct().Count() == 1) allThree++;
+            var bag = w.Combat.Loot.CreateBag(slime, players[0], w.Map, w.Begin())!;
+            bag.Entries.Count.ShouldBe(3);
+            foreach (var e in bag.Entries) counts[e.OwnerCharacterId] = counts.GetValueOrDefault(e.OwnerCharacterId) + 1;
+            if (bag.Entries.Select(e => e.OwnerCharacterId).Distinct().Count() == 1) allThree++;
         }
-        foreach (var p in players) (counts[p.CharacterId] / 3000.0).ShouldBeInRange(0.22, 0.28);
-        (allThree / (double)bagsWith3).ShouldBeInRange(1 / 16.0 - 0.03, 1 / 16.0 + 0.03);
-        _ = slime;
+        foreach (var p in players) (counts[p.CharacterId] / 3000.0).ShouldBeInRange(0.22, 0.28); // ≈ 25 % ± 3 %
+        (allThree / 1000.0).ShouldBeInRange(1 / 16.0 - 0.03, 1 / 16.0 + 0.03); // los tres al mismo ≈ 1/16
+    }
+
+    [Fact]
+    public void TwoTakesOfTheSameEntryInOneTick_OnlyTheFirstGetsIt() // CA5: la cola del tick serializa y la entrada desaparece
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob"); var slime = w.Monster("slime");
+        w.Combat.Loot.EligibleFor = (_, _, _) => [ana, bob];
+        var bag = w.Combat.Loot.CreateBag(slime, ana, w.Map, w.Begin())!;
+        bag.Entries.Clear();
+        bag.Entries.Add(new LootEntryState(0, "bread", 1, ana.CharacterId, w.Clock.NowMs)); // ya libre para cualquiera
+        bob.Position = slime.Position; ana.Position = slime.Position;
+        int Bread(Player p) => p.Inventory.Bag.Where(i => i?.TemplateId == "bread").Sum(i => i!.Qty);
+        var (anaBread, bobBread) = (Bread(ana), Bread(bob));
+        var ctx = w.Begin();
+        w.Combat.Loot.Take(ana, slime.Id, 0, w.Map, ctx).ShouldBeNull();
+        w.Combat.Loot.Take(bob, slime.Id, 0, w.Map, ctx).ShouldBe("not_found");
+        Bread(ana).ShouldBe(anaBread + 1);
+        Bread(bob).ShouldBe(bobBread); // nadie lo recibe dos veces
+    }
+
+    [Fact]
+    public void Groups_PickByWeight_WithFixedRng_AndGoldSplitsEvenly() // CA6
+    {
+        var db = TestContent.Load();
+        var table = new LootTable
+        {
+            Id = "test", Gold = new IntRange { Min = 10, Max = 10 }, Entries = [],
+            Groups = [new LootGroup { Rolls = 1, Entries = [new LootGroupEntry { ItemId = "bread", Weight = 1 }, new LootGroupEntry { ItemId = "slime_goo", Weight = 3 }] }],
+        };
+        // roll · pesoTotal (4): 0,2 → 0,8 cae en el primero (peso 1); 0,5 → 2,0 cae en el segundo (pesos 1..4).
+        LootSystem.Roll(table, new FixedRng(0.2), db).Items.ShouldBe(new[] { ("bread", 1) });
+        LootSystem.Roll(table, new FixedRng(0.5), db).Items.ShouldBe(new[] { ("slime_goo", 1) });
+        LootSystem.Roll(table, new FixedRng(0.5), db).Gold.ShouldBe(10);
+
+        // Oro a partes iguales entre 3 y el resto al primero que abre, con la asignación de items fijada por FixedRng.
+        var w = new WorldBuilder().WithMap(40, 40).WithRng(new FixedRng(0.0)).WithPlayer("Ana", "warrior", 5, (10, 10)).WithPlayer("Bob", "mage", 5, (11, 10))
+            .WithPlayer("Cid", "priest", 5, (10, 11)).WithMonster("slime", (12, 10), wanderRadius: 0).BuildWithCombat();
+        var three = new[] { w.Player("Ana"), w.Player("Bob"), w.Player("Cid") };
+        w.Combat.Loot.EligibleFor = (_, _, _) => three;
+        var bag = w.Combat.Loot.CreateBag(w.Monster("slime"), three[0], w.Map, w.Begin())!;
+        bag.Entries.ShouldAllBe(e => e.OwnerCharacterId == three[0].CharacterId); // FixedRng(0) → índice 0 siempre
+        var gold = bag.GoldShares.Values.Sum() + bag.GoldRemainder;
+        bag.GoldShares.Values.Distinct().Count().ShouldBe(1);
+        bag.GoldRemainder.ShouldBe(gold % 3);
     }
 
     [Fact]
@@ -88,16 +135,28 @@ public sealed class LootAndVendorTests
         var bag = w.Combat.Loot.CreateBag(slime, ana, w.Map, ctx)!;
         bag.Eligible.Count.ShouldBe(2);
         ctx.Events.OfType<LootAvailableEvent>().Single().Bag.ShouldBe(bag);
-        // Oro repartido a partes iguales (el resto al primero).
-        var totalGold = bag.GoldShares.Values.Sum();
-        (bag.GoldShares[ana.CharacterId] - bag.GoldShares[bob.CharacterId]).ShouldBeInRange(0, 1);
-        // Abrir: distancia ≤ lootRangeTiles, cobra mi oro.
+        // Oro repartido a partes iguales; el resto, para el primero que abra (HU-062 CA3).
+        var share = bag.GoldShares[ana.CharacterId];
+        bag.GoldShares[bob.CharacterId].ShouldBe(share);
+        var remainder = bag.GoldRemainder;
+        remainder.ShouldBeInRange(0, 1);
+        // Muerto no abre ni toma (HU-037 CA3).
+        ana.Hp = 0;
+        w.Combat.Loot.Open(ana, slime.Id, w.Map, ctx).Error.ShouldBe("is_dead");
+        w.Combat.Loot.TakeAll(ana, slime.Id, w.Map, ctx).ShouldBe("is_dead");
+        ana.Hp = ana.MaxHp;
+        // Abrir: distancia ≤ lootRangeTiles, cobra mi oro y la ventana lo sigue mostrando (HU-050 CA2: antes salía 0).
         var goldBefore = ana.Inventory.Gold;
         var (opened, err) = w.Combat.Loot.Open(ana, slime.Id, w.Map, ctx);
         err.ShouldBeNull(); opened.ShouldBe(bag);
-        (ana.Inventory.Gold - goldBefore).ShouldBe(totalGold - bag.GoldShares.Values.Sum());
+        (ana.Inventory.Gold - goldBefore).ShouldBe(share + remainder);
+        bag.GoldFor(ana.CharacterId).ShouldBe(share + remainder);
         w.Combat.Loot.Open(ana, slime.Id, w.Map, ctx); // segunda vez no cobra
-        ana.Inventory.Gold.ShouldBe(goldBefore + totalGold - bag.GoldShares.Values.Sum());
+        ana.Inventory.Gold.ShouldBe(goldBefore + share + remainder);
+        var bobBefore = bob.Inventory.Gold;
+        bob.Position = slime.Position;
+        w.Combat.Loot.Open(bob, slime.Id, w.Map, ctx).Error.ShouldBeNull();
+        (bob.Inventory.Gold - bobBefore).ShouldBe(share); // el resto ya se lo llevó Ana
         // Items: el que no es mío → not_owner hasta exclusiveSec; luego libre.
         foreach (var e in bag.Entries.ToList())
         {
@@ -113,9 +172,10 @@ public sealed class LootAndVendorTests
         // Fuera de alcance y no elegible.
         ana.Position = new Vec2(30, 30);
         w.Combat.Loot.Open(ana, slime.Id, w.Map, ctx2).Error.ShouldBe("out_of_range");
-        var carl = new Player(new EntityId(99), "Carl", "rogue") { CharacterId = Guid.NewGuid(), Position = slime.Position };
+        var carl = new Player(new EntityId(99), "Carl", "rogue") { CharacterId = Guid.NewGuid(), Position = slime.Position, Hp = 50, MaxHp = 50 };
         w.Map.Add(carl);
         w.Combat.Loot.Open(carl, slime.Id, w.Map, ctx2).Error.ShouldBe("not_owner");
+        w.Combat.Loot.TakeAll(carl, slime.Id, w.Map, ctx2).ShouldBe("not_owner"); // antes null: el handler le enviaba la ventana
     }
 
     [Fact]
@@ -230,13 +290,34 @@ public sealed class LootAndVendorTests
         w.Combat.Vendor.Sell(ana, npc.Id, goo.Id, 4, w.Map, ctx, 3).ShouldBeNull();
         ana.Inventory.Gold.ShouldBe(3 + db.Item("slime_goo").SellPrice * 4);
         ana.Inventory.Bag[5].ShouldBeNull();
-        var free = ItemInstance.New("bread", 1);
-        var freeTpl = db.Item("bread") with { SellPrice = 0 };
-        _ = freeTpl;
         // Distancia > vendorRangeTiles → out_of_range
         ana.Position = new Vec2(12 + (float)economy.VendorRangeTiles + 1, 10);
         w.Combat.Vendor.Buy(ana, npc.Id, "bread", 1, w.Map, ctx, 4).ShouldBe("out_of_range");
-        _ = free;
+    }
+
+    [Fact]
+    public void Vendor_ItemWithSellPriceZero_IsNotSold() // HU-055 CA3 (ningún item del contenido actual vale 0: se parchea uno)
+    {
+        using var tmp = new TempContent();
+        tmp.Patch("items.json", n =>
+        {
+            foreach (var it in n["items"]!.AsArray())
+                if (it!["id"]!.GetValue<string>() == "bread") it["sellPrice"] = 0;
+        });
+        var content = PixelRealms.Content.ContentLoader.LoadOrThrow(tmp.Path);
+        var data = new MapData("t", "T", new CollisionGrid(40, 40), [], [new NpcDef("marta", "Marta la tendera", "robledal_general_goods", null, new Vec2(12, 10))],
+            [new GraveyardDef("gy", new Vec2(2, 2))], [], [], "gy");
+        var w = new WorldBuilder(content).WithMap(data).WithPlayer("Ana", "warrior", 5, (10, 10)).BuildWithCombat();
+        var ana = w.Player("Ana");
+        var npc = new Npc(w.World.EntityIds.Next(), data.Npcs[0]) { Position = data.Npcs[0].Position };
+        w.Map.Add(npc);
+        var bread = ItemInstance.New("bread", 3);
+        ana.Inventory.Bag[7] = bread;
+        var gold = ana.Inventory.Gold;
+        w.Combat.Vendor.Sell(ana, npc.Id, bread.Id, 3, w.Map, w.Begin(), 1).ShouldBe("invalid_payload");
+        ana.Inventory.Bag[7].ShouldBe(bread);
+        bread.Qty.ShouldBe(3);
+        ana.Inventory.Gold.ShouldBe(gold);
     }
 
     [Fact]

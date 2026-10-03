@@ -26,16 +26,27 @@ public sealed class LootBag(EntityId lootId, Vec2 position, long expiresAtMs)
     public List<LootEntryState> Entries { get; } = new();
     /// <summary>Oro pendiente por elegible (characterId → cobre).</summary>
     public Dictionary<Guid, long> GoldShares { get; } = new();
+
+    /// <summary>Oro ya cobrado por elegible al abrir: la ventana lo sigue mostrando (HU-050 CA2).</summary>
+    public Dictionary<Guid, long> GoldCollected { get; } = new();
+
+    /// <summary>Lo que sobra al dividir el oro entre los elegibles: para el primero que abra (HU-062 CA3).</summary>
+    public long GoldRemainder { get; set; }
+
+    /// <summary>Oro de este cadáver para `characterId`, cobrado o no: lo que muestra `LootWindow.gold`.</summary>
+    public long GoldFor(Guid characterId) => GoldShares.GetValueOrDefault(characterId) + GoldCollected.GetValueOrDefault(characterId);
+
     public HashSet<Guid> Eligible { get; } = new();
 
     /// <summary>Hubo algo que saquear (si cayó vacío, el cadáver dura su tiempo normal).</summary>
     public bool HadLoot { get; set; }
 
-    public bool IsEmpty => Entries.Count == 0 && GoldShares.Values.All(g => g <= 0);
+    public bool IsEmpty => Entries.Count == 0 && GoldRemainder <= 0 && GoldShares.Values.All(g => g <= 0);
 
     public bool HasLootFor(Guid characterId, long nowMs)
     {
         if (GoldShares.TryGetValue(characterId, out var g) && g > 0) return true;
+        if (GoldRemainder > 0 && Eligible.Contains(characterId)) return true;
         foreach (var e in Entries) if (e.OwnerCharacterId == characterId || nowMs >= e.FreeAtMs) return true;
         return false;
     }
@@ -132,7 +143,7 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
         // Oro a partes iguales; el resto al primero que abra (ver Open).
         var share = gold / eligible.Count;
         foreach (var p in eligible) bag.GoldShares[p.CharacterId] = share;
-        bag.GoldShares[eligible[0].CharacterId] += gold - share * eligible.Count;
+        bag.GoldRemainder = gold - share * eligible.Count;
         var winners = new HashSet<Player>();
         var index = 0;
         foreach (var (templateId, qty) in items)
@@ -154,12 +165,16 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
     {
         var bag = Get(map, lootId);
         if (bag is null) return (null, "not_found");
+        if (p.IsDead) return (null, "is_dead"); // HU-037 CA3
         if (Vec2.Distance(p.Position, bag.Position) > ctx.Rules.Loot.LootRangeTiles) return (null, "out_of_range");
         if (!bag.Eligible.Contains(p.CharacterId)) return (null, "not_owner");
-        if (bag.GoldShares.TryGetValue(p.CharacterId, out var gold) && gold > 0)
+        var gold = bag.GoldShares.GetValueOrDefault(p.CharacterId) + bag.GoldRemainder;
+        if (gold > 0)
         {
             p.Inventory.Gold += gold;
             bag.GoldShares[p.CharacterId] = 0;
+            bag.GoldRemainder = 0;
+            bag.GoldCollected[p.CharacterId] = bag.GoldCollected.GetValueOrDefault(p.CharacterId) + gold;
             p.Dirty = true;
             ctx.Emit(new InventoryChangedEvent(map.Id, p, null));
         }
@@ -171,6 +186,7 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
     {
         var bag = Get(map, lootId);
         if (bag is null) return "not_found";
+        if (p.IsDead) return "is_dead"; // HU-037 CA3
         if (Vec2.Distance(p.Position, bag.Position) > ctx.Rules.Loot.LootRangeTiles) return "out_of_range";
         if (!bag.Eligible.Contains(p.CharacterId)) return "not_owner";
         var entry = bag.Entries.FirstOrDefault(e => e.Index == index);
@@ -189,6 +205,10 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
     {
         var bag = Get(map, lootId);
         if (bag is null) return "not_found";
+        if (p.IsDead) return "is_dead"; // HU-037 CA3
+        // Las mismas comprobaciones que Open aunque no haya nada que tomar: si no, un extraño recibía la ventana con el botín ajeno.
+        if (Vec2.Distance(p.Position, bag.Position) > ctx.Rules.Loot.LootRangeTiles) return "out_of_range";
+        if (!bag.Eligible.Contains(p.CharacterId)) return "not_owner";
         string? lastError = null;
         foreach (var entry in bag.Entries.ToList())
         {

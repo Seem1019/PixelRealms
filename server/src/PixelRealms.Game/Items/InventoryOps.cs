@@ -69,7 +69,8 @@ public static class InventoryOps
             if (moved <= 0) { (bag[from], bag[to]) = (dst, src); return OpResult.Success; } // destino lleno: intercambiar
             dst.Qty += moved;
             src.Qty -= moved;
-            if (src.Qty == 0) { bag[from] = null; p.Audit(new PendingAudit(src.Id, "merge", src.TemplateId, moved)); }
+            if (src.Qty == 0) bag[from] = null;
+            p.Audit(new PendingAudit(src.Id, "merge", src.TemplateId, moved)); // también la fusión parcial (HU-057 CA3)
             return OpResult.Success;
         }
         if (qty is { } partial && partial < src.Qty) return OpResult.Fail("invalid_payload"); // no se puede dividir sobre otro item

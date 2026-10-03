@@ -90,4 +90,38 @@ public sealed class PlayerMapperTests
         update.Derived.MaxHp.ShouldBe(maxHp); // el mismo máximo que ve el cliente en los Snapshot
         update.Gold.ShouldBe(50);
     }
+
+    [Fact]
+    public void UnknownTemplate_IsKeptAside_AndSavedAgain_NotDeleted() // HU-057 CA4
+    {
+        var mapper = Mapper();
+        var lost = new SavedItem(Guid.NewGuid(), "espada_retirada", 1, 0, 3);
+        var p = mapper.ToPlayer(Dto() with { Items = [lost] }, new EntityId(1));
+        p.Inventory.Bag[3].ShouldBeNull(); // no se muestra ni se usa
+        p.Unplaced.Single().Id.ShouldBe(lost.Id);
+        var saved = mapper.ToSave(p);
+        saved.Items.ShouldContain(i => i.Id == lost.Id && i.Container == PlayerMapper.UnplacedContainer);
+    }
+
+    [Fact]
+    public void TwoItemsInTheSameSlot_TheSecondMovesToAFreeBagSlot() // HU-057: antes el segundo pisaba al primero y se perdía
+    {
+        var mapper = Mapper();
+        var a = new SavedItem(Guid.NewGuid(), "bread", 2, 0, 0);
+        var b = new SavedItem(Guid.NewGuid(), "minor_healing_potion", 1, 0, 0);
+        var p = mapper.ToPlayer(Dto() with { Items = [a, b] }, new EntityId(1));
+        p.Inventory.Bag[0]!.Id.ShouldBe(a.Id);
+        p.Inventory.Bag.Count(i => i?.Id == b.Id).ShouldBe(1);
+        p.Unplaced.ShouldBeEmpty();
+        mapper.ToSave(p).Items.Select(i => (i.Container, i.Slot)).Distinct().Count().ShouldBe(2); // sin casillas repetidas
+    }
+
+    [Fact]
+    public void Rage_StartsAtZeroOnEveryEntry_ManaIsKept() // HU-039 CA2
+    {
+        var mapper = Mapper();
+        mapper.ToPlayer(Dto() with { Resource = 80 }, new EntityId(1)).Resource.ShouldBe(0); // Guerrero: ira
+        var mage = mapper.ToPlayer(Dto() with { ClassId = "mage", Resource = 30 }, new EntityId(2));
+        mage.Resource.ShouldBe(30);
+    }
 }

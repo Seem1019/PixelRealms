@@ -85,7 +85,8 @@ public sealed class LootOpenHandler(CombatHandlerDeps deps) : IMessageHandler<Lo
             var owner = map.Players.Values.FirstOrDefault(pl => pl.CharacterId == e.OwnerCharacterId);
             items.Add(new LootEntryDto(e.Index, e.TemplateId, e.Qty, owner?.Id.Value ?? 0, (int)Math.Max(0, e.FreeAtMs - nowMs)));
         }
-        return new LootWindow(bag.LootId.Value, bag.GoldShares.GetValueOrDefault(viewer.CharacterId), items);
+        // Oro de este cadáver para quien mira: se cobra al abrir, pero la ventana lo sigue enseñando (antes salía siempre 0).
+        return new LootWindow(bag.LootId.Value, bag.GoldFor(viewer.CharacterId), items);
     }
 }
 
@@ -109,7 +110,8 @@ public sealed class LootTakeAllHandler(CombatHandlerDeps deps) : IMessageHandler
         if (p is null || deps.MapOf(p) is not { } map) return;
         var error = deps.Combat.Loot.TakeAll(p, new EntityId(msg.LootId), map, ctx.Tick);
         if (error is not null) ctx.SendError(error);
-        if (deps.Combat.Loot.Get(map, new EntityId(msg.LootId)) is { } bag) ctx.Send(LootOpenHandler.LootWindowFor(bag, p, map, ctx.Tick.NowMs));
+        // La ventana solo a quien puede saquear: con not_owner, out_of_range o is_dead revelaría el botín de cualquier cadáver.
+        if (error is null or "bag_full" && deps.Combat.Loot.Get(map, new EntityId(msg.LootId)) is { } bag) ctx.Send(LootOpenHandler.LootWindowFor(bag, p, map, ctx.Tick.NowMs));
     }
 }
 
