@@ -40,7 +40,10 @@ func _ready() -> void:
 	stage.size = Vector2(cell - 1, cell * 3 - 1)
 	doll.add_child(stage)
 	_figure = TextureRect.new()
-	_figure.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	_figure.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  # 32×32 lógicos aunque la hoja sea HD (HU-099)
+	_figure.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_figure.custom_minimum_size = Vector2(32, 32)
+	_figure.size = Vector2(32, 32)
 	_figure.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stage.add_child(_figure)
 	for i: int in 9:
