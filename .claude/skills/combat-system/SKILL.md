@@ -25,7 +25,7 @@ está construido y cómo extenderlo sin romperlo.
 ## Pipeline de un hechizo
 ```
 CastSpell(msg) ─► CastSystem.TryBeginCast
-   ├─ validar: conoce, levelReq, !dead, !stunned, !silenced(si `magic`), !locked_out, CD, GCD, (si ya castea: cancelar el casteo actual, ADR-019)
+   ├─ validar: conoce, equipado en la barra (handler: `not_equipped`), levelReq, !dead, !stunned, !silenced y !locked_out (salvo objetos: pociones sí), CD, GCD, (si ya castea: cancelar el casteo actual, ADR-019)
    │           recurso ≥ coste, objetivo válido para targeting (jugador enemigo solo si PvpService.CanAttack), rango, LOS
    │           `ground_*`, cono, línea y `leap`: targetPos obligatorio, rango y LOS al punto; queda fijo en CastState (ADR-015/016)
    ├─ castMs == 0 ─► Resolve inmediato
@@ -38,7 +38,8 @@ EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto 
 - El impacto programado (proyectil) se guarda en `PendingImpacts` (cola por `atMs`) y se resuelve aunque el lanzador
   muera; si el objetivo murió, se descarta.
 - Moverse **no** interrumpe: mientras se castea, `MovementSystem` aplica `rules.combat.castMoveSpeedMult` (0.5). Solo cortan un
-  casteo `stun`, `silence` (hechizos `magic`) y el efecto `interrupt` → `interruptLockoutMs` sin castear (ADR-019).
+  casteo `stun`, `silence` (cualquier habilidad, física o mágica; no los objetos) y el efecto `interrupt` → `interruptLockoutMs`
+  sin castear (ADR-019).
 - Fin de casteo a un objetivo fuera de alcance (tolerancia 1.5) o sin LOS → `CastEnded{failed}` sin coste. Áreas y saltos: punto
   fijo, sin revalidar alcance. Un `CastSpell` nuevo o un salto durante un casteo lo cancelan (`cancelled`, sin coste).
 
@@ -75,7 +76,9 @@ entrada en `Evade`. Detalles en `docs/design/combat.md` §Monstruos.
 
 ## Rendimiento (ADR-018)
 - Áreas: rejilla AOI + pruebas de forma sin raíces ni trigonometría; LOS desde el centro solo para candidatos; topes en `rules.limits`.
-- Reservas de capacidad fija para áreas, impactos y auras; eventos del tick en buffer circular; sin LINQ ni closures en sistemas.
+- Reservas de capacidad fija para impactos (structs) y auras (reserva de instancias, se reutilizan desde el tick siguiente); sin
+  LINQ ni closures en sistemas; recorrer `map.Actors.Values` no asigna (`EntityTable`). Los eventos del tick siguen siendo
+  records (HU-088 CA1 enmendado): `TickAllocationTests` exige 0 bytes por tick sin combate y el escenario ≤ 16 KB por tick.
 - Presupuesto: combate ≤ 4 ms p99 por instancia; verificación con el escenario de HU-089.
 
 ## Tests mínimos por cambio de combate

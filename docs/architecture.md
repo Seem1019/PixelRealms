@@ -47,7 +47,8 @@ Protocol  ←  Game  ←  Server  →  Persistence
 - `PixelRealms.Persistence`: `GameDbContext`, entidades EF, `ICharacterRepository`, `IAccountRepository`.
 - `PixelRealms.Server`: `Program.cs` (minimal APIs), `ConnectionManager`, `WebSocketSession`,
   `GameLoopService : IHostedService` (arranca el hilo), `MessageRouter`, `SnapshotBuilder`, `SaveService`,
-  `WorldStats` (recuentos por instancia que calcula el hilo del tick y publica como copia inmutable para `/admin/stats`).
+  `WorldStats` (recuentos, tiempos de combate y memoria asignada por segundo por instancia, que calcula el hilo del tick y
+  publica como copia inmutable para `/admin/stats`; la memoria sale de `Simulation.InstanceAllocs`).
 
 ## 3. Game loop (servidor)
 
@@ -58,7 +59,9 @@ Orden estricto de cada tick (los pasos 3–9 se ejecutan **por cada `MapInstance
 1. `DrainInbound()` – vacía `Channel<InboundMessage>` (máx 500 msgs/tick). Conexiones/desconexiones incluidas.
 2. `Commands` – valida y aplica intenciones (`MessageRouter` → handlers). Handlers **no** calculan daño:
    encolan acciones (`BeginCast`, `SetMoveInput`, `InventoryOp`).
-3. `MovementSystem` – integra movimiento con colisión AABB contra la grilla de colisión del mapa.
+3. `MovementSystem` – integra movimiento con colisión AABB contra la grilla de colisión de la instancia (`MapInstance.Collision`:
+   la del mapa o, si tiene puertas, una copia propia donde las cerradas son sólidas). Después, `MapObjectSystem` cierra las
+   puertas cuyo plazo venció (palancas y puertas, HU-083).
 4. `CastSystem` – avanza casteos, resuelve los completados → `EffectResolver` (daño, cura, auras).
 5. `AuraSystem` – ticks de DoT/HoT, expiraciones.
 6. `MonsterAiSystem` – monstruos: Idle → Chase → Attack → Evade (`AiState`).
@@ -115,7 +118,8 @@ sequenceDiagram
 ## 5. Persistencia
 - El estado vivo está en memoria. La BD es la copia durable.
 - Guardado: al salir (logout, cierre o linkdead vencido), al cambiar de mapa, al subir de nivel, al cambiar de clase, al
-  reemplazar la sesión, al completar un intercambio (los dos en el mismo tick), al morir, cada 60 s si `Dirty`, y al apagar
+  reemplazar la sesión, al completar un intercambio (los dos en una sola transacción: `SaveService.EnqueueTogether` →
+  `ICharacterRepository.SaveManyAsync`), al morir, cada 60 s si `Dirty`, y al apagar
   el servidor (`GameLoopService.OnStopping`).
 - `SaveService` guarda **el personaje completo** (stats, posición, items, barra y cooldowns) en **una transacción**:
   `DELETE character_items WHERE character_id = X` + `INSERT` masivo. Simple y sin inconsistencias para el volumen MVP.

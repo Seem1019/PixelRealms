@@ -21,6 +21,8 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 | `graveyards` | objetos (puntos) | respawn de jugadores |
 | `zones` | objetos (rectángulos) | nombre de zona, `safe=true` (sin combate), rango de niveles |
 | `portals` | objetos | cambio de mapa (MVP: entrada a la Mina; ADR-007) |
+| `levers` | objetos (puntos) | palancas (HU-083): `leverId`, `doorId` de la puerta que abren; `opensAlone: true` = la abre ella sola (pon una dentro de cada sala que se pueda cerrar) |
+| `doors` | objetos (rectángulos) | puertas (HU-083): `doorId`; cerradas son sólidas y tapan la vista; se abren con todas sus palancas |
 
 ## Propiedades personalizadas
 - Tile (en el tileset): `solid: bool`, `blocksSight: bool` (paredes sí, arbustos bajos no).
@@ -55,7 +57,7 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 ## Buenas prácticas de diseño
 - Bordes del mapa siempre sólidos. Caminos de ≥ 3 tiles de ancho. Zonas separadas por cuellos de botella naturales.
 - Densidad: 1 spawn cada ~8×8 tiles en zonas de farmeo; aggro radius no debe solaparse entre grupos.
-- Zonas abiertas: 60–90 s de caminata para cruzarlas (~100×100 tiles útiles a 4 tiles/s), un punto de referencia visible,
+- Zonas abiertas: 25–40 s de caminata para cruzarlas (~100×100 tiles útiles a 4 tiles/s), un punto de referencia visible,
   sendero principal obvio, 2–3 campamentos con subniveles (bajos en la entrada, altos en la salida), ramas laterales con recompensa.
 - Cuevas (mapas aparte): 3–5 salas, 5–10 min; sala del jefe en rama lateral; sala élite antes de la salida al tier siguiente.
   Todas comparten el tileset `interior` cambiando paleta (mina marrón, cripta verde, fortaleza gris).

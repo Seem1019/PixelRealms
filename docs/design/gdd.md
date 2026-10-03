@@ -66,8 +66,9 @@ TIER 3 · Montaña (nv 11-15)                      ▼   ← Fase 3 (diseñado)
 ### Zonas abiertas (overworld)
 - Todas las zonas de un tier viven en **un solo mapa** (`meadow` para el Tier 1): se recorren sin cambio de mapa,
   delimitadas por cuellos de botella naturales, no por portales.
-- Se dimensionan por **tiempo de caminata**: cruzar una zona toma 60–90 s (`rules.world.zoneCrossTimeSecTarget`).
-  A 4 tiles/s (`rules.movement.baseSpeedTilesPerSec`) son ~100×100 tiles de área útil por zona.
+- Se dimensionan por **tiempo de caminata**: cruzar una zona toma 25–40 s (`rules.world.zoneCrossTimeSecTarget`), ~100×100
+  tiles de área útil a 4 tiles/s (`rules.movement.baseSpeedTilesPerSec`). Mapas compactos a propósito: con ~20 amigos, se
+  cruzan entre ellos (decisión 2026-10-03; el objetivo anterior de 60–90 s no cuadraba con ese tamaño).
 - Cada zona tiene un **punto de referencia visible** (torre, árbol enorme, lago), un **camino principal obvio**
   (sendero) con ramas laterales opcionales que dan recompensa (cofre, mob raro, recurso) y **2–3 campamentos de
   monstruos** con subniveles: los de menor nivel cerca de la entrada, los de mayor hacia la salida.
@@ -120,8 +121,9 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   tener casteo o retardo visible (regla para el rediseño de kits).
 - **Castear ralentiza, no inmoviliza (ADR-019).** Se puede mover mientras se castea al **50 %** de la velocidad
   (`rules.combat.castMoveSpeedMult`). Moverse no corta el casteo y recibir daño tampoco: **solo lo cortan los controles que
-  impiden castear (aturdir; silenciar para hechizos mágicos) y las habilidades de interrumpir**, y tras un corte no se puede
-  castear durante 1,5 s (`interruptLockoutMs`). Raíz y ralentización no cortan.
+  impiden castear (aturdir y silenciar) y las habilidades de interrumpir**, y tras un corte no se puede castear durante 1,5 s
+  (`interruptLockoutMs`). Raíz y ralentización no cortan. Silenciado (o recién interrumpido) no se lanza ninguna habilidad, pero
+  sí se beben pociones y se ataca con el arma.
   - Si al terminar un hechizo a un objetivo este quedó fuera de alcance (con tolerancia de 1,5 casillas) o de línea de
     visión, el casteo falla sin gastar recurso ni cooldown (el cooldown global sí).
   - En las áreas, el punto, el origen y la dirección se fijan al empezar y no se vuelve a comprobar el alcance al terminar:
@@ -210,7 +212,10 @@ Objetivo provisional (HU-084): con nivel y equipo iguales, el favorito gana entr
   solo se salva si acierta la Nova antes de la Gubia.
 - El **Sacerdote** queda fuera del triángulo: gana al Guerrero por desgaste (lo cura más de lo que él daña), pierde con
   el Pícaro (aturdimiento + burst antes de que la cura salga) y va parejo con el Mago (burst vs. curas, guerra de maná).
-- Palanca fina: `rules.classAdvantage` (multiplicador de daño atacante → defensor, hoy todo en 1.0).
+- Palanca: `rules.classAdvantage` (multiplicador de daño atacante → defensor, en básicos, hechizos y DoT). Desde HU-084
+  (2026-10-03) no es una palanca fina: con todo en 1.0 los duelos salían 0–100 %, y la matriz actual (Guerrero→Pícaro 0,63,
+  Guerrero→Mago 0,38, Pícaro→Mago 0,54, Pícaro→Sacerdote 0,93, Mago→Sacerdote 1,45, Sacerdote→Guerrero 1,12) deja al favorito
+  en 63–68 % en duelos simulados. Hay que confirmarlo jugando (`balance-report.md`, pasada de HU-084).
 
 ## Progresión
 Todas las constantes en `rules.progression` y `rules.group`.
@@ -287,8 +292,9 @@ Cambiar de clase nunca debe ser tedioso.
 ## PvP amistoso (duelos)
 - `/duel Nombre` o clic derecho → "Retar". El otro acepta o rechaza (expira en 30 s). Cuenta atrás de 3 s y empieza.
 - Termina cuando un participante baja al 1 % de vida (`endAtHpPct`), se aleja más de 30 tiles, se desconecta o se rinde
-  (`/rendirse`). Al terminar ambos vuelven a la vida y el recurso que tenían al empezar el duelo y pierden las auras del
-  rival (así no sirve para curarse gratis). Sin pérdida de XP, oro, items ni durabilidad. No se puede retar ni aceptar en
+  (`/rendirse`). Al terminar nadie se cura: cada uno se queda con la vida con que acabó y pierde las auras del rival. Como en
+  Albion, quien pierde por vida se recupera un poco más rápido (× 2 y sin esperar a salir de combate) hasta la vida con que
+  empezó el duelo o hasta volver a pelear; rendirse no da recuperación y el ganador se cura como siempre. Sin pérdida de XP, oro, items ni durabilidad. No se puede retar ni aceptar en
   combate, y un duelista en duelo activo no es aliado de nadie más (ni cura ni lo curan).
 - Permitido en la aldea y en cualquier zona. Los monstruos ignoran a los duelistas y viceversa (no se puede usar un mob de escudo).
 - Nota técnica (ADR-011): un `PvpRuleset` (`rules.pvp.rulesets`) define quién puede atacar a quién, cómo termina y qué

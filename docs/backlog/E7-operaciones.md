@@ -40,13 +40,13 @@
 ---
 ### HU-072 · Métricas y logs del servidor
 **Como** administrador **quiero** ver el estado del servidor **para** detectar problemas de rendimiento.
-- Prioridad: Should · Estimación: S · Estado: Parcial
+- Prioridad: Should · Estimación: S · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `dotnet-server`
 
 **Criterios de aceptación**
 1. **Dado** `GET /health` **entonces** responde 200 con `{status, players, tickP99Ms, uptime}`.
-2. **Dado** Serilog **entonces** en producción escribe JSON a consola con `CharacterName`, `AccountId`, `ConnId` como propiedades cuando aplique.
+2. **Dado** producción **entonces** el servidor escribe JSON a consola (`AddJsonConsole`, enmendado 2026-10-03: sin Serilog) con `CharacterName`, `AccountId`, `ConnId` como propiedades cuando aplique, y Docker guarda los logs con rotación.
 3. **Dado** `GET /admin/stats` (JWT admin) **entonces** muestra jugadores, monstruos, mensajes/s entrantes y salientes, bytes/s y, por instancia, tiempo de combate p99, áreas y auras activas y memoria asignada por segundo.
 
 **Notas de implementación**
@@ -54,7 +54,8 @@
 - `GET /admin/stats` (JWT con claim admin; 401 sin token, 403 sin admin): uptime, tick p50/p99/max, conexiones, jugadores, monstruos, mensajes/s y bytes/s dentro/fuera (`NetMetrics`, muestra cada segundo desde el GameLoop), `allocBytesPerSec` del proceso, Gen2, working set y por instancia: jugadores, monstruos, `combatP50Ms`/`combatP99Ms` (sistemas casts/auras/monster_ai/auto_attack/resources/death, `Simulation.CombatTimings`), `areasActive` (impactos de área pendientes) y `aurasActive`.
 - CA2 **parcial**: sin NuGet no se puede añadir Serilog; en Producción se usa `AddJsonConsole` con scopes y el router abre un scope `ConnId`/`CharacterName`/`AccountId` por mensaje (decisión provisional en docs/progress/fase-1.md). Para pasar a Serilog: `Serilog.AspNetCore` + `UseSerilog` en `ServerApp.Build`.
 - Tests: `MetricsTests` (3) y `CombatTimingTests` (1).
-- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: `/admin/stats` toma los recuentos por instancia de `WorldStats` (copia publicada por el tick). **Falta decidir** CA2 (Serilog o el `AddJsonConsole` actual) y la memoria por instancia de CA3 (.NET solo la da por proceso).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: `/admin/stats` toma los recuentos por instancia de `WorldStats` (copia publicada por el tick). Faltaban CA2 y la memoria por instancia *(cerrado el 2026-10-03, ver la nota siguiente)*.
+- 2026-10-03 (rama `feat/phase1-close-out`): CA2 decidido: `AddJsonConsole` y rotación de logs de Docker (5 × 10 MB por servicio, `x-logging` en `docker-compose.prod.yml`). CA3: `Simulation.InstanceAllocs` mide con `GC.GetAllocatedBytesForCurrentThread` lo que asignan los sistemas de cada instancia (todas corren en el hilo del tick) y `/admin/stats` publica `allocBytesPerSec` por instancia (`GameLoopTests.InstanceAllocs_ChargeEachInstanceWithWhatItsSystemsAllocated`, `MetricsTests`).
 
 ---
 ### HU-073 · Despliegue en VPS con TLS (wss)
@@ -75,6 +76,7 @@
 - `docs/deploy.md`: VPS/dominio, DNS, firewall (22/80/443), variables, primer despliegue, actualizar, logs, backups y restauración.
 - `.github/workflows/deploy.yml` (`workflow_dispatch`): build+push a GHCR y despliegue por SSH (`appleboy/scp-action` + `ssh-action`); secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_PATH?`. Ya se ejecuta en cada push verde a `main` (ver `docs/deploy.md`). *(cerrado el 2026-10-02: ver la última nota)*
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Comprobado en producción: https con certificado válido, COOP/COEP en `/play/`, `wss://…/ws` responde 101 y `/health` OK. CA1: imagen de 56 MiB comprimida y ~136 MB descomprimida (< 150 MB). `UseForwardedHeaders` va antes de `UseRateLimiter` (con test), así que los límites de login y registro cuentan la IP real detrás de Caddy.
+- 2026-10-03 (rama `feat/phase1-close-out`): `X-Forwarded-For` solo se cree si la conexión viene de `Net:TrustedProxyNetworks` (por defecto loopback y rangos privados, donde está Caddy en la red de compose): `AuthEndpointsTests.Login_FromAnUntrustedProxy_IgnoresTheForwardedIp`.
 
 ---
 

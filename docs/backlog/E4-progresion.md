@@ -71,6 +71,8 @@
 
 **Notas de implementación**
 - `client/scripts/ui/spellbook_window.gd` (tecla P): hechizos de la clase, no aprendidos en gris con "Nivel X", arrastrar a casillas 1–4 → `SetHotbar`; consumibles de la bolsa a 5–8 con la cantidad total en bolsa; Shift+arrastrar fuera quita. Servidor `SetHotbarHandler` rechaza hechizo en casilla de utilizables o consumible en casilla de hechizo (`invalid_payload`); persiste en `character_hotbar`.
+- 2026-10-03 (rama `feat/phase1-close-out`): `CastSpell` exige que el hechizo esté en una casilla de hechizo de la barra (ADR-014): si no, `not_equipped` (`CombatFlowTests.CastSpell_KnownButNotOnTheBar_IsNotEquipped`). Al subir de nivel, el cliente ya coloca los hechizos nuevos con `SetHotbar`.
+- 2026-10-03 (revisión de autoridad): en combate, una casilla de hechizo ocupada no se cambia ni se vacía (`in_combat`): si no, cambiarla antes de cada `CastSpell` daba todo el kit a mano. Llenar una vacía sí (lo usa el cliente al subir de nivel). El cliente lleva su propio "en combate" con los golpes que recibe (`GameState.is_in_combat`) y no lo pide (`SetHotbarTests.InCombat_*`, `test_combat_state.gd`).
 
 ---
 ### HU-044 · Cambio de clase en NPC (Fases 1–2)

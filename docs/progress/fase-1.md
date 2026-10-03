@@ -11,6 +11,10 @@
 > Tras la rama `fix/phase1-audit-blockers` (2026-10-02): 57 HUs hechas, 17 parciales y 1 pendiente (HU-084). De las
 > parciales, 8 esperan trabajo estético (HU-005, 024, 035, 038, 041, 050, 081 y 082) y las otras 9 esperan una decisión
 > o una prueba fuera del repo (HU-064 CA3, 072, 074, 075, 080, 083, 086 CA7b, 088, 089 CA3). Cada ficha dice qué le falta.
+>
+> Tras la rama `feat/phase1-close-out` (2026-10-03, decisiones del 2026-10-03 aplicadas): 63 hechas, 13 parciales y HU-100
+> pendiente (áreas duraderas, Fase 2). Las parciales son 8 estéticas (HU-005, 024, 035, 038, 041, 050, 081, 082) y 5 que esperan
+> una prueba fuera del repo o la partida con amigos (HU-074, 075, 083 CA3, 084 CA3/CA4, 089 CA3).
 
 ## Entorno de la sesión (2026-10-01)
 - Compilación y tests: SDK .NET 10 (10.0.112) en un sandbox Linux **sin acceso a NuGet**. El repo referencia los paquetes
@@ -95,9 +99,13 @@
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 - **HU-072 · JSON por consola con `AddJsonConsole` (Producción) + scope `ConnId`/`CharacterName`/`AccountId` en el router**,
   en lugar de Serilog (sin acceso a NuGet aquí). Descartado: dejar el CA2 sin cubrir. Cambiar a Serilog es sustituir el bloque
-  `builder.Logging.*` de `ServerApp.Build` por `UseSerilog`; los scopes salen igual.
+  `builder.Logging.*` de `ServerApp.Build` por `UseSerilog`; los scopes salen igual. *Decidido el 2026-10-03: se queda
+  `AddJsonConsole` con rotación de logs de Docker (CA2 enmendado).*
 - **HU-072 · `allocBytesPerSec` es del proceso entero** (`GC.GetTotalAllocatedBytes`): .NET no permite medir asignaciones por
   instancia de mapa sin instrumentar cada sistema. Descartado: estimar por proporción de entidades (inventaría un número).
+  *Corregido el 2026-10-03: todas las instancias corren en el hilo del tick, así que `GC.GetAllocatedBytesForCurrentThread`
+  alrededor de cada sistema y cada instancia sí da la memoria asignada por instancia (`Simulation.InstanceAllocs`); `/admin/stats`
+  la publica por instancia y mantiene la del proceso.*
 - **HU-072 · "áreas activas" = impactos de área pendientes** (`CastSystem.PendingImpacts`): las áreas de Fase 1 son instantáneas
   tras el casteo (ADR-015/023), no hay zonas persistentes todavía.
 - **HU-070 · `/gold` audita con `item_id = Guid.Empty` y `template_id = "gold"`**: `item_audit_log` no tiene columna de oro.
@@ -153,6 +161,7 @@ _(contradicciones o huecos descubiertos al implementar; cambios mínimos hechos 
 - **HU-080:** la skill `world-maps` y el GDD piden "~100×100 casillas útiles por zona" **y** "60–90 s para cruzarla": a
   `baseSpeedTilesPerSec = 4`, 100 casillas son 25 s; para 60–90 s harían falta ~240–360 casillas o caminos muy sinuosos. Se
   siguió el tamaño (100×100) y se deja la contradicción para que Diego decida (tamaño, velocidad o tiempo objetivo).
+  *Decidido el 2026-10-03: se mantiene el tamaño y el objetivo pasa a 25–40 s.*
 - **HU-070:** `item_audit_log` no tiene columna para oro; `/gold` se audita con `item_id = Guid.Empty` y `template_id = "gold"`.
 - **HU-071:** `docs/architecture.md` §4 fija los límites de rate pero `rules.json`/ADR-008 solo hablan de constantes de juego;
   quedaron en `appsettings` (`Net:RateLimits`). Conviene decir en architecture.md dónde viven.

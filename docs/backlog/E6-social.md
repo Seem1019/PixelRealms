@@ -74,14 +74,14 @@
 ---
 ### HU-064 · Duelos (PvP amistoso)
 **Como** jugador **quiero** retar a un amigo a un duelo **para** medirnos sin perder nada.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-033, HU-035, HU-037, HU-060
 - Skills: `combat-system`, `net-protocol`, `godot-client`
 
 **Criterios de aceptación**
 1. **Dado** otro jugador visible **cuando** hago clic derecho → "Retar a duelo" o `/duel Nombre` **entonces** recibe `DuelUpdate{state:"requested"}` con Aceptar/Rechazar (expira en `rules.pvp.rulesets.duel.requestExpireSec`).
 2. **Dado** que acepta **entonces** ambos ven una cuenta atrás de `countdownSec` y luego pueden atacarse: los hechizos con `targeting: enemy` aceptan al rival, los `ally` no; el daño aplica `rules.classAdvantage[atacante][defensor]`.
-3. **Dado** que un duelista baja a `endAtHpPct` (1 %) de vida **entonces** no muere: el duelo termina (`DuelUpdate{state:"ended", winner}`), ambos recuperan vida y recurso al 100 %, se limpian sus auras y se anuncia en `say`.
+3. **Dado** que un duelista baja a `endAtHpPct` (1 %) de vida **entonces** no muere: el duelo termina (`DuelUpdate{state:"ended", winner}`) y se anuncia en `say`; nadie se cura: cada uno se queda con la vida y el recurso con que acabó y pierde las auras que le puso el rival. Quien pierde por vida regenera × `rules.pvp.rulesets.duel.loserRegenMult` (2) y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo o hasta volver a entrar en combate (rendirse o alejarse no la da); el ganador regenera como siempre (decisión 2026-10-03, como en Albion).
 4. **Dado** que un duelista se aleja > `maxDistanceTiles`, se desconecta, usa un portal o escribe `/rendirse` **entonces** pierde el duelo.
 5. **Dado** el duelo **entonces** no se pierde XP, oro, items ni durabilidad; los monstruos ignoran a los duelistas y estos no pueden atacar monstruos ni a terceros mientras dure.
 6. **Dado** la aldea (`safe=true`) **entonces** los duelos están permitidos (`allowedInSafeZones`); cualquier otro daño entre jugadores sigue prohibido (`Error{pvp_not_allowed}`).
@@ -96,7 +96,8 @@
 **Notas de implementación**
 - `Social/PvpService` (única puerta del PvP): `/duel` o clic derecho → `DuelUpdate{requested}` (caduca `requestExpireSec`), aceptar → `countdown` (`countdownSec`) → `active`; `CanAttack(a, b)` devuelve el ruleset o null (sin duelo, otro rival, `enabledRulesets` vacío); daño con `rules.classAdvantage`; al llegar a `endAtHpPct` el daño se recorta, nadie muere, ambos se restauran, se limpian auras y se anuncia en `say`; pierde quien se rinde, se aleja > `maxDistanceTiles`, se desconecta o cambia de mapa; los monstruos ignoran a los duelistas y estos no atacan a monstruos ni terceros; los `ally` no aceptan al rival; mismas reglas de auras (ADR-022). Cliente: diálogo, cuenta atrás, rival en naranja, resultado 3 s.
 - Tests: `SocialTests.Duel_*`, `SocialFlowTests.Duel_*`.
-- 2026-10-02 (rama `fix/phase1-audit-blockers`): Exploit cerrado: no se puede retar ni aceptar en combate, rendirse antes de empezar solo cancela y al terminar cada uno vuelve a la vida y el recurso del inicio del duelo (no al máximo) y pierde las auras del rival. CA2: `classAdvantage` también en el básico y los DoT. CA6: `pvp_not_allowed`. **Falta una decisión:** CA3 dice "recuperan vida y recurso completos"; si se acepta la restauración al estado del inicio, cambiar ese texto y marcarla Hecha.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Exploit cerrado: no se puede retar ni aceptar en combate, rendirse antes de empezar solo cancela y al terminar cada uno vuelve a la vida y el recurso del inicio del duelo (no al máximo) y pierde las auras del rival. CA2: `classAdvantage` también en el básico y los DoT. CA6: `pvp_not_allowed`. *(La restauración al estado del inicio se sustituyó el 2026-10-03, ver la nota siguiente.)*
+- 2026-10-03 (rama `feat/phase1-close-out`): CA3 según la decisión: `restoreOnEnd: false` y `loserRegenMult: 2` en el ruleset `duel`; `PvpService.End` quita las auras del rival y deja al perdedor con `CombatState.Recovery`, que `ResourceSystem` aplica (sin espera, × 2) hasta llenarse o volver a entrar en combate (`SocialTests.Duel_Loser_RecoversFasterAndWithoutTheDelay_TheWinnerRegeneratesNormally`, `Duel_LoserRecovery_EndsWhenFull`).
 
 ### HU-097 · Historial del chat
 **Como** jugador **quiero** subir en el chat **para** leer mensajes que ya pasaron.
@@ -114,3 +115,4 @@
   "↓ nuevos". El desvanecido por inactividad (8 s, `f88c107`, sin HU propia) se suspende con el ratón encima o leyendo arriba.
 - Tests: `test_chat_history.gd` (200 líneas, desplazar sin saltar, seguir al último, no desvanecer leyendo); la rueda y el
   hover no tienen test.
+- 2026-10-03 (revisión de autoridad): la recuperación del perdedor se daba por cualquier final y hasta llenarse (retar, rendirse y regenerar × 2 tras cada pelea). Ahora solo al perder por vida y hasta la vida del inicio (`PostDuelRecovery.UntilHp`): `SocialTests.Duel_LoserRecovery_OnlyGivesBackWhatTheDuelTook`, `Duel_LostByForfeit_GivesNoRecovery`.

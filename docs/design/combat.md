@@ -129,8 +129,8 @@ Físico: `miss 5 %` (+1 % por nivel del objetivo sobre el atacante) → `dodge` 
 
 ## Casteo
 - `castMs = 0` ⇒ instantáneo. Durante un casteo el jugador **puede moverse** a `velocidad · castMoveSpeedMult` (0.5; ADR-019).
-  Moverse no interrumpe y recibir daño tampoco. **Solo interrumpen** los controles que impiden castear (`stun`; `silence` en
-  hechizos `magic`) y el efecto `interrupt` (`result: interrupted`); después, `interruptLockoutMs` (1500) sin poder castear.
+  Moverse no interrumpe y recibir daño tampoco. **Solo interrumpen** los controles que impiden castear (`stun` y `silence`) y
+  el efecto `interrupt` (`result: interrupted`); después, `interruptLockoutMs` (1500) sin poder castear.
   `root` y `slow` no interrumpen.
 - **Fin del casteo con objetivo único:** se revalidan alcance (`castRangeToleranceTiles` = 1.5) y LOS; si fallan,
   `CastEnded{result: failed, reason: out_of_range|no_los}`, sin gastar recurso ni cooldown (el GCD ya se gastó).
@@ -180,7 +180,9 @@ Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `t
   para ningún tope; solo pueden no aplicarse por inmunidad de jefe o por la inmunidad de 1,5 s tras un control fuerte (ADR-022).
 - **Controles del mismo tipo no se suman:** con varias ralentizaciones activas manda la más fuerte (`pct` mayor); con varios
   aturdimientos o raíces manda la que termina más tarde. Siguen visibles como iconos, pero solo una tiene efecto.
-- `stun`: no mueve, no castea (interrumpe), no ataca. `root`: no mueve. `silence`: no castea `magic`. `slow`: `speed × (1 − pct)`.
+- `stun`: no mueve, no castea (interrumpe), no ataca ni usa objetos. `root`: no mueve. `silence`: no usa ninguna habilidad de
+  clase, física o mágica (interrumpe), pero sí pociones y el ataque con el arma; el bloqueo tras una interrupción funciona igual
+  (decisión 2026-10-03). `slow`: `speed × (1 − pct)`.
 - `removesKinds`: al aplicarse quita esas auras del objetivo. `immuneKinds`: mientras dura, ignora auras nuevas de esos tipos (Carrera: root, slow).
 - Monstruos con `boss: true` ignoran `bossImmuneToAuraKinds` (stun, root, slow).
 
@@ -205,8 +207,10 @@ Los duelistas no generan aggro ni amenaza mientras dura el duelo.
 
 ## Muerte y reaparición
 `hp ≤ 0` → `Dead`, se limpian auras, los monstruos lo olvidan, `Died`. Reaparece en el punto seguro más cercano con
-`respawnHpPct`/`respawnResourcePct` (50 %). En duelo no se muere: al llegar a `endAtHpPct` el duelo termina y ambos vuelven a la vida y el recurso que tenían al
-empezar (no al máximo) y pierden las auras que les puso el rival.
+`respawnHpPct`/`respawnResourcePct` (50 %). En duelo no se muere: al llegar a `endAtHpPct` el duelo termina; cada uno se queda
+con la vida y el recurso con que acabó y pierde las auras que le puso el rival. Quien pierde por vida regenera × `loserRegenMult`
+(2) y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo (solo recupera lo que el duelo le quitó) o hasta volver a
+entrar en combate; rendirse o alejarse no da recuperación, y el ganador regenera como siempre (HU-064 CA3).
 
 ## Referencia de balance (calculado con estas fórmulas, ver `docs/design/balance-notes.md`)
 Nivel 5 con equipo verde contra Goblin arquero (nv 5), **solo ataque básico**:

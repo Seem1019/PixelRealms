@@ -180,6 +180,8 @@ docker compose -f docker-compose.prod.yml start server
 
 ## 10. Problemas frecuentes
 - *Caddy no obtiene certificado*: el DNS no apunta aún o el puerto 80/443 está cerrado en el firewall del proveedor (además de ufw).
+- *Logs*: el servidor escribe JSON a consola (`AddJsonConsole`, HU-072 CA2) y Docker los guarda con rotación (5 archivos de
+  10 MB por servicio, bloque `x-logging` del compose). Leerlos: `docker compose -f docker-compose.prod.yml logs -f server`.
 - *`/ws` devuelve 429*: tope de 10 conexiones por IP (HU-071). Detrás de Caddy el servidor usa `X-Forwarded-For` (solo en
   `ASPNETCORE_ENVIRONMENT=Production`, y antes del rate limiter: también los límites de login y registro son por IP real); si todos los amigos salen por la misma IP (misma casa), sube `Net:RateLimits:MaxConnectionsPerIp`
   con la variable `Net__RateLimits__MaxConnectionsPerIp=20` en el servicio `server`.

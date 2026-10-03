@@ -172,10 +172,17 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   con 100 candidatos < 20 µs. Se ejecuta en cada HU que toque áreas o auras y al cerrar M2 y M5.
 - **Consecuencias:** `CombatEvent` pasa a `CombatEvents` (cambio de protocolo antes de implementarlo). HU-088 y HU-089 nuevas.
 - *Nota 2026-10-02: hoy se guarda al salir (logout, cierre o linkdead vencido), cambiar de mapa, subir de nivel, cambiar de
-  clase, reemplazar la sesión, completar un intercambio (los dos en el mismo tick) y morir, más el autosave de 60 s si hubo
+  clase, reemplazar la sesión, completar un intercambio (los dos en una sola transacción) y morir, más el autosave de 60 s si hubo
   cambios y el apagado. Los cooldowns de hechizos y consumibles sí se guardan desde HU-015 (`character_cooldowns`); auras y
   casteos no. `area_limit` ya se aplica: un área con casteo con `rules.limits.maxAreasPerInstance` marcas activas en la
   instancia se rechaza, y al tope de impactos pendientes se resuelve el más antiguo en vez de descartarlo (HU-086, HU-088).*
+- *Nota 2026-10-03 (HU-088 CA1, enmendado): impactos pendientes (structs en una lista con la capacidad del tope) y auras (reserva
+  de instancias que se reutilizan desde el tick siguiente) salen de reservas fijas; los sistemas no usan LINQ ni closures y
+  recorren las entidades sin enumeradores en el heap. Los eventos del tick **siguen siendo records**: pasarlos a un buffer de
+  structs tocaba 23 tipos, 82 emisores y 131 comprobaciones de tests para ganar poco (0,17 MB/s y ninguna Gen2 en el
+  escenario de HU-089). Lo vigilan dos tests: 0 bytes por tick sin combate y ≤ 16 KB por tick en pleno combate. La búsqueda de
+  objetivos de las áreas recorre los actores de la instancia, no la rejilla AOI (HU-086 CA7b, enmendado: la rejilla se
+  reconstruye después del combate y daría posiciones de un tick antes). Las áreas duraderas pasan a HU-100 (Fase 2).*
 
 ## ADR-019 · Básico por arma y casteo en movimiento
 - **Decisión:** el ataque básico lo da el arma equipada y no ocupa ninguna de las 4 casillas. Cada tipo de arma define alcance,

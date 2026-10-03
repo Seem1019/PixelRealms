@@ -110,7 +110,7 @@
 2. **Dado** Veneno (`maxStacks: 3`) aplicado 4 veces **entonces** tiene 3 stacks, daño por tick ×3 y duración refrescada **sin reiniciar el ritmo de ticks** (ADR-022, ver CA10).
 2b. **Dado** Carrera (`removesKinds: [root, slow]`, `immuneKinds: [root, slow]`) sobre un Pícaro congelado **entonces** la raíz desaparece al instante y una Nova durante los 6 s no lo enraíza.
 2c. **Dado** un monstruo `boss: true` **entonces** ignora auras de `rules.combat.bossImmuneToAuraKinds` (Gubia sobre el Capataz no lo aturde; el evento reporta `immune`).
-3. **Dado** `stun` **entonces** el objetivo no se mueve, no castea (interrumpe el casteo actual) ni ataca; `root` solo impide moverse; `silence` impide hechizos no físicos; `slow` reduce velocidad.
+3. **Dado** `stun` **entonces** el objetivo no se mueve, no castea (interrumpe el casteo actual) ni ataca; `root` solo impide moverse; `silence` impide cualquier habilidad de clase, física o mágica (y la interrumpe), pero no usar objetos como pociones ni el ataque con el arma, y lo mismo el bloqueo tras una interrupción (decisión 2026-10-03); `slow` reduce velocidad.
 4. **Dado** `shield` de 50 y un golpe de 70 **entonces** se absorben 50, entran 20, el escudo desaparece y el evento reporta `absorb: 50`.
 5. **Dado** `stat_mod` (Carrera +50 % velocidad) **entonces** la velocidad cambia al aplicar y vuelve al expirar (el cliente predice con la velocidad del `Snapshot.self.speed`).
 6. **Dado** el cliente **entonces** muestra íconos de auras en marcos propio/objetivo con tiempo restante y stacks.
@@ -125,6 +125,7 @@
 - `Combat/AuraSystem` + `AuraSet`: instancia = (aura, lanzador); renovar refresca la duración sin reiniciar el ritmo de ticks; cargas solo con `maxStacks` > 1; ticks que no fallan ni critican con mitigación fijada al aplicar; `shield` por orden de caducidad; `removesKinds`/`immuneKinds`; jefes inmunes a `bossImmuneToAuraKinds` (evento `immune`); topes 16/16 sin contar controles con expulsión de la de menos tiempo (ADR-021); manda la ralentización más fuerte (tope `maxSlowPct`) y el bono de velocidad mayor; inmunidad `hardControlImmunitySec` tras stun/root/silence (ADR-022). Cliente: iconos (texto) con tiempo y cargas, en gris las que no mandan.
 - Tests: `AuraSystemTests` (12 CA).
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Las auras ya llegan al entrar en la AOI. Falta CA6 en el HUD: mostrar el tiempo junto a las cargas en el icono (estético).
+- 2026-10-03 (rama `feat/phase1-close-out`): CA3 según la decisión: `CastSystem` bloquea por silencio o `locked_out` cualquier habilidad salvo las que llegan por `UseItem` (`viaItem`), y el silencio interrumpe cualquier casteo que no sea de un objeto (`CastSystemTests.Silence_BlocksEveryAbility_ButNotPotionsNorTheWeapon`, `InterruptLockout_BlocksAbilities_ButNotPotions`). Sigue faltando CA6 en el HUD (estético).
 
 ---
 ### HU-036 · IA de monstruos: aggro, persecución, amenaza, evadir
@@ -210,7 +211,7 @@
 ---
 ### HU-086 · Hechizos de área apuntados (combate híbrido)
 **Como** jugador **quiero** lanzar los hechizos de área donde apunte con el ratón y ver las áreas enemigas antes de que golpeen **para** que el combate tenga esquiva y posicionamiento sin perder el tab-target.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-034, HU-038
 - Skills: `combat-system`, `net-protocol`, `godot-client`, `game-content`
 
@@ -222,7 +223,7 @@
 5. **Dado** un monstruo con hechizo de área (Golpe de pico del Capataz) **entonces** usa la misma marca: apunta a la posición de su objetivo al empezar el casteo y los jugadores pueden esquivarlo.
 6. **Dado** el contenido **entonces** `target_aoe_enemies` ya no existe en el schema y Estallido de llamas y Golpe de pico usan `ground_aoe_enemies` (hecho en el contenido el 2026-09-30); el validador lo comprueba.
 7. **Dado** un área enemiga **entonces** nunca afecta a aliados ni al lanzador (sin fuego amigo).
-7b. **Dado** la búsqueda de objetivos **entonces** usa la rejilla AOI de la instancia y pruebas de forma sin raíces ni trigonometría; la línea de visión se comprueba desde el centro solo para los candidatos que pasan la forma; `maxTargets` nunca supera `rules.limits.aoeMaxTargetsCap` (10); con `rules.limits.maxAreasPerInstance` áreas activas, un jugador recibe `Error{area_limit}` y un monstruo elige otra acción (ADR-018).
+7b. **Dado** la búsqueda de objetivos **entonces** recorre los actores de la instancia (enmendado 2026-10-03: la rejilla AOI se reconstruye después del combate y daría posiciones de un tick antes; el presupuesto medido es una consulta con 100 candidatos < 20 µs y el combate ≤ 4 ms p99) con pruebas de forma sin raíces ni trigonometría; la línea de visión se comprueba desde el centro solo para los candidatos que pasan la forma; `maxTargets` nunca supera `rules.limits.aoeMaxTargetsCap` (10); con `rules.limits.maxAreasPerInstance` áreas activas, un jugador recibe `Error{area_limit}` y un monstruo elige otra acción (ADR-018).
 8. **Dado** el schema de hechizos **entonces** `shape` admite `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`) y `line` (`aoeLength`, `aoeWidth`); en esta HU solo se implementa `circle`; los hechizos con `cone`/`line` quedan no disponibles hasta que se implementen (ADR-023).
 
 **Notas técnicas**
@@ -232,7 +233,7 @@
 **Notas de implementación**
 - Servidor: `ground_aoe_*` con `targetPos` obligatorio (NaN/fuera del mapa → `invalid_payload`), alcance + tolerancia y LOS al punto al iniciar, punto fijo en `CastState`, objetivos dentro de `aoeRadius` al terminar (más cercanos al centro, `maxTargets` ≤ tope), sin fuego amigo; los monstruos usan el mismo camino (Golpe de pico apunta a la posición del objetivo al empezar). Cliente: retícula de `aoeRadius` bajo el cursor (roja fuera de alcance), clic envía `targetPos`, marcas en el suelo con `CastStarted{targetPos}` hasta `CastEnded` (las enemigas nunca se ocultan).
 - **Pendiente (HU-088):** la búsqueda recorre los actores de la instancia en vez de la rejilla AOI; con ≤ 300 actores es suficiente para la Fase 1.
-- 2026-10-02 (rama `fix/phase1-audit-blockers`): `area_limit` ya se aplica (HU-033 CA4). **Falta decidir** CA7b: la búsqueda recorre los actores de la instancia en vez de la rejilla AOI (que se rehace por tick); con ≤ 300 actores el combate p99 queda muy por debajo de 4 ms, así que la propuesta es enmendar el criterio.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): `area_limit` ya se aplica (HU-033 CA4). CA7b enmendado el 2026-10-03 (ver el criterio): la búsqueda sigue recorriendo los actores de la instancia; la consulta de 100 candidatos mide 2–5 µs y el combate 0,5 ms p99.
 
 ---
 ### HU-085 · Hechizo de área del Sacerdote (`ground_aoe_all`)
@@ -279,14 +280,14 @@
 ---
 ### HU-088 · Rendimiento del combate
 **Como** anfitrión **quiero** que el combate aguante muchas áreas y auras a la vez **para** que no haya lag ni el servidor se caiga en las peleas grandes.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-034, HU-035, HU-086
 - Skills: `combat-system`, `dotnet-server`, `net-protocol`
 
 **Criterios de aceptación**
-1. **Dado** los sistemas de combate **entonces** áreas, impactos pendientes y auras salen de reservas de capacidad fija; los eventos del tick van a un buffer circular de estructuras y las consultas usan listas reutilizadas; no hay LINQ ni closures en los sistemas (revisión + test de asignaciones por tick).
-2. **Dado** `rules.limits` **entonces** se respetan: 2 áreas duraderas por lanzador (la tercera reemplaza a la más antigua), 128 áreas y 256 impactos pendientes por instancia, 10 objetivos por área como máximo, y 16 auras beneficiosas + 16 perjudiciales por entidad sin contar controles (ADR-021).
-3. **Dado** un área duradera **entonces** se evalúa cada `persistentAreaTickMs` (500 ms), repartida entre ticks; las áreas nunca interactúan entre sí.
+1. **Dado** los sistemas de combate **entonces** impactos pendientes y auras salen de reservas de capacidad fija y las consultas usan listas reutilizadas; no hay LINQ ni closures en los sistemas; los eventos del tick siguen siendo records dentro de un presupuesto (enmendado 2026-10-03: el buffer circular de structs tocaba 23 tipos de evento, 82 emisores y 131 comprobaciones para ganar poco); un test exige 0 bytes por tick sin combate y otro ≤ 16 KB por tick en pleno combate.
+2. **Dado** `rules.limits` **entonces** se respetan: 128 áreas y 256 impactos pendientes por instancia (el tope de 2 áreas duraderas por lanzador pasa a HU-100), 10 objetivos por área como máximo, y 16 auras beneficiosas + 16 perjudiciales por entidad sin contar controles (ADR-021).
+3. *(Pasa a HU-100, Fase 2: en la Fase 1 ningún hechizo deja un área duradera.)*
 4. **Dado** varios resultados en un tick **entonces** cada observador recibe un solo `CombatEvents{tick, e}` (máx. 64 entradas; si hay más, varios mensajes), solo con lo que ve.
 5. **Dado** el escenario de HU-089 **entonces** el combate cuesta ≤ 4 ms p99 por instancia.
 
@@ -297,7 +298,8 @@
 - Hecho con el dominio de M2: \`CombatEvents\` agrupado por observador y tick (máx. 64 entradas, CA4); topes de `rules.limits` para objetivos por área, impactos pendientes por instancia y auras 16/16 sin controles (CA2 en parte); listas reutilizadas en `TargetResolver`/`CastSystem`/`AutoAttackSystem`.
 - 2026-10-01 (HU-089): sin asignaciones por tick en `Pathfinder` (buffers `[ThreadStatic]`), `ThreatTable.Reevaluate<TState>` sin closure e `InterestSystem` con listas reutilizadas; medición por sistema en `Simulation.SystemTimings/SystemAllocs` (LoadBot).
 - Pendiente: reservas de capacidad fija y buffer circular de eventos (CA1), áreas duraderas (no hay hechizos con área persistente en la Fase 1; CA2/CA3), búsqueda de objetivos con la rejilla AOI (hoy recorre los actores de la instancia), microbenchmarks y la medición p99 del escenario de HU-089 (CA5). Se cierra junto con HU-089.
-- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA5: combate p99 ≤ 4 ms comprobado por el LoadBot (y en cada CI). Falta CA1 (reservas de capacidad fija y buffer circular de eventos) y CA2/CA3 de áreas duraderas, que no existen hasta la Fase 2.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA5: combate p99 ≤ 4 ms comprobado por el LoadBot (y en cada CI). Faltaban CA1 y las áreas duraderas *(cerrado el 2026-10-03, ver la nota siguiente)*.
+- 2026-10-03 (rama `feat/phase1-close-out`): CA1 (opción B): `PendingImpact` es un struct en una lista con la capacidad del tope; `AuraInstance` sale de una reserva de `AuraSystem` (lo quitado vuelve a la reserva al empezar el tick siguiente, para que los eventos del tick nunca vean un aura reutilizada) y cada `AuraSet` reserva su capacidad una vez; `MapInstance` expone `EntityTable` (recorrer `Values` no asigna); `ContentJson.EnumName` cachea los nombres; sin LINQ ni closures en los recorridos por tick (botín, duelos, intercambios, grupos, portales, amenaza). Asignación del escenario de HU-089: de 0,29 a 0,17 MB/s. Tests: `TickAllocationTests` (0 bytes por tick sin combate) y `LoadScenarioTests` (≤ 16 KB por tick). CA2/CA3 de áreas duraderas → HU-100.
 
 ### HU-094 · Ataque básico con Espacio
 **Como** jugador **quiero** atacar con la barra espaciadora **para** no depender del clic derecho en mitad del combate.
@@ -367,3 +369,20 @@
 - Limitación: `EntitySpawn` no trae auras, así que una entidad que entra en tu AOI con un aura ya puesta no la muestra hasta el siguiente `AuraApplied`.
 - Tests: `test_status_display.gd`. Capturas: `docs/screenshots/combat/status_*.png`, `range_ring.png`.
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: quien entra en la AOI (o reconecta) recibe las auras activas de cada entidad (`EventDispatcher.ToAuraApplied`).
+
+---
+
+### HU-100 · Áreas duraderas (Fase 2)
+**Como** jugador **quiero** hechizos que dejan un área en el suelo durante un rato **para** controlar zonas en las peleas de grupo.
+- Prioridad: Should · Estimación: M · Estado: Pendiente
+- Dependencias: HU-086, HU-088
+- Skills: `combat-system`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** un hechizo con área duradera **entonces** cada lanzador tiene como mucho 2 (la tercera reemplaza a la más antigua) y la instancia respeta `rules.limits.maxAreasPerInstance` (ADR-021).
+2. **Dado** un área duradera **entonces** se evalúa cada `persistentAreaTickMs` (500 ms), repartida entre ticks; las áreas nunca interactúan entre sí.
+3. **Dado** las áreas duraderas **entonces** salen de una reserva de capacidad fija y no rompen el presupuesto de asignaciones de HU-088.
+
+**Notas técnicas**
+- Sale de HU-088 CA2/CA3 el 2026-10-03: en la Fase 1 ningún hechizo deja un área persistente, así que no hay nada que probar
+  hasta que el contenido de la Fase 2 traiga el primero.
