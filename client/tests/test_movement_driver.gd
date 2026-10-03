@@ -6,7 +6,7 @@ extends GutTest
 const LATENCY_MS := 30.0
 
 
-func _simulate(frame_ms: float, duration_ms: float, jitter_ms: float = 0.0) -> Dictionary:
+func _simulate(frame_ms: float, duration_ms: float, jitter_ms: float = 0.0, latency_ms: float = LATENCY_MS) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var grid := CollisionGrid.new(400, 20)
@@ -37,7 +37,7 @@ func _simulate(frame_ms: float, duration_ms: float, jitter_ms: float = 0.0) -> D
 			server_pos = MovementStep.step(server_pos.x, server_pos.y, server_dx, 0, 4.0, grid)
 			ticks += 1
 			if ticks % 2 == 0:
-				to_client.append({"at": next_tick + LATENCY_MS + rng.randf_range(-jitter_ms, jitter_ms), "pos": server_pos, "ack": server_seq})
+				to_client.append({"at": next_tick + latency_ms + rng.randf_range(-jitter_ms, jitter_ms), "pos": server_pos, "ack": server_seq})
 			next_tick += 50.0
 		else:
 			var delivered: Array[Dictionary] = []
@@ -52,7 +52,7 @@ func _simulate(frame_ms: float, duration_ms: float, jitter_ms: float = 0.0) -> D
 					corrections += 1
 			for inp: Dictionary in driver.advance(frame_ms / 1000.0, 1, 0, pred):
 				var m := inp.duplicate()
-				m["at"] = next_frame + LATENCY_MS + rng.randf_range(-jitter_ms, jitter_ms)
+				m["at"] = next_frame + latency_ms + rng.randf_range(-jitter_ms, jitter_ms)
 				to_server.append(m)
 			next_frame += frame_ms
 	return {"corrections": corrections, "max_error": max_error, "client_x": pred.position.x, "server_x": server_pos.x}
@@ -99,3 +99,24 @@ func test_10ms_jitter_does_not_snap_back() -> void:
 	# Con más variación (±20 ms) caen a veces dos inputs en el mismo tick del servidor: corrección de un paso (3,2 px).
 	var r := _simulate(1000.0 / 60.0, 10000.0, 10.0)
 	assert_eq(int(r["corrections"]), 0, "correcciones ≥ 2 px (error máx. %.1f px)" % float(r["max_error"]))
+
+
+func test_150ms_round_trip_does_not_snap_back() -> void:
+	# HU-022 CA2: 150 ms de ida y vuelta (75 ms en cada sentido) con algo de variación; el jugador propio no tironea.
+	var r := _simulate(1000.0 / 60.0, 10000.0, 5.0, 75.0)
+	assert_eq(int(r["corrections"]), 0, "correcciones ≥ 2 px (error máx. %.1f px)" % float(r["max_error"]))
+
+
+func test_own_cast_predicts_at_cast_move_speed_and_restores_it() -> void:
+	# HU-022 CA4b: desde mi CastStarted hasta CastEnded la predicción va a velocidad · castMoveSpeedMult, sin esperar al Snapshot.
+	var pred := Prediction.new()
+	pred.setup(CollisionGrid.new(400, 20), Vector2(40, 40), 4.0)
+	pred.set_casting(true, 0.5)
+	assert_almost_eq(pred.speed_tiles_per_sec, 2.0, 0.001)
+	pred.set_casting(true, 0.5)  # repetido: no se aplica dos veces
+	assert_almost_eq(pred.speed_tiles_per_sec, 2.0, 0.001)
+	for i: int in 10:
+		pred.apply_input(i + 1, 1, 0)
+	assert_almost_eq(pred.position.x, 56.0, 0.01, "igual que el vector casting_half_speed_east_10_ticks")
+	pred.set_casting(false, 0.5)
+	assert_almost_eq(pred.speed_tiles_per_sec, 4.0, 0.001)

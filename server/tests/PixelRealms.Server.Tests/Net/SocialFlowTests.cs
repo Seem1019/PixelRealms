@@ -22,6 +22,24 @@ public sealed class SocialFlowTests
     }
 
     [Fact]
+    public async Task OnlineList_GivesEveryConnectedPlayer_WithClassLevelAndZone() // HU-063 CA1
+    {
+        await using var server = await TestServer.StartAsync();
+        var (ana, _) = await Enter(server, "ana", "Ana", "warrior");
+        var (bob, _) = await Enter(server, "bob", "Bob", "mage");
+        await using (ana) await using (bob)
+        {
+            await ana.SendAsync("OnlineListRequest");
+            var list = (await ana.ExpectAsync("OnlineList")).GetProperty("players").EnumerateArray().ToList();
+            list.Select(p => p.GetProperty("name").GetString()).ShouldBe(new[] { "Ana", "Bob" }); // por nombre
+            var bobRow = list[1];
+            bobRow.GetProperty("classId").GetString().ShouldBe("mage");
+            bobRow.GetProperty("level").GetInt32().ShouldBe(1);
+            bobRow.GetProperty("zone").GetString().ShouldNotBeNullOrEmpty(); // la zona de Tiled donde aparece (la Aldea)
+        }
+    }
+
+    [Fact]
     public async Task Chat_Say_Global_Whisper_RateLimit_Who()
     {
         await using var server = await TestServer.StartAsync();

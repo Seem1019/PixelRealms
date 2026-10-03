@@ -15,14 +15,7 @@ namespace PixelRealms.Game.Ai;
 /// </summary>
 public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, AuraSystem auras, MovementSystem movement) : IMapSystem
 {
-    // Ritmos técnicos de la IA (skill combat-system §IA). TODO(balance): candidatos a `rules.ai` si se quieren ajustar sin código.
-    public const int PerceptionMs = 250;
-    public const int PathRecalcMs = 500;
-    public const float PathRecalcMovedTiles = 2f;
-    public const int WanderPauseMinMs = 2000;
-    public const int WanderPauseMaxMs = 6000;
-    public const float ArriveTolerance = 0.25f;
-    public const float RangedAttackRangeThreshold = 2f;
+    // Ritmos de la IA (percepción, A*, patrulla, llegada): `rules.ai` (regla 4, ADR-008).
 
     private readonly List<Monster> _monsters = new(128);
 
@@ -61,7 +54,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         if (m.Threat.Count > 0) { StartChase(m); return; }
         if (ctx.NowMs >= brain.NextPerceptionAtMs)
         {
-            brain.NextPerceptionAtMs = ctx.NowMs + PerceptionMs;
+            brain.NextPerceptionAtMs = ctx.NowMs + ctx.Rules.Ai.PerceptionMs;
             if (m.Template.AggroRange > 0 && Perceive(m, map) is { } target)
             {
                 m.Threat.Add(target.Id, 0);
@@ -94,15 +87,18 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         if (brain.WanderTarget is null)
         {
             if (ctx.NowMs < brain.WanderPauseUntilMs || m.WanderRadius <= 0) return;
-            var r = m.WanderRadius;
-            var candidate = new Vec2(m.SpawnPosition.X + (float)((ctx.Rng.NextDouble() * 2 - 1) * r), m.SpawnPosition.Y + (float)((ctx.Rng.NextDouble() * 2 - 1) * r));
-            if (map.Data.Collision.IsSolidAt(candidate.X, candidate.Y)) { brain.WanderPauseUntilMs = ctx.NowMs + WanderPauseMinMs; return; }
+            // HU-031 CA2: un punto del círculo de radio `wanderRadius` (antes un cuadrado: hasta √2·r del spawn). La raíz del
+            // radio reparte los puntos uniformemente por el área.
+            var angle = ctx.Rng.NextDouble() * Math.Tau;
+            var dist = Math.Sqrt(ctx.Rng.NextDouble()) * m.WanderRadius;
+            var candidate = new Vec2(m.SpawnPosition.X + (float)(Math.Cos(angle) * dist), m.SpawnPosition.Y + (float)(Math.Sin(angle) * dist));
+            if (map.Data.Collision.IsSolidAt(candidate.X, candidate.Y)) { brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rules.Ai.WanderPauseMinMs; return; }
             brain.WanderTarget = candidate;
         }
-        if (StepTowards(m, brain.WanderTarget.Value, map, ctx, speedMult: 0.5f))
+        if (StepTowards(m, brain.WanderTarget.Value, map, ctx, speedMult: (float)ctx.Rules.Ai.WanderSpeedMult))
         {
             brain.WanderTarget = null;
-            brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rng.Next(WanderPauseMinMs, WanderPauseMaxMs + 1);
+            brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rng.Next(ctx.Rules.Ai.WanderPauseMinMs, ctx.Rules.Ai.WanderPauseMaxMs + 1);
         }
     }
 
@@ -123,7 +119,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         // Leash: demasiado lejos del spawn → evadir.
         if (Vec2.Distance(m.Position, m.SpawnPosition) > m.Template.LeashRange) { BeginEvade(m, map, ctx); return; }
 
-        var switchMult = m.Template.AttackRange > RangedAttackRangeThreshold ? rules.ThreatSwitchRanged : rules.ThreatSwitchMelee;
+        var switchMult = m.Template.AttackRange > ctx.Rules.Ai.RangedThreatThresholdTiles ? rules.ThreatSwitchRanged : rules.ThreatSwitchMelee;
         var targetId = m.Threat.Reevaluate(ctx.NowMs, switchMult, (this, m, map), static (id, s) => s.map.Find(id) is Player p && p.IsAlive && s.Item1.CanBeAggroed(p) && Vec2.Distance(p.Position, s.m.Position) <= s.m.Template.LeashRange * 2);
         var target = targetId is { } tid ? map.Find(tid) : null;
         if (target is null)
@@ -188,10 +184,10 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
     private static bool EnsurePath(Monster m, Vec2 targetPos, MapInstance map, TickContext ctx)
     {
         var brain = m.Brain;
-        var stale = brain.PathComputedAtMs == long.MinValue || ctx.NowMs - brain.PathComputedAtMs >= PathRecalcMs
-                    || Vec2.Distance(brain.PathTargetPos, targetPos) > PathRecalcMovedTiles || brain.PathIndex >= brain.Path.Count;
+        var stale = brain.PathComputedAtMs == long.MinValue || ctx.NowMs - brain.PathComputedAtMs >= ctx.Rules.Ai.PathRecalcMs
+                    || Vec2.Distance(brain.PathTargetPos, targetPos) > ctx.Rules.Ai.PathRecalcMovedTiles || brain.PathIndex >= brain.Path.Count;
         if (!stale) return true;
-        if (!Pathfinder.FindPath(map.Data.Collision, m.Position, targetPos, brain.Path)) return false;
+        if (!Pathfinder.FindPath(map.Data.Collision, m.Position, targetPos, brain.Path, ctx.Rules.Ai.PathMaxNodes)) return false;
         brain.PathIndex = 0;
         brain.PathComputedAtMs = ctx.NowMs;
         brain.PathTargetPos = targetPos;
@@ -206,7 +202,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         while (brain.PathIndex < brain.Path.Count)
         {
             var waypoint = brain.Path[brain.PathIndex];
-            if (Vec2.Distance(m.Position, waypoint) <= ArriveTolerance) { brain.PathIndex++; continue; }
+            if (Vec2.Distance(m.Position, waypoint) <= ctx.Rules.Ai.ArriveToleranceTiles) { brain.PathIndex++; continue; }
             StepTowards(m, waypoint, map, ctx, 1f);
             return;
         }
@@ -226,7 +222,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
 
     private void Evade(Monster m, MapInstance map, TickContext ctx)
     {
-        if (Vec2.Distance(m.Position, m.SpawnPosition) <= ArriveTolerance || StepTowards(m, m.SpawnPosition, map, ctx, (float)ctx.Rules.Combat.EvadeSpeedMult, ignoreControl: true))
+        if (Vec2.Distance(m.Position, m.SpawnPosition) <= ctx.Rules.Ai.ArriveToleranceTiles || StepTowards(m, m.SpawnPosition, map, ctx, (float)ctx.Rules.Combat.EvadeSpeedMult, ignoreControl: true))
         {
             m.Position = m.SpawnPosition;
             m.Combat.Evading = false;
@@ -236,7 +232,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
             auras.ClearAll(m, map, ctx);
             m.LastCombatAtMs = long.MinValue;
             m.Brain.State = AiState.Idle;
-            m.Brain.WanderPauseUntilMs = ctx.NowMs + WanderPauseMinMs;
+            m.Brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rules.Ai.WanderPauseMinMs;
         }
     }
 
@@ -246,7 +242,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
     private bool StepTowards(Monster m, Vec2 target, MapInstance map, TickContext ctx, float speedMult, bool ignoreControl = false)
     {
         var delta = target - m.Position;
-        if (delta.Length <= ArriveTolerance) return true;
+        if (delta.Length <= ctx.Rules.Ai.ArriveToleranceTiles) return true;
         if (!ignoreControl && (m.Auras.IsStunned || m.Auras.IsRooted)) return false;
         var dx = MathF.Abs(delta.X) < 0.1f ? 0 : Math.Sign(delta.X);
         var dy = MathF.Abs(delta.Y) < 0.1f ? 0 : Math.Sign(delta.Y);
@@ -257,7 +253,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         var before = m.Position;
         MovementSystem.Move(m, dx, dy, map.Data.Collision, speed);
         if (delta.Length <= stepTiles) { m.Position = target; }
-        return Vec2.Distance(m.Position, target) <= ArriveTolerance || m.Position == before;
+        return Vec2.Distance(m.Position, target) <= ctx.Rules.Ai.ArriveToleranceTiles || m.Position == before;
     }
 
     private static void FaceTowards(Monster m, Vec2 target)

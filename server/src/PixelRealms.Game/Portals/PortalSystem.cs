@@ -19,9 +19,6 @@ public static class PortalPolicy
     public const string LevelTooLow = "level_too_low";
     public const string OutOfRange = "out_of_range";
 
-    /// <summary>Distancia máxima (casillas) desde el borde del portal para `UsePortal` explícito (CA1: "estando a ≤ 1 tile").</summary>
-    public const float UseRangeTiles = 1f;
-
     /// <summary>Código de error o null si puede cruzar.</summary>
     public static string? Check(Player player, PortalDef portal, long nowMs, IRules rules)
     {
@@ -54,13 +51,15 @@ public sealed class PortalSystem : IMapSystem
         if (map.Data.Portals.Count == 0) return;
         foreach (var player in map.Players.Values)
         {
+            // En pleno salto (HU-087) no se cruza: el vuelo lleva coordenadas de este mapa. Se evalúa al aterrizar.
+            if (player.Combat.Flight is not null) continue;
             PortalDef? portal = null;
             if (player.RequestedPortalId is { } requested)
             {
                 player.RequestedPortalId = null;
                 var p = map.Data.Portals.FirstOrDefault(x => x.PortalId == requested);
                 if (p is null) { ctx.Emit(new PortalRejected(map.Id, player, new PortalDef(requested, "", 0, 0, null, Vec2.Zero, Vec2.Zero), "not_found")); continue; }
-                if (PortalPolicy.DistanceTo(p, player.Position) > PortalPolicy.UseRangeTiles) { ctx.Emit(new PortalRejected(map.Id, player, p, PortalPolicy.OutOfRange)); continue; }
+                if (PortalPolicy.DistanceTo(p, player.Position) > ctx.Rules.Movement.PortalUseRangeTiles) { ctx.Emit(new PortalRejected(map.Id, player, p, PortalPolicy.OutOfRange)); continue; }
                 portal = p;
             }
             else

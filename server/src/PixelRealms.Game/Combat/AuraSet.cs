@@ -123,11 +123,15 @@ public sealed class AuraSet
         return total;
     }
 
-    /// <summary>¿Es el aura que manda en su tipo de modificador? Las demás se muestran en gris (HU-035 CA11).</summary>
+    /// <summary>¿Es el aura que manda en su tipo de modificador? Las demás se muestran en gris (HU-035 CA11, HU-038 CA4b, ADR-022:
+    /// velocidad, ralentización, daño hecho y daño recibido).</summary>
     public bool IsDominant(AuraInstance aura)
     {
         if (aura.Kind == AuraKind.Slow) return aura.Def.Pct >= MaxSlow();
-        if (aura.Def.Mods is { SpeedPct: > 0 } m) return m.SpeedPct >= MaxSpeedBonus();
+        if (aura.Def.Mods is not { } m) return true;
+        if (m.SpeedPct > 0 && m.SpeedPct < MaxSpeedBonus()) return false;
+        if (m.DamageDonePct != 0 && Math.Abs(m.DamageDonePct) < Math.Abs(Strongest(static x => x.DamageDonePct))) return false;
+        if (m.DamageTakenPct != 0 && Math.Abs(m.DamageTakenPct) < Math.Abs(Strongest(static x => x.DamageTakenPct))) return false;
         return true;
     }
 }

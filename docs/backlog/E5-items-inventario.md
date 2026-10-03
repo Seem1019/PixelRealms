@@ -4,7 +4,7 @@
 
 ### HU-050 · Botín de monstruos
 **Como** jugador **quiero** recoger el botín de los monstruos que mato **para** conseguir equipo y oro.
-- Prioridad: Must · Estimación: L · Estado: Hecha
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-037, HU-051
 - Skills: `inventory-items`, `net-protocol`, `godot-client`
 
@@ -21,6 +21,7 @@
 **Notas de implementación**
 - `Items/LootSystem`: tirada de la tabla (`entries` independientes, `groups` por peso sin repetir, orden por rareza, corte a `maxItems`), elegibles = quien taggeó (vivos a ≤ `eligibleRangeTiles`; el grupo llega con HU-062 por `EligibleFor`), cada item asignado al azar uniforme, oro a partes iguales (resto al primero que abre), `LootOpen`/`LootTake`/`LootTakeAll` con `lootRangeTiles`, `not_owner` hasta `exclusiveSec`, `bag_full` deja el item; el cadáver brilla para los ganadores (`EntitySpawn.flags` bit 8) y desaparece al quedar saqueado o a los `corpseLifetimeSec`. Cliente: clic en el cadáver → ventana con oro, items con color de rareza y dueño (ajenos atenuados), "Tomar todo".
 - Tests: `LootAndVendorTests` (FixedRng, Capataz siempre 1 del grupo, 1 000 kills ≈ 25 % ±3 % y ≈ 1/16, open/take/exclusive/bag_full, flujo en tick). CA5 (dos `LootTake` en el mismo tick): la cola única del tick serializa los mensajes, el segundo recibe `not_found`.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: la ventana muestra la parte del oro de cada uno (`LootBag.GoldFor`). Falta CA1 en el cliente: el brillo del cadáver (estético; el servidor ya manda el bit 8 de `flags`).
 
 ---
 ### HU-051 · Inventario (bolsa de 24)
@@ -75,6 +76,7 @@
 
 **Notas de implementación**
 - `client/scripts/ui/tooltip_builder.gd` (+ `money_format.gd`): nombre en color de rareza, slot/tipo, afinidad de mi clase con ×mult (verde/amarillo/rojo), daño/velocidad/armadura/poder/stats ya multiplicados con el base entre paréntesis si difiere, DPS con haste, escuela del básico, nivel requerido en rojo si no alcanza, venta y comparación ▲/▼ con lo equipado. Tests GUT `test_tooltip_builder.gd` (arma, armadura, consumible, DPS).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: la ventana de botín compara con lo equipado. CA3b: el multiplicador se escribe ×1, ×0.85, ×0.7 (`TooltipBuilder._mult`).
 
 ---
 ### HU-054 · Usar consumibles
@@ -140,7 +142,8 @@
 4. **Dado** un `template_id` guardado que ya no existe **entonces** el personaje carga igual y se loguea `warn`.
 
 **Notas de implementación**
-- La auditoría pendiente (`Player.PendingAudit`: loot, buy, sell, destroy, split, merge, use, admin_give) viaja en lote en `CharacterSaveDto.Audit` con cada guardado y el repositorio la escribe (InMemory: `store.Audit`; EF: `item_audit_log`, sin compilar). Un `template_id` desconocido se ignora con aviso y el personaje carga igual. Round-trip comprobado en `InventoryFlowTests`; CA2 (migración) pendiente del PC con NuGet.
+- La auditoría pendiente (`Player.PendingAudit`: loot, buy, sell, destroy, split, merge, use, admin_give) viaja en lote en `CharacterSaveDto.Audit` con cada guardado y el repositorio la escribe (InMemory: `store.Audit`; EF: `item_audit_log`, sin compilar). Un `template_id` desconocido se ignora con aviso y el personaje carga igual. Round-trip comprobado en `InventoryFlowTests`; la migración (CA2) se generó después (`a7a2dcb`).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: la fusión parcial también deja su fila `merge`. CA4: un item con plantilla desconocida (o en casilla repetida) ya no se borra: va al contenedor 2 (apartado) y vuelve a la bolsa cuando su plantilla existe y hay hueco (`PlayerMapper`, `PlayerMapperTests`). La migración `InitialCreate` existe desde `a7a2dcb`.
 
 ---
 ### HU-058 · Equipo inicial por clase
@@ -178,3 +181,4 @@
 **Notas de implementación**
 - `Social/TradeService`: solicitud ≤ 3 casillas (caduca 30 s), ofertas en vivo (≤ 6 items + oro) que desmarcan ambas confirmaciones y suben `version`, `TradeConfirm{version}` (`trade_version` si no coincide), commit atómico con simulación de espacio en ambas bolsas (nadie pierde nada si falla: `bag_full`), items bloqueados (`trade_busy` al mover/usar/vender/destruir), cancelación por distancia, muerte, desconexión o cancelar; auditoría `trade_out`/`trade_in` con la contraparte. Cliente: clic derecho en jugador → Intercambiar (o `/trade`), ventana con ofertas, oro y Confirmar; clic derecho en la bolsa ofrece.
 - Tests: `SocialTests.Trade_*` (conservación de cantidades y oro, ids únicos, versión, bag_full sin pérdidas, cancelación).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Al completar un intercambio no vacío se guarda a los dos en el mismo tick (HU-026 CA6). Distancia, máximo de items y caducidad salen de `rules.social`. CA5: `SocialTests.Trade_PropertyTest_RandomTradesBetweenTwo_KeepItemsGoldAndUniqueIds`.

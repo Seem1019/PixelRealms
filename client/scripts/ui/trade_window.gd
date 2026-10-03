@@ -6,7 +6,8 @@ extends PanelContainer
 ## el servidor (`TradeUpdate`); la oferta local solo es lo que se envía en `TradeOffer`.
 
 ## TradeSession.MaxItems del servidor.
-const MAX_ITEMS := 6
+## Casillas de oferta: `rules.social.tradeMaxItems` (el servidor lo valida igual).
+var MAX_ITEMS: int = int(Content.rule("social", "tradeMaxItems", 6))
 const COLUMNS := 3
 
 ## Nombre de una entidad por id (lo rellena el mundo; "" si no se ve).

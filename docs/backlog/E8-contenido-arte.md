@@ -2,7 +2,7 @@
 
 ### HU-080 · Mapa "meadow" completo (Tier 1)
 **Como** jugador **quiero** un mundo variado con zonas por nivel **para** explorar mientras progreso.
-- Prioridad: Must · Estimación: L · Estado: Hecha
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-031, HU-055
 - Skills: `world-maps`, `pixel-art-assets`
 
@@ -21,7 +21,7 @@
 ---
 ### HU-081 · Arte de clases y monstruos
 **Como** jugador **quiero** personajes y monstruos con animaciones **para** que el juego se vea bien.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-024
 - Skills: `pixel-art-assets`
 
@@ -34,7 +34,7 @@
 
 ### HU-082 · Íconos de items y hechizos
 **Como** jugador **quiero** íconos claros **para** reconocer mis hechizos y objetos de un vistazo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-038, HU-051
 - Skills: `pixel-art-assets`, `game-content`
 
@@ -46,7 +46,7 @@
 
 ### HU-083 · Mina Abandonada y jefe Capataz Grask
 **Como** grupo de nivel 4–6 **queremos** una cueva con jefe **para** tener el objetivo final del Tier 1 y botín raro.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-027, HU-036, HU-062, HU-080, HU-086
 - Skills: `world-maps`, `combat-system`, `game-content`
 
@@ -58,7 +58,7 @@
 
 **Notas de implementación (parcial)**
 - CA1 **parcial**: `maps/mine.tmj` regenerado (90×60, `tools/maps/gen_tier1_maps.py`): entrada (portal + `gy_entrance`) → Sala 1 (6 kóbolds) → Sala 2 (6 kóbolds + 4 pilares) → rama lateral sur: sala del Capataz (spawn fijo) · Sala 3 (gólem élite + 3 kóbolds) → hornacina cerrada hacia el Tier 2. El **puzle de palancas no existe** (no hay mecánica de palancas en el motor: decidir si se hace HU propia); recorrido/paleta sin validar jugando; tileset placeholder.
-- CA2: hechizos y objetivos del jefe (`foreman_slam` área marcada, `foreman_whip` a `random_not_top_threat`, `foreman_rally` bajo 50 %) e inmunidad a aturdir/raíz/ralentizar ya estaban en HU-036/HU-088 (`rules.boss.immuneToAuraKinds`).
+- CA2: hechizos y objetivos del jefe (`foreman_slam` área marcada, `foreman_whip` a `random_not_top_threat`, `foreman_rally` bajo 50 %) e inmunidad a aturdir/raíz/ralentizar ya estaban en HU-036/HU-088 (`rules.combat.bossImmuneToAuraKinds`).
 - CA3: **sin validar jugando** (HU-084/partida de prueba); el modelo de `tools/balance/` es la única referencia.
 - CA4: hecho con HU-062 CA4: `LootAnnouncedEvent` → `ChatMessage{global}` a todos los conectados cuando el monstruo es `boss` (test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`). El grupo de la tabla `lt_foreman` garantiza exactamente 1 raro (`Foreman_AlwaysDropsExactlyOneGroupItem`).
 
@@ -134,6 +134,11 @@
 1. **Dado** el tema de la interfaz **entonces** el texto usa Alegreya Sans (Medium; Bold en negritas) con suavizado y los títulos (`TitleLabel`, `HeadlineLabel`) Alegreya SC; licencia OFL anotada en `assets/CREDITS.md`.
 2. **Dado** el cambio **entonces** paneles 9-slice, paleta, sprites y tamaños de panel siguen igual (la altura de mayúscula a 8 px lógicos es la de la fuente anterior).
 3. **Dado** texto sobre el mundo (nombres, números, chat) **entonces** lleva contorno oscuro proporcionado a la letra suave (`OUTLINE_THIN` / `OUTLINE_THICK`).
+
+**Notas de implementación** (escritas en la auditoría del 2026-10-02, a partir de `2e4988d`)
+- `scripts/ui/ui_theme.gd` carga Alegreya Sans y Alegreya SC de `assets/fonts/` con antialias gris; reemplaza a Tiny5 de
+  ADR-026. Los contornos del texto del mundo usan `OUTLINE_THIN` / `OUTLINE_THICK`.
+- Test: `test_ui_theme.gd::test_theme_uses_the_hd_font_smoothed`.
 
 ### HU-093 · Guerrero y mago con hojas dibujadas
 **Como** jugador **quiero** que el guerrero y el mago tengan el aspecto de las hojas de referencia **para** que los héroes se vean más detallados.

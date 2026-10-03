@@ -1,6 +1,6 @@
 ---
 name: world-maps
-description: Crear y editar mapas en Tiled (.tmj) para PixelRealms — capas obligatorias, colisión, línea de visión, spawns de monstruos, NPCs, cementerios y zonas — y cómo los leen el servidor (TiledMapLoader) y el cliente (YATI). Úsala al tocar maps/ o la carga de mapas.
+description: Crear y editar mapas en Tiled (.tmj) para PixelRealms — capas obligatorias, colisión, línea de visión, spawns de monstruos, NPCs, cementerios y zonas — y cómo los leen el servidor (TiledMapLoader) y el cliente (TmjMap). Úsala al tocar maps/ o la carga de mapas.
 ---
 
 # Mapas del mundo (Tiled)
@@ -44,10 +44,12 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 6. Test: `TiledMapLoaderTests` con `maps/test_small.tmj` (10×10) versionado para tests.
 
 ## Cliente
-- Plugin **YATI** importa `.tmj` a una escena con `TileMapLayer` por capa. `above` se coloca con `z_index` mayor que `Entities`.
-- Las capas de objetos se ignoran en el cliente (el servidor envía NPCs/monstruos como entidades); `zones` sí se usa para
-  mostrar el nombre al entrar ("Bosque Sombrío" con fade).
-- `collision` se oculta (`visible = false`).
+- Sin plugin ni `TileMapLayer`: `scripts/world/tmj_map.gd` (`TmjMap`) lee el `.tmj` que `tools/sync_content.gd` copia a
+  `res://maps/`, y `TerrainBaker` hornea `ground`/`detail`/`walls` y `above` con autotile dual-grid (ADR-026);
+  `TerrainRenderer` dibuja `above` con `z_index` mayor que `Entities`.
+- De las capas de objetos el cliente solo lee `zones` (nombre al entrar, "Bosque Sombrío" con fade), `graveyards` y
+  `portals` (para dibujarlos); NPCs y monstruos llegan del servidor como entidades.
+- `collision` no se dibuja: solo alimenta la colisión.
 - El cliente construye su propia `CollisionGrid` desde el mismo `.tmj` para la predicción de movimiento (mismo algoritmo).
 
 ## Buenas prácticas de diseño
@@ -58,4 +60,5 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 - Cuevas (mapas aparte): 3–5 salas, 5–10 min; sala del jefe en rama lateral; sala élite antes de la salida al tier siguiente.
   Todas comparten el tileset `interior` cambiando paleta (mina marrón, cripta verde, fortaleza gris).
 - El pueblo (`safe=true`) debe estar a < 40 tiles de las zonas 1–3.
-- Tras editar: `dotnet test --filter Map` y abrir el cliente para revisar capas `above`.
+- Tras editar: `dotnet test --filter Map`, copiar los mapas al cliente (`godot --path client --headless -s ../tools/sync_content.gd`)
+  y abrirlo para revisar capas `above`.

@@ -10,31 +10,28 @@ public sealed record ChatDeliveredEvent(int MapInstanceId, IReadOnlyList<Player>
 
 /// <summary>
 /// HU-060: canales `say` (jugadores de la misma instancia a ≤ `rules.movement.sayRangeTiles`), `global`, `party`, `whisper`;
-/// 1–200 caracteres sin caracteres de control; límite de 5 mensajes por 5 s por jugador (docs/architecture.md §Red).
+/// 1–`rules.social.chatMaxLength` caracteres sin caracteres de control; límite de `chatRateLimitCount` mensajes por
+/// `chatRateLimitWindowSec` por jugador.
 /// </summary>
 public sealed class ChatService
 {
-    public const int MaxLength = 200;
-    public const int RateLimitCount = 5;
-    public const int RateLimitWindowMs = 5000;
-
     private readonly Dictionary<Guid, Queue<long>> _recent = new();
 
-    /// <summary>Normaliza el texto: recorta a 200, quita caracteres de control; null si queda vacío.</summary>
-    public static string? Sanitize(string? text)
+    /// <summary>Normaliza el texto: recorta a `maxLength`, quita caracteres de control; null si queda vacío.</summary>
+    public static string? Sanitize(string? text, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
         var chars = text.Where(c => !char.IsControl(c)).ToArray();
         var clean = new string(chars).Trim();
         if (clean.Length == 0) return null;
-        return clean.Length > MaxLength ? clean[..MaxLength] : clean;
+        return clean.Length > maxLength ? clean[..maxLength] : clean;
     }
 
-    public bool AllowRate(Guid characterId, long nowMs)
+    public bool AllowRate(Guid characterId, long nowMs, SocialRules rules)
     {
         if (!_recent.TryGetValue(characterId, out var q)) _recent[characterId] = q = new Queue<long>();
-        while (q.Count > 0 && nowMs - q.Peek() >= RateLimitWindowMs) q.Dequeue();
-        if (q.Count >= RateLimitCount) return false;
+        while (q.Count > 0 && nowMs - q.Peek() >= rules.ChatRateLimitWindowSec * 1000) q.Dequeue();
+        if (q.Count >= rules.ChatRateLimitCount) return false;
         q.Enqueue(nowMs);
         return true;
     }
@@ -42,7 +39,7 @@ public sealed class ChatService
     /// <summary>Resuelve destinatarios; devuelve código de error o null. `allPlayers` = conectados en todas las instancias.</summary>
     public string? Send(Player from, string channel, string? rawText, string? to, MapInstance map, IEnumerable<Player> allPlayers, Func<Guid, Party?> partyOf, TickContext ctx)
     {
-        var text = Sanitize(rawText);
+        var text = Sanitize(rawText, ctx.Rules.Social.ChatMaxLength);
         if (text is null) return "invalid_payload";
         List<Player> recipients;
         switch (channel)
@@ -74,7 +71,7 @@ public sealed class ChatService
             default:
                 return "invalid_payload";
         }
-        if (!AllowRate(from.CharacterId, ctx.NowMs)) return "rate_limited"; // solo cuentan los mensajes que se envían
+        if (!AllowRate(from.CharacterId, ctx.NowMs, ctx.Rules.Social)) return "rate_limited"; // solo cuentan los mensajes que se envían
         ctx.Emit(new ChatDeliveredEvent(map.Id, recipients, channel, from.Name, text));
         return null;
     }

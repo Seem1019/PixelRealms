@@ -127,4 +127,4 @@
 - Si un guardado falla del todo (3 intentos), `SaveService` conserva su auditoría y la escribe con el siguiente guardado de ese personaje (salida, autosave o cualquier otro). Si ese fallo en realidad llegó a confirmarse en la BD, la auditoría queda duplicada: se prefiere a perderla.
 - El cliente no se queda esperando si el servidor rechaza el `Logout` sin `reqId` (`invalid_payload`, p. ej. un servidor anterior a esta HU): el menú vuelve a quedar usable con "No se pudo salir: el servidor rechazó la petición".
 - Tests: `LogoutTests` (10: fuera/dentro de combate, CA3, sin jugador, toma del personaje vivo, reentrada con BD atrasada (2), cooldowns tras salir, amenaza y marcas), `CloseAfterFlushTests` (cierre forzado a los 2 s), `SaveServiceTests` (generaciones, auditoría arrastrada), `PlayerMapperTests` y `CharacterRepositoryTests` (cooldowns), GUT `test_logout_menu.gd`.
-
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA1 ya no caduca a los 15 min: `POST /api/auth/refresh` renueva el JWT (tope de sesión desde `auth_time`, límite propio por IP) y `api_client.gd` lo renueva con un temporizador mientras hay token (`AuthEndpointsTests`, `test_api_client.gd`).

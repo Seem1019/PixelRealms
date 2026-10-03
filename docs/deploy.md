@@ -5,14 +5,20 @@ copias de seguridad diarias y despliegue desde GitHub con un clic. Todo lo de es
 `server/Dockerfile`, `docker-compose.prod.yml`, `deploy/Caddyfile`, `deploy/backup.sh`, `deploy/restore.sh`,
 `.github/workflows/deploy.yml` y `.github/workflows/release-client.yml`.
 
-> Estado: escrito sin poder probarlo en un VPS real (no había Docker ni red en la sesión que lo generó). La primera vez,
-> sigue los pasos en orden y anota aquí lo que haya que corregir.
+> Estado (2026-10-02): desplegado y funcionando. El workflow *Deploy* publica solo en cada push verde a `main`: servidor en
+> GHCR y VPS con chequeo de `/health` (primer run verde en `ed09fae`, tras arreglar el nombre de la imagen en minúsculas en
+> `8927dd1`) y cliente web en `/play/` comprobado por https (`0cd4f50`). HU-073 comprobada el 2026-10-02: `https` con
+> certificado válido, `/play/` con las cabeceras COOP/COEP, `wss://…/ws` responde `101 Switching Protocols`, `/health` OK y
+> el cliente web llega a la pantalla de login en Chromium. Imagen medida en local: 56 MiB comprimida y unos 136 MB
+> descomprimida (HU-073 CA1, < 150 MB; Docker Desktop muestra 195 MB porque containerd cuenta también las capas
+> comprimidas). Sin probar todavía: *Publicar cliente* (Windows a itch.io), Firefox y un ensayo de restauración **en el
+> VPS** (en local sí, ver §9).
 >
 > Primer despliegue real (2026-10-02, Vultr Miami, Ubuntu 24.04, opción B): funcionó tras dos arreglos en
 > `server/Dockerfile`: copiar el `.editorconfig` de la raíz (sin él, CA1716/CA1720 rompen el `dotnet publish`) y usar
 > `Urls` en vez de `ASPNETCORE_URLS` (el `"Urls"` de `appsettings.json` pisa la variable con prefijo y el servidor solo
 > escuchaba en `localhost` dentro del contenedor). Con opción B pon `SERVER_IMAGE=pixelrealms-server:local` en `.env`.
-> El cliente se exportó en local (plantillas 4.7.2) y se subió a `deploy/play` con `scp`; los workflows siguen sin probar.
+> Aquel día el cliente se exportó en local (plantillas 4.7.2) y se subió a `deploy/play` con `scp`; desde `a70a6a4` lo hace *Deploy*.
 
 ## 1. Comprar VPS y dominio
 - VPS Linux (Ubuntu 24.04 LTS o Debian 12), 2 vCPU y 2–4 GB de RAM bastan para ~20 jugadores (el servidor usa < 1 GB; Postgres
@@ -55,15 +61,18 @@ cp .env.example .env   # o créalo a mano con estas claves:
 | `POSTGRES_USER` / `POSTGRES_DB` | `pixelrealms` |
 | `POSTGRES_PASSWORD` | contraseña larga aleatoria (`openssl rand -base64 24`) |
 | `JWT_SIGNING_KEY` | ≥ 32 bytes aleatorios (`openssl rand -base64 48`) |
-| `SERVER_IMAGE` | `ghcr.io/<usuario>/pixelrealms-server:latest` (lo actualiza el Action en cada despliegue) |
+| `SERVER_IMAGE` | `ghcr.io/seem1019/pixelrealms-server:<sha>` (lo escribe *Deploy* en cada despliegue; GHCR exige minúsculas). Con la opción B, `pixelrealms-server:local` |
 
 `.env` nunca va al repo (regla 8 de `CLAUDE.md`). Si cambias `JWT_SIGNING_KEY`, todas las sesiones abiertas caducan.
 
 ## 5. Primer despliegue
-Opción A, desde GitHub (recomendada): en el repo → *Settings → Secrets and variables → Actions* crea `VPS_HOST`, `VPS_USER`
-(`pixelrealms`), `VPS_SSH_KEY` (clave privada) y, si no usas `~/pixelrealms`, `VPS_PATH`. Crea el *environment* `production`.
-Luego *Actions → Deploy servidor → Run workflow*. El job construye la imagen (falla si pesa > 150 MB), la sube a GHCR y en el
-VPS hace `docker compose pull` + `up -d` y comprueba `/health`. La primera vez la imagen de GHCR es privada: en el VPS
+Opción A, desde GitHub (recomendada): crea el *environment* `production` y en él los secrets `VPS_HOST`, `VPS_USER`
+(`pixelrealms`), `VPS_SSH_KEY` (clave privada) y `VPS_KNOWN_HOSTS` (`ssh-keyscan -t ed25519 <ip>`, comprobando la huella), y
+las variables `SERVER_URL` (`https://<dominio>`) y, si no usas `~/pixelrealms`, `VPS_PATH`. Luego *Actions → Deploy → Run
+workflow* (`force`). El job construye la imagen, la sube a GHCR y en el VPS hace `docker compose pull` + `up -d` y comprueba
+`/health`; el job del cliente exporta la web y la sube a `deploy/play`. (El chequeo de tamaño < 150 MB se quitó en `a70a6a4`
+y no se ha vuelto a poner para no bloquear despliegues; la medida a mano está en el estado de arriba.) La primera vez la
+imagen de GHCR es privada: en el VPS
 el Action ya hace `docker login ghcr.io` con el token del workflow; si lo lanzas a mano necesitas un PAT con `read:packages`.
 
 Opción B, construyendo en el VPS:
@@ -109,13 +118,12 @@ la collation `case_insensitive`. Si el volumen `pgdata` ya tiene tablas creadas 
 (la cuenta debe existir: regístrala desde el cliente antes).
 
 ## 6. Cliente web y de escritorio (HU-074)
-*Actions → Publicar cliente → Run workflow* con la URL pública (`https://juego.midominio.com`) y la versión. El workflow:
-1. copia `content/` y `maps/` al cliente (`tools/sync_content.gd`), fija `DEFAULT_SERVER_URL` y exporta **Web** y **Windows**
-   con los presets de `client/export_presets.cfg`;
-2. sube el export Web a `~/pixelrealms/deploy/play` del VPS: Caddy lo sirve en `https://<dominio>/play/` con las cabeceras
-   COOP/COEP que exige Godot Web (hilos) — Chrome y Firefox recientes;
-3. sube el `.zip` de Windows a itch.io con `butler` (secrets `BUTLER_API_KEY` e `ITCH_TARGET` = `usuario/juego:windows`; en
-   itch.io marca la página como *Restricted* con contraseña).
+- **Web**: la publica *Deploy* (§7) en cada push a `main` que toque `client/`, `content/` o `maps/`: exporta con el preset
+  **Web** de `client/export_presets.cfg` (con `DEFAULT_SERVER_URL` = la variable `SERVER_URL`) y la sube a `deploy/play`. Caddy
+  la sirve en `https://<dominio>/play/` con las cabeceras COOP/COEP que exige Godot Web (hilos): Chrome y Firefox recientes.
+- **Windows**: *Actions → Publicar cliente → Run workflow* con la URL pública y la versión. Exporta **Web** (solo como
+  artefacto) y **Windows**, y sube el `.zip` a itch.io con `butler` (secrets `BUTLER_API_KEY` e `ITCH_TARGET` =
+  `usuario/juego:windows`; en itch.io marca la página como *Restricted* con contraseña). Nunca se ha ejecutado todavía.
 Si el cliente es de otra versión de protocolo, el servidor responde `bad_version` y el cliente muestra el aviso con un enlace
 a `/play/` (configurable en `user://settings.cfg` → `[net] update_url`).
 
@@ -128,6 +136,8 @@ a `/play/` (configurable en `user://settings.cfg` → `[net] update_url`).
   restringida en `authorized_keys`), `VPS_KNOWN_HOSTS` (`ssh-keyscan -t ed25519 <ip>`, comprobando la huella) y la variable
   `SERVER_URL`.
 - Reiniciar el servidor desconecta a todos: guarda a los jugadores al pararse (`OnStopping`), pero avisa antes con `/announce`.
+  `docker-compose.prod.yml` da al servicio `server` `stop_grace_period: 40s` para que Docker no lo mate (SIGKILL a los 10 s por
+  defecto) mientras vacía los guardados contra la BD.
 - A mano en el VPS: `docker compose -f docker-compose.prod.yml pull server && docker compose -f docker-compose.prod.yml up -d server`.
 - Cliente de escritorio: *Publicar cliente → Run workflow* (`.zip` para itch.io). La web se actualiza al recargar.
 - Contenido (`content/*.json`, `maps/*.tmj`) va dentro de la imagen: cambiar números = nuevo despliegue del servidor **y** del
@@ -156,12 +166,21 @@ docker compose -f docker-compose.prod.yml stop server
 sh deploy/restore.sh backups/pixelrealms-20261001-040000.dump
 docker compose -f docker-compose.prod.yml start server
 ```
-`restore.sh` hace `pg_restore --clean --if-exists` sobre la base de producción (sobrescribe). **Pendiente**: ensayar una
-restauración real al menos una vez (HU-075 CA2) y anotar aquí la fecha y el resultado.
+`restore.sh` hace `pg_restore --clean --if-exists --no-owner` sobre la base de producción (sobrescribe).
+
+**Ensayos** (HU-075 CA2):
+- 2026-10-02, en local (Docker 29.8 en el PC de Diego, contenedor desechable `postgres:17-alpine`): el servidor de esta rama
+  creó el esquema real (migraciones `InitialCreate` y `CharacterCooldowns`) y por la API se crearon 1 cuenta y 2 personajes (8
+  items, 2 casillas de barra). `deploy/backup.sh once`, sin cambios, generó un `.dump` de 14 KB. Tras simular una pérdida
+  (borrar un personaje y cambiar el oro del otro), `pg_restore` con los mismos flags que `restore.sh` devolvió exactamente los
+  datos del backup y el servidor arrancó sobre la base restaurada ("sin migraciones pendientes") y listó los dos personajes.
+  `restore.sh` en sí (que usa `docker compose -f docker-compose.prod.yml`) no se ejecutó: falta el ensayo en el VPS.
+- **Pendiente**: ensayo en el VPS con un backup real y la copia automática fuera del VPS (decidir destino: otro servidor,
+  almacenamiento S3 compatible con `rclone`, o el PC de alguien del grupo).
 
 ## 10. Problemas frecuentes
 - *Caddy no obtiene certificado*: el DNS no apunta aún o el puerto 80/443 está cerrado en el firewall del proveedor (además de ufw).
 - *`/ws` devuelve 429*: tope de 10 conexiones por IP (HU-071). Detrás de Caddy el servidor usa `X-Forwarded-For` (solo en
-  `ASPNETCORE_ENVIRONMENT=Production`); si todos los amigos salen por la misma IP (misma casa), sube `Net:RateLimits:MaxConnectionsPerIp`
+  `ASPNETCORE_ENVIRONMENT=Production`, y antes del rate limiter: también los límites de login y registro son por IP real); si todos los amigos salen por la misma IP (misma casa), sube `Net:RateLimits:MaxConnectionsPerIp`
   con la variable `Net__RateLimits__MaxConnectionsPerIp=20` en el servicio `server`.
 - *El cliente web no carga*: faltan las cabeceras COOP/COEP (revisa el `Caddyfile`) o el navegador bloquea `SharedArrayBuffer`.

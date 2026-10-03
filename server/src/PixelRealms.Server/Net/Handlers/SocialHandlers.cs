@@ -25,7 +25,22 @@ public sealed class ChatSendHandler(CombatHandlerDeps deps, PlayerRegistry playe
         if (error is not null) ctx.SendError(error);
     }
 
-    private string ZoneOf(Player p)
+    private string ZoneOf(Player p) => OnlineListHandler.ZoneOf(p, deps, session);
+}
+
+/// <summary>HU-063 CA1: `OnlineListRequest` → `OnlineList` con los conectados (nombre, clase, nivel, zona), ordenados por nombre.</summary>
+public sealed class OnlineListHandler(CombatHandlerDeps deps, PlayerRegistry players, WorldSession session) : IMessageHandler<OnlineListRequest>
+{
+    public void Handle(OnlineListRequest msg, HandlerContext ctx)
+    {
+        if (ctx.Player is null) return;
+        var list = players.All.Where(x => x.ConnectionId >= 0).OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(x => new OnlinePlayerDto(x.Name, x.ClassId, x.Level, ZoneOf(x, deps, session))).ToList();
+        ctx.Send(new OnlineList(list));
+    }
+
+    /// <summary>Zona del mapa donde está (nombre de Tiled) o, si no hay, el nombre del mapa.</summary>
+    public static string ZoneOf(Player p, CombatHandlerDeps deps, WorldSession session)
     {
         var map = deps.MapOf(p);
         return map?.Data.ZoneAt(p.Position)?.Name ?? map?.Data.DisplayName ?? session.MapIdOf(p);
@@ -184,14 +199,16 @@ public sealed class TradeCancelHandler(CombatHandlerDeps deps) : IMessageHandler
 }
 
 /// <summary>HU-044: `ChangeClass{npcId, classId, reqId}`.</summary>
-public sealed class ChangeClassHandler(CombatHandlerDeps deps, WorldSession session) : IMessageHandler<ChangeClass>
+public sealed class ChangeClassHandler(CombatHandlerDeps deps, WorldSession session, ILogger<ChangeClassHandler> logger) : IMessageHandler<ChangeClass>
 {
     public void Handle(ChangeClass msg, HandlerContext ctx)
     {
         var p = ctx.Player;
         if (p is null || deps.MapOf(p) is not { } map) return;
+        var oldClass = p.ClassId;
         var error = deps.Combat.ClassChange.Change(p, new EntityId(msg.NpcId), msg.ClassId ?? "", map, ctx.Tick);
         if (error is not null) { ctx.SendError(error, msg.ReqId); return; }
+        logger.LogInformation("{Name} cambió de clase: {OldClass} → {NewClass}", p.Name, oldClass, p.ClassId); // HU-044 CA5
         session.Save(p, ctx.Tick.NowMs, "class_change");
         ctx.Tick.Emit(new Game.Items.InventoryChangedEvent(map.Id, p, msg.ReqId));
     }

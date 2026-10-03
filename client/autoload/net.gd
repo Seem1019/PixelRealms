@@ -13,6 +13,8 @@ const MAX_ATTEMPTS := 5
 
 var rtt_ms: int = -1
 var simulated_latency_ms: int = 0
+## HU-023 CA3: % de Snapshots que se descartan al llegar, para ver la interpolación con pérdidas (solo depuración).
+var simulated_snapshot_loss_pct: float = 0.0
 var is_connected: bool = false
 
 var _peer: WebSocketPeer = WebSocketPeer.new()
@@ -35,6 +37,16 @@ var _refreshing: bool = false
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
+	# HU-022 CA2: latencia simulada para probar la predicción sin red real. `[debug] simulated_latency_ms` en
+	# user://settings.cfg o `--latency=150` en la línea de órdenes (solo fuera de las builds de release).
+	if not OS.has_feature("release"):
+		simulated_latency_ms = int(Settings.get_value("debug", "simulated_latency_ms", 0))
+		simulated_snapshot_loss_pct = float(Settings.get_value("debug", "simulated_snapshot_loss_pct", 0.0))
+		for arg: String in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+			if arg.begins_with("--latency="):
+				simulated_latency_ms = maxi(0, arg.trim_prefix("--latency=").to_int())
+			elif arg.begins_with("--snapshot-loss="):
+				simulated_snapshot_loss_pct = clampf(arg.trim_prefix("--snapshot-loss=").to_float(), 0.0, 100.0)
 	_handlers["Pong"] = _on_pong
 	_handlers["Error"] = _on_error
 	_handlers["Snapshot"] = func(d: Dictionary) -> void: snapshot.emit(d)
@@ -203,6 +215,8 @@ func _dispatch(text: String) -> void:
 		return
 	var envelope: Dictionary = parsed
 	var type := str(envelope.get("t", ""))
+	if type == "Snapshot" and simulated_snapshot_loss_pct > 0.0 and randf() * 100.0 < simulated_snapshot_loss_pct:
+		return
 	var data: Variant = envelope.get("d", {})
 	var payload: Dictionary = data if data is Dictionary else {}
 	message_received.emit(type, payload)

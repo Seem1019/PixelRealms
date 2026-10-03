@@ -7,7 +7,7 @@ flowchart LR
   subgraph Cliente["Cliente Godot 4 (GDScript)"]
     Input[Input / UI] --> Net[autoload Net\nWebSocketPeer]
     Net --> GS[autoload GameState]
-    GS --> World[World scene\nTileMap + entidades]
+    GS --> World[World scene\nmapa horneado + entidades]
     Content1[autoload Content\ncontent/*.json]
   end
   subgraph Servidor[".NET 10 — proceso único"]
@@ -29,19 +29,25 @@ Protocol  ←  Game  ←  Server  →  Persistence
    ↑          ↑                      ↑
    └──── Content ─────────────────────┘ (Content solo depende de Protocol para enums compartidos)
 ```
-- `PixelRealms.Protocol`: `record` DTOs, `MessageType` enum, `ProtocolVersion` const, `JsonSerializerContext`
+- `PixelRealms.Protocol`: `record` DTOs, `MessageRegistry` (nombre `t` ⇄ tipo C#), `ProtocolVersion` const, `JsonSerializerContext`
   (System.Text.Json **source generated**, `camelCase`). Cero dependencias.
 - `PixelRealms.Content`: modelos inmutables (`ClassDef`, `SpellDef`, `EffectDef`, `ItemTemplate`,
-  `MonsterTemplate`, `LootTable`, `Rules`), `ContentDb` con diccionarios `FrozenDictionary<string, T>`, validación.
-  `Rules` (de `content/rules.json`) se inyecta como `IRules` en todos los sistemas; recarga en caliente por comando admin (ADR-008).
+  `MonsterTemplate`, `LootTable`, `RulesDb`), `ContentDb` con diccionarios `FrozenDictionary<string, T>`, validación.
+  `RulesDb` (de `content/rules.json`) se inyecta como `IRules` en todos los sistemas, también la IA de monstruos
+  (`rules.ai`: percepción, A*, patrulla) y lo social (`rules.social`: chat e intercambio). Recarga en caliente (ADR-008):
+  `/reload rules` llama a `ReloadableContent.ReloadRules()`; `TickContext.Rules` se relee al empezar cada tick, así que el
+  cambio entra en el tick siguiente sin reiniciar, y las stats derivadas cacheadas se recalculan en ese momento. Si el JSON
+  no valida (incluidos los pares mínimo/máximo que el tick usa como rango), se conserva el anterior y el admin ve el error.
 - `PixelRealms.Game`: `World` = colección de `MapInstance` (estado vivo: jugadores, monstruos, loot, amenaza, AOI) sobre
   `MapData` inmutables compartidos (ADR-007); `Player`, `Monster`, `Actor`; sistemas por instancia (`MovementSystem`, `CastSystem`,
-  `AuraSystem`, `AiSystem`, `RegenSystem`, `LootSystem`, `RespawnSystem`, `InterestSystem`), servicios globales
-  (`CombatCalculator`, `StatCalculator`, `AffinityResolver`, `Inventory`, `TradeService`, `PartyService`, `ChatService`, `PvpService`).
+  `AuraSystem`, `MonsterAiSystem`, `ResourceSystem`, `LootSystem`, `SpawnSystem`, `InterestSystem`), servicios globales
+  (`CombatCalculator`, `StatCalculator`, `Inventory`, `TradeService`, `PartyService`, `ChatService`, `PvpService`); la afinidad
+  la da `rules.Affinity.MultiplierFor(clase, tipo)`.
   Emite `IGameEvent`s en una lista por tick.
 - `PixelRealms.Persistence`: `GameDbContext`, entidades EF, `ICharacterRepository`, `IAccountRepository`.
 - `PixelRealms.Server`: `Program.cs` (minimal APIs), `ConnectionManager`, `WebSocketSession`,
-  `GameLoopService : BackgroundService` (arranca el hilo), `MessageRouter`, `SnapshotBuilder`, `SaveService`.
+  `GameLoopService : IHostedService` (arranca el hilo), `MessageRouter`, `SnapshotBuilder`, `SaveService`,
+  `WorldStats` (recuentos por instancia que calcula el hilo del tick y publica como copia inmutable para `/admin/stats`).
 
 ## 3. Game loop (servidor)
 
@@ -55,13 +61,13 @@ Orden estricto de cada tick (los pasos 3–9 se ejecutan **por cada `MapInstance
 3. `MovementSystem` – integra movimiento con colisión AABB contra la grilla de colisión del mapa.
 4. `CastSystem` – avanza casteos, resuelve los completados → `EffectResolver` (daño, cura, auras).
 5. `AuraSystem` – ticks de DoT/HoT, expiraciones.
-6. `AiSystem` – monstruos: Idle → Aggro → Chase → Attack → Leash/Evade.
-7. `RegenSystem` – maná/energía/ira, vida fuera de combate.
-8. `DeathSystem` / `LootSystem` / `RespawnSystem`.
+6. `MonsterAiSystem` – monstruos: Idle → Chase → Attack → Evade (`AiState`).
+7. `ResourceSystem` – maná/energía/ira, vida fuera de combate.
+8. `DeathSystem` / `LootSystem` / `SpawnSystem` (reaparición de monstruos).
 9. `InterestSystem` – recalcula AOI (celdas de 16×16 tiles) → spawns/despawns por observador.
 10. `Outbound` – cada 2 ticks `SnapshotBuilder` construye un snapshot por jugador; eventos del tick
     (`CombatEvents` agrupados por tick, `AuraApplied`…) se envían a quienes tengan la entidad en su AOI.
-11. `Persistence` – jugadores `Dirty` con autosave vencido (60 s) → `CharacterSaveDto` a `SaveService`.
+11. `Persistence` – jugadores `Dirty` con autosave vencido (60 s, appsettings `Persistence:AutosaveSec`) → `CharacterSaveDto` a `SaveService`.
 
 ```mermaid
 sequenceDiagram
@@ -84,8 +90,8 @@ sequenceDiagram
 - Formato: JSON texto, sobre `{ "t": string, "d": object }`. Límite 4 KB por mensaje entrante.
 - Autenticación: login REST → JWT (15 min) → `POST /api/game/ticket` (ticket de un solo uso, 30 s) →
   `ws://host/ws?ticket=...` (el navegador no permite headers en WebSocket). Primer mensaje: `Hello`.
-- Rate limiting por conexión (token bucket): `MoveInput` 30/s con ráfaga de 90 (un corte de red breve entrega los inputs de golpe), `CastSpell` 10/s, `Chat` 5/5 s, resto 20/s.
-  Exceder 3 veces en 10 s → desconexión con `Error{code:"rate_limited"}`.
+- Rate limiting por conexión (token bucket, appsettings `Net:RateLimits`, no `rules.json`): `MoveInput` 30/s con ráfaga de 90 (un corte de red breve entrega los inputs de golpe), `CastSpell` 10/s, `Chat` 5/5 s, resto 20/s.
+  El mensaje que excede se descarta con `Error{code:"rate_limited"}`; exceder 3 veces en 10 s → desconexión.
 - Heartbeat: `Ping` cada 5 s; sin tráfico 15 s → desconectar. Reconexión: el personaje queda 10 s en el mundo
   ("linkdead") para evitar abuso de desconectar en combate.
 
@@ -104,27 +110,32 @@ sequenceDiagram
 - Entidades remotas: buffer de interpolación de 100 ms entre los dos snapshots que rodean `renderTime`.
 - Desplazamientos por habilidad (Carga, saltos a un punto): los aplica el servidor; el cliente no los predice y muestra la
   posición recibida con un suavizado de ~100 ms (ADR-016). No pasan por `MovementStep` ni por los vectores de movimiento.
+  Un salto con `travelMs` vuela durante ese tiempo (`CombatState.Flight`): el lanzador no se mueve ni castea hasta aterrizar.
 
 ## 5. Persistencia
 - El estado vivo está en memoria. La BD es la copia durable.
-- Guardado: al salir, al cambiar de mapa, cada 60 s si `Dirty`, y al apagar el servidor (`IHostApplicationLifetime`).
-- `SaveService` guarda **el personaje completo** (stats, posición, items) en **una transacción**:
+- Guardado: al salir (logout, cierre o linkdead vencido), al cambiar de mapa, al subir de nivel, al cambiar de clase, al
+  reemplazar la sesión, al completar un intercambio (los dos en el mismo tick), al morir, cada 60 s si `Dirty`, y al apagar
+  el servidor (`GameLoopService.OnStopping`).
+- `SaveService` guarda **el personaje completo** (stats, posición, items, barra y cooldowns) en **una transacción**:
   `DELETE character_items WHERE character_id = X` + `INSERT` masivo. Simple y sin inconsistencias para el volumen MVP.
 - `ItemInstance.Id` (UUID v7) nunca se reutiliza → permite auditar duplicaciones (`item_audit_log`).
 
 ## 6. Cliente Godot
-- Autoloads: `Net` (WebSocketPeer, cola, reconexión, dispatch por `t` a señales), `Content` (carga JSON de
-  `res://content`), `GameState` (personaje propio, inventario, target, party — **solo reflejo** del servidor),
-  `Settings`, `UiStyle` (tema de la interfaz).
-- Escenas: `Boot` → `Login` → `CharacterSelect` → `World` (TileMapLayer por Tiled/YATI, `Entities` YSort,
+- Autoloads (en este orden): `EventBus` (señales globales de UI), `Settings`, `Content` (carga JSON de `res://content`),
+  `Net` (WebSocketPeer, cola, reconexión, dispatch por `t` a señales), `GameState` (personaje propio, inventario, target,
+  party — **solo reflejo** del servidor), `Api` (`scripts/net/api_client.gd`: REST con `HTTPRequest`, JWT en memoria),
+  `UiStyle` (tema de la interfaz).
+- Escenas: `Boot` → `Login` → `CharacterSelect` → `World` (`Ground`/`Above` con el `.tmj` leído por `TmjMap`, `Entities` YSort,
   `Camera2D` pixel-perfect) + `HUD` (CanvasLayer: barras, hotbar, target frame, cast bar, chat, party, ventanas).
 - Resolución lógica 480×270 (16:9), escalado entero (`stretch mode = canvas_items`, `scale mode = integer`, ADR-025): el 2D
   se dibuja a la resolución de la ventana, así que el texto sale nítido a su tamaño y el mundo conserva la escala entera.
 - Un único `Theme` creado por código (`scripts/ui/ui_theme.gd`; el autoload `UiStyle` lo fusiona con el tema por defecto
   del motor, porque los `Control` dentro de un `CanvasLayer` no heredan el de la ventana):
   tamaños de letra, espaciados, colores y estilos. Tooltips propios (`RichTooltip`) de ancho contenido.
-- Aspecto (ADR-026): fuente pixel Tiny5 a su tamaño nativo (8 px, ×2 para titulares), estilos 9-slice (`StyleBoxTexture`)
-  y arte en la paleta Resurrect 64 generado por `tools/art/`. El mapa se dibuja con `TerrainBaker`/`TerrainRenderer`: al
+- Aspecto (ADR-026): fuente Alegreya Sans / Alegreya SC con suavizado gris (HU-092; 8 px lógicos, 16 para titulares), estilos
+  9-slice (`StyleBoxTexture`) y arte en la paleta Resurrect 64 generado por `tools/art/` (salvo guerrero y mago: hojas
+  importadas con `tools/art/import_heroes.py`, HU-093). El mapa se dibuja con `TerrainBaker`/`TerrainRenderer`: al
   cargar, hornea el `.tmj` (los mismos GIDs que lee la colisión) con autotile dual-grid en texturas por trozos, una capa
   bajo las entidades y otra (copas, aleros) encima. Las entidades son `EntityVisual` (sprite de 32×32 animado, sombra y
   placa de nombre); `NameplateLayout` separa las placas que se pisan.

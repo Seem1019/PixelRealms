@@ -2,11 +2,12 @@ using System.Globalization;
 
 namespace PixelRealms.Tools.LoadBot;
 
-public sealed record LoadOptions(int DurationSec, int Bots, int Monsters, int Size, int Seed, string? ContentDir, bool Bench)
+/// <param name="Network">URL base de un servidor en marcha (`http://127.0.0.1:5099`): bots por WebSocket en vez de la simulación en proceso.</param>
+public sealed record LoadOptions(int DurationSec, int Bots, int Monsters, int Size, int Seed, string? ContentDir, bool Bench, string? Network = null)
 {
     public static LoadOptions Parse(string[] args)
     {
-        int duration = 300, bots = 30, monsters = 300, size = 60, seed = 7; string? content = null; var bench = false;
+        int duration = 300, bots = 30, monsters = 300, size = 60, seed = 7; string? content = null, network = null; var bench = false;
         for (var i = 0; i < args.Length; i++)
         {
             string Next() => i + 1 < args.Length ? args[++i] : throw new ArgumentException($"falta valor para {args[i]}");
@@ -19,10 +20,11 @@ public sealed record LoadOptions(int DurationSec, int Bots, int Monsters, int Si
                 case "--seed": seed = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--content": content = Next(); break;
                 case "--bench": bench = true; break;
+                case "--network": network = Next(); break;
                 default: throw new ArgumentException($"argumento desconocido: {args[i]}");
             }
         }
-        return new LoadOptions(duration, bots, monsters, size, seed, content, bench);
+        return new LoadOptions(duration, bots, monsters, size, seed, content, bench, network);
     }
 
     public static string FindContentDir(string? explicitDir)

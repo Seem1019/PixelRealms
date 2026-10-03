@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using PixelRealms.Persistence.Repositories;
 using PixelRealms.Server.Players;
@@ -29,6 +30,52 @@ public sealed class AdminCommandTests
     }
 
     private static Task<JsonElement> System(TestGameClient c, int timeoutMs = 3000) => c.ExpectAsync("ChatMessage", m => m.GetProperty("channel").GetString() == "system", timeoutMs);
+
+    [Fact]
+    public async Task ReloadRules_AppliesFromTheNextTick_AndKeepsTheOldOnesIfInvalid() // HU-003 CA4c
+    {
+        using var content = PatchedContent.WithRules(_ => { });
+        await using var server = await TestServer.StartAsync(content.Settings);
+        var (ana, _) = await Enter(server, "ana", "Ana", "warrior", admin: true);
+        await using (ana)
+        {
+            var rulesPath = Path.Combine(content.Dir, "rules.json");
+            var node = JsonNode.Parse(File.ReadAllText(rulesPath))!;
+            node["movement"]!["sayRangeTiles"] = 33;
+            File.WriteAllText(rulesPath, node.ToJsonString());
+            await ana.SendAsync("AdminCommand", """{"text":"/reload rules"}""");
+            (await System(ana)).GetProperty("text").GetString()!.ShouldContain("recargado");
+            double say = 0;
+            await server.RunOnTickAsync(t => say = t.Rules.Movement.SayRangeTiles);
+            say.ShouldBe(33);
+
+            node["movement"]!.AsObject().Remove("sayRangeTiles"); // inválido: falta un campo obligatorio
+            File.WriteAllText(rulesPath, node.ToJsonString());
+            await ana.SendAsync("AdminCommand", """{"text":"/reload rules"}""");
+            (await System(ana)).GetProperty("text").GetString()!.ShouldContain("inválido");
+            await server.RunOnTickAsync(t => say = t.Rules.Movement.SayRangeTiles);
+            say.ShouldBe(33); // se mantiene la versión buena
+        }
+    }
+
+    [Fact]
+    public async Task ReloadRules_RecalculatesCachedStats_AndSendsStatsUpdate() // HU-003 CA4c
+    {
+        using var content = PatchedContent.WithRules(_ => { });
+        await using var server = await TestServer.StartAsync(content.Settings);
+        var (ana, _) = await Enter(server, "ana", "Ana", "warrior", admin: true);
+        await using (ana)
+        {
+            var crit0 = (await ana.ExpectAsync("StatsUpdate")).GetProperty("derived").GetProperty("critChance").GetDouble();
+            var rulesPath = Path.Combine(content.Dir, "rules.json");
+            var node = JsonNode.Parse(File.ReadAllText(rulesPath))!;
+            node["combat"]!["critBase"] = node["combat"]!["critBase"]!.GetValue<double>() + 0.10;
+            File.WriteAllText(rulesPath, node.ToJsonString());
+            await ana.SendAsync("AdminCommand", """{"text":"/reload rules"}""");
+            var update = await ana.ExpectAsync("StatsUpdate");
+            update.GetProperty("derived").GetProperty("critChance").GetDouble().ShouldBe(crit0 + 0.10, 1e-4);
+        }
+    }
 
     [Fact]
     public async Task NormalAccount_GetsForbidden() // CA2
@@ -100,6 +147,31 @@ public sealed class AdminCommandTests
 
             await ana.SendAsync("AdminCommand", """{"text":"/nada"}""");
             (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("invalid_payload");
+        }
+    }
+
+    [Fact]
+    public async Task TpTo_AnotherMap_CancelsTheCastInProgress() // HU-027: un casteo no termina en el mapa de destino
+    {
+        await using var server = await TestServer.StartAsync();
+        var (bob, _) = await Enter(server, "bob", "Bob", "warrior", admin: true);
+        var (ana, anaId) = await Enter(server, "ana", "Ana", "priest", admin: true);
+        await using (ana) await using (bob)
+        {
+            await bob.SendAsync("AdminCommand", """{"text":"/level 4"}""");
+            await System(bob);
+            await bob.SendAsync("AdminCommand", """{"text":"/tp 243 53.5"}"""); // sobre el portal de la Mina (minLevel 4)
+            (await bob.ExpectAsync("ChangeMap")).GetProperty("mapId").GetString().ShouldBe("mine");
+
+            await ana.SendAsync("CastSpell", $$"""{"spellId":"priest_heal","targetId":{{anaId}}}""");
+            await ana.ExpectAsync("CastStarted", m => m.GetProperty("casterId").GetInt32() == anaId);
+            await ana.SendAsync("AdminCommand", """{"text":"/tpto Bob"}""");
+            var ended = await ana.ExpectAsync("CastEnded", m => m.GetProperty("casterId").GetInt32() == anaId);
+            ended.GetProperty("result").GetString().ShouldBe("cancelled");
+            (await ana.ExpectAsync("ChangeMap")).GetProperty("mapId").GetString().ShouldBe("mine");
+            server.Services.GetRequiredService<PlayerRegistry>().ByName("Ana")!.Combat.Cast.ShouldBeNull();
+            // El casteo (1,5 s) no se resuelve después en la Mina.
+            await Should.ThrowAsync<TimeoutException>(() => ana.ExpectAsync("CastEnded", m => m.GetProperty("casterId").GetInt32() == anaId, 2000));
         }
     }
 

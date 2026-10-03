@@ -49,6 +49,8 @@ namespace PixelRealms.Protocol;
 [JsonSerializable(typeof(ChangeClass))]
 [JsonSerializable(typeof(Logout))]
 [JsonSerializable(typeof(LoggedOut))]
+[JsonSerializable(typeof(OnlineListRequest))]
+[JsonSerializable(typeof(OnlineList))]
 [JsonSerializable(typeof(Welcome))]
 [JsonSerializable(typeof(Snapshot))]
 [JsonSerializable(typeof(EntitySpawn))]

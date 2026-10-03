@@ -39,11 +39,12 @@ public sealed class TestServer : IAsyncDisposable
 
     public IServiceProvider Services => _app.Services;
 
-    public static async Task<TestServer> StartAsync(Dictionary<string, string?>? settings = null, Action<IServiceCollection>? overrideServices = null)
+    /// <param name="environment">"Production" para probar lo que solo se activa detrás de Caddy (cabeceras reenviadas).</param>
+    public static async Task<TestServer> StartAsync(Dictionary<string, string?>? settings = null, Action<IServiceCollection>? overrideServices = null, string environment = "Development")
     {
         var app = ServerApp.Build([], b =>
         {
-            b.Environment.EnvironmentName = "Development";
+            b.Environment.EnvironmentName = environment;
             b.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Urls"] = "http://127.0.0.1:0",

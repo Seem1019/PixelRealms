@@ -32,6 +32,7 @@ public sealed class InventoryOpsTests
         InventoryOps.Move(p, Bag(0), Bag(1), null, Db).Ok.ShouldBeTrue();
         p.Inventory.Bag[1]!.Qty.ShouldBe(20);
         p.Inventory.Bag[0]!.Qty.ShouldBe(3);
+        p.PendingAudit.ShouldContain(a => a.Action == "merge" && a.Quantity == 2); // HU-057 CA3: la fusión parcial también se audita
         // Intercambiar con distinto.
         InventoryOps.Move(p, Bag(0), Bag(2), null, Db).Ok.ShouldBeTrue();
         p.Inventory.Bag[2]!.TemplateId.ShouldBe("bread");
@@ -42,6 +43,7 @@ public sealed class InventoryOpsTests
         p.Inventory.Bag[1]!.Qty.ShouldBe(13);
         p.Inventory.Bag[5]!.Qty.ShouldBe(7);
         p.Inventory.Bag[5]!.Id.ShouldNotBe(originalId);
+        p.PendingAudit.ShouldContain(a => a.Action == "split" && a.ItemId == p.Inventory.Bag[5]!.Id && a.Quantity == 7); // HU-057 CA3
         // Mover a vacía.
         InventoryOps.Move(p, Bag(0), Bag(9), null, Db).Ok.ShouldBeTrue();
         p.Inventory.Bag[0].ShouldBeNull();

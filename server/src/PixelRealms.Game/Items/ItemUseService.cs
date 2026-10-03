@@ -21,7 +21,7 @@ public sealed class ItemUseService(CombatServices services, CastSystem casts)
         if (p.IsDead) return "is_dead";
         if (p.ItemCooldownEndsAtMs.TryGetValue(tpl.Id, out var end) && ctx.NowMs < end) return "on_cooldown";
         if (!services.Content.TryGetSpell(tpl.UseSpellId, out var spell) || spell is null) return "invalid_payload";
-        var error = casts.TryBeginCast(p, spell, p.Id, null, map, ctx, cancelCurrent: false);
+        var error = casts.TryBeginCast(p, spell, p.Id, null, map, ctx, cancelCurrent: false, viaItem: true);
         if (error is not null) return error;
         if (tpl.UseCooldownMs > 0)
         {

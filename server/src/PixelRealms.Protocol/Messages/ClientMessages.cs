@@ -53,6 +53,9 @@ public sealed record PartyLeave : IClientMessage;
 /// jugador y responde `LoggedOut`; en combate responde `Error{in_combat}` y el jugador sigue dentro.</summary>
 public sealed record Logout(int? ReqId = null) : IClientMessage;
 
+/// <summary>HU-063: pide la lista de jugadores conectados (tecla O); el servidor responde `OnlineList`.</summary>
+public sealed record OnlineListRequest : IClientMessage;
+
 public sealed record PartyKick(string Name) : IClientMessage;
 
 public sealed record SetHotbar(int Slot, string? Kind = null, string? Ref = null) : IClientMessage;

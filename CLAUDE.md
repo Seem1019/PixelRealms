@@ -28,7 +28,7 @@ server/            Solución .NET (PixelRealms.sln)
   tools/ContentValidator        CLI: valida schemas + referencias cruzadas
   tests/*.Tests                 xUnit v3 + Shouldly (+ Testcontainers para Persistence)
 client/            Proyecto Godot (project.godot)
-  autoload/ scenes/ scripts/ ui/ assets/ tests/ (GUT)
+  autoload/ scenes/ scripts/{net,world,ui} assets/ tests/ (GUT)   (la UI se construye por código en scripts/ui/)
 content/           JSON de juego + rules.json (constantes) + content/schemas/*.schema.json
 maps/              Mapas Tiled (.tmj) + tilesets (fuente de verdad del mundo)
 shared/test-vectors/  Casos JSON que DEBEN pasar en servidor (xUnit) y cliente (GUT)
@@ -41,8 +41,9 @@ docs/              Arquitectura, ADRs, diseño, backlog (HUs), prompts
    objetivo vivo, línea de visión, propiedad del item, rate limit.
 2. **Un solo hilo muta el mundo.** Solo el `GameLoop` (tick thread) toca `World`. La red encola en
    `Channel<T>`; la persistencia recibe *copias inmutables*. Nunca `lock` dentro de `PixelRealms.Game`.
-3. **`PixelRealms.Game` es puro y determinista:** sin `DateTime.Now`, sin `Random` global, sin IO.
-   Inyecta `IGameClock` y `IRng` (semilla). Todo sistema nuevo nace con tests unitarios.
+3. **`PixelRealms.Game` es puro y determinista:** sin `DateTime.Now`, sin `Random` global, sin IO (única excepción:
+   `Map/TiledMapLoader.cs` lee los `.tmj` del disco al arrancar). Inyecta `IGameClock` y `IRng` (semilla). Todo sistema
+   nuevo nace con tests unitarios.
 4. **Datos, no código.** Una clase, hechizo, item o monstruo nuevo = JSON en `content/` + validador verde.
    Si hace falta código, es porque falta un *tipo de efecto* genérico (ver skill `game-content`). Ningún número mágico:
    toda constante se lee de `rules.json` vía `IRules`. Nada de `if (classId == ...)`: las diferencias entre clases son tablas.

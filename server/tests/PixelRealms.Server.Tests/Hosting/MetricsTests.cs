@@ -67,7 +67,9 @@ public sealed class MetricsTests
         {
             await Task.Delay(500, TestContext.Current.CancellationToken);
             stats = await api.Http.GetFromJsonAsync<JsonElement>("/admin/stats", cancellationToken: TestContext.Current.CancellationToken);
-            if (stats.GetProperty("messagesOutPerSec").GetDouble() > 0) break;
+            // Los recuentos por instancia los publica el tick una vez por segundo (WorldStats).
+            if (stats.GetProperty("messagesOutPerSec").GetDouble() > 0
+                && stats.GetProperty("instances").EnumerateArray().Any(i => i.GetProperty("mapId").GetString() == "meadow" && i.GetProperty("players").GetInt32() == 1)) break;
         }
         stats.GetProperty("players").GetInt32().ShouldBe(1);
         stats.GetProperty("connections").GetInt32().ShouldBe(1);

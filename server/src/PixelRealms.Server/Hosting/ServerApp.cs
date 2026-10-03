@@ -61,7 +61,7 @@ public static class ServerApp
         builder.Services.AddSingleton(new TicketService(TimeSpan.FromSeconds(30)));
         builder.Services.AddSingleton<Passwords>();
         builder.Services.AddSingleton<CharacterFactory>();
-        AuthEndpoints.AddRateLimiting(builder.Services);
+        AuthEndpoints.AddRateLimiting(builder.Services, builder.Configuration);
 
         var world = new World();
         // HU-020 CA1/CA2: un MapData por .tmj y una MapInstance de cada uno; un mapa inválido impide arrancar.
@@ -84,6 +84,7 @@ public static class ServerApp
         }
         var rng = new SeededRng(Environment.TickCount);
         var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>() }; // HU-072
+        simulation.Context.RulesProvider = () => content.Rules; // HU-003 CA4c: `/reload rules` en caliente
         var movementSystem = new MovementSystem();
         var interestSystem = new InterestSystem();
         var combat = CombatModule.Create(() => content.Current, world, movementSystem, interestSystem);
@@ -115,6 +116,7 @@ public static class ServerApp
         builder.Services.AddSingleton<MapTransferService>();
         builder.Services.AddSingleton<SnapshotBuilder>();
         builder.Services.AddSingleton<EventDispatcher>();
+        builder.Services.AddSingleton<WorldStats>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SaveService>());
         builder.Services.AddSingleton<GameLoopService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
@@ -133,7 +135,7 @@ public static class ServerApp
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
         router.Register(new UsePortalHandler());
         var combatDeps = app.Services.GetRequiredService<CombatHandlerDeps>();
-        router.Register(new SelectTargetHandler());
+        router.Register(new SelectTargetHandler(combatDeps));
         router.Register(new CastSpellHandler(combatDeps));
         router.Register(new CancelCastHandler(combatDeps));
         router.Register(new AutoAttackHandler(combatDeps));
@@ -162,8 +164,9 @@ public static class ServerApp
         router.Register(new TradeOfferHandler(combatDeps));
         router.Register(new TradeConfirmHandler(combatDeps));
         router.Register(new TradeCancelHandler(combatDeps));
-        router.Register(new ChangeClassHandler(combatDeps, worldSession));
+        router.Register(new ChangeClassHandler(combatDeps, worldSession, app.Services.GetRequiredService<ILogger<ChangeClassHandler>>()));
         router.Register(new LogoutHandler(worldSession));
+        router.Register(new OnlineListHandler(combatDeps, registry0, worldSession));
         router.Register(new AdminCommandHandler(combatDeps, registry0, app.Services.GetRequiredService<MapTransferService>(), content, app.Services.GetRequiredService<ILogger<AdminCommandHandler>>()));
         // Orden del tick (docs/architecture.md §3): entrada → movimiento → … → interés → salida.
         simulation.OnPreTick(router.Drain);
@@ -172,7 +175,8 @@ public static class ServerApp
             .OnPostTick(app.Services.GetRequiredService<MapTransferService>().OnPostTick)
             .OnPostTick(worldSession.SweepLinkdead)
             .OnPostTick(app.Services.GetRequiredService<EventDispatcher>().OnPostTick)
-            .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick);
+            .OnPostTick(app.Services.GetRequiredService<SnapshotBuilder>().OnPostTick)
+            .OnPostTick(app.Services.GetRequiredService<WorldStats>().OnPostTick);
         // Al apagar (Ctrl+C): guardar a todos los jugadores conectados antes de salir (HU-026 CA2), en el hilo del tick.
         app.Services.GetRequiredService<GameLoopService>().OnStopping = () =>
         {
@@ -181,42 +185,41 @@ public static class ServerApp
         };
 
         var net = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<NetOptions>>().Value;
-        app.UseRateLimiter();
-        AuthEndpoints.Map(app);
-        CharacterEndpoints.Map(app);
-        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
         if (app.Environment.IsProduction())
         {
-            // HU-073: detrás de Caddy, la IP real llega en X-Forwarded-For (tope por IP de HU-071) y el esquema en X-Forwarded-Proto.
+            // HU-073: detrás de Caddy, la IP real llega en X-Forwarded-For (tope por IP de HU-071 y límites de login/registro de
+            // HU-010/011) y el esquema en X-Forwarded-Proto. Va antes que UseRateLimiter: si no, todos los jugadores compartirían
+            // el cupo de la IP del proxy (5 logins/min y 5 registros/hora para el servidor entero).
             var fwd = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions { ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto };
             fwd.KnownIPNetworks.Clear(); fwd.KnownProxies.Clear(); // el proxy es el contenedor `caddy` de la misma red de compose
             app.UseForwardedHeaders(fwd);
         }
+        app.UseRateLimiter();
+        AuthEndpoints.Map(app);
+        CharacterEndpoints.Map(app);
+        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
         app.MapGet("/health", (GameLoopService loop, ConnectionManager cm, NetMetrics metrics) =>
         {
             var (_, p99) = loop.Stats.Percentiles();
             return Results.Ok(new { status = "ok", players = cm.Count, tickP99Ms = Math.Round(p99, 2), uptime = Math.Round(metrics.UptimeSec, 1), tick = loop.TicksRun });
         });
         // HU-072 CA3: estadísticas para administradores (JWT con claim admin).
-        app.MapGet("/admin/stats", (HttpContext http, GameLoopService loop, ConnectionManager cm, NetMetrics metrics, PlayerRegistry players, World w, CombatModule cmb) =>
+        app.MapGet("/admin/stats", (HttpContext http, GameLoopService loop, ConnectionManager cm, NetMetrics metrics, PlayerRegistry players, WorldStats worldStats) =>
         {
             if (JwtAuth.ClaimsOf(http) is not { Admin: true }) return Results.StatusCode(StatusCodes.Status403Forbidden);
             var (p50, p99) = loop.Stats.Percentiles();
             var instances = new List<object>();
-            foreach (var inst in w.Instances)
+            var monsters = 0;
+            foreach (var inst in worldStats.Latest) // recuentos y tiempos del tick (copia de hace ≤ 1 s): aquí no se toca el mundo
             {
-                var auras = 0;
-                foreach (var a in inst.Actors.Values) auras += a.Auras.Count;
-                var (cp50, cp99) = loop.Simulation.CombatTimings is { } ct && ct.TryGetValue(inst.Id, out var cs) ? cs.Percentiles() : (0, 0);
                 instances.Add(new
                 {
-                    id = inst.Id, mapId = inst.MapId, players = inst.Players.Count, monsters = inst.Monsters.Count,
-                    combatP50Ms = Math.Round(cp50, 3), combatP99Ms = Math.Round(cp99, 3),
-                    areasActive = cmb.Casts.PendingImpacts(inst), aurasActive = auras,
+                    id = inst.Id, mapId = inst.MapId, players = inst.Players, monsters = inst.Monsters,
+                    combatP50Ms = Math.Round(inst.CombatP50Ms, 3), combatP99Ms = Math.Round(inst.CombatP99Ms, 3),
+                    areasActive = inst.AreasActive, projectilesInFlight = inst.ProjectilesInFlight, aurasActive = inst.AurasActive,
                 });
+                monsters += inst.Monsters;
             }
-            var monsters = 0;
-            foreach (var inst in w.Instances) monsters += inst.Monsters.Count;
             return Results.Ok(new
             {
                 uptime = Math.Round(metrics.UptimeSec, 1), tick = loop.TicksRun, tickP50Ms = Math.Round(p50, 2), tickP99Ms = Math.Round(p99, 2), tickMaxMs = Math.Round(loop.Stats.MaxMs, 2),

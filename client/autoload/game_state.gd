@@ -20,6 +20,7 @@ signal party_changed
 signal party_invited(leader: String)
 signal duel_changed(state: String, opponent_id: int, winner_id: int, starts_in_ms: int)
 signal trade_changed(d: Dictionary)
+signal online_list_received(players: Array)  ## HU-063: respuesta a OnlineListRequest
 
 var self_id: int = -1
 var character_name: String = ""
@@ -77,6 +78,7 @@ func _ready() -> void:
 	Net.register_handler("PartyUpdate", _on_party_update)
 	Net.register_handler("DuelUpdate", _on_duel_update)
 	Net.register_handler("TradeUpdate", _on_trade_update)
+	Net.register_handler("OnlineList", func(d: Dictionary) -> void: online_list_received.emit(d.get("players", [])))
 	Net.snapshot.connect(_on_snapshot)
 
 

@@ -33,4 +33,4 @@ Calcula con un script (Python o `dotnet script`) y muestra tablas:
 4. Curva de XP (`rules.progression`): kills por nivel curva por tiempo (`minutesPerLevel`, `killCycleSecTarget`, ADR-017); kills totales a nivel 15 (~2 517) y horas estimadas con el tiempo por kill medido (objetivo 20–30 h); reparto en grupo para 3 composiciones.
 5. Economía: oro medio por hora al nivel 5 vs. coste de pociones.
 Señala desviaciones con propuesta concreta de cambio de números (diff JSON), **prefiriendo tocar `rules.json` antes que items o hechizos individuales**. Ejecuta el validador de contenido al final:
-`dotnet run --project server/tools/ContentValidator -- content/` (si existe).
+`dotnet run --project server/tools/ContentValidator -- content/`.

@@ -97,6 +97,9 @@ func _ready() -> void:
 	_chat.bubble_requested.connect(_show_bubble)
 	_chat.command.connect(_on_chat_command)
 	_social.party_member_selected.connect(_select)
+	_social.whisper_requested.connect(func(player_name: String) -> void:
+		_chat._input.text = "/w %s " % player_name
+		_chat._input.grab_focus())
 	_social.entity_name = func(entity_id: int) -> String: return (_remotes[entity_id] as RemoteEntity).display_name if _remotes.has(entity_id) else ""
 	_inventory.offer_requested.connect(_social.offer_item)
 	GameState.duel_changed.connect(_on_duel_changed)
@@ -455,6 +458,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_spellbook.toggle()
 	elif event.is_action_pressed("toggle_character"):
 		_character.toggle()
+	elif event.is_action_pressed("toggle_online_list"):
+		_social.toggle_online_list()  # HU-063 CA1: tecla O
 	elif event.is_action_pressed("basic_attack"):
 		basic_attack()
 	elif event.is_action_pressed("ui_cancel"):
@@ -462,7 +467,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_approach.cancel()
 		elif not _aiming_spell.is_empty():
 			_stop_aiming()
-		elif _loot.visible or _vendor.visible or _inventory.visible or _spellbook.visible or _character.visible:
+		elif _loot.visible or _vendor.visible or _inventory.visible or _spellbook.visible or _character.visible or _social.is_online_list_open():
+			_social.close_online_list()
 			_loot.visible = false
 			_vendor.close_window()
 			_inventory.visible = false
@@ -731,6 +737,8 @@ func _on_message(type: String, d: Dictionary) -> void:
 				for e: Variant in spell.get("effects", []):
 					if str((e as Dictionary).get("type", "")) in ["leap", "dash"]:
 						_forced_move_until_ms = Time.get_ticks_msec() + 500
+				if int(d.get("durationMs", 0)) > 0:
+					prediction.set_casting(true, float(Content.rule("combat", "castMoveSpeedMult", 0.5)))
 			elif _remotes.has(caster):
 				(_remotes[caster] as RemoteEntity).begin_cast(int(d.get("durationMs", 0)))
 			if d.get("targetPos") != null and int(d.get("durationMs", 0)) > 0:
@@ -743,6 +751,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 			var caster := int(d.get("casterId", -1))
 			_reticle.clear_mark(caster)
 			if caster == GameState.self_id:
+				prediction.set_casting(false, float(Content.rule("combat", "castMoveSpeedMult", 0.5)))
 				_hud.show_cast_result(str(d.get("result", "")), str(d.get("reason", "")))
 			elif _remotes.has(caster):
 				(_remotes[caster] as RemoteEntity).end_cast(str(d.get("result", "")))

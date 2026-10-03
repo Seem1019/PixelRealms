@@ -87,6 +87,7 @@ cambio compile y se pruebe automáticamente desde el primer día.
 - Validación de schemas con `Validation/SchemaValidator` propio (subconjunto de 2020-12 que usan los schemas del repo) en lugar de JsonSchema.Net: decisión provisional porque el entorno no tenía NuGet; cambiar a JsonSchema.Net es un reemplazo local de esa clase (ver `docs/progress/fase-1.md`).
 - `Validation/CrossRefValidator` con todas las reglas de la skill game-content y CA 3/4/4b/4d; `EngineCapabilities` es la lista de funciones del motor implementadas (ADR-023): los 4 hechizos de cono/línea quedan no disponibles con aviso.
 - CLI `server/tools/ContentValidator`; el servidor no arranca con contenido inválido (CA5); hook PostToolUse en `.claude/settings.json` → `tools/hooks/validate-content.sh`; `tools/ContentCheck` retirado. Tests en `Game.Tests/Content/ContentLoaderTests` (20 casos, uno por regla).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA4c: `/reload rules` (admin) relee `content/rules.json` y lo aplica desde el tick siguiente (`TickContext.RulesProvider`); si no valida, conserva el anterior y responde con el primer error (`AdminCommandTests`).
 
 ---
 ### HU-004 · Esqueleto del game loop de 20 Hz
@@ -117,7 +118,7 @@ determinista donde agregar sistemas.
 ### HU-005 · Proyecto Godot base
 **Como** desarrollador **quiero** el proyecto Godot configurado para pixel art y con la arquitectura de autoloads
 **para** construir pantallas sobre una base consistente.
-- Prioridad: Must · Estimación: M · Estado: Hecha
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-001
 - Skills: `godot-client`, `pixel-art-assets`
 

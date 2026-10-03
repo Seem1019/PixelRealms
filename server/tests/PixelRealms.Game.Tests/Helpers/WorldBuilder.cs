@@ -15,9 +15,10 @@ namespace PixelRealms.Game.Tests.Helpers;
 /// Constructor fluido de mundos de prueba (skill dotnet-server §Tests):
 /// <c>new WorldBuilder().WithMap(20, 20).WithPlayer("Ana", "mage", level: 3, at: (5, 5)).WithMonster("wolf", at: (8, 5)).Build()</c>.
 /// </summary>
-public sealed class WorldBuilder
+public sealed class WorldBuilder(ContentDb? content = null)
 {
-    private readonly ContentDb _content = TestContent.Load();
+    /// <summary>El contenido real del repo, o uno parcheado (<see cref="TempContent"/>) para probar números distintos.</summary>
+    private readonly ContentDb _content = content ?? TestContent.Load();
     private readonly World _world = new();
     private readonly List<Action<MapInstance>> _spawns = new();
     private MapData? _map;

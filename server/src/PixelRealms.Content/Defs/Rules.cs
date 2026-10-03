@@ -23,6 +23,8 @@ public interface IRules
     BossRules Boss { get; }
     MovementRules Movement { get; }
     WorldRules World { get; }
+    SocialRules Social { get; }
+    AiRules Ai { get; }
 
     /// <summary>Hash estable del archivo cargado (Welcome.rulesHash): el cliente detecta un rules.json distinto.</summary>
     string Hash { get; }
@@ -51,6 +53,8 @@ public sealed record RulesDb : IRules
     public required BossRules Boss { get; init; }
     public required MovementRules Movement { get; init; }
     public required WorldRules World { get; init; }
+    public required SocialRules Social { get; init; }
+    public required AiRules Ai { get; init; }
 
     [JsonIgnore] public string Hash { get; init; } = "";
 
@@ -212,8 +216,11 @@ public sealed record ClassAdvantageRules
     public required IReadOnlyDictionary<string, double> Mage { get; init; }
     public required IReadOnlyDictionary<string, double> Priest { get; init; }
 
+    private IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>>? _rows;
+
+    /// <summary>Se consulta en cada golpe entre jugadores (básico, hechizo y DoT): se construye una vez, no por golpe.</summary>
     [JsonIgnore]
-    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> Rows => new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal)
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> Rows => _rows ??= new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal)
     {
         ["warrior"] = Warrior, ["rogue"] = Rogue, ["mage"] = Mage, ["priest"] = Priest,
     };
@@ -347,6 +354,35 @@ public sealed record MovementRules
     public required double BaseSpeedTilesPerSec { get; init; }
     public required double SayRangeTiles { get; init; }
     public required int AoiCellTiles { get; init; }
+    public required int InputTimeoutMs { get; init; }
+    public required double PortalUseRangeTiles { get; init; }
+}
+
+/// <summary>Chat (HU-060) e intercambio (HU-059).</summary>
+public sealed record SocialRules
+{
+    [JsonPropertyName("_doc")] public string? Doc { get; init; }
+    public required int ChatMaxLength { get; init; }
+    public required int ChatRateLimitCount { get; init; }
+    public required double ChatRateLimitWindowSec { get; init; }
+    public required int TradeMaxItems { get; init; }
+    public required double TradeRangeTiles { get; init; }
+    public required double TradeRequestExpireSec { get; init; }
+}
+
+/// <summary>Ritmos de la IA de monstruos (HU-031, HU-036).</summary>
+public sealed record AiRules
+{
+    [JsonPropertyName("_doc")] public string? Doc { get; init; }
+    public required int PerceptionMs { get; init; }
+    public required int PathRecalcMs { get; init; }
+    public required double PathRecalcMovedTiles { get; init; }
+    public required int PathMaxNodes { get; init; }
+    public required int WanderPauseMinMs { get; init; }
+    public required int WanderPauseMaxMs { get; init; }
+    public required double WanderSpeedMult { get; init; }
+    public required double ArriveToleranceTiles { get; init; }
+    public required double RangedThreatThresholdTiles { get; init; }
 }
 
 public sealed record WorldRules

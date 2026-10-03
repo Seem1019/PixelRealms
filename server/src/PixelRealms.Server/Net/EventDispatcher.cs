@@ -41,6 +41,10 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     var lootable = v.Entity is Monster { IsDead: true } dead && world.GetInstance(v.MapInstanceId) is { } inst
                                    && loot.Get(inst, dead.Id) is { } bag && bag.HasLootFor(v.Observer.CharacterId, ctx.NowMs);
                     connections.Send(v.Observer.ConnectionId, SnapshotBuilder.ToSpawn(v.Entity, lootable ? SnapshotBuilder.FlagLootable : 0));
+                    // HU-035 CA6 / HU-098 CA2: quien entra en la AOI con auras ya puestas las trae consigo (si no, no se verían hasta
+                    // el siguiente AuraApplied).
+                    foreach (var aura in v.Entity.Auras.All)
+                        connections.Send(v.Observer.ConnectionId, ToAuraApplied(v.Entity, aura, ctx.NowMs));
                     break;
                 }
                 case LootAvailableEvent la:
@@ -83,13 +87,14 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     Batch(hit);
                     break;
                 case AuraAppliedEvent aa:
-                    Broadcast(aa.MapInstanceId, aa.Target, new AuraApplied(aa.Target.Id.Value, aa.Aura.AuraId, aa.Aura.CasterId?.Value, aa.Aura.Stacks, aa.Aura.RemainingMs(ctx.NowMs)));
+                    Broadcast(aa.MapInstanceId, aa.Target, ToAuraApplied(aa.Target, aa.Aura, ctx.NowMs));
                     break;
                 case AuraRemovedEvent ar:
                     Broadcast(ar.MapInstanceId, ar.Target, new AuraRemoved(ar.Target.Id.Value, ar.AuraId, ar.CasterId?.Value));
                     break;
-                case ActorDiedEvent died when died.Victim is Player { ConnectionId: >= 0 } victim:
-                    connections.Send(victim.ConnectionId, new Died(died.Killer?.Id.Value, 0));
+                case ActorDiedEvent died when died.Victim is Player victim:
+                    if (victim.ConnectionId >= 0) connections.Send(victim.ConnectionId, new Died(died.Killer?.Id.Value, 0));
+                    session.Save(victim, ctx.NowMs, "death"); // HU-026 CA6 / ADR-018
                     break;
                 case CooldownEvent cd when cd.Caster is Player { ConnectionId: >= 0 } caster:
                     connections.Send(caster.ConnectionId, new Cooldown(cd.SpellId, cd.RemainingMs, cd.GcdMs, cd.TemplateId));
@@ -153,6 +158,14 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                         connections.Send(p.ConnectionId, new TradeUpdate(tr.State, tr.Trade.Partner(p).Id.Value, tr.Trade.Version, ToOffer(mine, p), ToOffer(theirs, tr.Trade.Partner(p)),
                             tr.Trade.ConfirmedBy(p), tr.Trade.ConfirmedBy(tr.Trade.Partner(p)), tr.Reason));
                     }
+                    // HU-026 CA6 / ADR-018: los dos en el mismo tick (antes esperaban al autosave, hasta 60 s: si el proceso moría
+                    // entre los dos, lo intercambiado quedaba en ambos). Son dos escrituras seguidas en la cola, no una transacción:
+                    // queda una ventana de milisegundos. Un intercambio vacío no mueve nada y no se guarda.
+                    if (tr.State == "completed" && (tr.Trade.OfferA.Items.Count + tr.Trade.OfferB.Items.Count > 0 || tr.Trade.OfferA.Gold + tr.Trade.OfferB.Gold > 0))
+                    {
+                        session.Save(tr.Trade.A, ctx.NowMs, "trade");
+                        session.Save(tr.Trade.B, ctx.NowMs, "trade");
+                    }
                     break;
                 }
                 case ClassChangedEvent cc when cc.Player.ConnectionId >= 0:
@@ -168,6 +181,10 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
     }
 
+    /// <summary>AuraApplied de un aura ya puesta (al aplicarse, al entrar alguien en la AOI o al reconectar).</summary>
+    public static AuraApplied ToAuraApplied(Actor target, AuraInstance aura, long nowMs) =>
+        new(target.Id.Value, aura.AuraId, aura.CasterId?.Value, aura.Stacks, aura.RemainingMs(nowMs));
+
     /// <summary>La plantilla sale del inventario de quien ofrece: el otro no tiene el objeto y no sabría qué recibe.</summary>
     private static OfferDto ToOffer(TradeOfferState o, Game.Entities.Player owner) =>
         new(o.Items.Select(i => new OfferedItemDto(i.ItemId.ToString(), Game.Items.InventoryOps.Find(owner.Inventory, i.ItemId)?.TemplateId ?? "", i.Qty)).ToList(), o.Gold);
@@ -181,7 +198,8 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
             var p = players.ByCharacter(m.CharacterId);
             var online = p is { ConnectionId: >= 0 };
             var hpPct = p is null || p.MaxHp <= 0 ? 0 : (int)Math.Round(100.0 * p.Hp / p.MaxHp);
-            members.Add(new PartyMemberDto(m.Name, p?.Id.Value, p?.ClassId ?? m.ClassId, p?.Level ?? 0, hpPct, online, p is null ? null : session.MapIdOf(p)));
+            int? resPct = p is null || p.MaxResource <= 0 ? null : (int)Math.Round(100.0 * p.Resource / p.MaxResource);
+            members.Add(new PartyMemberDto(m.Name, p?.Id.Value, p?.ClassId ?? m.ClassId, p?.Level ?? 0, hpPct, online, p is null ? null : session.MapIdOf(p), resPct));
         }
         var msg = new PartyUpdate(leaderName, members);
         foreach (var m in party.Members)

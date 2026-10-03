@@ -1,3 +1,4 @@
+using PixelRealms.Content;
 using PixelRealms.Content.Defs;
 using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
@@ -67,6 +68,32 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void Party_MaxFiveMembers_LeaderLeavingHandsOver_AndAStaleInviteIsRefused() // HU-061 CA2, CA3
+    {
+        var w = new WorldBuilder().WithMap(60, 60).WithPlayer("P1", "warrior", 5, (10, 10)).WithPlayer("P2", "mage", 5, (11, 10))
+            .WithPlayer("P3", "priest", 5, (12, 10)).WithPlayer("P4", "rogue", 5, (13, 10)).WithPlayer("P5", "mage", 5, (14, 10))
+            .WithPlayer("P6", "priest", 5, (15, 10)).WithPlayer("Zed", "rogue", 5, (16, 10)).BuildWithCombat();
+        var rules = w.Content.Rules.Group;
+        rules.MaxMembers.ShouldBe(5);
+        var party = MakeParty(w, "P1", "P2", "P3", "P4", "P5");
+        party.Members.Count.ShouldBe(5);
+        w.Combat.Parties.Invite(w.Player("P1"), w.Player("P6"), 0, rules).ShouldBe("forbidden"); // lleno: el 6.º no entra
+
+        // El líder se va con ≥ 3: hereda el siguiente y el grupo sigue.
+        var (after, disbanded, _) = w.Combat.Parties.Leave(w.Player("P1").CharacterId);
+        disbanded.ShouldBeFalse();
+        after!.Leader.ShouldBe(w.Player("P2").CharacterId);
+        after.Members.Count.ShouldBe(4);
+
+        // Invitación vieja: Zed invitó a P6 y luego Zed entró en el grupo de P2; aceptar no mete a P6 sin permiso de P2.
+        w.Combat.Parties.Invite(w.Player("Zed"), w.Player("P6"), 0, rules).ShouldBeNull();
+        w.Combat.Parties.Invite(w.Player("P2"), w.Player("Zed"), 0, rules).ShouldBeNull();
+        w.Combat.Parties.Respond(w.Player("Zed"), true, id => w.Map.Players.Values.FirstOrDefault(x => x.CharacterId == id), 0, rules).Error.ShouldBeNull();
+        w.Combat.Parties.Respond(w.Player("P6"), true, id => w.Map.Players.Values.FirstOrDefault(x => x.CharacterId == id), 0, rules).Error.ShouldBe("forbidden");
+        w.Combat.Parties.PartyOf(w.Player("P6").CharacterId).ShouldBeNull();
+    }
+
+    [Fact]
     public void GroupXp_Example_10_8_5_vs_Normal9() // HU-062 CA2b
     {
         var rules = TestContent.Load().Rules;
@@ -125,12 +152,36 @@ public sealed class SocialTests
         bob.IsDead.ShouldBeFalse();
         var ended = ctx2.Events.OfType<DuelChangedEvent>().Single(e => e.State == "ended");
         ended.Duel.Winner.ShouldBe(ana);
-        bob.Hp.ShouldBe(bob.MaxHp); ana.Resource.ShouldBe(ana.MaxResource);
+        bob.Hp.ShouldBe(bob.MaxHp); // como al empezar el duelo (lleno de vida)
+        ana.Resource.ShouldBeLessThan(ana.MaxResource); // ira: la del inicio (0) más la del último golpe, no el máximo
         w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
         _ = applied;
         // enabledRulesets vacío → siempre null.
         var noPvp = TestContent.Load().Rules with { Pvp = rules.Pvp with { EnabledRulesets = [] } };
         w.Combat.Pvp.CanAttack(ana, bob, noPvp).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Duel_EndedByALanding_WhileTheRivalIsInTheAir_DoesNotBreakTheTick() // HU-064 + HU-087
+    {
+        // 0.99: golpe normal (ni fallo, ni esquiva, ni crítico).
+        var w = new WorldBuilder().WithRng(new FixedRng(0.99)).WithMap(60, 60)
+            .WithPlayer("Ana", "warrior", 13, (10.5f, 10.5f)).WithPlayer("Bob", "rogue", 11, (11.5f, 10.5f)).BuildWithCombat();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Pvp.InActiveDuel(ana).ShouldBeTrue();
+        bob.Hp = (int)Math.Ceiling(bob.MaxHp * rs.EndAtHpPct) + 1; // el golpe del aterrizaje de Ana lo deja en el umbral
+        // Ana aterriza este tick con Golpe poderoso sobre Bob, que sigue en el aire; Ana va antes en el recorrido.
+        ana.Combat.Flight = new LeapFlight(w.Content.Spell("warrior_mighty_blow"), ana.Position, bob.Position, 0, 0);
+        bob.Combat.Flight = new LeapFlight(w.Content.Spell("rogue_shadowstep"), bob.Position, bob.Position + new Vec2(3, 0), 0, 60_000);
+
+        Should.NotThrow(() => TickRunner.Run(w, 1));
+        w.Combat.Pvp.InActiveDuel(ana).ShouldBeFalse();
+        bob.Combat.Flight.ShouldBeNull();
+        bob.IsDead.ShouldBeFalse();
     }
 
     [Fact]
@@ -198,6 +249,187 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void AttackingAPlayerOutsideADuel_IsPvpNotAllowed() // HU-064 CA6
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        bob.Position = new Vec2(11, 10);
+        ana.Resource = ana.MaxResource; // ira: el coste se valida antes que el objetivo
+        w.Combat.Casts.TryBeginCast(ana, w.Content.Spell("warrior_heroic_strike"), bob.Id, null, w.Map, w.Begin()).ShouldBe(CastErrors.PvpNotAllowed);
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Casts.TryBeginCast(ana, w.Content.Spell("warrior_heroic_strike"), bob.Id, null, w.Map, w.Begin()).ShouldBe(CastErrors.PvpNotAllowed); // cuenta atrás
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Casts.TryBeginCast(ana, w.Content.Spell("warrior_heroic_strike"), bob.Id, null, w.Map, w.Begin()).ShouldNotBe(CastErrors.PvpNotAllowed);
+    }
+
+    [Fact]
+    public void Duel_ClassAdvantage_AppliesToBasicAttacksAndDots() // HU-064 CA2 (antes solo a hechizos)
+    {
+        using var tmp = new TempContent();
+        tmp.Patch("rules.json", n => n["classAdvantage"]!["warrior"]!["mage"] = 2.0);
+        var doubled = ContentLoader.LoadOrThrow(tmp.Path);
+
+        var (basicNormal, dotNormal) = DuelHits(null);
+        var (basicDoubled, dotDoubled) = DuelHits(doubled);
+        basicNormal.ShouldBeGreaterThan(0);
+        dotNormal.ShouldBeGreaterThan(0);
+        basicDoubled.ShouldBeInRange(basicNormal * 2 - 1, basicNormal * 2 + 1);
+        dotDoubled.ShouldBeInRange(dotNormal * 2 - 1, dotNormal * 2 + 1);
+    }
+
+    /// <summary>Guerrero contra Mago en duelo con tiradas fijas: daño del primer básico y del primer tick de un DoT físico.</summary>
+    private static (int Basic, int Dot) DuelHits(ContentDb? content)
+    {
+        var w = new WorldBuilder(content).WithMap(40, 40).WithRng(new FixedRng(0.5)).WithPlayer("Ana", "warrior", 5, (10, 10))
+            .WithPlayer("Bob", "mage", 5, (11, 10)).BuildWithCombat();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Pvp.InActiveDuel(ana).ShouldBeTrue();
+        ana.Combat.TargetId = bob.Id;
+        ana.Combat.AutoAttackOn = true;
+        var basic = TickRunner.RunMs(w, 4000).OfType<CombatHitEvent>().First(e => e.Source == ana && e.Target == bob && e.Kind == HitKinds.Damage).Amount;
+        ana.Combat.AutoAttackOn = false;
+        bob.Hp = bob.MaxHp;
+        var bleed = w.Content.Aura("foreman_whip_bleed");
+        w.Combat.Auras.Apply(bob, bleed, ana, w.Map, w.Begin());
+        var dot = TickRunner.RunMs(w, bleed.TickMs + 100).OfType<CombatHitEvent>().First(e => e.SpellId == bleed.Id).Amount;
+        return (basic, dot);
+    }
+
+    [Fact]
+    public void Duel_ForfeitBeforeItStarts_WithdrawsTheChallenge_AndRestoresNobody() // revisión de autoridad: retar y rendirse curaba
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        ana.Hp = 10; bob.Hp = 10;
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        var ctx = w.Begin();
+        w.Combat.Pvp.Forfeit(ana, w.Map, ctx).ShouldBeNull(); // reto sin aceptar
+        ctx.Events.OfType<DuelChangedEvent>().Single().State.ShouldBe("declined");
+        w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
+
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        var ctx2 = w.Begin();
+        w.Combat.Pvp.Forfeit(bob, w.Map, ctx2).ShouldBeNull(); // en la cuenta atrás
+        ctx2.Events.OfType<DuelChangedEvent>().Single().State.ShouldBe("declined");
+        ana.Hp.ShouldBe(10); bob.Hp.ShouldBe(10);
+    }
+
+    [Fact]
+    public void Duel_IsNotAnInn_EachOneEndsAsTheyStarted() // revisión de autoridad: retar a un alt y rendirse curaba al 100 %
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        ana.Hp = 20; bob.Resource = 5; // herida y sin maná de una pelea anterior (ya fuera de combate)
+        var cid = w.Player("Cid");
+        w.Combat.Auras.Apply(ana, w.Content.Aura("priest_power_shield_speed"), cid, w.Map, w.Begin()); // un beneficio de un tercero
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        var hpAtStart = ana.Hp;
+        w.Combat.Auras.Apply(ana, w.Content.Aura("warrior_charge_stun"), bob, w.Map, w.Begin()); // lo que le pone el rival
+        w.Combat.Pvp.Forfeit(ana, w.Map, w.Begin()).ShouldBeNull();
+        ana.Hp.ShouldBe(hpAtStart);
+        bob.Resource.ShouldBeLessThan(bob.MaxResource);
+        ana.Auras.All.ShouldNotContain(a => a.AuraId == "warrior_charge_stun"); // se quita lo del rival
+        ana.Auras.All.ShouldContain(a => a.AuraId == "priest_power_shield_speed"); // lo de otros sigue
+    }
+
+    [Fact]
+    public void ActiveDuelist_IsNoOnesAlly_AndHealingSomeoneInCombatPutsTheHealerInCombat() // revisión de autoridad: sanador intocable
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob"); var cid = w.Player("Cid");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Services.IsAlly(cid, ana).ShouldBeTrue();
+        w.Combat.Pvp.Request(cid, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Services.IsAlly(cid, ana).ShouldBeFalse(); // el sacerdote en duelo no cura al grupo...
+        w.Combat.Services.IsAlly(ana, cid).ShouldBeFalse(); // ...ni el grupo lo cura a él
+        w.Combat.Pvp.Forfeit(cid, w.Map, w.Begin());
+
+        ana.EnterCombat(w.Clock.NowMs); ana.Hp = 10;
+        cid.IsInCombat(w.Clock.NowMs, w.Content.Rules.Combat.InCombatWindowSec).ShouldBeFalse();
+        w.Combat.Damage.Heal(cid, ana, 20, false, null, w.Map, w.Begin());
+        cid.IsInCombat(w.Clock.NowMs, w.Content.Rules.Combat.InCombatWindowSec).ShouldBeTrue();
+        w.Combat.Pvp.Request(cid, bob, w.Map, w.Begin()).ShouldBe("in_combat");
+    }
+
+    [Fact]
+    public void Duel_StrayingFromTheStartPoint_EndsIt() // revisión de autoridad: viajar juntos ignorados por los monstruos
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        var far = (float)rs.MaxDistanceTiles + 3;
+        ana.Position = new Vec2(10.5f + far, 10); bob.Position = new Vec2(11.5f + far, 10); // juntos, lejos del punto de inicio
+        TickRunner.Run(w, 1).OfType<DuelChangedEvent>().ShouldContain(e => e.State == "ended");
+    }
+
+    [Fact]
+    public void Duel_InCombat_CannotBeRequestedNorAccepted_AndCombatCancelsTheCountdown()
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var now = w.Clock.NowMs;
+        ana.LastCombatAtMs = now; // pelea con un monstruo
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBe("in_combat");
+        w.Combat.Pvp.Request(bob, ana, w.Map, w.Begin()).ShouldBe("in_combat");
+        ana.LastCombatAtMs = long.MinValue;
+
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        bob.LastCombatAtMs = w.Clock.NowMs; // entra en combate antes de aceptar
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBe("in_combat");
+        w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
+        bob.LastCombatAtMs = long.MinValue;
+
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        ana.LastCombatAtMs = w.Clock.NowMs; // la ataca un monstruo durante la cuenta atrás
+        TickRunner.Run(w, 1).OfType<DuelChangedEvent>().ShouldContain(e => e.State == "declined" && e.Reason == "in_combat");
+        w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Duel_AcceptedWhenTooFar_IsDeclined()
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        bob.Position = new Vec2(10 + (float)rs.MaxDistanceTiles + 2, 10);
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBe("out_of_range");
+        w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Duel_DamageWhoseSourceIsTheVictim_CountsAsTheOpponents() // DoT de un rival que salió del mapa
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        bob.Hp = 5;
+        var ctx = w.Begin();
+        w.Combat.Damage.Deal(bob, bob, 999, School.Physical, false, null, w.Map, ctx);
+        bob.IsDead.ShouldBeFalse();
+        ctx.Events.OfType<DuelChangedEvent>().Single(e => e.State == "ended").Duel.Winner.ShouldBe(ana);
+    }
+
+    [Fact]
     public void Duel_Forfeit_Distance_Expiry() // HU-064 CA4
     {
         var w = Arena();
@@ -245,11 +477,42 @@ public sealed class SocialTests
         w.Combat.Chat.Send(ana, "say", "4", null, w.Map, all, _ => null, ctx).ShouldBeNull();
         w.Combat.Chat.Send(ana, "say", "5", null, w.Map, all, _ => null, ctx).ShouldBeNull();
         w.Combat.Chat.Send(ana, "say", "6", null, w.Map, all, _ => null, ctx).ShouldBe("rate_limited");
-        w.Clock.Advance(ChatService.RateLimitWindowMs);
+        w.Clock.Advance((long)(w.Content.Rules.Social.ChatRateLimitWindowSec * 1000));
         w.Combat.Chat.Send(ana, "say", "7", null, w.Map, all, _ => null, w.Begin()).ShouldBeNull();
-        ChatService.Sanitize("   ").ShouldBeNull();
-        ChatService.Sanitize("ho\u0007la").ShouldBe("hola");
-        ChatService.Sanitize(new string('x', 250))!.Length.ShouldBe(200);
+        var maxLength = w.Content.Rules.Social.ChatMaxLength;
+        ChatService.Sanitize("   ", maxLength).ShouldBeNull();
+        ChatService.Sanitize("ho\u0007la", maxLength).ShouldBe("hola");
+        ChatService.Sanitize(new string('x', maxLength + 50), maxLength)!.Length.ShouldBe(maxLength);
+    }
+
+    [Fact]
+    public void Chat_AcrossMaps_SayStaysInTheMap_PartyAndGlobalArrive() // HU-027 CA5
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        // Bob cruza a otra instancia (la Mina en el juego real): misma posición, otro mapa.
+        var other = w.World.CreateInstance(w.Map.MapId);
+        w.Map.Remove(bob.Id);
+        other.Add(bob);
+        foreach (var p in new[] { ana, bob }) p.ConnectionId = p.Id.Value;
+        var all = new List<Player> { ana, bob };
+        var party = MakePartyAcrossMaps(w, ana, bob);
+        var ctx = w.Begin();
+        w.Combat.Chat.Send(ana, "say", "hola", null, w.Map, all, _ => party, ctx).ShouldBeNull();
+        ctx.Events.OfType<ChatDeliveredEvent>().Last().Recipients.ShouldNotContain(bob);
+        w.Combat.Chat.Send(ana, "party", "¿dónde estás?", null, w.Map, all, _ => party, ctx).ShouldBeNull();
+        ctx.Events.OfType<ChatDeliveredEvent>().Last().Recipients.ShouldContain(bob);
+        w.Combat.Chat.Send(ana, "global", "a todos", null, w.Map, all, _ => party, ctx).ShouldBeNull();
+        ctx.Events.OfType<ChatDeliveredEvent>().Last().Recipients.ShouldContain(bob);
+    }
+
+    private static Party MakePartyAcrossMaps(TestWorld w, Player leader, Player member)
+    {
+        var rules = w.Content.Rules.Group;
+        w.Combat.Parties.Invite(leader, member, 0, rules).ShouldBeNull();
+        var (party, err) = w.Combat.Parties.Respond(member, true, _ => leader, 0, rules);
+        err.ShouldBeNull();
+        return party!;
     }
 
     [Fact]
@@ -285,6 +548,75 @@ public sealed class SocialTests
         w.Combat.ClassChange.Change(ana, npc.Id, "rogue", w.Map, w.Begin()).ShouldBe("is_dead");
         var later = TestContent.Load().Rules with { World = TestContent.Load().Rules.World with { CurrentPhase = 3 } };
         w.Combat.ClassChange.IsAvailable(later).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ClassChange_InADuelOrATrade_SaysWhich() // HU-044 CA3: duel_busy / trade_busy (antes ambos daban duel_busy)
+    {
+        var data = new PixelRealms.Game.Map.MapData("t", "T", new PixelRealms.Game.Map.CollisionGrid(40, 40), [], [new PixelRealms.Game.Map.NpcDef("maestro", "Maestro", null, "class_change", new Vec2(12, 10))],
+            [new PixelRealms.Game.Map.GraveyardDef("gy", new Vec2(2, 2))], [], [], "gy");
+        var w = new WorldBuilder().WithMap(data).WithPlayer("Ana", "warrior", 5, (10, 10)).WithPlayer("Bob", "mage", 5, (11, 10)).BuildWithCombat();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var npc = new Npc(w.World.EntityIds.Next(), data.Npcs[0]) { Position = data.Npcs[0].Position };
+        w.Map.Add(npc);
+        w.Combat.Trades.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.ClassChange.Change(ana, npc.Id, "mage", w.Map, w.Begin()).ShouldBe("trade_busy");
+        w.Combat.Trades.CancelBy(ana, "test", w.Map, w.Begin());
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.ClassChange.Change(ana, npc.Id, "mage", w.Map, w.Begin()).ShouldBe("duel_busy");
+    }
+
+    [Fact]
+    public void Trade_PropertyTest_RandomTradesBetweenTwo_KeepItemsGoldAndUniqueIds() // HU-059 CA5
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rng = new SeededRng(4242);
+        string[] templates = ["bread", "minor_healing_potion", "iron_sword", "slime_goo", "worn_dagger"];
+        foreach (var p in new[] { ana, bob })
+        {
+            p.Gold = 500;
+            for (var i = 0; i < 10; i++) p.Inventory.Bag[i] = ItemInstance.New(templates[rng.Next(0, templates.Length)], 1);
+        }
+        Dictionary<string, int> Totals()
+        {
+            var d = new Dictionary<string, int>();
+            foreach (var it in ana.Inventory.Bag.Concat(bob.Inventory.Bag).Concat(ana.Equipment.Slots).Concat(bob.Equipment.Slots))
+                if (it is not null) d[it.TemplateId] = d.GetValueOrDefault(it.TemplateId) + it.Qty;
+            return d;
+        }
+        var totals = Totals(); var gold = ana.Gold + bob.Gold;
+
+        List<(Guid, int)> RandomOffer(Player p)
+        {
+            var offer = new List<(Guid, int)>();
+            foreach (var it in p.Inventory.Bag)
+                if (it is not null && offer.Count < w.Content.Rules.Social.TradeMaxItems && rng.Next(0, 3) == 0) offer.Add((it.Id, rng.Next(1, it.Qty + 1)));
+            return offer;
+        }
+        var completed = 0;
+        for (var round = 0; round < 300; round++)
+        {
+            var ctx = w.Begin();
+            w.Combat.Trades.Request(ana, bob, w.Map, ctx).ShouldBeNull();
+            w.Combat.Trades.Respond(bob, true, w.Map, ctx).ShouldBeNull();
+            var trade = w.Combat.Trades.TradeOf(ana)!;
+            w.Combat.Trades.Offer(ana, RandomOffer(ana), rng.Next(0, (int)Math.Min(ana.Gold, 50) + 1), w.Map, ctx).ShouldBeNull();
+            w.Combat.Trades.Offer(bob, RandomOffer(bob), rng.Next(0, (int)Math.Min(bob.Gold, 50) + 1), w.Map, ctx).ShouldBeNull();
+            if (rng.Next(0, 5) == 0) { w.Combat.Trades.CancelBy(ana, "test", w.Map, ctx); continue; }
+            w.Combat.Trades.Confirm(ana, trade.Version, w.Map, ctx).ShouldBeNull();
+            var result = w.Combat.Trades.Confirm(bob, trade.Version, w.Map, ctx);
+            if (result is null) completed++;
+            else { result.ShouldBe("bag_full"); w.Combat.Trades.CancelBy(ana, "test", w.Map, ctx); }
+            w.Combat.Trades.TradeOf(ana).ShouldBeNull();
+
+            Totals().ShouldBe(totals, ignoreOrder: true);
+            (ana.Gold + bob.Gold).ShouldBe(gold);
+            ana.Gold.ShouldBeGreaterThanOrEqualTo(0); bob.Gold.ShouldBeGreaterThanOrEqualTo(0);
+            var ids = ana.Inventory.Bag.Concat(bob.Inventory.Bag).Where(i => i is not null).Select(i => i!.Id).ToList();
+            ids.Distinct().Count().ShouldBe(ids.Count); // ningún id repetido entre los dos
+        }
+        completed.ShouldBeGreaterThan(100); // el test ejerce intercambios reales, no solo cancelaciones
     }
 
     [Fact]

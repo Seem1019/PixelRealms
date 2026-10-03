@@ -47,7 +47,7 @@ static func build(item: Dictionary, qty: int, class_id: String, level: int, equi
 	var affinity := affinity_of(class_id, item)
 	var mult := affinity_mult(affinity)
 	if not affinity.is_empty():
-		lines.append("[color=%s]Afinidad: %s (×%s)[/color]" % [AFFINITY_COLORS.get(affinity, "#ffffff"), affinity, _num(mult)])
+		lines.append("[color=%s]Afinidad: %s (×%s)[/color]" % [AFFINITY_COLORS.get(affinity, "#ffffff"), affinity, _mult(mult)])
 
 	var haste := _haste(class_id)
 	if item.has("damageMin"):
@@ -145,6 +145,14 @@ static func _delta(diff: float, label: String) -> String:
 static func _haste(class_id: String) -> float:
 	var scaling: Dictionary = Content.rule("classScaling", class_id, {})
 	return float(scaling.get("haste", 1.0))
+
+
+## Multiplicador de afinidad con hasta dos decimales (HU-053 CA3b): ×1, ×0.85, ×0.7.
+static func _mult(v: float) -> String:
+	var text := "%.2f" % v
+	while text.ends_with("0"):
+		text = text.left(text.length() - 1)
+	return text.trim_suffix(".")
 
 
 static func _num(v: float) -> String:

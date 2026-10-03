@@ -10,8 +10,11 @@ using PixelRealms.Protocol.Messages;
 namespace PixelRealms.Server.Players;
 
 /// <summary>Convierte entre el personaje guardado (DTO inmutable) y la entidad viva del mundo, y construye los DTOs del protocolo.</summary>
-public sealed class PlayerMapper(ReloadableContent content)
+public sealed class PlayerMapper(ReloadableContent content, ILogger<PlayerMapper>? logger = null)
 {
+    /// <summary>Contenedor de `character_items` para los objetos que no se pueden colocar (<see cref="Player.Unplaced"/>).</summary>
+    public const short UnplacedContainer = 2;
+
     /// <summary>Nombre visible de una plantilla (o el id si no existe).</summary>
     public string ItemName(string templateId) => content.Current.TryGetItem(templateId, out var tpl) && tpl is not null ? tpl.Name : templateId;
 
@@ -26,22 +29,35 @@ public sealed class PlayerMapper(ReloadableContent content)
         };
         foreach (var item in dto.Items)
         {
+            var inst = new ItemInstance(item.Id, item.TemplateId, item.Quantity);
             if (!db.TryGetItem(item.TemplateId, out _))
             {
-                // HU-057 CA4: plantilla que ya no existe → el personaje carga igual y se avisa.
-                Console.WriteLine($"WARN  {dto.Name}: item {item.Id} con plantilla desconocida '{item.TemplateId}' ignorado");
+                // HU-057 CA4: plantilla que ya no existe → el personaje carga igual, se avisa y el objeto se conserva aparte (antes
+                // se descartaba y el siguiente guardado lo borraba para siempre).
+                logger?.LogWarning("{Name}: item {ItemId} con plantilla desconocida '{TemplateId}' apartado", dto.Name, item.Id, item.TemplateId);
+                player.Unplaced.Add(inst);
                 continue;
             }
-            var inst = new ItemInstance(item.Id, item.TemplateId, item.Quantity);
-            if (item.Container == 1 && item.Slot >= 0 && item.Slot < Equipment.SlotCount) player.Equipment.Slots[item.Slot] = inst;
-            else if (item.Container == 0 && item.Slot >= 0 && item.Slot < Inventory.BagSize) player.Inventory.Bag[item.Slot] = inst;
+            if (item.Container == 1 && item.Slot >= 0 && item.Slot < Equipment.SlotCount && player.Equipment.Slots[item.Slot] is null) player.Equipment.Slots[item.Slot] = inst;
+            else if (item.Container == 0 && item.Slot >= 0 && item.Slot < Inventory.BagSize && player.Inventory.Bag[item.Slot] is null) player.Inventory.Bag[item.Slot] = inst;
+            else player.Unplaced.Add(inst); // casilla repetida o fuera de rango (o ya apartado): se recoloca abajo si cabe
         }
+        // Lo apartado con plantilla válida vuelve a la bolsa en cuanto hay hueco; lo demás sigue aparte, sin perderse.
+        for (var i = 0; i < player.Unplaced.Count;)
+        {
+            var it = player.Unplaced[i];
+            var free = Array.IndexOf(player.Inventory.Bag, null);
+            if (db.TryGetItem(it.TemplateId, out _) && free >= 0) { player.Inventory.Bag[free] = it; player.Unplaced.RemoveAt(i); player.Dirty = true; }
+            else i++;
+        }
+        if (player.Unplaced.Count > 0) logger?.LogWarning("{Name}: {Count} items apartados (sin plantilla o sin hueco)", dto.Name, player.Unplaced.Count);
         foreach (var h in dto.Hotbar)
             if (h.Slot >= 0 && h.Slot < player.Hotbar.Length) player.Hotbar[h.Slot] = (h.Kind == 0 ? "spell" : "item", h.Ref);
         player.KnownSpells.AddRange(db.KnownSpells(cls.Id, dto.Level).Select(s => s.Id));
         Recalculate(player);
         player.Hp = Math.Clamp(dto.Hp, 0, player.MaxHp);
-        player.Resource = Math.Clamp(dto.Resource, 0, player.MaxResource);
+        // HU-039 CA2: la ira empieza en 0 en cada entrada al mundo; maná y energía se conservan.
+        player.Resource = cls.Resource == Resource.Rage ? 0 : Math.Clamp(dto.Resource, 0, player.MaxResource);
         // HU-015: los cooldowns siguen corriendo con el reloj real mientras está fuera; solo vuelven los que no han terminado.
         var nowMs = NowMs();
         var utcNow = Time.GetUtcNow().UtcDateTime;
@@ -73,6 +89,8 @@ public sealed class PlayerMapper(ReloadableContent content)
             if (p.Inventory.Bag[i] is { } it) items.Add(new SavedItem(it.Id, it.TemplateId, it.Qty, 0, (short)i));
         for (var i = 0; i < p.Equipment.Slots.Length; i++)
             if (p.Equipment.Slots[i] is { } it) items.Add(new SavedItem(it.Id, it.TemplateId, it.Qty, 1, (short)i));
+        for (var i = 0; i < p.Unplaced.Count; i++)
+            items.Add(new SavedItem(p.Unplaced[i].Id, p.Unplaced[i].TemplateId, p.Unplaced[i].Qty, UnplacedContainer, (short)i));
         var hotbar = new List<SavedHotbarSlot>();
         for (var i = 0; i < p.Hotbar.Length; i++)
             if (p.Hotbar[i] is { } h) hotbar.Add(new SavedHotbarSlot((short)i, (short)(h.Kind == "spell" ? 0 : 1), h.Ref));

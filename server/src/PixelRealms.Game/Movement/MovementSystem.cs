@@ -6,12 +6,11 @@ namespace PixelRealms.Game.Movement;
 
 /// <summary>
 /// Paso 3 del tick (HU-021): aplica el último input de cada jugador con <see cref="MovementStep"/>. Si no llegó input en
-/// `InputTimeoutMs` el jugador se detiene (CA5). La velocidad efectiva la da <see cref="SpeedOf"/> (base × modificadores:
+/// `rules.movement.inputTimeoutMs` el jugador se detiene (CA5). La velocidad efectiva la da <see cref="SpeedOf"/> (base × modificadores:
 /// casteo, auras; se amplía en M2).
 /// </summary>
 public sealed class MovementSystem : IMapSystem
 {
-    public const int InputTimeoutMs = 500;
 
     public string Name => "movement";
 
@@ -26,7 +25,7 @@ public sealed class MovementSystem : IMapSystem
         foreach (var player in map.Players.Values)
         {
             if (player.MoveDx == 0 && player.MoveDy == 0) continue;
-            if (ctx.NowMs - player.LastInputAtMs > InputTimeoutMs) { player.MoveDx = 0; player.MoveDy = 0; continue; }
+            if (ctx.NowMs - player.LastInputAtMs > ctx.Rules.Movement.InputTimeoutMs) { player.MoveDx = 0; player.MoveDy = 0; continue; }
             if (IsImmobilized(player)) continue;
             Move(player, player.MoveDx, player.MoveDy, map.Data.Collision, SpeedOf(player, ctx));
         }

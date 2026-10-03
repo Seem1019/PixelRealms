@@ -12,7 +12,7 @@ description: Crear, editar y balancear contenido data-driven del juego (clases, 
 | `content/spells.json` | `schemas/spells.schema.json` | hechizos de clase, de items (consumibles) y de monstruos |
 | `content/auras.json` | `schemas/auras.schema.json` | DoT, HoT, buffs/debuffs, stun, root, silence, shield, slow |
 | `content/items.json` | `schemas/items.schema.json` | armas, armaduras, consumibles, materiales, basura |
-| `content/monsters.json` | `schemas/monsters.schema.json` | stats, IA (aggro/leash), XP, botín, hechizos |
+| `content/monsters.json` | `schemas/monsters.schema.json` | stats, IA (aggro/leash), `type` (de él sale la XP, que no se escribe), botín, hechizos |
 | `content/loot_tables.json` | `schemas/loot_tables.schema.json` | oro y probabilidades por item |
 | `content/vendors.json` | `schemas/vendors.schema.json` | NPCs vendedores y qué venden |
 | `content/rules.json` | `schemas/rules.schema.json` | **todas las constantes**: XP, grupo, combate, conversión por clase, afinidad, PvP, botín, jefes (ADR-008) |

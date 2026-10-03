@@ -142,17 +142,28 @@ public sealed class TargetingAndEffectsTests
         var ana = w.Player("Ana");
         for (var y = 0; y < 40; y++) { w.Map.Data.Collision.SetSolid(16, y); w.Map.Data.Collision.SetBlocksSight(16, y); }
         var ctx = w.Begin();
-        // Paso sombrío (alcance 5): apunta tras el muro → se queda antes del muro.
-        w.Combat.Casts.TryBeginCast(ana, w.Content.Spell("rogue_shadowstep"), null, new Vec2(18.5f, 10.5f), w.Map, ctx).ShouldBeNull();
+        var step = w.Content.Spell("rogue_shadowstep");
+        var travelMs = step.Effects.First(e => e.Type == EffectType.Leap).TravelMs;
+        travelMs.ShouldBeGreaterThan(0);
+        // Paso sombrío (alcance 5): apunta tras el muro → vuela travelMs y se queda antes del muro.
+        w.Combat.Casts.TryBeginCast(ana, step, null, new Vec2(18.5f, 10.5f), w.Map, ctx).ShouldBeNull();
+        ana.Position.X.ShouldBe(10.5f); // aún no ha despegado del todo: el destino llega en travelMs (HU-087 CA1)
+        var landing = new List<IGameEvent>(TickRunner.RunMs(w, travelMs / 2));
+        ana.Position.X.ShouldBeGreaterThan(10.5f); ana.Position.X.ShouldBeLessThan(14); // a medio camino
+        ana.Combat.Flight.ShouldNotBeNull();
+        w.Combat.Movement.IsImmobilized(ana).ShouldBeTrue(); // en el aire el input no lo mueve
+        landing.AddRange(TickRunner.RunMs(w, travelMs / 2 + GameConstants.TickMs));
+        ana.Combat.Flight.ShouldBeNull();
         ana.Position.X.ShouldBeLessThan(16);
         ana.Position.X.ShouldBeGreaterThan(14);
-        // El aura de velocidad propia (applyTo self) y la ralentización al slime en el punto de llegada.
-        ctx.Events.OfType<AuraAppliedEvent>().ShouldContain(e => e.Target == ana);
-        ctx.Events.OfType<AuraAppliedEvent>().ShouldContain(e => e.Target == w.Monster("slime"));
+        // El aura de velocidad propia (applyTo self) y la ralentización al slime, al aterrizar y en el punto de llegada.
+        landing.OfType<AuraAppliedEvent>().ShouldContain(e => e.Target == ana);
+        landing.OfType<AuraAppliedEvent>().ShouldContain(e => e.Target == w.Monster("slime"));
         // Fuera del mapa: nunca sale.
         var w2 = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "rogue", 3, (2.5f, 2.5f)).BuildWithCombat();
         var a2 = w2.Player("Ana");
         w2.Combat.Casts.TryBeginCast(a2, w2.Content.Spell("rogue_shadowstep"), null, new Vec2(0.5f, 0.5f), w2.Map, w2.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w2, travelMs + GameConstants.TickMs);
         w2.Map.Data.Collision.IsSolidAt(a2.Position.X, a2.Position.Y).ShouldBeFalse();
     }
 

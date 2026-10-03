@@ -27,6 +27,10 @@ jobs:
         run: dotnet test server/PixelRealms.sln --no-build --logger "trx;LogFileName=results.trx"
       - name: Validador de contenido
         run: dotnet run --project server/tools/ContentValidator --no-build -- content/
+      - name: Prueba de carga en proceso (HU-089 CA5, "Mina llena" 120 s simulados)
+        # Umbrales de HU-089 CA2, HU-088 CA5 y HU-036 CA6 (tick p99 ≤ 15 ms, combate ≤ 4 ms, IA < 3 ms, ≤ 2 MB/s, sin Gen2).
+        # Los microbenchmarks (--bench) no van aquí: sus objetivos son para el PC de referencia y un runner compartido los falsea.
+        run: dotnet run -c Release --project server/tools/LoadBot -- --duration 120
 
   godot:
     name: Cliente Godot (GUT headless)
