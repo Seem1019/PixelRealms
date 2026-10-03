@@ -270,11 +270,15 @@ public sealed class SocialTests
     [Fact]
     public void Duel_ClassAdvantage_AppliesToBasicAttacksAndDots() // HU-064 CA2 (antes solo a hechizos)
     {
+        // Neutro (1,0) frente a doble (2,0): el valor real del contenido lo decide el balance (HU-084), no este test.
+        using var neutralTmp = new TempContent();
+        neutralTmp.Patch("rules.json", n => n["classAdvantage"]!["warrior"]!["mage"] = 1.0);
+        var neutral = ContentLoader.LoadOrThrow(neutralTmp.Path);
         using var tmp = new TempContent();
         tmp.Patch("rules.json", n => n["classAdvantage"]!["warrior"]!["mage"] = 2.0);
         var doubled = ContentLoader.LoadOrThrow(tmp.Path);
 
-        var (basicNormal, dotNormal) = DuelHits(null);
+        var (basicNormal, dotNormal) = DuelHits(neutral);
         var (basicDoubled, dotDoubled) = DuelHits(doubled);
         basicNormal.ShouldBeGreaterThan(0);
         dotNormal.ShouldBeGreaterThan(0);

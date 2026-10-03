@@ -116,11 +116,11 @@
   },
 
   "classAdvantage": {
-    "_doc": "Multiplicador de daño del atacante (fila) sobre el defensor (columna) en PvP. 1.0 = sin ajuste. Palanca fina del triángulo; la identidad la dan los hechizos.",
-    "warrior": { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 },
-    "rogue":   { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 },
-    "mage":    { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 },
-    "priest":  { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.0 }
+    "_doc": "Multiplicador de daño del atacante (fila) sobre el defensor (columna) en PvP. 1.0 = sin ajuste. Palanca fina del triángulo; la identidad la dan los hechizos. Valores medidos con duelos simulados (docs/design/balance-report.md §3b, HU-084).",
+    "warrior": { "warrior": 1.0, "rogue": 0.63, "mage": 0.38, "priest": 1.0 },
+    "rogue":   { "warrior": 1.0, "rogue": 1.0, "mage": 0.54, "priest": 0.93 },
+    "mage":    { "warrior": 1.0, "rogue": 1.0, "mage": 1.0, "priest": 1.45 },
+    "priest":  { "warrior": 1.12, "rogue": 1.0, "mage": 1.0, "priest": 1.0 }
   },
 
   "pvp": {
