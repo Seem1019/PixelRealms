@@ -34,6 +34,9 @@ var hotbar: Array = []
 var known_spells: Array[String] = []
 var target_id: int = -1
 var party: Dictionary = {}  # {leader, members: [{name, entityId, classId, level, hpPct, online, mapId}]}
+## Último golpe dado o recibido (ms de `Time.get_ticks_msec`): aproxima el "en combate" del servidor para no pedir cosas que
+## rechazaría (cambiar una casilla de hechizo ocupada en combate).
+var last_combat_ms: int = -1000000
 var duel_opponent_id: int = -1
 var duel_state: String = ""
 var trade: Dictionary = {}  # último TradeUpdate o vacío
@@ -79,6 +82,7 @@ func _ready() -> void:
 	Net.register_handler("DuelUpdate", _on_duel_update)
 	Net.register_handler("TradeUpdate", _on_trade_update)
 	Net.register_handler("OnlineList", func(d: Dictionary) -> void: online_list_received.emit(d.get("players", [])))
+	Net.combat_events.connect(_on_combat_events)
 	Net.snapshot.connect(_on_snapshot)
 
 
@@ -195,6 +199,19 @@ func bag_count(template_id: String) -> int:
 func _on_change_map(d: Dictionary) -> void:
 	map_id = str(d.get("mapId", map_id))
 	map_changed.emit(map_id)
+
+
+## Golpes con uno mismo como origen o destino (las curas no cuentan: una cura propia no mete en combate).
+func _on_combat_events(d: Dictionary) -> void:
+	for e: Variant in d.get("e", []):
+		var ed: Dictionary = e
+		if str(ed.get("kind", "")) != "heal" and (int(ed.get("src", -1)) == self_id or int(ed.get("dst", -1)) == self_id):
+			last_combat_ms = Time.get_ticks_msec()
+			return
+
+
+func is_in_combat() -> bool:
+	return Time.get_ticks_msec() - last_combat_ms < int(float(Content.rule("combat", "inCombatWindowSec", 6)) * 1000.0)
 
 
 func _on_snapshot(d: Dictionary) -> void:

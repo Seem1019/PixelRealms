@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using PixelRealms.Server.Players;
 using PixelRealms.Server.Tests.Helpers;
 using Shouldly;
 using Xunit;
@@ -63,6 +65,29 @@ public sealed class SetHotbarTests
                 // Un hechizo no ocupa dos casillas: al ponerlo en la 3 salió de la casilla donde estaba.
                 hotbar.Count(h => h.GetProperty("ref").GetString() == "warrior_heroic_strike").ShouldBe(1);
             }
+        }
+    }
+
+    [Fact]
+    public async Task InCombat_AnOccupiedSpellSlotCannotChange_ButAnEmptyOneCanBeFilled() // revisión de autoridad: kit completo a mano
+    {
+        await using var server = await TestServer.StartAsync();
+        var (api, _, ana, _) = await Enter(server);
+        using (api) await using (ana)
+        {
+            var players = server.Services.GetRequiredService<PlayerRegistry>();
+            await server.RunOnTickAsync(t => players.ByName("Ana")!.EnterCombat(t.NowMs));
+            await ana.SendAsync("SetHotbar", """{"slot":0}"""); // vaciar la casilla de Golpe heroico en plena pelea
+            (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("in_combat");
+
+            await ana.SendAsync("SetHotbar", """{"slot":3,"kind":"spell","ref":"warrior_heroic_strike"}"""); // casilla vacía: sí
+            (string Kind, string Ref)? slot3 = null;
+            for (var i = 0; i < 20 && slot3 is null; i++)
+            {
+                await server.RunOnTickAsync(_ => slot3 = players.ByName("Ana")!.Hotbar[3]);
+                if (slot3 is null) await Task.Delay(50, TestContext.Current.CancellationToken);
+            }
+            slot3.ShouldBe(("spell", "warrior_heroic_strike"));
         }
     }
 }

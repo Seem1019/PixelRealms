@@ -40,12 +40,26 @@ public sealed class CastSpellHandler(CombatHandlerDeps deps) : IMessageHandler<C
             ctx.SendError(ErrorCodes.NotFound, msg.ReqId);
             return;
         }
+        // ADR-014: se lanzan los hechizos equipados en las casillas de hechizo de la barra, no cualquiera de los conocidos (los de
+        // objeto y monstruo los rechaza TryBeginCast).
+        if (spell.Source == Content.Defs.SpellSource.Class && !IsEquipped(player, spell.Id, deps.Combat.Services.Content.Rules.Loadout.SpellSlots))
+        {
+            ctx.SendError(ErrorCodes.NotEquipped, msg.ReqId, "Ese hechizo no está en tu barra");
+            return;
+        }
         var map = deps.MapOf(player);
         if (map is null) return;
         var targetId = msg.TargetId is { } t ? new EntityId(t) : player.Combat.TargetId;
         Vec2? pos = msg.TargetPos is { } p ? new Vec2(p.X / GameConstants.PixelsPerTile, p.Y / GameConstants.PixelsPerTile) : null;
         var error = deps.Combat.Casts.TryBeginCast(player, spell, targetId, pos, map, ctx.Tick);
         if (error is not null) ctx.SendError(error, msg.ReqId, MessageFor(error, spell));
+    }
+
+    private static bool IsEquipped(Game.Entities.Player p, string spellId, int spellSlots)
+    {
+        for (var i = 0; i < Math.Min(spellSlots, p.Hotbar.Length); i++)
+            if (p.Hotbar[i] is { Kind: "spell" } slot && slot.Ref == spellId) return true;
+        return false;
     }
 
     private static string? MessageFor(string code, Content.Defs.SpellDef spell) => code switch

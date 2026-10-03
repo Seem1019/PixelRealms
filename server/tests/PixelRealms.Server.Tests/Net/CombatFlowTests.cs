@@ -92,6 +92,24 @@ public sealed class CombatFlowTests
     }
 
     [Fact]
+    public async Task CastSpell_KnownButNotOnTheBar_IsNotEquipped() // ADR-014: solo los hechizos equipados
+    {
+        await using var server = await TestServer.StartAsync();
+        var (ana, _) = await Enter(server, "ana", "Ana", "mage");
+        await using var _ = ana;
+        for (var slot = 0; slot < TestContent.Load().Rules.Loadout.SpellSlots; slot++)
+            await ana.SendAsync("SetHotbar", $$"""{"slot":{{slot}}}""");
+        await ana.SendAsync("CastSpell", """{"spellId":"mage_fireball","reqId":4}""");
+        var err = await ana.ExpectAsync("Error");
+        err.GetProperty("code").GetString().ShouldBe("not_equipped");
+        err.GetProperty("reqId").GetInt32().ShouldBe(4);
+
+        await ana.SendAsync("SetHotbar", """{"slot":2,"kind":"spell","ref":"mage_fireball"}""");
+        await ana.SendAsync("CastSpell", """{"spellId":"mage_fireball","reqId":5}"""); // equipada: ya solo falta un objetivo
+        (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("invalid_target");
+    }
+
+    [Fact]
     public async Task LevelUp_OthersSeeTheNewLevel_AndItIsSaved() // HU-041 CA3 (el número; el efecto visual es del cliente), HU-026 CA6
     {
         await using var server = await TestServer.StartAsync();

@@ -114,6 +114,7 @@ public static class ErrorCodes
     public const string Silenced = "silenced";
     public const string LockedOut = "locked_out";
     public const string AreaLimit = "area_limit";
+    public const string NotEquipped = "not_equipped";
     public const string BagFull = "bag_full";
     public const string NotEnoughGold = "not_enough_gold";
     public const string LevelTooLow = "level_too_low";

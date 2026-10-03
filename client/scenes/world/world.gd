@@ -771,7 +771,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 			_inventory.refresh()
 		"Error":
 			var code := str(d.get("code", ""))
-			if code in ["on_cooldown", "on_gcd", "not_enough_resource", "out_of_range", "no_los", "invalid_target", "stunned", "silenced", "rooted", "locked_out", "is_dead", "area_limit"]:
+			if code in ["on_cooldown", "on_gcd", "not_enough_resource", "out_of_range", "no_los", "invalid_target", "stunned", "silenced", "rooted", "locked_out", "is_dead", "area_limit", "not_equipped"]:
 				GameState.revert_prediction("")
 		_:
 			pass
