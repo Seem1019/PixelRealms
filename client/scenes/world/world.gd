@@ -64,6 +64,8 @@ const LOGOUT_IN_COMBAT_TEXT := "No puedes salir en combate"
 ## Acercarse solo al objetivo fuera de alcance (HU-095) y círculo del alcance al mantener la tecla (HU-096).
 var _approach: Approach = Approach.new()
 var _range_ring: RangeRing
+## Palancas y puertas del mapa (HU-083).
+var _map_objects: MapObjectsLayer
 const STUCK_TEXT := "No puedes llegar hasta el objetivo"
 ## Envío de mensajes (los tests lo sustituyen para ver qué se manda sin servidor).
 var send_fn: Callable = func(type: String, data: Dictionary) -> void: Net.send(type, data)
@@ -97,6 +99,10 @@ func _ready() -> void:
 	_chat.bubble_requested.connect(_show_bubble)
 	_chat.command.connect(_on_chat_command)
 	_social.party_member_selected.connect(_select)
+	_map_objects = MapObjectsLayer.new()
+	_map_objects.z_index = -6  # sobre el suelo, bajo la retícula y las entidades
+	add_child(_map_objects)
+	GameState.map_objects_changed.connect(_apply_map_objects)
 	_social.whisper_requested.connect(func(player_name: String) -> void:
 		_chat._input.text = "/w %s " % player_name
 		_chat._input.grab_focus())
@@ -293,11 +299,22 @@ func _load_map(map_id: String) -> void:
 		return
 	_ground.setup(map, ["ground", "detail", "walls"])
 	_above.setup(map, ["above"])
+	_map_objects.setup(map)
+	_apply_map_objects()
 	var ts := map.tile_size
 	_camera.limit_left = 0
 	_camera.limit_top = 0
 	_camera.limit_right = map.width * ts
 	_camera.limit_bottom = map.height * ts
+
+
+## HU-083: las puertas abiertas dejan de colisionar también en la predicción (la rejilla es la misma que usa `prediction`).
+func _apply_map_objects() -> void:
+	if map == null:
+		return
+	for d: Dictionary in map.doors:
+		map.set_door_open(str(d["id"]), str(GameState.map_objects.get(d["id"], "closed")) == "open")
+	_map_objects.set_states(GameState.map_objects)
 
 
 # --- Movimiento propio (HU-021 CA1, HU-022) -------------------------------------------------------------------------
@@ -440,6 +457,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_send("VendorOpen", {"npcId": hit.entity_id})  # HU-055 CA1
 				elif hit.kind == "npc" and hit.template_id == "class_change":
 					_social.open_class_change(hit.entity_id)  # HU-044 CA1
+			elif not _map_objects.lever_at(world_pos).is_empty():
+				_send("Interact", {"objectId": _map_objects.lever_at(world_pos)})  # HU-083: el servidor valida distancia y vida
 			else:
 				_select(-1)  # clic en el suelo: deseleccionar (CA3)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:

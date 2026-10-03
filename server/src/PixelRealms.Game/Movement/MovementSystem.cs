@@ -27,7 +27,7 @@ public sealed class MovementSystem : IMapSystem
             if (player.MoveDx == 0 && player.MoveDy == 0) continue;
             if (ctx.NowMs - player.LastInputAtMs > ctx.Rules.Movement.InputTimeoutMs) { player.MoveDx = 0; player.MoveDy = 0; continue; }
             if (IsImmobilized(player)) continue;
-            Move(player, player.MoveDx, player.MoveDy, map.Data.Collision, SpeedOf(player, ctx));
+            Move(player, player.MoveDx, player.MoveDy, map.Collision, SpeedOf(player, ctx));
         }
     }
 

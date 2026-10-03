@@ -274,7 +274,8 @@ def build_meadow() -> tuple[dict, dict]:
 
 
 # ----------------------------------------------------------------------------------------------------------------------------
-# mine (HU-083): entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds, pilares) → rama lateral: sala del jefe · Sala 3 (gólem élite) → salida cerrada.
+# mine (HU-083): entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds + palancas) → rama lateral tras una puerta: sala del jefe · Sala 3
+# (gólem élite) → salida cerrada.
 # ----------------------------------------------------------------------------------------------------------------------------
 
 def build_mine() -> tuple[dict, dict]:
@@ -303,7 +304,7 @@ def build_mine() -> tuple[dict, dict]:
 
     entrance = (6, 24, 12, 10)      # Entrada: portal de vuelta + punto seguro
     room1 = (22, 18, 18, 22)        # Sala 1: kóbolds
-    room2 = (46, 10, 22, 26)        # Sala 2: kóbolds + pilares ("palancas" pendientes de mecánica)
+    room2 = (46, 10, 22, 26)        # Sala 2: kóbolds + dos palancas que abren la puerta de la rama del jefe
     boss = (46, 42, 26, 15)         # Sala del jefe (rama lateral al sur de la Sala 2)
     room3 = (72, 16, 14, 20)        # Sala 3: gólem élite → salida al Tier 2 (cerrada)
     for r in (entrance, room1, room2, boss, room3):
@@ -312,7 +313,7 @@ def build_mine() -> tuple[dict, dict]:
     corridor([(39, 29), (46, 29)])
     corridor([(57, 35), (57, 42)])
     corridor([(67, 26), (72, 26)])
-    # Pilares de la Sala 2 (el "puzle" de palancas no tiene mecánica en Fase 1: quedan como obstáculos).
+    # Pilares de la Sala 2 (obstáculos entre las dos palancas).
     for px, py in ((52, 16), (60, 16), (52, 28), (60, 28)):
         g.fill_rect(g.walls, px, py, 2, 2, ROCK)
     # Salida al Tier 2: hornacina cerrada con roca al este de la Sala 3.
@@ -338,13 +339,27 @@ def build_mine() -> tuple[dict, dict]:
     portals = [obj(nid(), "to_meadow", "portal", 9, 27, 2, 3, [prop("portalId", "mine_to_meadow"), prop("targetMapId", "meadow"), prop("targetX", 238), prop("targetY", 54)])]
     zones = [obj(nid(), "Mina Abandonada", "zone", 1, 1, W - 2, H - 2,
                  [prop("name", "Mina Abandonada"), prop("safe", False), prop("minLevel", 4), prop("maxLevel", 6), prop("landmark", "Linterna del Capataz")])]
+    # Puzle de la Sala 2 (HU-083 CA1): una palanca a cada lado de la sala; con las dos activadas se abre la puerta del pasillo que
+    # baja a la sala del jefe (x 56..58), y se cierra sola a los `rules.world.doorResetSec`. La puerta cubre el pasillo de pared a pared.
+    # Del lado del jefe hay una tercera palanca que abre sola (`opensAlone`): quien se quede dentro al cerrarse puede salir.
+    levers = [
+        obj(nid(), "lever_west", "lever", 48.5, 22.5, props=[prop("leverId", "mine_lever_west"), prop("doorId", "mine_boss_door")], point=True),
+        obj(nid(), "lever_east", "lever", 65.5, 22.5, props=[prop("leverId", "mine_lever_east"), prop("doorId", "mine_boss_door")], point=True),
+        obj(nid(), "lever_inside", "lever", 57.5, 40.5, props=[prop("leverId", "mine_lever_inside"), prop("doorId", "mine_boss_door"), prop("opensAlone", True)], point=True),
+    ]
+    doors = [obj(nid(), "boss_door", "door", 55, 38, 5, 1, [prop("doorId", "mine_boss_door")])]
     origin = (11, 31)
     sealed = g.seal_unreachable(origin, ROCK)
     report = check_map(g, origin, spawns, graveyards, [], portals)
     report["sealed"] = sealed
+    reach = g.reachable_from(*origin)
+    for lv in levers:
+        if (int(lv["x"]) // TS, int(lv["y"]) // TS) not in reach:
+            report["errors"].append(f"palanca {lv['name']} inaccesible")
     layers = [
         tile_layer(1, "ground", g.ground, W, H), tile_layer(2, "detail", g.detail, W, H), tile_layer(3, "walls", g.walls, W, H), tile_layer(4, "above", g.above, W, H),
         obj_layer(5, "spawns", spawns), obj_layer(6, "npcs", []), obj_layer(7, "graveyards", graveyards), obj_layer(8, "zones", zones), obj_layer(9, "portals", portals),
+        obj_layer(10, "levers", levers), obj_layer(11, "doors", doors),
     ]
     return tmj(g, "mine", "Mina Abandonada", "gy_entrance", layers, oid), report
 

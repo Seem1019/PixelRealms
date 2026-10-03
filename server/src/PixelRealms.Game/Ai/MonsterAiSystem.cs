@@ -77,7 +77,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
             if (p.IsDead || !CanBeAggroed(p)) continue;
             var d = Vec2.DistanceSquared(p.Position, m.Position);
             if (d > rangeSq || d >= bestD) continue;
-            if (!LineOfSight.Has(map.Data.Collision, m.Position, p.Position)) continue;
+            if (!LineOfSight.Has(map.Collision, m.Position, p.Position)) continue;
             best = p; bestD = d;
         }
         return best;
@@ -94,7 +94,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
             var angle = ctx.Rng.NextDouble() * Math.Tau;
             var dist = Math.Sqrt(ctx.Rng.NextDouble()) * m.WanderRadius;
             var candidate = new Vec2(m.SpawnPosition.X + (float)(Math.Cos(angle) * dist), m.SpawnPosition.Y + (float)(Math.Sin(angle) * dist));
-            if (map.Data.Collision.IsSolidAt(candidate.X, candidate.Y)) { brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rules.Ai.WanderPauseMinMs; return; }
+            if (map.Collision.IsSolidAt(candidate.X, candidate.Y)) { brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rules.Ai.WanderPauseMinMs; return; }
             brain.WanderTarget = candidate;
         }
         if (StepTowards(m, brain.WanderTarget.Value, map, ctx, speedMult: (float)ctx.Rules.Ai.WanderSpeedMult))
@@ -135,7 +135,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         m.Combat.TargetId = target.Id;
 
         var dist = Vec2.Distance(m.Position, target.Position);
-        var inRange = dist <= m.Template.AttackRange && LineOfSight.Has(map.Data.Collision, m.Position, target.Position);
+        var inRange = dist <= m.Template.AttackRange && LineOfSight.Has(map.Collision, m.Position, target.Position);
         if (inRange)
         {
             brain.State = AiState.Attack;
@@ -188,7 +188,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         var stale = brain.PathComputedAtMs == long.MinValue || ctx.NowMs - brain.PathComputedAtMs >= ctx.Rules.Ai.PathRecalcMs
                     || Vec2.Distance(brain.PathTargetPos, targetPos) > ctx.Rules.Ai.PathRecalcMovedTiles || brain.PathIndex >= brain.Path.Count;
         if (!stale) return true;
-        if (!Pathfinder.FindPath(map.Data.Collision, m.Position, targetPos, brain.Path, ctx.Rules.Ai.PathMaxNodes)) return false;
+        if (!Pathfinder.FindPath(map.Collision, m.Position, targetPos, brain.Path, ctx.Rules.Ai.PathMaxNodes)) return false;
         brain.PathIndex = 0;
         brain.PathComputedAtMs = ctx.NowMs;
         brain.PathTargetPos = targetPos;
@@ -252,7 +252,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         // No pasarse del destino en este tick.
         var stepTiles = speed * ctx.DeltaMs / 1000f;
         var before = m.Position;
-        MovementSystem.Move(m, dx, dy, map.Data.Collision, speed);
+        MovementSystem.Move(m, dx, dy, map.Collision, speed);
         if (delta.Length <= stepTiles) { m.Position = target; }
         return Vec2.Distance(m.Position, target) <= ctx.Rules.Ai.ArriveToleranceTiles || m.Position == before;
     }

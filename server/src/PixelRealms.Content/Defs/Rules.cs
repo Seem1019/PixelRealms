@@ -391,4 +391,6 @@ public sealed record WorldRules
     public required string StartMapId { get; init; }
     public required int CurrentPhase { get; init; }
     public required IReadOnlyList<double> ZoneCrossTimeSecTarget { get; init; }
+    public required double InteractRangeTiles { get; init; }
+    public required double DoorResetSec { get; init; }
 }

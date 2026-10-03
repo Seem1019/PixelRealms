@@ -8,8 +8,8 @@ using PixelRealms.Game.Social;
 namespace PixelRealms.Game.Combat;
 
 /// <summary>
-/// Composición de los sistemas de combate (M2) en el orden del tick de docs/architecture.md §3: movimiento → casteo → auras →
-/// IA → básico → recursos → muerte/respawn → interés. La usan el servidor y los tests (WorldBuilder).
+/// Composición de los sistemas de combate (M2) en el orden del tick de docs/architecture.md §3: movimiento → objetos del mapa →
+/// casteo → auras → IA → básico → recursos → muerte/respawn → interés. La usan el servidor y los tests (WorldBuilder).
 /// </summary>
 public sealed class CombatModule
 {
@@ -36,6 +36,7 @@ public sealed class CombatModule
         Trades = new TradeService(Services);
         ClassChange = new ClassChangeService(Services);
         Social = new SocialTickSystem(Pvp, Trades);
+        Objects = new Map.MapObjectSystem();
         Movement = movement;
         Interest = interest;
 
@@ -81,6 +82,7 @@ public sealed class CombatModule
     public TradeService Trades { get; }
     public ClassChangeService ClassChange { get; }
     public SocialTickSystem Social { get; }
+    public Map.MapObjectSystem Objects { get; }
 
     /// <summary>HU-062 CA2: XP repartida entre los miembros activos del grupo del que taggeó (vivos, ≤ xpRangeTiles, acción en activeWindowSec).</summary>
     private List<(Entities.Player Player, int Xp)> GroupRecipients(Entities.Player tagger, Entities.Monster monster, Map.MapInstance map, Content.Defs.IRules rules)
@@ -120,7 +122,7 @@ public sealed class CombatModule
     /// <summary>Registra los sistemas en orden; `extraBeforeInterest` permite insertar portales u otros antes de la AOI.</summary>
     public Simulation Register(Simulation sim, params IMapSystem[] extraBeforeInterest)
     {
-        sim.AddSystem(Movement).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Loot).AddSystem(Spawns).AddSystem(Social);
+        sim.AddSystem(Movement).AddSystem(Objects).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Loot).AddSystem(Spawns).AddSystem(Social);
         foreach (var s in extraBeforeInterest) sim.AddSystem(s);
         return sim.AddSystem(Interest);
     }

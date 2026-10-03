@@ -95,6 +95,12 @@ public sealed record OnlinePlayerDto(string Name, string ClassId, int Level, str
 /// <summary>HU-063: respuesta a `OnlineListRequest`, ordenada por nombre.</summary>
 public sealed record OnlineList(IReadOnlyList<OnlinePlayerDto> Players) : IServerMessage;
 
+/// <summary>HU-083: estado de un objeto del mapa: palanca `on`/`off`, puerta `open`/`closed`.</summary>
+public sealed record MapObjectDto(string Id, string State);
+
+/// <summary>HU-083: todos los objetos del mapa al entrar en él (tras `Welcome` o `ChangeMap`) y luego solo los que cambian.</summary>
+public sealed record MapObjects(IReadOnlyList<MapObjectDto> Objects) : IServerMessage;
+
 /// <summary>Códigos de error de docs/protocol.md §Códigos de error.</summary>
 public static class ErrorCodes
 {

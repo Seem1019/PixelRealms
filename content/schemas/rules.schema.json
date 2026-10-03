@@ -265,8 +265,8 @@
     },
 
     "world": {
-      "type": "object", "additionalProperties": false, "required": ["startMapId", "currentPhase", "zoneCrossTimeSecTarget"],
-      "properties": { "startMapId": { "type": "string" }, "currentPhase": { "type": "integer", "minimum": 1, "description": "Fase activa del MVP (1 = Tier 1). Decide el tope de nivel (progression.levelCapByPhase) y las reglas por fase." }, "zoneCrossTimeSecTarget": { "type": "array", "items": { "type": "number" } } }
+      "type": "object", "additionalProperties": false, "required": ["startMapId", "currentPhase", "zoneCrossTimeSecTarget", "interactRangeTiles", "doorResetSec"],
+      "properties": { "startMapId": { "type": "string" }, "currentPhase": { "type": "integer", "minimum": 1, "description": "Fase activa del MVP (1 = Tier 1). Decide el tope de nivel (progression.levelCapByPhase) y las reglas por fase." }, "zoneCrossTimeSecTarget": { "type": "array", "items": { "type": "number" } }, "interactRangeTiles": { "type": "number", "minimum": 0, "description": "Distancia máxima (casillas) para usar un objeto del mapa, como una palanca (HU-083)." }, "doorResetSec": { "type": "number", "minimum": 1, "description": "Segundos que una puerta abierta por palancas sigue abierta antes de cerrarse y reiniciar sus palancas." } }
     }
   },
 

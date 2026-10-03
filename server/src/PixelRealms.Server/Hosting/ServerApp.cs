@@ -134,6 +134,7 @@ public static class ServerApp
         router.Register(new PingHandler());
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
         router.Register(new UsePortalHandler());
+        router.Register(new InteractHandler(app.Services.GetRequiredService<CombatHandlerDeps>()));
         var combatDeps = app.Services.GetRequiredService<CombatHandlerDeps>();
         router.Register(new SelectTargetHandler(combatDeps));
         router.Register(new CastSpellHandler(combatDeps));

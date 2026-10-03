@@ -84,7 +84,7 @@ public sealed class TargetResolver(CombatServices services)
             if (result.Count >= max) break;
             // LOS del centro a los pies, no al punto del cuadro más cercano: la cabeza de quien está pegado a un muro entra en la
             // casilla del muro, y LineOfSight no mira la casilla de destino.
-            if (!LineOfSight.Has(map.Data.Collision, center, actor.Position)) continue;
+            if (!LineOfSight.Has(map.Collision, center, actor.Position)) continue;
             result.Add(actor);
         }
     }

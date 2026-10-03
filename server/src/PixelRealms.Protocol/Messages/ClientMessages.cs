@@ -56,6 +56,9 @@ public sealed record Logout(int? ReqId = null) : IClientMessage;
 /// <summary>HU-063: pide la lista de jugadores conectados (tecla O); el servidor responde `OnlineList`.</summary>
 public sealed record OnlineListRequest : IClientMessage;
 
+/// <summary>HU-083: usa un objeto del mapa (una palanca) por su id de Tiled; el cambio llega como `MapObjects` a todo el mapa.</summary>
+public sealed record Interact(string? ObjectId, int? ReqId = null) : IClientMessage;
+
 public sealed record PartyKick(string Name) : IClientMessage;
 
 public sealed record SetHotbar(int Slot, string? Kind = null, string? Ref = null) : IClientMessage;

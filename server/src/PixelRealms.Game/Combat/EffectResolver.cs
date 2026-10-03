@@ -21,7 +21,7 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
     public void Apply(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, Vec2 origin, MapInstance map, TickContext ctx)
     {
         var rules = ctx.Rules.Combat;
-        var grid = map.Data.Collision;
+        var grid = map.Collision;
 
         // Desplazamientos primero: lo demás se resuelve en el punto de llegada (ADR-016).
         foreach (var e in spell.Effects)

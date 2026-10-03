@@ -89,6 +89,13 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                 case AuraAppliedEvent aa:
                     Broadcast(aa.MapInstanceId, aa.Target, ToAuraApplied(aa.Target, aa.Aura, ctx.NowMs));
                     break;
+                case Game.Map.MapObjectChangedEvent oc when world.GetInstance(oc.MapInstanceId) is { } objMap:
+                {
+                    // Una palanca o una puerta se ven desde todo el mapa (las salas son pequeñas): a todos los de la instancia.
+                    var msg = new MapObjects([new MapObjectDto(oc.ObjectId, oc.State)]);
+                    foreach (var p in objMap.Players.Values) if (p.ConnectionId >= 0) connections.Send(p.ConnectionId, msg);
+                    break;
+                }
                 case AuraRemovedEvent ar:
                     Broadcast(ar.MapInstanceId, ar.Target, new AuraRemoved(ar.Target.Id.Value, ar.AuraId, ar.CasterId?.Value));
                     break;
@@ -176,6 +183,16 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         }
         FlushBatches(ctx.Tick);
         if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
+    }
+
+    /// <summary>HU-083: estado de todos los objetos del mapa (palancas y puertas) para quien entra; null si el mapa no tiene.</summary>
+    public static MapObjects? ToMapObjects(Game.Map.MapInstance map)
+    {
+        if (map.Data.Levers.Count + map.Data.Doors.Count == 0) return null;
+        var states = Game.Map.MapObjectSystem.States(map);
+        var list = new List<MapObjectDto>(states.Count);
+        foreach (var (id, state) in states) list.Add(new MapObjectDto(id, state));
+        return new MapObjects(list);
     }
 
     /// <summary>AuraApplied de un aura ya puesta (al aplicarse, al entrar alguien en la AOI o al reconectar).</summary>

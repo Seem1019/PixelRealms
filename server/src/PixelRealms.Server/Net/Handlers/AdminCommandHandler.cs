@@ -85,7 +85,7 @@ public sealed class AdminCommandHandler(CombatHandlerDeps deps, PlayerRegistry p
     private static string Tp(Player p, Game.Map.MapInstance map, string[] args)
     {
         if (args.Length < 2 || !TryFloat(args[0], out var x) || !TryFloat(args[1], out var y)) return "Uso: /tp x y";
-        if (map.Data.Collision.IsSolidAt(x, y)) return $"({x:0.##}, {y:0.##}) es sólido";
+        if (map.Collision.IsSolidAt(x, y)) return $"({x:0.##}, {y:0.##}) es sólido";
         Teleport(p, new Vec2(x, y));
         return $"Teletransportado a ({x:0.##}, {y:0.##})";
     }

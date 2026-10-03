@@ -40,6 +40,8 @@ public static class TiledMapLoader
         var graveyards = new List<GraveyardDef>();
         var zones = new List<ZoneDef>();
         var portals = new List<PortalDef>();
+        var levers = new List<LeverDef>();
+        var doors = new List<DoorDef>();
 
         foreach (var layer in root.GetProperty("layers").EnumerateArray())
         {
@@ -103,11 +105,34 @@ public static class TiledMapLoader
                             if (mapExists is not null && !mapExists(target)) errors.Add($"portal '{oname}': targetMapId '{target}' no existe en maps/");
                             break;
                         }
+                        case "levers":
+                            levers.Add(new LeverDef(op.GetValueOrDefault("leverId") as string ?? oname, op.GetValueOrDefault("doorId") as string ?? "", pos, op.GetValueOrDefault("opensAlone") is true));
+                            break;
+                        case "doors":
+                            doors.Add(new DoorDef(op.GetValueOrDefault("doorId") as string ?? oname, pos, size));
+                            break;
                         default:
                             break;
                     }
                 }
             }
+        }
+
+        // HU-083: ids únicos (entre palancas y puertas también: comparten el espacio de ids de `Interact` y `MapObjects`); cada
+        // palanca abre una puerta que existe; cada puerta tiene al menos una palanca y un rectángulo dentro del mapa.
+        var objectIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in levers.Select(l => l.LeverId).Concat(doors.Select(d => d.DoorId)))
+            if (!objectIds.Add(id)) errors.Add($"id de palanca o puerta repetido: '{id}'");
+        foreach (var l in levers)
+        {
+            if (!doors.Exists(d => d.DoorId == l.DoorId)) errors.Add($"palanca '{l.LeverId}': doorId '{l.DoorId}' no existe en la capa doors");
+            if (grid.IsSolidAt(l.Position.X, l.Position.Y)) errors.Add($"palanca '{l.LeverId}' cae en una casilla sólida");
+        }
+        foreach (var d in doors)
+        {
+            if (d.Size.X <= 0 || d.Size.Y <= 0 || !grid.InBounds(d.Tiles.X0, d.Tiles.Y0) || !grid.InBounds(d.Tiles.X1, d.Tiles.Y1))
+                errors.Add($"puerta '{d.DoorId}': su rectángulo debe tener tamaño y estar dentro del mapa");
+            if (!levers.Exists(l => l.DoorId == d.DoorId)) errors.Add($"puerta '{d.DoorId}' no tiene ninguna palanca");
         }
 
         if (graveyards.Count == 0) errors.Add("no hay ningún cementerio (capa graveyards)");
@@ -121,7 +146,7 @@ public static class TiledMapLoader
             if (grid.IsSolidAt(g.Position.X, g.Position.Y)) errors.Add($"cementerio '{g.Id}' cae en una casilla sólida");
 
         if (errors.Count > 0) throw new MapLoadException(tmjPath, errors);
-        return new MapData(mapId, displayName, grid, spawns, npcs, graveyards, zones, portals, defaultGraveyard);
+        return new MapData(mapId, displayName, grid, spawns, npcs, graveyards, zones, portals, defaultGraveyard, levers, doors);
     }
 
     /// <summary>Carga todos los `.tmj` de la carpeta y comprueba los portales entre ellos. Error → el servidor no arranca.</summary>

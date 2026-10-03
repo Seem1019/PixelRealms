@@ -17,6 +17,10 @@ var zones: Array[Dictionary] = []
 ## Solo para dibujar: cementerios (fogata) y portales (entrada a la cueva), en píxeles.
 var graveyards: Array[Vector2] = []
 var portals: Array[Rect2] = []
+## HU-083: palancas {id, door, pos (px)} y puertas {id, rect (px)}. Las puertas empiezan cerradas en `collision`.
+var levers: Array[Dictionary] = []
+var doors: Array[Dictionary] = []
+var _door_base: Dictionary = {}  # id de puerta → [[x, y, solid, blocksSight]] de sus casillas sin la puerta
 var _tile_props: Dictionary = {}  # gid → {solid, blocksSight}
 
 
@@ -83,6 +87,16 @@ func _parse(path: String) -> bool:
 			for o: Variant in l.get("objects", []):
 				var po: Dictionary = o
 				portals.append(Rect2(float(po.get("x", 0)), float(po.get("y", 0)), maxf(float(po.get("width", 0)), 1.0), maxf(float(po.get("height", 0)), 1.0)))
+		elif str(l.get("type", "")) == "objectgroup" and name == "levers":
+			for o: Variant in l.get("objects", []):
+				var lo: Dictionary = o
+				var lp := _props(lo)
+				levers.append({"id": str(lp.get("leverId", lo.get("name", ""))), "door": str(lp.get("doorId", "")), "pos": Vector2(float(lo.get("x", 0)), float(lo.get("y", 0)))})
+		elif str(l.get("type", "")) == "objectgroup" and name == "doors":
+			for o: Variant in l.get("objects", []):
+				var dobj: Dictionary = o
+				var dp := _props(dobj)
+				doors.append({"id": str(dp.get("doorId", dobj.get("name", ""))), "rect": Rect2(float(dobj.get("x", 0)), float(dobj.get("y", 0)), float(dobj.get("width", 0)), float(dobj.get("height", 0)))})
 		elif str(l.get("type", "")) == "objectgroup" and name == "zones":
 			for o: Variant in l.get("objects", []):
 				var od: Dictionary = o
@@ -92,7 +106,24 @@ func _parse(path: String) -> bool:
 					"safe": bool(op.get("safe", false)),
 					"rect": Rect2(float(od.get("x", 0)) / tile_size, float(od.get("y", 0)) / tile_size, float(od.get("width", 0)) / tile_size, float(od.get("height", 0)) / tile_size),
 				})
+	# Las puertas empiezan cerradas, como en el servidor (MapInstance): se guarda lo que había debajo para abrirlas.
+	for d: Dictionary in doors:
+		var cells: Array = []
+		var rect: Rect2 = d["rect"]
+		for y: int in range(floori(rect.position.y / tile_size), ceili(rect.end.y / tile_size)):
+			for x: int in range(floori(rect.position.x / tile_size), ceili(rect.end.x / tile_size)):
+				cells.append([x, y, collision.is_solid(x, y), collision.blocks_sight(x, y)])
+		_door_base[str(d["id"])] = cells
+		set_door_open(str(d["id"]), false)
 	return true
+
+
+## HU-083: abre (devuelve las casillas a lo que dice el mapa) o cierra (sólidas y opacas) una puerta en la colisión de predicción.
+func set_door_open(door_id: String, open: bool) -> void:
+	for cell: Variant in _door_base.get(door_id, []):
+		var c: Array = cell
+		collision.set_solid(int(c[0]), int(c[1]), bool(c[2]) if open else true)
+		collision.set_blocks_sight(int(c[0]), int(c[1]), bool(c[3]) if open else true)
 
 
 func _load_tile_props(root: Dictionary, base_dir: String) -> void:

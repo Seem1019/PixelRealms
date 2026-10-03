@@ -101,7 +101,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
 
         var player = mapper.ToPlayer(dto, world.EntityIds.Next());
         if (mapId != dto.MapId || player.Position == Vec2.Zero) player.Position = instance.Data.DefaultGraveyard.Position;
-        if (instance.Data.Collision.IsSolidAt(player.Position.X, player.Position.Y)) player.Position = instance.Data.DefaultGraveyard.Position;
+        if (instance.Collision.IsSolidAt(player.Position.X, player.Position.Y)) player.Position = instance.Data.DefaultGraveyard.Position;
         instance.Add(player);
         players.Add(player, connectionId);
         if (hadDeparted) _departed.Remove(dto.Id); // ya está dentro: lo siguiente que salga lo vuelve a apuntar
@@ -114,6 +114,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         // Welcome no trae stats primarios ni oro: sin esto el cliente los ve a 0. Va al final para no dejar la entrada a medias.
         ctx.Send(mapper.ToStatsUpdate(player));
         foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd); // recargas que siguieron corriendo fuera (HU-015)
+        if (EventDispatcher.ToMapObjects(instance) is { } objects) ctx.Send(objects); // palancas y puertas (HU-083)
     }
 
     /// <summary>HU-025 CA2: la conexión nueva toma el personaje que seguía en el mundo; se reenvía Welcome y la AOI completa.</summary>
@@ -129,6 +130,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd);
         // Las auras propias siguieron corriendo mientras estaba linkdead: el cliente nuevo no las conoce (HU-098 CA2).
         foreach (var aura in player.Auras.All) ctx.Send(EventDispatcher.ToAuraApplied(player, aura, ctx.Tick.NowMs));
+        if (instance is not null && EventDispatcher.ToMapObjects(instance) is { } objects) ctx.Send(objects);
         logger.LogInformation("{Name} reconectó (conexión {Conn})", player.Name, connectionId);
     }
 

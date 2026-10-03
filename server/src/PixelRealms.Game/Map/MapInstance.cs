@@ -19,11 +19,49 @@ public sealed class MapInstance(int id, MapData data)
 
     public string MapId => Data.MapId;
 
+    /// <summary>
+    /// Colisión de esta copia del mapa: la del <see cref="MapData"/> o, si tiene puertas (HU-083), una copia propia donde las puertas
+    /// cerradas son sólidas y tapan la vista. Movimiento, línea de visión, rutas y áreas leen esta, nunca `Data.Collision`.
+    /// </summary>
+    public CollisionGrid Collision { get; } = InitialCollision(data);
+
+    /// <summary>Palancas activadas (HU-083).</summary>
+    public HashSet<string> LeversOn { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Puertas abiertas y cuándo vuelven a cerrarse (ms de juego).</summary>
+    public Dictionary<string, long> DoorsOpenUntil { get; } = new(StringComparer.Ordinal);
+
     public EntityTable<Player> Players => new(_players);
 
     public EntityTable<Monster> Monsters => new(_monsters);
 
     public EntityTable<Actor> Actors => new(_actors);
+
+    /// <summary>Sin puertas, la rejilla del mapa; con puertas, una copia con todas cerradas (así empiezan).</summary>
+    private static CollisionGrid InitialCollision(MapData data)
+    {
+        if (data.Doors.Count == 0) return data.Collision;
+        var grid = data.Collision.Clone();
+        foreach (var door in data.Doors)
+        {
+            var (x0, y0, x1, y1) = door.Tiles;
+            for (var y = y0; y <= y1; y++)
+                for (var x = x0; x <= x1; x++) { grid.SetSolid(x, y); grid.SetBlocksSight(x, y); }
+        }
+        return grid;
+    }
+
+    /// <summary>Marca las casillas de una puerta como sólidas y opacas (cerrada) o les devuelve lo que tienen en el mapa (abierta).</summary>
+    public void SetDoorTiles(DoorDef door, bool closed)
+    {
+        var (x0, y0, x1, y1) = door.Tiles;
+        for (var y = y0; y <= y1; y++)
+            for (var x = x0; x <= x1; x++)
+            {
+                Collision.SetSolid(x, y, closed || Data.Collision.IsSolid(x, y));
+                Collision.SetBlocksSight(x, y, closed || Data.Collision.BlocksSight(x, y));
+            }
+    }
 
     public void Add(Actor actor)
     {
