@@ -192,6 +192,8 @@ public static class ServerApp
             // el cupo de la IP del proxy (5 logins/min y 5 registros/hora para el servidor entero).
             var fwd = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions { ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto };
             fwd.KnownIPNetworks.Clear(); fwd.KnownProxies.Clear(); // el proxy es el contenedor `caddy` de la misma red de compose
+            foreach (var cidr in net.TrustedProxyNetworks is { Length: > 0 } custom ? custom : NetOptions.DefaultTrustedProxyNetworks)
+                fwd.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
             app.UseForwardedHeaders(fwd);
         }
         app.UseRateLimiter();

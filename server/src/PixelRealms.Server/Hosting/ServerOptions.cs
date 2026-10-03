@@ -13,6 +13,14 @@ public sealed class NetOptions
 
     /// <summary>HU-071: límites por conexión y por IP.</summary>
     public Net.RateLimitOptions RateLimits { get; set; } = new();
+
+    /// <summary>
+    /// HU-073: redes (CIDR) de las que se acepta `X-Forwarded-For` en producción. Sin configurar: loopback y rangos privados, que es
+    /// donde vive el contenedor de Caddy en la red de compose. Una petición desde otra IP no puede fingir su origen.
+    /// </summary>
+    public string[]? TrustedProxyNetworks { get; set; }
+
+    public static readonly string[] DefaultTrustedProxyNetworks = ["127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"];
 }
 
 /// <summary>Opciones técnicas de persistencia (appsettings `Persistence`).</summary>
