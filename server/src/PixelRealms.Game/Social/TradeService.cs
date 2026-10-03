@@ -164,6 +164,11 @@ public sealed class TradeService(CombatServices services)
         foreach (var (tpl, qty) in toA) InventoryOps.AddItem(trade.A, tpl, qty, "trade_in", counterparty: trade.B.CharacterId);
         foreach (var (tpl, qty) in toB) InventoryOps.AddItem(trade.B, tpl, qty, "trade_in", counterparty: trade.A.CharacterId);
         trade.A.Dirty = true; trade.B.Dirty = true;
+        if (trade.OfferA.Items.Count + trade.OfferB.Items.Count > 0 || trade.OfferA.Gold + trade.OfferB.Gold > 0)
+        {
+            trade.A.TradeSavePartner = trade.B;
+            trade.B.TradeSavePartner = trade.A;
+        }
         trade.State = TradeState.Completed;
         ctx.Emit(new TradeChangedEvent(map.Id, trade, "completed", null));
         ctx.Emit(new InventoryChangedEvent(map.Id, trade.A, null));

@@ -158,14 +158,11 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                         connections.Send(p.ConnectionId, new TradeUpdate(tr.State, tr.Trade.Partner(p).Id.Value, tr.Trade.Version, ToOffer(mine, p), ToOffer(theirs, tr.Trade.Partner(p)),
                             tr.Trade.ConfirmedBy(p), tr.Trade.ConfirmedBy(tr.Trade.Partner(p)), tr.Reason));
                     }
-                    // HU-026 CA6 / ADR-018: los dos en el mismo tick (antes esperaban al autosave, hasta 60 s: si el proceso moría
-                    // entre los dos, lo intercambiado quedaba en ambos). Son dos escrituras seguidas en la cola, no una transacción:
-                    // queda una ventana de milisegundos. Un intercambio vacío no mueve nada y no se guarda.
-                    if (tr.State == "completed" && (tr.Trade.OfferA.Items.Count + tr.Trade.OfferB.Items.Count > 0 || tr.Trade.OfferA.Gold + tr.Trade.OfferB.Gold > 0))
-                    {
-                        session.Save(tr.Trade.A, ctx.NowMs, "trade");
-                        session.Save(tr.Trade.B, ctx.NowMs, "trade");
-                    }
+                    // HU-026 CA6 / ADR-018: los dos en el mismo tick y en una sola transacción (antes esperaban al autosave, hasta
+                    // 60 s, y luego eran dos escrituras sueltas: si el proceso moría entre ellas, lo intercambiado quedaba en ambos o en
+                    // ninguno). Si otro guardado de este tick (cambio de mapa, autosave, salida) ya los escribió juntos, la marca de
+                    // `TradeSavePartner` ya no está. Un intercambio vacío no la pone y no se guarda.
+                    if (tr.State == "completed" && tr.Trade.A.TradeSavePartner is not null) session.Save(tr.Trade.A, ctx.NowMs, "trade");
                     break;
                 }
                 case ClassChangedEvent cc when cc.Player.ConnectionId >= 0:
