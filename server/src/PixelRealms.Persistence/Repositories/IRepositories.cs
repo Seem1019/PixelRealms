@@ -35,6 +35,15 @@ public interface ICharacterRepository
     /// <summary>Guarda el personaje completo en una transacción (DELETE items + INSERT, HU-026/HU-057).</summary>
     Task SaveAsync(CharacterSaveDto character, CancellationToken ct = default);
 
+    /// <summary>
+    /// Guarda varios personajes en una sola transacción: o quedan todos o ninguno. Lo usa el intercambio (HU-059), donde guardar a
+    /// uno sin el otro duplicaría o perdería lo intercambiado si el proceso cae entre los dos. Por defecto, uno tras otro.
+    /// </summary>
+    async Task SaveManyAsync(IReadOnlyList<CharacterSaveDto> characters, CancellationToken ct = default)
+    {
+        foreach (var c in characters) await SaveAsync(c, ct);
+    }
+
     /// <summary>Soft delete; el nombre queda libre con sufijo `#deleted-&lt;id&gt;` (HU-013 CA4, MVP). False si no es de esa cuenta.</summary>
     Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default);
 }

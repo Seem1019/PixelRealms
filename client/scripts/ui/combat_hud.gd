@@ -439,7 +439,11 @@ func _refresh_hotbar() -> void:
 
 
 ## HU-043 CA2/CA4: asigna (SetHotbar) o vacía (kind vacío) una casilla; la copia local se corrige con el próximo Welcome.
+## En combate, una casilla de hechizo ocupada no se toca: el servidor lo rechazaría (`in_combat`) y la copia local quedaría mal.
 func _assign_slot(slot: int, kind: String, ref: String) -> void:
+	if slot < int(Content.rule("loadout", "spellSlots", 4)) and not _slot_entry(slot).is_empty() and GameState.is_in_combat():
+		show_error(ApiMessages.text_for("in_combat"))
+		return
 	for i: int in range(GameState.hotbar.size() - 1, -1, -1):
 		var hd: Dictionary = GameState.hotbar[i]
 		if int(hd.get("slot", -1)) == slot or (not kind.is_empty() and str(hd.get("kind", "")) == kind and str(hd.get("ref", "")) == ref):

@@ -49,7 +49,7 @@ public sealed class MapTransferService(World world, InterestSystem interest, Con
             if (player.ConnectionId >= 0) connections.Send(player.ConnectionId, new Error(ErrorCodes.NotFound, "Mapa no disponible", null));
             return false;
         }
-        if (to.Data.Collision.IsSolidAt(position.X, position.Y)) position = to.Data.DefaultGraveyard.Position;
+        if (to.Collision.IsSolidAt(position.X, position.Y)) position = to.Data.DefaultGraveyard.Position;
 
         // Un casteo o un salto llevan objetivo y coordenadas del mapa de origen: no pueden terminar en el de destino.
         if (player.Combat.Cast is { } cast)
@@ -67,7 +67,10 @@ public sealed class MapTransferService(World world, InterestSystem interest, Con
         to.Add(player);
         player.Dirty = true;
         if (player.ConnectionId >= 0)
+        {
             connections.Send(player.ConnectionId, new ChangeMap(to.MapId, SnapshotBuilder.Px(position.X), SnapshotBuilder.Px(position.Y)));
+            if (EventDispatcher.ToMapObjects(to) is { } objects) connections.Send(player.ConnectionId, objects); // HU-083
+        }
         session.Save(player, ctx.NowMs, "change_map");
         logger.LogInformation("{Name}: {From} → {To} ({Reason})", player.Name, from.MapId, to.MapId, reason);
         return true;

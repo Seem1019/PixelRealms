@@ -68,22 +68,22 @@
 | HU-061 | Grupos (invitar, aceptar, salir, expulsar) | E6 | Must | M | Hecha |
 | HU-062 | Marcos de grupo y XP/oro compartidos | E6 | Must | M | Hecha |
 | HU-063 | Lista de jugadores en línea | E6 | Should | S | Hecha |
-| HU-064 | Duelos (PvP amistoso) | E6 | Must | L | Parcial |
+| HU-064 | Duelos (PvP amistoso) | E6 | Must | L | Hecha |
 | HU-070 | Comandos de administrador | E7 | Should | M | Hecha |
 | HU-071 | Rate limiting y protección de mensajes | E7 | Must | M | Hecha |
-| HU-072 | Métricas y logs del servidor | E7 | Should | S | Parcial |
+| HU-072 | Métricas y logs del servidor | E7 | Should | S | Hecha |
 | HU-073 | Despliegue en VPS con TLS (wss) | E7 | Must | M | Hecha |
 | HU-074 | Build web y de escritorio del cliente | E7 | Must | M | Parcial |
 | HU-075 | Backups automáticos | E7 | Must | S | Parcial |
-| HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Parcial |
+| HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Hecha |
 | HU-081 | Arte de clases y monstruos | E8 | Must | L | Parcial |
 | HU-082 | Íconos de items y hechizos | E8 | Must | M | Parcial |
 | HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Parcial |
-| HU-084 | Pasada de balance | E8 | Must | M | Pendiente |
+| HU-084 | Pasada de balance | E8 | Must | M | Parcial |
 | HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Hecha |
-| HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Parcial |
+| HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Hecha |
 | HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Hecha |
-| HU-088 | Rendimiento del combate | E3 | Must | L | Parcial |
+| HU-088 | Rendimiento del combate | E3 | Must | L | Hecha |
 | HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Parcial |
 | HU-090 | Animaciones de combate del cuerpo | E8 | Should | L | Hecha |
 | HU-091 | Efectos visuales de hechizos | E8 | Should | M | Hecha |
@@ -95,6 +95,7 @@
 | HU-097 | Historial del chat | E6 | Should | S | Hecha |
 | HU-098 | Estados (buffos, perjuicios y control) legibles | E3 | Must | M | Hecha |
 | HU-099 | Héroes en alta resolución | E8 | Should | M | Hecha |
+| HU-100 | Áreas duraderas (Fase 2) | E3 | Should | M | Pendiente |
 
 ## Pendiente de diseño
 - **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).

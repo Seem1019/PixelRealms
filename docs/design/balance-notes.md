@@ -24,6 +24,9 @@ del Pícaro. El `ap.int = 1.4` de los casters es lo que hace que su ataque bási
 | Sacerdote | media | baja | alta | media | alta | alta | alta | media | alta | baja | baja | alta |
 
 ## 3. Ejemplo numérico: nivel 5 contra Goblin arquero (nv 5, 140 hp, armadura 20), solo ataque básico
+> Recalculada el 2026-10-03 con el equipo verde actual y el Disparo del goblin en [balance-report.md](balance-report.md)
+> §2b: Mago pesado 47 % del aguante del Guerrero, Mago con espada y placas 54 % del daño del Pícaro.
+
 | Combinación | Vida | Mitig. | AP | SP | DPS | Tiempo en matarlo | El goblin me mata en | Vida perdida por kill |
 |---|---|---|---|---|---|---|---|---|
 | Pícaro + daga (alta) | 190 | 16 % | 66 | 18 | **8.0** | 18 s | 82 s | 21 % |
@@ -57,6 +60,9 @@ Recalculado el 2026-09-30 con el modelo de `tools/balance/` y los números de la
 | 2 × nivel 6 (Pícaro, Mago) | ~25 | ~57 s | justo: el Pícaro (200 hp) aguanta ~24 s por pasada, hay que alternar aggro |
 | 2 × nivel 6 (Guerrero, Sacerdote) | ~14 | ~101 s | seguro pero lento: el Sacerdote cura el 69 % del tiempo |
 
+Recalculado de nuevo el 2026-10-03 con la duración iterada, las seis parejas de nivel 6 y el maná al final:
+[balance-report.md](balance-report.md) §3 (81–86 s con sanador, 54 s sin él, 53–105 s las parejas de nivel 6).
+
 Nivel 7 + nivel 5 no se puede dar en la Fase 1 (tope 6); se valida al abrir la Fase 2. Lo que hay que verificar jugando
 (HU-084): el Golpe de pico (área marcada, esquivable) castiga a los melee que se apilan y el Latigazo obliga al sanador a
 curar a alguien distinto del tanque.
@@ -83,16 +89,16 @@ Reparto en grupo (niveles 10 / 8 / 5, monstruo normal nv 9 = 46 XP): referencia 
 pesos 1.00 / 1.00 / 0.42 → **26.5 / 26.5 / 11.2 XP**. Sin piso: la brecha penaliza a propósito.
 
 ## 6. Triángulo de duelos y posición del Sacerdote
-> **Desactualizado (2026-09-30):** el triángulo de duelos y esta tabla usan los números anteriores al balance de la Fase 1
-> (Sanar hoy cura ~12 por casteo, ~8 por segundo; Castigo ya no ralentiza; Gubia aturde 2 s, no 3; Carga tiene 16 s de
-> cooldown y Nova 18 s). No se han recalculado a propósito: el triángulo necesita simular movimiento y se mide jugando en
-> **HU-084 (M5)**. Hasta entonces, los valores vigentes son los de `content/spells.json` y `balance-report.md`.
+> **Medido con duelos simulados con movimiento (2026-10-03, HU-084):** [balance-report.md](balance-report.md) §3b. Con
+> `classAdvantage` en 1,0 el triángulo salía al revés o absoluto (Mago contra Guerrero 0 %, Guerrero contra Pícaro 99 %,
+> Pícaro contra Mago 100 %, Sacerdote contra Mago 96 %); la matriz de `rules.classAdvantage` lo deja en 63–68 %. Falta
+> contrastarlo con duelos reales (HU-084 CA3).
 
-| Contra | Resultado esperado | Por qué |
+| Contra | Resultado (simulado, nivel 6) | Por qué |
 |---|---|---|
-| Guerrero | **gana** | el Guerrero no interrumpe (sin Carga en CD, 15 s) y su DPS (≈14 a nivel 6) es menor que la cura del Sacerdote (Sanar ≈ 22 HPS + Renovar); el Sacerdote lo desgasta con Castigo y varita |
-| Pícaro | **pierde** | Gubia (3 s de aturdimiento) interrumpe Sanar; Golpe siniestro + veneno superan la cura cuando el maná baja |
-| Mago | parejo | burst del Mago vs. Escudo + Sanar; se decide por maná y por quién acierta primero el control |
+| Guerrero | **gana** el 67 % | Sanar, Escudo y Pulso curan ~19 por segundo en ráfaga, más que lo que pega el Guerrero; Sacerdote→Guerrero 1,12 |
+| Pícaro | **pierde**, gana el 34 % | Gubia (2 s) corta Sanar; si el Sacerdote se aleja bien con la varita, gana él; Pícaro→Sacerdote 0,93 |
+| Mago | parejo, 56 % | sin ajuste el Mago no llega a matarlo (96 % para el Sacerdote); Mago→Sacerdote 1,45 |
 
 Opción si se quiere meterlo en la figura: convertir el triángulo en un ciclo de 4 (Mago > Guerrero > Pícaro > Sacerdote > Mago)
 dándole al Sacerdote un `silence` corto (Palabra de poder: Silencio, 3 s) que solo importa contra casters. Hoy no se hace: los

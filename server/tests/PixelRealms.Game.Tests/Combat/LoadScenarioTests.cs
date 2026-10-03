@@ -9,6 +9,11 @@ namespace PixelRealms.Game.Tests.Combat;
 [Collection(nameof(LoadScenarioIsolation))]
 public sealed class LoadScenarioTests
 {
+    /// <summary>HU-088 CA1 (enmendado): los eventos del tick siguen siendo records; el resto no asigna. Medido: ~9 KB por tick con
+    /// 30 bots y 300 monstruos peleando; el presupuesto deja margen sin tapar una regresión (una lista o un LINQ por actor y tick
+    /// lo superan).</summary>
+    private const double AllocPerTickBudgetBytes = 16 * 1024;
+
     [Fact]
     public void MinaLlena_10s_RunsWithoutExceptions_AndAllocatesUnderBudget()
     {
@@ -18,6 +23,8 @@ public sealed class LoadScenarioTests
         result.Kills.ShouldBeGreaterThan(0);
         result.AurasMax.ShouldBeGreaterThanOrEqualTo(150);
         result.AllocPerSec.ShouldBeLessThanOrEqualTo(CombatScenario.AllocLimitBytesPerSec);
+        // HU-088 CA1: en pleno combate solo asignan los eventos del tick (records), dentro de un presupuesto por tick.
+        (result.AllocPerSec / CombatScenario.TicksPerSecond).ShouldBeLessThanOrEqualTo(AllocPerTickBudgetBytes);
         result.Gen2.ShouldBe(0);
     }
 }

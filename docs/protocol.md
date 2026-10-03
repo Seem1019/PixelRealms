@@ -32,21 +32,22 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Ping` | `{ clientTime }` | — |
 | `MoveInput` | `{ seq, dx, dy }` dx,dy ∈ {-1,0,1} | seq creciente por conexión (vuelve a 1 tras cada `Hello`; un `Welcome` posterior en la misma conexión no lo reinicia); uno por tick de 50 ms con movimiento y uno con 0,0 al parar; vivo; no aturdido/raíz |
 | `SelectTarget` | `{ targetId? }` | la entidad existe en el mapa del jugador; si no, el objetivo queda vacío (no se guarda ni se reenvía en `EntState.tgt`) |
-| `CastSpell` | `{ spellId, targetId?, targetPos?: Vec2, reqId }` | solo hechizos de clase que conoce (los de objeto se lanzan únicamente con `UseItem`, que paga la recarga y gasta la unidad; los de monstruo, nunca → `not_found`), nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no aturdido (ni silenciado si el hechizo es `magic`), fuera del bloqueo tras interrupción (`locked_out`). Si ya está casteando, el casteo actual se cancela (ADR-019). Un área con casteo cuando la instancia ya tiene `rules.limits.maxAreasPerInstance` marcas en el suelo → `area_limit`. Otro jugador fuera de un duelo activo → `pvp_not_allowed`. Hechizos `ground_*`, de cono o línea y con `leap` (ADR-015, ADR-016): `targetPos` obligatorio, a ≤ `range + castRangeToleranceTiles` y con LOS al punto (el cono y la línea solo usan su dirección) |
+| `CastSpell` | `{ spellId, targetId?, targetPos?: Vec2, reqId }` | solo hechizos de clase que conoce (los de objeto se lanzan únicamente con `UseItem`, que paga la recarga y gasta la unidad; los de monstruo, nunca → `not_found`) y que tiene equipados en una casilla de hechizo de la barra (ADR-014; si no, `not_equipped`), nivel, CD, GCD, recurso, rango, objetivo válido según `targeting`, LOS, no aturdido ni silenciado (el silencio bloquea cualquier habilidad, física o mágica), fuera del bloqueo tras interrupción (`locked_out`). Si ya está casteando, el casteo actual se cancela (ADR-019). Un área con casteo cuando la instancia ya tiene `rules.limits.maxAreasPerInstance` marcas en el suelo → `area_limit`. Otro jugador fuera de un duelo activo → `pvp_not_allowed`. Hechizos `ground_*`, de cono o línea y con `leap` (ADR-015, ADR-016): `targetPos` obligatorio, a ≤ `range + castRangeToleranceTiles` y con LOS al punto (el cono y la línea solo usan su dirección) |
 | `CancelCast` | `{}` | — |
 | `AutoAttack` | `{ on: bool }` | tiene arma; objetivo hostil (otro jugador fuera de duelo → `pvp_not_allowed`) |
 | `InventoryMove` | `{ from: SlotRef, to: SlotRef, qty?, reqId }` | ver skill `inventory-items` |
-| `UseItem` | `{ itemId, targetId?, reqId }` | item propio, usable, CD de consumibles |
+| `UseItem` | `{ itemId, targetId?, reqId }` | item propio, usable, CD de consumibles, no aturdido. Silenciado o bloqueado por una interrupción sí puede usarlo (HU-035 CA3) |
 | `DestroyItem` | `{ itemId, qty, reqId }` | item propio, no `questItem` |
 | `LootOpen` | `{ lootId }` | vivo (`is_dead`), distancia ≤ `rules.loot.lootRangeTiles` (2), elegible (`not_owner`). Abrir cobra la parte de oro (y el resto de la división, al primero que abre) |
 | `LootTake` | `{ lootId, index }` / `LootTakeAll` `{ lootId }` | vivo, distancia, elegible, dueño o ya libre (`not_owner`), espacio en bolsa (`bag_full`). Solo quien puede saquear recibe la `LootWindow` de vuelta |
 | `VendorOpen` / `VendorBuy` / `VendorSell` | `{ npcId }` / `{ npcId, templateId, qty }` / `{ npcId, itemId, qty }` | distancia ≤ 3 tiles, oro, espacio |
 | `ChatSend` | `{ channel: "say"|"party"|"global"|"whisper"|"who", text, to? }` | 1–200 chars, rate limit, sanitizado. `who` (`/who`) pide la lista de conectados, que llega como `ChatMessage{channel:"system"}` (HU-063) |
 | `PartyInvite` / `PartyRespond` / `PartyLeave` / `PartyKick` | `{ name }` / `{ accept }` / `{}` / `{ name }` | reglas de grupo (máx 5) |
-| `SetHotbar` | `{ slot, kind: "spell"|"item"|null, ref? }` | slot 0–7: 0–3 solo `spell` (teclas 1–4), 4–7 solo `item` (teclas 5–8) (`rules.loadout`, ADR-014) |
+| `SetHotbar` | `{ slot, kind: "spell"|"item"|null, ref? }` | slot 0–7: 0–3 solo `spell` (teclas 1–4), 4–7 solo `item` (teclas 5–8) (`rules.loadout`, ADR-014). En combate, una casilla de hechizo ocupada no se cambia ni se vacía (`in_combat`); una vacía sí se puede llenar |
 | `Respawn` | `{}` | está muerto |
 | `UsePortal` | `{ portalId }` | a ≤ 1 tile, vivo, fuera de combate, `minLevel` |
-| `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo ni intercambio, **ambos fuera de combate** (`in_combat`: el final restaura vida y recurso), a ≤ `maxDistanceTiles` y fuera de zona segura si el ruleset lo exige. Al aceptar se revalida todo; si alguien entra en combate durante la cuenta atrás, el duelo se retira. `DuelForfeit` antes de que empiece retira el reto (`declined`: nadie gana ni se restaura). Al terminar (`ended`) cada uno vuelve a la vida y el recurso que tenía al empezar el duelo (no al máximo) y pierde las auras que le puso el rival. En duelo activo, un duelista no es aliado de nadie más (ni cura ni lo curan) y se aleja del punto de inicio más de `maxDistanceTiles` → pierde |
+| `Interact` | `{ objectId, reqId? }` | HU-083: usar una palanca del mapa (id de la capa `levers`): vivo, a ≤ `rules.world.interactRangeTiles` (`out_of_range`), que exista (`not_found`). Con la puerta abierta, tirar de cualquiera de sus palancas renueva el plazo; una palanca `opensAlone` (la de dentro de la sala) abre su puerta ella sola. El cambio llega como `MapObjects` a todos los del mapa |
+| `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo ni intercambio, **ambos fuera de combate** (`in_combat`: si no, el duelo serviría para que los monstruos los soltaran), a ≤ `maxDistanceTiles` y fuera de zona segura si el ruleset lo exige. Al aceptar se revalida todo; si alguien entra en combate durante la cuenta atrás, el duelo se retira. `DuelForfeit` antes de que empiece retira el reto (`declined`: nadie gana). Al terminar (`ended`) cada uno se queda con la vida y el recurso con que acabó y pierde las auras que le puso el rival; quien pierde por vida (al `endAtHpPct`; rendirse o alejarse no cuenta) regenera vida × `loserRegenMult` y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo o hasta volver a entrar en combate (HU-064 CA3). En duelo activo, un duelista no es aliado de nadie más (ni cura ni lo curan) y se aleja del punto de inicio más de `maxDistanceTiles` → pierde |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
 | `ChangeClass` | `{ npcId, classId, reqId? }` | NPC `class_change` a ≤ `vendorRangeTiles`, vivo, fuera de combate, sin duelo ni intercambio, clase distinta (HU-044); responde con `Welcome` + `StatsUpdate` + `InventoryUpdate` por la misma conexión y un `EntitySpawn` renovado a quien lo ve |
 | `OnlineListRequest` | `{}` | lista de conectados (tecla O, HU-063); responde `OnlineList` |
@@ -80,6 +81,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `Error` | `{ code, message?, reqId? }` | códigos abajo |
 | `Pong` | `{ clientTime, serverTick }` | |
 | `OnlineList` | `{ players: { name, classId, level, zone }[] }` | respuesta a `OnlineListRequest`, ordenada por nombre; `zone` = zona de Tiled donde está (o el nombre del mapa) |
+| `MapObjects` | `{ objects: { id, state }[] }` | HU-083: palancas (`on`/`off`) y puertas (`open`/`closed`) del mapa. Tras `Welcome`, una reconexión o `ChangeMap` llegan todas las del mapa (si tiene); después, solo las que cambian, a todos los del mapa. Una puerta cerrada es sólida y tapa la vista: el cliente la aplica a su rejilla de colisión para predecir igual que el servidor |
 | `LoggedOut` | `{}` | `Logout` aceptado: el personaje ya está guardado (encolado) y fuera del mundo; el servidor cierra después la conexión. El cliente cierra con `disconnect_from_server()` (sin reconexión) y vuelve a la selección de personaje con el mismo token. Un `Hello` posterior del mismo personaje espera (máx. 3 s) a que ese guardado esté escrito antes de leerlo de la BD; si aún no lo está, entra con el estado con el que salió (el servidor lo guarda en memoria hasta que el personaje vuelve a entrar). Un `Hello` del mismo personaje mientras sigue dentro toma ese personaje vivo (la conexión anterior se cierra con `replaced`) en vez de recargarlo |
 
 `EntState` (en `Snapshot`) = `{ id, x, y, dir, hpPct, anim: "idle"|"walk"|"cast"|"attack"|"dead", tgt? }`
@@ -87,7 +89,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 
 ## Códigos de error
 `bad_version`, `bad_ticket`, `rate_limited`, `not_found`, `out_of_range`, `no_los`, `on_cooldown`, `on_gcd`,
-`not_enough_resource`, `invalid_target`, `is_dead`, `stunned`, `rooted`, `silenced`, `locked_out`, `area_limit`, `bag_full`, `in_combat`,
+`not_enough_resource`, `invalid_target`, `is_dead`, `stunned`, `rooted`, `silenced`, `locked_out`, `area_limit`, `not_equipped`, `bag_full`, `in_combat`,
 `not_enough_gold`, `level_too_low`, `not_owner`, `pvp_not_allowed`, `duel_busy`, `trade_busy`, `trade_version`, `forbidden`, `invalid_payload`.
 (`cannot_equip` y `wrong_class` **no existen**: cualquier clase equipa cualquier item, ADR-009. `is_casting` tampoco: un `CastSpell` durante un casteo lo cancela, ADR-019.)
 
@@ -107,6 +109,8 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
   `CastSpell` rechaza hechizos de objeto y de monstruo; los duelos exigen estar fuera de combate; `Hello` responde `in_combat`
   si el otro personaje de la cuenta pelea; `LootWindow.gold` muestra el oro cobrado; `SelectTarget` solo guarda entidades del mapa.
 - v1 · HU-063: `OnlineListRequest` (C→S) y `OnlineList` (S→C), sin subir versión (regla 4: solo se envía si el cliente lo pide).
+- v1 · HU-083: `Interact` (C→S) y `MapObjects` (S→C), sin subir versión: un cliente antiguo no tiene palancas que usar y el
+  servidor solo envía `MapObjects` en mapas con objetos. `CastSpell` responde `not_equipped` si el hechizo no está en la barra.
   HU-062: `PartyUpdate.members[].resPct` (aditivo).
 
 ## REST (HTTP)
@@ -121,4 +125,6 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `GET /admin/stats` | Bearer de una cuenta admin | métricas del servidor (HU-072) |
 
 En Producción, detrás de Caddy, los límites por IP usan la IP de `X-Forwarded-For`: `UseForwardedHeaders` va antes que
-`UseRateLimiter` (si no, todos los jugadores compartirían el cupo de la IP del proxy).
+`UseRateLimiter` (si no, todos los jugadores compartirían el cupo de la IP del proxy). La cabecera solo se cree si la conexión
+viene de una red de confianza (`Net:TrustedProxyNetworks`; por defecto loopback y rangos privados, donde vive el contenedor de
+Caddy): desde cualquier otra IP no se puede fingir el origen.

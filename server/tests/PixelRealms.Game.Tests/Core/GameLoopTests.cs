@@ -44,6 +44,28 @@ public sealed class GameLoopTests
         order.ShouldBe(new[] { "a:test", "a:mine", "b:test", "b:mine" });
     }
 
+    /// <summary>Pide 1 000 bytes por tick, pero solo en la instancia de `mapId`.</summary>
+    private sealed class AllocatingSystem(string mapId) : IMapSystem
+    {
+        public object? Sink { get; private set; }
+        public string Name => "alloc";
+        public void Tick(MapInstance map, TickContext ctx) { if (map.MapId == mapId) Sink = new byte[1000]; }
+    }
+
+    [Fact]
+    public void InstanceAllocs_ChargeEachInstanceWithWhatItsSystemsAllocated() // HU-072 CA3
+    {
+        var w = new WorldBuilder().WithMap().Build();
+        w.World.RegisterMap(new MapData("mine", "Mina", new CollisionGrid(8, 8), [], [], [new GraveyardDef("g", new Vec2(1, 1))], [], [], "g"));
+        var mine = w.World.CreateInstance("mine");
+        w.Simulation.CombatTimings = new();
+        w.Simulation.InstanceAllocs = new();
+        w.Simulation.AddSystem(new AllocatingSystem("mine"));
+        TickRunner.Run(w, 10);
+        w.Simulation.InstanceAllocs[mine.Id].ShouldBeGreaterThanOrEqualTo(10 * 1000);
+        w.Simulation.InstanceAllocs.GetValueOrDefault(w.Map.Id).ShouldBeLessThan(1000);
+    }
+
     [Fact]
     public void PreAndPostTickHooks_RunAroundSystems()
     {

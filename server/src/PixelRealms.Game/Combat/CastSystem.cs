@@ -35,7 +35,7 @@ public static class CastErrors
 /// </summary>
 public sealed class CastSystem(CombatServices services, EffectResolver effects, DamagePipeline damage) : IMapSystem, ICastInterrupter
 {
-    private sealed record PendingImpact(long AtMs, Actor Caster, SpellDef Spell, EntityId? TargetId, Vec2? TargetPos, Vec2 Origin);
+    private readonly record struct PendingImpact(long AtMs, Actor Caster, SpellDef Spell, EntityId? TargetId, Vec2? TargetPos, Vec2 Origin);
 
     private readonly Dictionary<int, List<PendingImpact>> _impacts = new();
     private readonly List<Actor> _casting = new(32);
@@ -66,7 +66,9 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     /// <summary>Descarta los impactos en vuelo de quien sale del mundo (HU-015): no resuelven a nombre de un ausente.</summary>
     public void ForgetCaster(Actor caster, MapInstance map)
     {
-        if (_impacts.TryGetValue(map.Id, out var list)) list.RemoveAll(i => i.Caster.Id == caster.Id);
+        if (!_impacts.TryGetValue(map.Id, out var list)) return;
+        for (var i = list.Count - 1; i >= 0; i--)
+            if (list[i].Caster.Id == caster.Id) list.RemoveAt(i);
     }
 
     /// <summary>Intenta lanzar; devuelve el código de error o null si el hechizo empezó (o se resolvió si es instantáneo).</summary>
@@ -88,8 +90,10 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         }
         if (caster.IsDead) return CastErrors.IsDead;
         if (caster.Auras.IsStunned) return CastErrors.Stunned;
-        if (spell.School == School.Magic && caster.Auras.IsSilenced) return CastErrors.Silenced;
-        if (combat.IsLockedOut(now)) return CastErrors.LockedOut;
+        // Silencio y bloqueo por interrupción impiden habilidades de cualquier escuela, no usar objetos: un silenciado puede beber
+        // pociones (y atacar con el arma, que no pasa por aquí).
+        if (!viaItem && caster.Auras.IsSilenced) return CastErrors.Silenced;
+        if (!viaItem && combat.IsLockedOut(now)) return CastErrors.LockedOut;
         if (combat.IsOnCooldown(spell.Id, now)) return CastErrors.OnCooldown;
         if (caster is Player && spell.Source != SpellSource.Item && ((combat.IsOnGcd(now) && spell.TriggersGcd) || combat.IsAbilityLocked(now))) return CastErrors.OnGcd;
         var hasLeap = false; EffectDef? dash = null;
@@ -115,7 +119,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                 if (target is null || target.IsDead || target.Combat.Evading || !services.IsEnemy(caster, target)) return CastErrors.InvalidTarget;
                 if (Vec2.Distance(caster.Position, target.Position) > spell.Range + tolerance) return CastErrors.OutOfRange;
                 if (dash is not null && Vec2.Distance(caster.Position, target.Position) < dash.MinRange) return CastErrors.OutOfRange;
-                if (!LineOfSight.Has(map.Data.Collision, caster.Position, target.Position)) return CastErrors.NoLos;
+                if (!LineOfSight.Has(map.Collision, caster.Position, target.Position)) return CastErrors.NoLos;
                 break;
             }
             case Targeting.Ally:
@@ -125,7 +129,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                 if (!ReferenceEquals(target, caster))
                 {
                     if (Vec2.Distance(caster.Position, target.Position) > spell.Range) return CastErrors.OutOfRange;
-                    if (!LineOfSight.Has(map.Data.Collision, caster.Position, target.Position)) return CastErrors.NoLos;
+                    if (!LineOfSight.Has(map.Collision, caster.Position, target.Position)) return CastErrors.NoLos;
                 }
                 targetId = target.Id;
                 break;
@@ -143,9 +147,9 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                     // HU-033 CA4 / HU-086 CA7b: tope de marcas en el suelo por instancia (rendimiento del cliente y del servidor).
                     if (!spell.IsInstant && ActiveAreas(map) >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
                     if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
-                    if (!LineOfSight.Has(map.Data.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
+                    if (!LineOfSight.Has(map.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
                     // LineOfSight no mira la casilla de destino: apuntar dentro de un muro alcanzaría a quien está detrás.
-                    if (map.Data.Collision.BlocksSight((int)MathF.Floor(targetPos.Value.X), (int)MathF.Floor(targetPos.Value.Y))) return CastErrors.NoLos;
+                    if (map.Collision.BlocksSight((int)MathF.Floor(targetPos.Value.X), (int)MathF.Floor(targetPos.Value.Y))) return CastErrors.NoLos;
                 }
                 break;
         }
@@ -194,7 +198,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     public void InterruptByControl(Actor target, AuraKind kind, MapInstance map, TickContext ctx)
     {
         if (target.Combat.Cast is not { } cast) return;
-        if (kind == AuraKind.Stun || (kind == AuraKind.Silence && cast.Spell.School == School.Magic)) Interrupt(target, map, ctx);
+        if (kind == AuraKind.Stun || (kind == AuraKind.Silence && cast.Spell.Source != SpellSource.Item)) Interrupt(target, map, ctx);
     }
 
     private static void EndCast(Actor caster, CastState cast, string result, string? reason, MapInstance map, TickContext ctx)
@@ -239,7 +243,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
             if (target is null || target.IsDead) return CastErrors.InvalidTarget;
             if (ReferenceEquals(target, caster)) return null;
             if (Vec2.Distance(caster.Position, target.Position) > spell.Range + ctx.Rules.Combat.CastRangeToleranceTiles) return CastErrors.OutOfRange;
-            if (!LineOfSight.Has(map.Data.Collision, caster.Position, target.Position)) return CastErrors.NoLos;
+            if (!LineOfSight.Has(map.Collision, caster.Position, target.Position)) return CastErrors.NoLos;
         }
         return null;
     }
@@ -256,7 +260,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         if (spell.Projectile is { Speed: > 0 } proj && targetId is { } tid && map.Find(tid) is { } target && !ReferenceEquals(target, caster))
         {
             var travelMs = (long)Math.Round(Vec2.Distance(caster.Position, target.Position) / proj.Speed * 1000);
-            if (!_impacts.TryGetValue(map.Id, out var list)) _impacts[map.Id] = list = new List<PendingImpact>();
+            // HU-088 CA1: reserva de capacidad fija, el tope de la instancia; no crece porque el tope se respeta abajo.
+            if (!_impacts.TryGetValue(map.Id, out var list)) _impacts[map.Id] = list = new List<PendingImpact>(ctx.Rules.Limits.MaxPendingImpactsPerInstance);
             if (list.Count >= ctx.Rules.Limits.MaxPendingImpactsPerInstance)
             {
                 // Tope de seguridad: el más antiguo se resuelve ya en vez de perderse (su lanzador ya pagó el coste).
@@ -270,7 +275,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         // HU-087 CA1: un salto con `travelMs` vuela hasta el punto (recortado ya ahora, con colisión y LOS) y resuelve al aterrizar.
         if (LeapOf(spell) is { TravelMs: > 0 } leap && targetPos is { } aim)
         {
-            var dest = ForcedMovement.LeapDestination(caster.Position, aim, leap.MaxRange > 0 ? leap.MaxRange : spell.Range, map.Data.Collision);
+            var dest = ForcedMovement.LeapDestination(caster.Position, aim, leap.MaxRange > 0 ? leap.MaxRange : spell.Range, map.Collision);
             var end = ctx.NowMs + leap.TravelMs;
             caster.Combat.Flight = new LeapFlight(spell, caster.Position, dest, ctx.NowMs, end);
             caster.Combat.AbilityLockEndsAtMs = Math.Max(caster.Combat.AbilityLockEndsAtMs, end); // en el aire ni se castea ni se pega

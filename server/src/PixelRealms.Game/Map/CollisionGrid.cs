@@ -16,6 +16,15 @@ public sealed class CollisionGrid
         _blocksSight = new bool[width * height];
     }
 
+    /// <summary>Copia independiente (una instancia con puertas cambia su propia rejilla, no la del <see cref="MapData"/>).</summary>
+    public CollisionGrid Clone()
+    {
+        var copy = new CollisionGrid(Width, Height);
+        Array.Copy(_solid, copy._solid, _solid.Length);
+        Array.Copy(_blocksSight, copy._blocksSight, _blocksSight.Length);
+        return copy;
+    }
+
     public int Width { get; }
 
     public int Height { get; }

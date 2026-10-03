@@ -53,7 +53,7 @@ public sealed class AutoAttackSystem(CombatServices services, DamagePipeline dam
             combat.SwingProgressMs = Math.Min(swingMs.Value, combat.SwingProgressMs + ctx.DeltaMs);
             if (combat.SwingProgressMs < swingMs.Value) continue;
             if (combat.IsAbilityLocked(ctx.NowMs)) continue; // CA7: sale al terminar el bloqueo
-            if (!LineOfSight.Has(map.Data.Collision, attacker.Position, target.Position)) continue;
+            if (!LineOfSight.Has(map.Collision, attacker.Position, target.Position)) continue;
             combat.SwingProgressMs = 0;
             Swing(attacker, target, swingMs.Value, map, ctx);
         }

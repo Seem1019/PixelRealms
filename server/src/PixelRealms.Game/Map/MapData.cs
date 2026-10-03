@@ -20,14 +20,33 @@ public sealed record PortalDef(string PortalId, string TargetMapId, float Target
 }
 
 /// <summary>
-/// Datos estáticos de un mapa (ADR-007): colisión, spawns, NPCs, cementerios, zonas y portales. Inmutable y compartido por
-/// todas las <see cref="MapInstance"/> del mismo mapa.
+/// Palanca de la capa `levers` (HU-083): al tirar de ella queda activada; cuando todas las de su puerta lo están, la abre. Una
+/// palanca `opensAlone` (la del lado de dentro de una sala) abre su puerta ella sola: nadie se queda encerrado.
+/// </summary>
+public sealed record LeverDef(string LeverId, string DoorId, Vec2 Position, bool OpensAlone = false);
+
+/// <summary>Puerta de la capa `doors` (HU-083): rectángulo que bloquea paso y visión mientras está cerrada.</summary>
+public sealed record DoorDef(string DoorId, Vec2 Position, Vec2 Size)
+{
+    public bool Contains(Vec2 p) => p.X >= Position.X && p.Y >= Position.Y && p.X < Position.X + Size.X && p.Y < Position.Y + Size.Y;
+
+    /// <summary>Casillas que ocupa (las que toca el rectángulo).</summary>
+    public (int X0, int Y0, int X1, int Y1) Tiles => ((int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y),
+        (int)MathF.Ceiling(Position.X + Size.X) - 1, (int)MathF.Ceiling(Position.Y + Size.Y) - 1);
+}
+
+/// <summary>
+/// Datos estáticos de un mapa (ADR-007): colisión, spawns, NPCs, cementerios, zonas, portales, palancas y puertas. Inmutable y
+/// compartido por todas las <see cref="MapInstance"/> del mismo mapa.
 /// </summary>
 public sealed class MapData
 {
     public MapData(string mapId, string displayName, CollisionGrid collision, IReadOnlyList<SpawnDef> spawns, IReadOnlyList<NpcDef> npcs,
-        IReadOnlyList<GraveyardDef> graveyards, IReadOnlyList<ZoneDef> zones, IReadOnlyList<PortalDef> portals, string defaultGraveyard)
+        IReadOnlyList<GraveyardDef> graveyards, IReadOnlyList<ZoneDef> zones, IReadOnlyList<PortalDef> portals, string defaultGraveyard,
+        IReadOnlyList<LeverDef>? levers = null, IReadOnlyList<DoorDef>? doors = null)
     {
+        Levers = levers ?? [];
+        Doors = doors ?? [];
         MapId = mapId;
         DisplayName = displayName;
         Collision = collision;
@@ -48,6 +67,8 @@ public sealed class MapData
     public IReadOnlyList<GraveyardDef> Graveyards { get; }
     public IReadOnlyList<ZoneDef> Zones { get; }
     public IReadOnlyList<PortalDef> Portals { get; }
+    public IReadOnlyList<LeverDef> Levers { get; }
+    public IReadOnlyList<DoorDef> Doors { get; }
     public GraveyardDef DefaultGraveyard { get; }
 
     public int Width => Collision.Width;

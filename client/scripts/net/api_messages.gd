@@ -31,6 +31,7 @@ const TEXTS := {
 	"silenced": "Estás silenciado",
 	"locked_out": "No puedes lanzar hechizos todavía",
 	"area_limit": "Demasiadas áreas activas",
+	"not_equipped": "Ese hechizo no está en tu barra",
 	"bag_full": "Bolsa llena",
 	"not_enough_gold": "No tienes suficiente oro",
 	"level_too_low": "Nivel insuficiente",

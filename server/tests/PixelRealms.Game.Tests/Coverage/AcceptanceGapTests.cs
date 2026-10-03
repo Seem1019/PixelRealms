@@ -66,7 +66,7 @@ public sealed class AcceptanceGapTests
     }
 
     [Fact]
-    public void Cast_SilenceDuringPhysicalCast_DoesNotInterrupt() // HU-033 CA2b (el silencio solo corta hechizos `magic`)
+    public void Cast_SilenceDuringPhysicalCast_AlsoInterrupts() // HU-033 CA2b; el silencio corta cualquier habilidad (HU-035 CA3)
     {
         var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "mage", 3, (10, 10)).WithMonster("goblin_archer", (10, 15), wanderRadius: 0).BuildWithCombat();
         var ana = w.Player("Ana"); var goblin = w.Monster("goblin_archer");
@@ -75,8 +75,8 @@ public sealed class AcceptanceGapTests
         w.Combat.Casts.TryBeginCast(goblin, shoot, ana.Id, null, w.Map, w.Begin()).ShouldBeNull();
         var ctx = w.Begin();
         w.Combat.Auras.Apply(goblin, Silence(w), ana, w.Map, ctx).ShouldNotBeNull();
-        ctx.Events.OfType<CastEndedEvent>().ShouldBeEmpty();
-        goblin.Combat.Cast.ShouldNotBeNull().Spell.Id.ShouldBe("goblin_shoot");
+        ctx.Events.OfType<CastEndedEvent>().Single().Result.ShouldBe(CastResults.Interrupted);
+        goblin.Combat.Cast.ShouldBeNull();
     }
 
     [Fact]

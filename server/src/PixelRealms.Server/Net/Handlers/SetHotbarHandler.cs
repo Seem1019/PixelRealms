@@ -5,7 +5,8 @@ namespace PixelRealms.Server.Net.Handlers;
 
 /// <summary>
 /// `SetHotbar{slot, kind?, ref?}` (ADR-014, HU-041 CA2, HU-043 CA2/CA5): casillas 0–3 solo hechizos conocidos; 4–7 solo
-/// consumibles; sin `kind` vacía la casilla. Persiste con el personaje (character_hotbar).
+/// consumibles; sin `kind` vacía la casilla. En combate, una casilla de hechizo ocupada no se cambia ni se vacía (`in_combat`):
+/// si no, cambiarla antes de cada `CastSpell` daría todo el kit conocido a mano. Persiste con el personaje (character_hotbar).
 /// </summary>
 public sealed class SetHotbarHandler(ReloadableContent content) : IMessageHandler<SetHotbar>
 {
@@ -16,6 +17,8 @@ public sealed class SetHotbarHandler(ReloadableContent content) : IMessageHandle
         var rules = content.Current.Rules.Loadout;
         var total = rules.SpellSlots + rules.UsableSlots;
         if (msg.Slot < 0 || msg.Slot >= total || msg.Slot >= player.Hotbar.Length) { ctx.SendError(ErrorCodes.InvalidPayload); return; }
+        if (msg.Slot < rules.SpellSlots && player.Hotbar[msg.Slot] is not null
+            && player.IsInCombat(ctx.Tick.NowMs, content.Current.Rules.Combat.InCombatWindowSec)) { ctx.SendError(ErrorCodes.InCombat); return; }
         if (msg.Kind is null || msg.Ref is null)
         {
             player.Hotbar[msg.Slot] = null;

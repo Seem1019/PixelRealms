@@ -26,7 +26,8 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     /// </summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, IReadOnlyList<AuditEntry>> _unwrittenAudit = new();
 
-    private readonly record struct Queued(CharacterSaveDto Dto, long Gen);
+    /// <summary>Uno o varios personajes que se escriben juntos, en una transacción (varios: intercambio, HU-059).</summary>
+    private readonly record struct Queued(CharacterSaveDto[] Dtos, long[] Gens);
 
     /// <summary>Plazo para vaciar la cola al apagar (HU-026 CA2).</summary>
     public TimeSpan DrainTimeout { get; init; } = TimeSpan.FromSeconds(10);
@@ -39,17 +40,27 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
     public int Pending => _pending;
 
     /// <summary>Encola el guardado y devuelve su generación (monótona por personaje).</summary>
-    public long Enqueue(CharacterSaveDto dto)
+    public long Enqueue(CharacterSaveDto dto) => EnqueueTogether(dto)[0];
+
+    /// <summary>
+    /// Encola varios personajes que se escriben en la misma transacción: o quedan todos o ninguno (intercambio, HU-059). Devuelve
+    /// la generación de cada uno, en el mismo orden.
+    /// </summary>
+    public long[] EnqueueTogether(params CharacterSaveDto[] dtos)
     {
-        Interlocked.Increment(ref _pending);
-        _pendingByCharacter.AddOrUpdate(dto.Id, 1, (_, n) => n + 1);
-        var gen = _enqueuedGen.AddOrUpdate(dto.Id, 1, (_, g) => g + 1);
-        var item = new Queued(dto, gen);
-        if (_queue.Writer.TryWrite(item)) return gen;
+        var gens = new long[dtos.Length];
+        for (var i = 0; i < dtos.Length; i++)
+        {
+            Interlocked.Increment(ref _pending);
+            _pendingByCharacter.AddOrUpdate(dtos[i].Id, 1, (_, n) => n + 1);
+            gens[i] = _enqueuedGen.AddOrUpdate(dtos[i].Id, 1, (_, g) => g + 1);
+        }
+        var item = new Queued(dtos, gens);
+        if (_queue.Writer.TryWrite(item)) return gens;
         // La cola ya se cerró al apagar: nadie lo va a escribir.
         Done(item, written: false);
-        LogLost(dto, "encolado después del apagado");
-        return gen;
+        foreach (var dto in dtos) LogLost(dto, "encolado después del apagado");
+        return gens;
     }
 
     /// <summary>
@@ -76,9 +87,13 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
 
     private void Done(Queued item, bool written)
     {
-        if (written) _writtenGen.AddOrUpdate(item.Dto.Id, item.Gen, (_, g) => Math.Max(g, item.Gen));
-        Interlocked.Decrement(ref _pending);
-        _pendingByCharacter.AddOrUpdate(item.Dto.Id, 0, (_, n) => Math.Max(0, n - 1));
+        for (var i = 0; i < item.Dtos.Length; i++)
+        {
+            var (id, gen) = (item.Dtos[i].Id, item.Gens[i]);
+            if (written) _writtenGen.AddOrUpdate(id, gen, (_, g) => Math.Max(g, gen));
+            Interlocked.Decrement(ref _pending);
+            _pendingByCharacter.AddOrUpdate(id, 0, (_, n) => Math.Max(0, n - 1));
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -87,7 +102,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         {
             await foreach (var item in _queue.Reader.ReadAllAsync(stoppingToken))
             {
-                Done(item, await WriteAsync(item.Dto, CancellationToken.None));
+                Done(item, await WriteAsync(item, CancellationToken.None));
                 // ReadAllAsync no mira el token entre elementos ya encolados: al apagar, el resto lo vacía StopAsync.
                 if (stoppingToken.IsCancellationRequested) break;
             }
@@ -120,7 +135,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             while (!cts.IsCancellationRequested && _queue.Reader.TryRead(out var next))
             {
                 current = next;
-                Done(next, await WriteAsync(next.Dto, cts.Token));
+                Done(next, await WriteAsync(next, cts.Token));
                 current = null;
                 drained++;
             }
@@ -133,7 +148,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
             {
                 // Puede que la BD sí lo confirmara antes de reaccionar al token: Failed sobra como mucho, y el DTO queda en el log.
                 Done(cur, written: false);
-                LogLost(cur.Dto, "plazo de apagado agotado durante el guardado");
+                foreach (var dto in cur.Dtos) LogLost(dto, "plazo de apagado agotado durante el guardado");
             }
             LogRemaining("plazo de apagado agotado");
         }
@@ -145,7 +160,7 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         while (_queue.Reader.TryRead(out var left))
         {
             Done(left, written: false);
-            LogLost(left.Dto, reason);
+            foreach (var dto in left.Dtos) LogLost(dto, reason);
         }
         foreach (var characterId in _unwrittenAudit.Keys)
             if (_unwrittenAudit.TryRemove(characterId, out var audit))
@@ -158,42 +173,55 @@ public sealed class SaveService(ICharacterRepository characters, ILogger<SaveSer
         logger.LogError("Guardado de {Name} no escrito ({Reason}). DTO: {Dto}", dto.Name, reason, System.Text.Json.JsonSerializer.Serialize(dto));
     }
 
-    /// <summary>Guarda un DTO de la cola sumándole la auditoría de guardados fallidos anteriores; si falla, la conserva para el siguiente.</summary>
-    private async Task<bool> WriteAsync(CharacterSaveDto dto, CancellationToken ct)
+    /// <summary>Guarda un elemento de la cola sumando a cada DTO la auditoría de guardados fallidos anteriores; si falla, la conserva
+    /// para el siguiente.</summary>
+    private async Task<bool> WriteAsync(Queued item, CancellationToken ct)
     {
-        if (_unwrittenAudit.TryRemove(dto.Id, out var carried)) dto = dto with { Audit = [.. carried, .. dto.Audit] };
+        var dtos = new CharacterSaveDto[item.Dtos.Length];
+        for (var i = 0; i < dtos.Length; i++)
+        {
+            var dto = item.Dtos[i];
+            if (_unwrittenAudit.TryRemove(dto.Id, out var carried)) dto = dto with { Audit = [.. carried, .. dto.Audit] };
+            dtos[i] = dto;
+        }
         var written = false;
-        try { written = await SaveWithRetryAsync(dto, ct); }
+        try { written = await SaveBatchWithRetryAsync(dtos, ct); }
         finally
         {
-            if (!written && dto.Audit.Count > 0) _unwrittenAudit[dto.Id] = dto.Audit;
+            if (!written)
+                foreach (var dto in dtos)
+                    if (dto.Audit.Count > 0) _unwrittenAudit[dto.Id] = dto.Audit;
         }
         return written;
     }
 
     /// <summary>Guarda de inmediato (uso en tests y en el apagado). Devuelve si quedó escrito.</summary>
-    public async Task<bool> SaveWithRetryAsync(CharacterSaveDto dto, CancellationToken ct)
+    public Task<bool> SaveWithRetryAsync(CharacterSaveDto dto, CancellationToken ct) => SaveBatchWithRetryAsync([dto], ct);
+
+    private async Task<bool> SaveBatchWithRetryAsync(CharacterSaveDto[] dtos, CancellationToken ct)
     {
+        var names = string.Join(" y ", dtos.Select(d => d.Name));
         var delay = TimeSpan.FromMilliseconds(200);
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             try
             {
-                await characters.SaveAsync(dto, ct);
-                Interlocked.Increment(ref _saved);
+                if (dtos.Length == 1) await characters.SaveAsync(dtos[0], ct);
+                else await characters.SaveManyAsync(dtos, ct);
+                Interlocked.Add(ref _saved, dtos.Length);
                 return true;
             }
             // Solo se propaga la cancelación pedida por `ct`; otra (p. ej. un timeout interno del driver) es un fallo más y se reintenta.
             catch (Exception ex) when (!ct.IsCancellationRequested && attempt < 3)
             {
-                logger.LogWarning(ex, "Guardado de {Name} falló (intento {Attempt})", dto.Name, attempt);
+                logger.LogWarning(ex, "Guardado de {Name} falló (intento {Attempt})", names, attempt);
                 await Task.Delay(delay, ct);
                 delay *= 2;
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
-                Interlocked.Increment(ref _failed);
-                logger.LogError(ex, "Guardado de {Name} falló definitivamente. DTO: {Dto}", dto.Name, System.Text.Json.JsonSerializer.Serialize(dto));
+                Interlocked.Add(ref _failed, dtos.Length);
+                logger.LogError(ex, "Guardado de {Name} falló definitivamente. DTO: {Dto}", names, System.Text.Json.JsonSerializer.Serialize(dtos));
                 return false;
             }
         }

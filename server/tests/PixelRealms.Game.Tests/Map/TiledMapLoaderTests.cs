@@ -88,6 +88,13 @@ public sealed class TiledMapLoaderTests
         Vec2.Distance(new Vec2(back.TargetX, back.TargetY), meadow.Portals[0].Position).ShouldBeLessThan(8);
         meadow.Collision.IsSolidAt(back.TargetX, back.TargetY).ShouldBeFalse();
         mine.Collision.IsSolidAt(meadow.Portals[0].TargetX, meadow.Portals[0].TargetY).ShouldBeFalse();
+        // HU-083 CA1: dos palancas en la Sala 2 que abren la puerta del pasillo de la sala del jefe y una dentro que abre sola.
+        mine.Levers.Count.ShouldBe(3);
+        mine.Levers.ShouldAllBe(l => l.DoorId == "mine_boss_door");
+        mine.Levers.Count(l => l.OpensAlone).ShouldBe(1);
+        var door = mine.Doors.ShouldHaveSingleItem();
+        door.DoorId.ShouldBe("mine_boss_door");
+        mine.Spawns.Single(s => s.MonsterId == "foreman_grask").Position.Y.ShouldBeGreaterThan(door.Position.Y); // el jefe, detrás
     }
 
     [Theory]
@@ -114,6 +121,7 @@ public sealed class TiledMapLoaderTests
         foreach (var gy in map.Graveyards) seen[(int)gy.Position.X, (int)gy.Position.Y].ShouldBeTrue(gy.Id);
         foreach (var npc in map.Npcs) seen[(int)npc.Position.X, (int)npc.Position.Y].ShouldBeTrue(npc.Name);
         foreach (var p in map.Portals) seen[(int)p.Position.X, (int)p.Position.Y].ShouldBeTrue(p.PortalId);
+        foreach (var l in map.Levers) seen[(int)l.Position.X, (int)l.Position.Y].ShouldBeTrue(l.LeverId);
         foreach (var s in map.Spawns)
         {
             var w = Math.Max(1, (int)s.Size.X); var h = Math.Max(1, (int)s.Size.Y);
@@ -138,6 +146,33 @@ public sealed class TiledMapLoaderTests
         File.WriteAllText(Path.Combine(tmp, "test_small.tmj"), text);
         var onSolid = Should.Throw<MapLoadException>(() => TiledMapLoader.Load(Path.Combine(tmp, "test_small.tmj"), Check()));
         onSolid.Errors.ShouldContain(e => e.Contains("casilla sólida", StringComparison.Ordinal));
+        Directory.Delete(tmp, true);
+    }
+
+    [Fact]
+    public void LeverForAMissingDoor_Fails() // HU-083: cada palanca abre una puerta que existe
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "pr-map-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmp, "tilesets"));
+        foreach (var f in Directory.GetFiles(Path.Combine(MapsDir, "tilesets"))) File.Copy(f, Path.Combine(tmp, "tilesets", Path.GetFileName(f)));
+        var text = File.ReadAllText(Path.Combine(MapsDir, "mine.tmj"));
+        var i = text.IndexOf("\"mine_boss_door\"", StringComparison.Ordinal); // la primera es la palanca oeste
+        File.WriteAllText(Path.Combine(tmp, "mine.tmj"), text[..i] + "\"nope\"" + text[(i + "\"mine_boss_door\"".Length)..]);
+        var error = Should.Throw<MapLoadException>(() => TiledMapLoader.Load(Path.Combine(tmp, "mine.tmj"), Check(), _ => true));
+        error.Errors.ShouldContain(e => e.Contains("doorId 'nope' no existe", StringComparison.Ordinal));
+        Directory.Delete(tmp, true);
+    }
+
+    [Fact]
+    public void RepeatedLeverOrDoorId_Fails() // revisión de autoridad: dos objetos con el mismo id
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "pr-map-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmp, "tilesets"));
+        foreach (var f in Directory.GetFiles(Path.Combine(MapsDir, "tilesets"))) File.Copy(f, Path.Combine(tmp, "tilesets", Path.GetFileName(f)));
+        var text = File.ReadAllText(Path.Combine(MapsDir, "mine.tmj")).Replace("\"mine_lever_east\"", "\"mine_lever_west\"", StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(tmp, "mine.tmj"), text);
+        var error = Should.Throw<MapLoadException>(() => TiledMapLoader.Load(Path.Combine(tmp, "mine.tmj"), Check(), _ => true));
+        error.Errors.ShouldContain(e => e.Contains("repetido: 'mine_lever_west'", StringComparison.Ordinal));
         Directory.Delete(tmp, true);
     }
 

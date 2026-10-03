@@ -77,7 +77,9 @@ server/
 ## Estilo C#
 - `record`/`readonly record struct` para datos; clases `sealed` por defecto; `file`-scoped namespaces.
 - Colecciones calientes del tick: `List<T>` reutilizadas, evitar LINQ en rutas por-tick (alloc). `Dictionary<int, Player>`.
-- Combate sin asignaciones por tick: reservas de capacidad fija (áreas, impactos, auras), eventos en buffer circular; memoria nueva ≤ 1 MB/s bajo carga (ADR-018, HU-089).
+- Combate sin asignaciones por tick: reservas de capacidad fija (impactos, auras), sin LINQ ni closures en sistemas, eventos como
+  records dentro de un presupuesto por tick (HU-088 CA1 enmendado, `TickAllocationTests`); memoria nueva ≤ 1 MB/s bajo carga (ADR-018, HU-089).
+- Colisión: los sistemas leen `map.Collision` (la de la instancia: puertas, HU-083), nunca `map.Data.Collision`.
 - Logs estructurados: `logger.LogInformation("Player {Name} joined map {Map}", ...)`. Nunca loguear passwords/tokens.
 - Solo constantes técnicas en `GameConstants` (duración del tick, tamaños de buffers, límites de red). Todo número de juego
   (GCD, radios AOI, crit, XP, afinidades…) se lee de `content/rules.json` vía `IRules` (ADR-008; regla 4 de `CLAUDE.md`).

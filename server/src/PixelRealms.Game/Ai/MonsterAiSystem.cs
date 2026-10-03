@@ -18,6 +18,8 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
     // Ritmos de la IA (percepción, A*, patrulla, llegada): `rules.ai` (regla 4, ADR-008).
 
     private readonly List<Monster> _monsters = new(128);
+    private readonly List<EntityId> _threatIds = new(8);
+    private readonly List<Actor> _candidates = new(8);
 
     public string Name => "monster_ai";
 
@@ -75,7 +77,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
             if (p.IsDead || !CanBeAggroed(p)) continue;
             var d = Vec2.DistanceSquared(p.Position, m.Position);
             if (d > rangeSq || d >= bestD) continue;
-            if (!LineOfSight.Has(map.Data.Collision, m.Position, p.Position)) continue;
+            if (!LineOfSight.Has(map.Collision, m.Position, p.Position)) continue;
             best = p; bestD = d;
         }
         return best;
@@ -92,7 +94,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
             var angle = ctx.Rng.NextDouble() * Math.Tau;
             var dist = Math.Sqrt(ctx.Rng.NextDouble()) * m.WanderRadius;
             var candidate = new Vec2(m.SpawnPosition.X + (float)(Math.Cos(angle) * dist), m.SpawnPosition.Y + (float)(Math.Sin(angle) * dist));
-            if (map.Data.Collision.IsSolidAt(candidate.X, candidate.Y)) { brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rules.Ai.WanderPauseMinMs; return; }
+            if (map.Collision.IsSolidAt(candidate.X, candidate.Y)) { brain.WanderPauseUntilMs = ctx.NowMs + ctx.Rules.Ai.WanderPauseMinMs; return; }
             brain.WanderTarget = candidate;
         }
         if (StepTowards(m, brain.WanderTarget.Value, map, ctx, speedMult: (float)ctx.Rules.Ai.WanderSpeedMult))
@@ -133,7 +135,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         m.Combat.TargetId = target.Id;
 
         var dist = Vec2.Distance(m.Position, target.Position);
-        var inRange = dist <= m.Template.AttackRange && LineOfSight.Has(map.Data.Collision, m.Position, target.Position);
+        var inRange = dist <= m.Template.AttackRange && LineOfSight.Has(map.Collision, m.Position, target.Position);
         if (inRange)
         {
             brain.State = AiState.Attack;
@@ -172,13 +174,12 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         return false;
     }
 
-    private static Actor RandomNotTop(Monster m, Actor current, MapInstance map, TickContext ctx)
+    private Actor RandomNotTop(Monster m, Actor current, MapInstance map, TickContext ctx)
     {
-        var ranked = m.Threat.Ranked();
-        if (ranked.Count <= 1) return current;
-        var candidates = new List<Actor>(ranked.Count - 1);
-        for (var i = 1; i < ranked.Count; i++) if (map.Find(ranked[i]) is { IsAlive: true } a) candidates.Add(a);
-        return candidates.Count == 0 ? current : candidates[ctx.Rng.Next(0, candidates.Count)];
+        m.Threat.AllButTop(_threatIds);
+        _candidates.Clear();
+        foreach (var id in _threatIds) if (map.Find(id) is { IsAlive: true } a) _candidates.Add(a);
+        return _candidates.Count == 0 ? current : _candidates[ctx.Rng.Next(0, _candidates.Count)];
     }
 
     private static bool EnsurePath(Monster m, Vec2 targetPos, MapInstance map, TickContext ctx)
@@ -187,7 +188,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         var stale = brain.PathComputedAtMs == long.MinValue || ctx.NowMs - brain.PathComputedAtMs >= ctx.Rules.Ai.PathRecalcMs
                     || Vec2.Distance(brain.PathTargetPos, targetPos) > ctx.Rules.Ai.PathRecalcMovedTiles || brain.PathIndex >= brain.Path.Count;
         if (!stale) return true;
-        if (!Pathfinder.FindPath(map.Data.Collision, m.Position, targetPos, brain.Path, ctx.Rules.Ai.PathMaxNodes)) return false;
+        if (!Pathfinder.FindPath(map.Collision, m.Position, targetPos, brain.Path, ctx.Rules.Ai.PathMaxNodes)) return false;
         brain.PathIndex = 0;
         brain.PathComputedAtMs = ctx.NowMs;
         brain.PathTargetPos = targetPos;
@@ -251,7 +252,7 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         // No pasarse del destino en este tick.
         var stepTiles = speed * ctx.DeltaMs / 1000f;
         var before = m.Position;
-        MovementSystem.Move(m, dx, dy, map.Data.Collision, speed);
+        MovementSystem.Move(m, dx, dy, map.Collision, speed);
         if (delta.Length <= stepTiles) { m.Position = target; }
         return Vec2.Distance(m.Position, target) <= ctx.Rules.Ai.ArriveToleranceTiles || m.Position == before;
     }

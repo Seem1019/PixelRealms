@@ -47,6 +47,7 @@ public sealed class TradeService(CombatServices services)
 {
 
     private readonly Dictionary<int, List<TradeSession>> _trades = new();
+    private readonly List<TradeSession> _ticking = new();
 
     /// <summary>¿El jugador está retando o en un duelo? No se intercambia en pleno duelo (lo rellena CombatModule).</summary>
     public Func<Player, bool> InDuel { get; set; } = static _ => false;
@@ -164,6 +165,11 @@ public sealed class TradeService(CombatServices services)
         foreach (var (tpl, qty) in toA) InventoryOps.AddItem(trade.A, tpl, qty, "trade_in", counterparty: trade.B.CharacterId);
         foreach (var (tpl, qty) in toB) InventoryOps.AddItem(trade.B, tpl, qty, "trade_in", counterparty: trade.A.CharacterId);
         trade.A.Dirty = true; trade.B.Dirty = true;
+        if (trade.OfferA.Items.Count + trade.OfferB.Items.Count > 0 || trade.OfferA.Gold + trade.OfferB.Gold > 0)
+        {
+            trade.A.TradeSavePartner = trade.B;
+            trade.B.TradeSavePartner = trade.A;
+        }
         trade.State = TradeState.Completed;
         ctx.Emit(new TradeChangedEvent(map.Id, trade, "completed", null));
         ctx.Emit(new InventoryChangedEvent(map.Id, trade.A, null));
@@ -209,7 +215,9 @@ public sealed class TradeService(CombatServices services)
     public void Tick(MapInstance map, TickContext ctx)
     {
         if (!_trades.TryGetValue(map.Id, out var list) || list.Count == 0) return;
-        foreach (var t in list.ToList())
+        _ticking.Clear();
+        _ticking.AddRange(list); // cancelar lo quita de `list`
+        foreach (var t in _ticking)
         {
             if (t.State == TradeState.Requested && ctx.NowMs - t.RequestedAtMs > ctx.Rules.Social.TradeRequestExpireSec * 1000) { Cancel(t, "expired", map, ctx); continue; }
             if (t.A.IsDead || t.B.IsDead) { Cancel(t, "died", map, ctx); continue; }

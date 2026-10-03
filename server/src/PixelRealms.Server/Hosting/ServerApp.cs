@@ -83,7 +83,7 @@ public static class ServerApp
             return null;
         }
         var rng = new SeededRng(Environment.TickCount);
-        var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>() }; // HU-072
+        var simulation = new Simulation(world, content.Rules, rng, new TickClock()) { CombatTimings = new Dictionary<int, TickStats>(), InstanceAllocs = new Dictionary<int, long>() }; // HU-072
         simulation.Context.RulesProvider = () => content.Rules; // HU-003 CA4c: `/reload rules` en caliente
         var movementSystem = new MovementSystem();
         var interestSystem = new InterestSystem();
@@ -134,6 +134,7 @@ public static class ServerApp
         router.Register(new PingHandler());
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
         router.Register(new UsePortalHandler());
+        router.Register(new InteractHandler(app.Services.GetRequiredService<CombatHandlerDeps>()));
         var combatDeps = app.Services.GetRequiredService<CombatHandlerDeps>();
         router.Register(new SelectTargetHandler(combatDeps));
         router.Register(new CastSpellHandler(combatDeps));
@@ -192,6 +193,8 @@ public static class ServerApp
             // el cupo de la IP del proxy (5 logins/min y 5 registros/hora para el servidor entero).
             var fwd = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions { ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto };
             fwd.KnownIPNetworks.Clear(); fwd.KnownProxies.Clear(); // el proxy es el contenedor `caddy` de la misma red de compose
+            foreach (var cidr in net.TrustedProxyNetworks is { Length: > 0 } custom ? custom : NetOptions.DefaultTrustedProxyNetworks)
+                fwd.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
             app.UseForwardedHeaders(fwd);
         }
         app.UseRateLimiter();
@@ -217,6 +220,7 @@ public static class ServerApp
                     id = inst.Id, mapId = inst.MapId, players = inst.Players, monsters = inst.Monsters,
                     combatP50Ms = Math.Round(inst.CombatP50Ms, 3), combatP99Ms = Math.Round(inst.CombatP99Ms, 3),
                     areasActive = inst.AreasActive, projectilesInFlight = inst.ProjectilesInFlight, aurasActive = inst.AurasActive,
+                    allocBytesPerSec = Math.Round(inst.AllocBytesPerSec), // lo que piden los sistemas de esta instancia (hilo del tick)
                 });
                 monsters += inst.Monsters;
             }

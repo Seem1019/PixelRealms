@@ -19,6 +19,39 @@ public sealed class CastSystemTests
         => w.Combat.Casts.TryBeginCast(w.Player("Ana"), w.Content.Spell(spellId), target, pos, w.Map, w.Begin());
 
     [Fact]
+    public void Silence_BlocksEveryAbility_ButNotPotionsNorTheWeapon() // HU-035 CA3 (decisión 2026-10-03)
+    {
+        var w = Arena("warrior", level: 3, distance: 1f);
+        var ana = w.Player("Ana"); var slime = w.Monster("slime");
+        ana.Resource = ana.MaxResource;
+        var silence = w.Content.Aura("warrior_charge_stun") with { Id = "test_silence", Kind = AuraKind.Silence };
+        w.Combat.Auras.Apply(ana, silence, slime, w.Map, w.Begin());
+        Cast(w, "warrior_heroic_strike", slime.Id).ShouldBe(CastErrors.Silenced); // también las físicas
+
+        ana.Hp = ana.MaxHp / 2;
+        var potion = ItemInstance.New("minor_healing_potion", 1);
+        ana.Inventory.Bag[0] = potion;
+        w.Combat.ItemUse.Use(ana, potion.Id, w.Map, w.Begin()).ShouldBeNull(); // la poción sí
+        ana.Hp.ShouldBeGreaterThan(ana.MaxHp / 2);
+
+        ana.Combat.TargetId = slime.Id; ana.Combat.AutoAttackOn = true; // y el ataque con el arma
+        TickRunner.RunMs(w, 3000).OfType<CombatHitEvent>().ShouldContain(e => ReferenceEquals(e.Source, ana) && e.SpellId == null);
+    }
+
+    [Fact]
+    public void InterruptLockout_BlocksAbilities_ButNotPotions() // HU-035 CA3: como el silencio
+    {
+        var w = Arena("mage", level: 3);
+        var ana = w.Player("Ana"); var slime = w.Monster("slime");
+        ana.Combat.LockoutEndsAtMs = w.Clock.NowMs + 5000;
+        Cast(w, "mage_fireball", slime.Id).ShouldBe(CastErrors.LockedOut);
+        ana.Hp = ana.MaxHp / 2;
+        var potion = ItemInstance.New("minor_healing_potion", 1);
+        ana.Inventory.Bag[0] = potion;
+        w.Combat.ItemUse.Use(ana, potion.Id, w.Map, w.Begin()).ShouldBeNull();
+    }
+
+    [Fact]
     public void GroundArea_AimedInsideAWallThatBlocksSight_IsRejected()
     {
         // Un muro de una casilla en (12, 10) y el slime detrás: apuntar dentro del muro alcanzaba al otro lado.

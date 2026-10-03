@@ -69,10 +69,17 @@ public sealed class Simulation
                 var allocStart = SystemAllocs is null ? 0 : GC.GetAllocatedBytesForCurrentThread();
                 for (var i = 0; i < instances.Count; i++)
                 {
-                    if (!isCombat) { system.Tick(instances[i], Context); continue; }
-                    var start = System.Diagnostics.Stopwatch.GetTimestamp();
-                    system.Tick(instances[i], Context);
-                    _combatMsThisTick[instances[i].Id] += System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+                    // HU-072 CA3: todas las instancias corren en este hilo, así que su contador de asignaciones se reparte por instancia.
+                    var instanceAllocStart = InstanceAllocs is null ? 0 : GC.GetAllocatedBytesForCurrentThread();
+                    if (!isCombat) system.Tick(instances[i], Context);
+                    else
+                    {
+                        var start = System.Diagnostics.Stopwatch.GetTimestamp();
+                        system.Tick(instances[i], Context);
+                        _combatMsThisTick[instances[i].Id] += System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+                    }
+                    if (InstanceAllocs is not null)
+                        InstanceAllocs[instances[i].Id] = InstanceAllocs.GetValueOrDefault(instances[i].Id) + GC.GetAllocatedBytesForCurrentThread() - instanceAllocStart;
                 }
                 if (SystemTimings is not null)
                 {
@@ -103,6 +110,9 @@ public sealed class Simulation
 
     /// <summary>Bytes asignados por sistema (acumulado, hilo del tick); solo para perfilar.</summary>
     public Dictionary<string, long>? SystemAllocs { get; set; }
+
+    /// <summary>Bytes asignados por los sistemas de cada instancia (acumulado); solo si `CombatTimings` está activo (HU-072 CA3).</summary>
+    public Dictionary<int, long>? InstanceAllocs { get; set; }
 
     public int EntityCount()
     {

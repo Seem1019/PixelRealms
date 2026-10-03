@@ -62,8 +62,8 @@ public sealed class EnvelopeTests
         MessageRegistry.ClientMessageNames.ShouldContain("MoveInput");
         MessageRegistry.ServerMessageNames.ShouldContain("CombatEvents");
         MessageRegistry.ServerMessageNames.ShouldNotContain("CombatEvent");
-        MessageRegistry.ClientMessageNames.Count.ShouldBe(36); // + OnlineListRequest (HU-063)
-        MessageRegistry.ServerMessageNames.Count.ShouldBe(26); // + OnlineList (HU-063)
+        MessageRegistry.ClientMessageNames.Count.ShouldBe(37); // + OnlineListRequest (HU-063), Interact (HU-083)
+        MessageRegistry.ServerMessageNames.Count.ShouldBe(27); // + OnlineList (HU-063), MapObjects (HU-083)
     }
 
     [Fact]
@@ -89,5 +89,14 @@ public sealed class EnvelopeTests
         MessageRegistry.Decode("""{"t":"OnlineListRequest","d":{}}""").Message.ShouldBeOfType<OnlineListRequest>();
         MessageRegistry.EncodeToString(new OnlineList([new OnlinePlayerDto("Ana", "mage", 4, "Campos")]))
             .ShouldBe("""{"t":"OnlineList","d":{"players":[{"name":"Ana","classId":"mage","level":4,"zone":"Campos"}]}}""");
+    }
+
+    [Fact]
+    public void Interact_Decodes_AndMapObjects_EncodesExactJson() // HU-083
+    {
+        MessageRegistry.Decode("""{"t":"Interact","d":{"objectId":"mine_lever_west","reqId":3}}""").Message
+            .ShouldBeOfType<Interact>().ShouldBe(new Interact("mine_lever_west", 3));
+        MessageRegistry.EncodeToString(new MapObjects([new MapObjectDto("mine_lever_west", "on"), new MapObjectDto("mine_boss_door", "closed")]))
+            .ShouldBe("""{"t":"MapObjects","d":{"objects":[{"id":"mine_lever_west","state":"on"},{"id":"mine_boss_door","state":"closed"}]}}""");
     }
 }

@@ -51,6 +51,8 @@ namespace PixelRealms.Protocol;
 [JsonSerializable(typeof(LoggedOut))]
 [JsonSerializable(typeof(OnlineListRequest))]
 [JsonSerializable(typeof(OnlineList))]
+[JsonSerializable(typeof(Interact))]
+[JsonSerializable(typeof(MapObjects))]
 [JsonSerializable(typeof(Welcome))]
 [JsonSerializable(typeof(Snapshot))]
 [JsonSerializable(typeof(EntitySpawn))]

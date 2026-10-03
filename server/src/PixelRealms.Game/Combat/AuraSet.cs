@@ -5,21 +5,22 @@ namespace PixelRealms.Game.Combat;
 
 /// <summary>
 /// Aura activa sobre un actor: instancia = (aura, lanzador) (ADR-022). La cantidad por tick y la mitigación de un DoT físico se
-/// fijan al aplicarse (snapshot). El ritmo de ticks (`NextTickAtMs`) no se reinicia al renovar.
+/// fijan al aplicarse (snapshot). El ritmo de ticks (`NextTickAtMs`) no se reinicia al renovar. Las instancias salen de la reserva
+/// de <see cref="AuraSystem"/> (HU-088 CA1): una quitada se reutiliza a partir del tick siguiente, nunca en el mismo.
 /// </summary>
-public sealed class AuraInstance(AuraDef def, EntityId? casterId, long appliedAtMs)
+public sealed class AuraInstance
 {
-    public AuraDef Def { get; } = def;
+    public AuraDef Def { get; private set; } = null!;
 
-    public EntityId? CasterId { get; } = casterId;
+    public EntityId? CasterId { get; private set; }
 
-    public long AppliedAtMs { get; } = appliedAtMs;
+    public long AppliedAtMs { get; private set; }
 
-    public long ExpiresAtMs { get; set; } = appliedAtMs + def.DurationMs;
+    public long ExpiresAtMs { get; set; }
 
-    public long NextTickAtMs { get; set; } = def.TickMs > 0 ? appliedAtMs + def.TickMs : long.MaxValue;
+    public long NextTickAtMs { get; set; }
 
-    public int Stacks { get; set; } = 1;
+    public int Stacks { get; set; }
 
     /// <summary>Cantidad por tick (DoT/HoT) o absorción restante (escudo), por carga.</summary>
     public double Amount { get; set; }
@@ -37,6 +38,21 @@ public sealed class AuraInstance(AuraDef def, EntityId? casterId, long appliedAt
     public int RemainingMs(long nowMs) => (int)Math.Max(0, ExpiresAtMs - nowMs);
 
     public bool SameInstance(string auraId, EntityId? casterId) => Def.Id == auraId && CasterId == casterId;
+
+    /// <summary>Deja la instancia como recién aplicada (nueva o sacada de la reserva).</summary>
+    internal AuraInstance Reset(AuraDef def, EntityId? casterId, long appliedAtMs)
+    {
+        Def = def;
+        CasterId = casterId;
+        AppliedAtMs = appliedAtMs;
+        ExpiresAtMs = appliedAtMs + def.DurationMs;
+        NextTickAtMs = def.TickMs > 0 ? appliedAtMs + def.TickMs : long.MaxValue;
+        Stacks = 1;
+        Amount = 0;
+        ShieldRemaining = 0;
+        Mitigation = 0;
+        return this;
+    }
 }
 
 /// <summary>

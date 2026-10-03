@@ -44,6 +44,9 @@ public sealed class PartyService
     private readonly Dictionary<Guid, Party> _byMember = new();
     private readonly Dictionary<Guid, PartyInviteState> _invitesByTarget = new();
     private int _nextId = 1;
+    private readonly List<Guid> _expiredInvites = new();
+    private readonly List<Guid> _toKick = new();
+    private readonly List<(Party? Party, Guid Removed, bool Disbanded, Guid? Last)> _changes = new();
 
     public Party? PartyOf(Guid characterId) => _byMember.GetValueOrDefault(characterId);
 
@@ -129,19 +132,24 @@ public sealed class PartyService
         return party;
     }
 
-    /// <summary>Caducidad de invitaciones y expulsión de desconectados tras `offlineGraceSec` (HU-061 CA5).</summary>
+    /// <summary>Caducidad de invitaciones y expulsión de desconectados tras `offlineGraceSec` (HU-061 CA5). La lista devuelta se
+    /// reutiliza: vale hasta la siguiente llamada (se llama una vez por tick).</summary>
     public List<(Party? Party, Guid Removed, bool Disbanded, Guid? Last)> Tick(long nowMs, GroupRules rules)
     {
-        foreach (var key in _invitesByTarget.Where(kv => kv.Value.ExpiresAtMs < nowMs).Select(kv => kv.Key).ToList()) _invitesByTarget.Remove(key);
-        var changes = new List<(Party?, Guid, bool, Guid?)>();
+        _expiredInvites.Clear();
+        foreach (var (target, invite) in _invitesByTarget) if (invite.ExpiresAtMs < nowMs) _expiredInvites.Add(target);
+        foreach (var key in _expiredInvites) _invitesByTarget.Remove(key);
+        _changes.Clear();
         var graceMs = (long)(rules.OfflineGraceSec * 1000);
-        foreach (var party in All.ToList())
-            foreach (var m in party.Members.Where(m => !m.Online && nowMs - m.OfflineSinceMs >= graceMs).ToList())
-            {
-                var (after, disbanded, last) = Leave(m.CharacterId);
-                changes.Add((after, m.CharacterId, disbanded, last));
-            }
-        return changes;
+        _toKick.Clear();
+        foreach (var (characterId, party) in _byMember)
+            if (party.Find(characterId) is { Online: false } m && nowMs - m.OfflineSinceMs >= graceMs) _toKick.Add(characterId);
+        foreach (var characterId in _toKick)
+        {
+            var (after, disbanded, last) = Leave(characterId);
+            _changes.Add((after, characterId, disbanded, last));
+        }
+        return _changes;
     }
 }
 

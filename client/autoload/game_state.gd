@@ -21,6 +21,7 @@ signal party_invited(leader: String)
 signal duel_changed(state: String, opponent_id: int, winner_id: int, starts_in_ms: int)
 signal trade_changed(d: Dictionary)
 signal online_list_received(players: Array)  ## HU-063: respuesta a OnlineListRequest
+signal map_objects_changed  ## HU-083: palancas o puertas del mapa actual
 
 var self_id: int = -1
 var character_name: String = ""
@@ -34,6 +35,10 @@ var hotbar: Array = []
 var known_spells: Array[String] = []
 var target_id: int = -1
 var party: Dictionary = {}  # {leader, members: [{name, entityId, classId, level, hpPct, online, mapId}]}
+var map_objects: Dictionary = {}  # HU-083: id → estado ("on"/"off", "open"/"closed") de los objetos del mapa actual
+## Último golpe dado o recibido (ms de `Time.get_ticks_msec`): aproxima el "en combate" del servidor para no pedir cosas que
+## rechazaría (cambiar una casilla de hechizo ocupada en combate).
+var last_combat_ms: int = -1000000
 var duel_opponent_id: int = -1
 var duel_state: String = ""
 var trade: Dictionary = {}  # último TradeUpdate o vacío
@@ -79,6 +84,8 @@ func _ready() -> void:
 	Net.register_handler("DuelUpdate", _on_duel_update)
 	Net.register_handler("TradeUpdate", _on_trade_update)
 	Net.register_handler("OnlineList", func(d: Dictionary) -> void: online_list_received.emit(d.get("players", [])))
+	Net.register_handler("MapObjects", _on_map_objects)
+	Net.combat_events.connect(_on_combat_events)
 	Net.snapshot.connect(_on_snapshot)
 
 
@@ -113,6 +120,7 @@ func set_target(entity_id: int) -> void:
 func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	self_id = int(d.get("selfId", -1))
 	map_id = str(d.get("mapId", ""))
+	map_objects.clear()  # el estado del mapa llega justo después en MapObjects
 	var self_state: Dictionary = d.get("self", {})
 	character_name = str(self_state.get("name", ""))
 	class_id = str(self_state.get("classId", ""))
@@ -194,7 +202,29 @@ func bag_count(template_id: String) -> int:
 
 func _on_change_map(d: Dictionary) -> void:
 	map_id = str(d.get("mapId", map_id))
+	map_objects.clear()  # el estado del mapa nuevo llega justo después en MapObjects
 	map_changed.emit(map_id)
+
+
+## Golpes con uno mismo como origen o destino (las curas no cuentan: una cura propia no mete en combate).
+func _on_combat_events(d: Dictionary) -> void:
+	for e: Variant in d.get("e", []):
+		var ed: Dictionary = e
+		if str(ed.get("kind", "")) != "heal" and (int(ed.get("src", -1)) == self_id or int(ed.get("dst", -1)) == self_id):
+			last_combat_ms = Time.get_ticks_msec()
+			return
+
+
+func is_in_combat() -> bool:
+	return Time.get_ticks_msec() - last_combat_ms < int(float(Content.rule("combat", "inCombatWindowSec", 6)) * 1000.0)
+
+
+## HU-083: estado de palancas y puertas (todas al entrar en el mapa; después solo las que cambian).
+func _on_map_objects(d: Dictionary) -> void:
+	for o: Variant in d.get("objects", []):
+		var od: Dictionary = o
+		map_objects[str(od.get("id", ""))] = str(od.get("state", ""))
+	map_objects_changed.emit()
 
 
 func _on_snapshot(d: Dictionary) -> void:

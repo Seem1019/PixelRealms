@@ -7,7 +7,8 @@ namespace PixelRealms.Game.Combat;
 
 /// <summary>
 /// Paso 7 del tick (HU-039): maná por `spi`/`int` (por 5 s, penalizado tras gastar), energía +energyPerSec, ira que decae fuera
-/// de combate, y vida fuera de combate tras `hpRegenDelaySec` según `spi`/`sta`. Todo por tick con acumuladores de fracciones.
+/// de combate, y vida fuera de combate tras `hpRegenDelaySec` según `spi`/`sta`; el perdedor de un duelo regenera más rápido y sin
+/// esperar (HU-064 CA3). Todo por tick con acumuladores de fracciones.
 /// </summary>
 public sealed class ResourceSystem(CombatServices services, DamagePipeline damage) : IMapSystem
 {
@@ -41,14 +42,18 @@ public sealed class ResourceSystem(CombatServices services, DamagePipeline damag
                     break;
             }
 
-            // Vida fuera de combate: tras hpRegenDelaySec sin hacer ni recibir daño.
+            // Vida fuera de combate: tras hpRegenDelaySec sin hacer ni recibir daño. La recuperación tras perder un duelo no espera
+            // y multiplica, hasta la vida con que empezó el duelo o hasta volver a entrar en combate.
+            if (p.Combat.Recovery is { } r && (p.Hp >= r.UntilHp || p.LastCombatAtMs > r.FromMs)) p.Combat.Recovery = null;
+            var recovery = p.Combat.Recovery;
             var sinceCombat = p.LastCombatAtMs == long.MinValue ? double.MaxValue : (ctx.NowMs - p.LastCombatAtMs) / 1000.0;
-            if (p.Hp < p.MaxHp && sinceCombat >= rules.HpRegenDelaySec)
+            if (p.Hp < p.MaxHp && (recovery is not null || sinceCombat >= rules.HpRegenDelaySec))
             {
-                var acc = p.Combat.HpRegenAcc + stats.HpRegenPerSec * dt;
+                var acc = p.Combat.HpRegenAcc + stats.HpRegenPerSec * (recovery?.Mult ?? 1.0) * dt;
                 var whole = (int)Math.Truncate(acc);
                 p.Combat.HpRegenAcc = acc - whole;
                 if (whole > 0) { p.Hp = Math.Min(p.MaxHp, p.Hp + whole); p.Dirty = true; }
+                if (p.Combat.Recovery is { } done && p.Hp >= done.UntilHp) p.Combat.Recovery = null;
             }
         }
     }

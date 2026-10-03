@@ -69,6 +69,7 @@ public sealed record InventoryChangedEvent(int MapInstanceId, Player Player, int
 public sealed class LootSystem(CombatServices services) : IMapSystem
 {
     private readonly Dictionary<(int Map, int Loot), LootBag> _bags = new();
+    private readonly List<(int Map, int Loot)> _expired = new();
 
     public string Name => "loot";
 
@@ -85,23 +86,25 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
     public static (long Gold, List<(string TemplateId, int Qty)> Items) Roll(LootTable table, IRng rng, ContentDb db)
     {
         var gold = table.Gold.Max <= table.Gold.Min ? table.Gold.Min : rng.Next(table.Gold.Min, table.Gold.Max + 1);
-        var fromEntries = new List<(string, int)>();
+        var fromEntries = new List<(string ItemId, int Qty, Rarity Rarity)>();
         foreach (var e in table.Entries)
         {
             if (rng.NextDouble() >= e.Chance) continue;
             var qty = e.Max <= e.Min ? e.Min : rng.Next(e.Min, e.Max + 1);
-            fromEntries.Add((e.ItemId, qty));
+            fromEntries.Add((e.ItemId, qty, db.Item(e.ItemId).Rarity));
         }
-        fromEntries.Sort((a, b) => db.Item(b.Item1).Rarity.CompareTo(db.Item(a.Item1).Rarity));
+        fromEntries.Sort(static (a, b) => b.Rarity.CompareTo(a.Rarity));
         if (fromEntries.Count > table.MaxItems) fromEntries.RemoveRange(table.MaxItems, fromEntries.Count - table.MaxItems);
 
-        var result = new List<(string, int)>(fromEntries);
+        var result = new List<(string, int)>(fromEntries.Count);
+        foreach (var (itemId, qty, _) in fromEntries) result.Add((itemId, qty));
         foreach (var g in table.Groups)
         {
-            var pool = g.Entries.ToList();
+            var pool = new List<LootGroupEntry>(g.Entries);
             for (var r = 0; r < g.Rolls && pool.Count > 0; r++)
             {
-                var total = pool.Sum(x => x.Weight);
+                var total = 0.0;
+                foreach (var x in pool) total += x.Weight;
                 var roll = rng.NextDouble() * total;
                 var pick = pool[^1];
                 foreach (var cand in pool) { roll -= cand.Weight; if (roll < 0) { pick = cand; break; } }
@@ -124,9 +127,11 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
             CreateBag(monster, tagger, map, ctx);
         }
         // Caducidad: va de la mano del cadáver; por seguridad, limpiar bolsas vencidas de esta instancia.
-        if (_bags.Count > 0)
-            foreach (var key in _bags.Where(kv => kv.Key.Map == map.Id && kv.Value.ExpiresAtMs <= ctx.NowMs).Select(kv => kv.Key).ToList())
-                _bags.Remove(key);
+        if (_bags.Count == 0) return;
+        _expired.Clear();
+        foreach (var (key, bag) in _bags)
+            if (key.Map == map.Id && bag.ExpiresAtMs <= ctx.NowMs) _expired.Add(key);
+        foreach (var key in _expired) _bags.Remove(key);
     }
 
     public LootBag? CreateBag(Monster monster, Player tagger, MapInstance map, TickContext ctx)
@@ -156,7 +161,7 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
         }
         bag.HadLoot = items.Count > 0 || gold > 0;
         _bags[(map.Id, monster.Id.Value)] = bag;
-        ctx.Emit(new LootAvailableEvent(map.Id, bag, winners.ToList()));
+        ctx.Emit(new LootAvailableEvent(map.Id, bag, [.. winners]));
         return bag;
     }
 

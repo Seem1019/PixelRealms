@@ -1,9 +1,17 @@
 # HU-073 CA2 / HU-075 CA1: producción en el VPS. `docker compose -f docker-compose.prod.yml up -d`
 # Variables en .env (ver .env.example): DOMAIN, POSTGRES_*, JWT_SIGNING_KEY, SERVER_IMAGE.
+
+# HU-072 CA2: los logs (JSON del servidor incluido) se quedan en el json-file de Docker (`docker compose logs`), rotando a
+# 5 archivos de 10 MB por servicio para no llenar el disco del VPS.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
 services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pixelrealms}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
@@ -20,6 +28,7 @@ services:
     image: ${SERVER_IMAGE:-ghcr.io/seem1019/pixelrealms-server:latest} # GHCR exige minúsculas (8927dd1)
     build: { context: ., dockerfile: server/Dockerfile }
     restart: unless-stopped
+    logging: *logging
     # Al apagar, el servidor guarda a todos los conectados (HU-026 CA2) y espera a la BD hasta el ShutdownTimeout del host (30 s).
     # Con los 10 s por defecto de Docker, un SIGKILL a mitad del vaciado perdería guardados en cada despliegue.
     stop_grace_period: 40s
@@ -42,6 +51,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *logging
     depends_on: [server]
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
@@ -56,6 +66,7 @@ services:
     # HU-075 CA1: pg_dump -Fc diario, conserva los últimos 7 (deploy/backup.sh).
     image: postgres:17-alpine
     restart: unless-stopped
+    logging: *logging
     depends_on:
       postgres: { condition: service_healthy }
     environment:

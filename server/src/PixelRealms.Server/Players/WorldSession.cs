@@ -101,7 +101,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
 
         var player = mapper.ToPlayer(dto, world.EntityIds.Next());
         if (mapId != dto.MapId || player.Position == Vec2.Zero) player.Position = instance.Data.DefaultGraveyard.Position;
-        if (instance.Data.Collision.IsSolidAt(player.Position.X, player.Position.Y)) player.Position = instance.Data.DefaultGraveyard.Position;
+        if (instance.Collision.IsSolidAt(player.Position.X, player.Position.Y)) player.Position = instance.Data.DefaultGraveyard.Position;
         instance.Add(player);
         players.Add(player, connectionId);
         if (hadDeparted) _departed.Remove(dto.Id); // ya está dentro: lo siguiente que salga lo vuelve a apuntar
@@ -114,6 +114,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         // Welcome no trae stats primarios ni oro: sin esto el cliente los ve a 0. Va al final para no dejar la entrada a medias.
         ctx.Send(mapper.ToStatsUpdate(player));
         foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd); // recargas que siguieron corriendo fuera (HU-015)
+        if (EventDispatcher.ToMapObjects(instance) is { } objects) ctx.Send(objects); // palancas y puertas (HU-083)
     }
 
     /// <summary>HU-025 CA2: la conexión nueva toma el personaje que seguía en el mundo; se reenvía Welcome y la AOI completa.</summary>
@@ -129,6 +130,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd);
         // Las auras propias siguieron corriendo mientras estaba linkdead: el cliente nuevo no las conoce (HU-098 CA2).
         foreach (var aura in player.Auras.All) ctx.Send(EventDispatcher.ToAuraApplied(player, aura, ctx.Tick.NowMs));
+        if (instance is not null && EventDispatcher.ToMapObjects(instance) is { } objects) ctx.Send(objects);
         logger.LogInformation("{Name} reconectó (conexión {Conn})", player.Name, connectionId);
     }
 
@@ -177,13 +179,32 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
     }
 
 
-    /// <summary>Guardado por evento (ADR-018 / HU-026 CA6): salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir.</summary>
+    /// <summary>Guardado por evento (ADR-018 / HU-026 CA6): salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir.
+    /// Si acaba de completar un intercambio sin guardar, se guarda junto con el otro (ver <see cref="Player.TradeSavePartner"/>).</summary>
     public void Save(Player player, long nowMs, string reason)
     {
+        if (player.TradeSavePartner is { } partner)
+        {
+            SaveTogether(player, partner, nowMs, reason);
+            return;
+        }
         saver.Enqueue(mapper.ToSave(player));
         player.Dirty = false;
         player.LastSaveAtMs = nowMs;
         logger.LogDebug("{Name} guardado ({Reason})", player.Name, reason);
+    }
+
+    /// <summary>Guarda a los dos en la misma transacción (intercambio completado, HU-059): o quedan ambos o ninguno.</summary>
+    public void SaveTogether(Player a, Player b, long nowMs, string reason)
+    {
+        saver.EnqueueTogether(mapper.ToSave(a), mapper.ToSave(b));
+        foreach (var p in new[] { a, b })
+        {
+            p.Dirty = false;
+            p.LastSaveAtMs = nowMs;
+            p.TradeSavePartner = null;
+        }
+        logger.LogDebug("{A} y {B} guardados juntos ({Reason})", a.Name, b.Name, reason);
     }
 
     /// <summary>Motivo con el que `Logout` saca al jugador (HU-015).</summary>
@@ -215,7 +236,15 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             if (Combat.Parties.SetOnline(player.CharacterId, false, tick.NowMs) is { } party) tick.Emit(new Game.Social.PartyChangedEvent(instance.Id, party, "offline"));
         }
         var save = mapper.ToSave(player);
-        _departed[player.CharacterId] = (save, saver.Enqueue(save));
+        if (player.TradeSavePartner is { } partner)
+        {
+            // Sale en el mismo tick en que completó un intercambio: los dos en la misma transacción (HU-059).
+            _departed[player.CharacterId] = (save, saver.EnqueueTogether(save, mapper.ToSave(partner))[0]);
+            partner.Dirty = false;
+            partner.TradeSavePartner = null;
+            player.TradeSavePartner = null;
+        }
+        else _departed[player.CharacterId] = (save, saver.Enqueue(save));
         player.Dirty = false;
         players.Remove(player);
         if (instance is not null)

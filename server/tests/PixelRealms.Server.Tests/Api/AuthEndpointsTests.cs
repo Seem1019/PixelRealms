@@ -115,6 +115,24 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task Login_FromAnUntrustedProxy_IgnoresTheForwardedIp() // HU-073: solo se cree a la red de compose
+    {
+        // La conexión llega desde 127.0.0.1, que aquí no es de confianza: X-Forwarded-For no cuenta y todo es una sola IP.
+        await using var server = await TestServer.StartAsync(new() { ["JWT_SIGNING_KEY"] = new string('k', 40), ["Net:TrustedProxyNetworks:0"] = "10.0.0.0/8" }, environment: "Production");
+        using var api = new ApiClient(server);
+        (await api.Register("ana", "segura123")).StatusCode.ShouldBe(HttpStatusCode.Created);
+        for (var i = 1; i <= 5; i++)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login") { Content = JsonContent.Create(new { username = "ana", password = "segura123" }) };
+            req.Headers.Add("X-Forwarded-For", $"203.0.113.{i}");
+            (await api.Http.SendAsync(req, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+        using var sixth = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login") { Content = JsonContent.Create(new { username = "ana", password = "segura123" }) };
+        sixth.Headers.Add("X-Forwarded-For", "203.0.113.6"); // otra IP "real", pero inventada por un cliente que no es el proxy
+        (await api.Http.SendAsync(sixth, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
     public async Task Refresh_WithAValidToken_IssuesANewOne_WithTheAdminFlagFromTheDatabase() // HU-015 CA1
     {
         await using var server = await TestServer.StartAsync();

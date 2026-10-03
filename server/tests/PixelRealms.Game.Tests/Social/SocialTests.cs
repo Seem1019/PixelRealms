@@ -125,7 +125,7 @@ public sealed class SocialTests
     }
 
     [Fact]
-    public void Duel_Request_Accept_Countdown_Active_EndsAtHpPct_Restores() // HU-064 CA1-CA3, CA7
+    public void Duel_Request_Accept_Countdown_Active_EndsAtHpPct_NobodyIsRestored() // HU-064 CA1-CA3, CA7
     {
         var w = Arena();
         var ana = w.Player("Ana"); var bob = w.Player("Bob"); var slime = w.Monster("slime");
@@ -145,15 +145,17 @@ public sealed class SocialTests
         w.Combat.Services.IsEnemy(slime, ana).ShouldBeFalse();
         // Los `ally` no aceptan al rival: un hechizo de cura del Sacerdote sobre su rival va a sí mismo (ya cubierto por IsAlly).
         w.Combat.Services.IsAlly(ana, bob).ShouldBeFalse();
-        // Daño con classAdvantage y recorte en endAtHpPct: nadie muere, se restauran y termina.
+        // Daño con classAdvantage y recorte en endAtHpPct: nadie muere y termina; cada uno se queda como acabó.
         bob.Hp = 10;
         var ctx2 = w.Begin();
         var applied = w.Combat.Damage.Deal(ana, bob, 999, School.Physical, false, null, w.Map, ctx2);
         bob.IsDead.ShouldBeFalse();
         var ended = ctx2.Events.OfType<DuelChangedEvent>().Single(e => e.State == "ended");
         ended.Duel.Winner.ShouldBe(ana);
-        bob.Hp.ShouldBe(bob.MaxHp); // como al empezar el duelo (lleno de vida)
-        ana.Resource.ShouldBeLessThan(ana.MaxResource); // ira: la del inicio (0) más la del último golpe, no el máximo
+        bob.Hp.ShouldBe(Math.Max(1, (int)Math.Ceiling(bob.MaxHp * rs.EndAtHpPct))); // HU-064 CA3: al umbral, sin restaurar
+        bob.Combat.Recovery.ShouldNotBeNull(); // el perdedor se recupera más rápido
+        ana.Combat.Recovery.ShouldBeNull();
+        ana.Resource.ShouldBeLessThan(ana.MaxResource); // ira: la que llevaba, no el máximo
         w.Combat.Pvp.DuelOf(ana).ShouldBeNull();
         _ = applied;
         // enabledRulesets vacío → siempre null.
@@ -245,7 +247,8 @@ public sealed class SocialTests
         ana.Hp = 0; // muere por otra causa en pleno duelo
         TickRunner.Run(w, 1).OfType<DuelChangedEvent>().ShouldContain(e => e.State == "ended");
         ana.Hp.ShouldBe(0);
-        bob.Hp.ShouldBe(bob.MaxHp); // al vivo sí se le restaura
+        bob.Hp.ShouldBe(bob.MaxHp); // el vivo sigue como estaba (no recibió daño) y, como ganó, sin recuperación especial
+        bob.Combat.Recovery.ShouldBeNull();
     }
 
     [Fact]
@@ -267,11 +270,15 @@ public sealed class SocialTests
     [Fact]
     public void Duel_ClassAdvantage_AppliesToBasicAttacksAndDots() // HU-064 CA2 (antes solo a hechizos)
     {
+        // Neutro (1,0) frente a doble (2,0): el valor real del contenido lo decide el balance (HU-084), no este test.
+        using var neutralTmp = new TempContent();
+        neutralTmp.Patch("rules.json", n => n["classAdvantage"]!["warrior"]!["mage"] = 1.0);
+        var neutral = ContentLoader.LoadOrThrow(neutralTmp.Path);
         using var tmp = new TempContent();
         tmp.Patch("rules.json", n => n["classAdvantage"]!["warrior"]!["mage"] = 2.0);
         var doubled = ContentLoader.LoadOrThrow(tmp.Path);
 
-        var (basicNormal, dotNormal) = DuelHits(null);
+        var (basicNormal, dotNormal) = DuelHits(neutral);
         var (basicDoubled, dotDoubled) = DuelHits(doubled);
         basicNormal.ShouldBeGreaterThan(0);
         dotNormal.ShouldBeGreaterThan(0);
@@ -322,7 +329,7 @@ public sealed class SocialTests
     }
 
     [Fact]
-    public void Duel_IsNotAnInn_EachOneEndsAsTheyStarted() // revisión de autoridad: retar a un alt y rendirse curaba al 100 %
+    public void Duel_IsNotAnInn_EachOneEndsAsTheyFinished() // revisión de autoridad: retar a un alt y rendirse curaba al 100 %
     {
         var w = Arena();
         var ana = w.Player("Ana"); var bob = w.Player("Bob");
@@ -340,6 +347,69 @@ public sealed class SocialTests
         bob.Resource.ShouldBeLessThan(bob.MaxResource);
         ana.Auras.All.ShouldNotContain(a => a.AuraId == "warrior_charge_stun"); // se quita lo del rival
         ana.Auras.All.ShouldContain(a => a.AuraId == "priest_power_shield_speed"); // lo de otros sigue
+    }
+
+    [Fact]
+    public void Duel_Loser_RecoversFasterAndWithoutTheDelay_TheWinnerRegeneratesNormally() // HU-064 CA3
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        var combat = w.Content.Rules.Combat;
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        ana.Hp = ana.MaxHp - 50; bob.Hp = 10;
+        w.Combat.Damage.Deal(ana, bob, 999, School.Physical, false, null, w.Map, w.Begin()); // Ana gana: Bob queda al umbral
+        var bobAtEnd = bob.Hp; var anaAtEnd = ana.Hp;
+
+        TickRunner.RunMs(w, 1000);
+        var expected = w.Combat.Services.StatsOf(bob).HpRegenPerSec * rs.LoserRegenMult; // por segundo, sin esperar
+        (bob.Hp - bobAtEnd).ShouldBeInRange((int)expected - 1, (int)Math.Ceiling(expected) + 1);
+        ana.Hp.ShouldBe(anaAtEnd); // el ganador espera hpRegenDelaySec como siempre
+
+        // Volver a entrar en combate corta la recuperación: a partir de ahí, la regeneración normal (con su espera).
+        bob.EnterCombat(w.Clock.NowMs);
+        var bobBefore = bob.Hp;
+        TickRunner.RunMs(w, 1000);
+        bob.Combat.Recovery.ShouldBeNull();
+        bob.Hp.ShouldBe(bobBefore);
+        TickRunner.RunMs(w, (int)(combat.HpRegenDelaySec * 1000));
+        ana.Hp.ShouldBeGreaterThan(anaAtEnd);
+    }
+
+    [Fact]
+    public void Duel_LoserRecovery_OnlyGivesBackWhatTheDuelTook() // HU-064 CA3; revisión de autoridad: no es una posada
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        bob.Hp = bob.MaxHp * 6 / 10; // llega herido de una pelea anterior
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        var startHp = w.Combat.Pvp.DuelOf(bob).ShouldNotBeNull().StartB.Hp; // al activarse (en la cuenta atrás aún regenera)
+        startHp.ShouldBeLessThan(bob.MaxHp);
+        w.Combat.Damage.Deal(ana, bob, 999, School.Physical, false, null, w.Map, w.Begin());
+        bob.Combat.Recovery.ShouldNotBeNull().UntilHp.ShouldBe(startHp);
+
+        for (var i = 0; i < 600 && bob.Combat.Recovery is not null; i++) TickRunner.Run(w, 1);
+        bob.Combat.Recovery.ShouldBeNull();
+        bob.Hp.ShouldBeInRange(startHp, startHp + 1); // se corta al volver a la vida del inicio, no al máximo
+    }
+
+    [Fact]
+    public void Duel_LostByForfeit_GivesNoRecovery() // revisión de autoridad: retar, rendirse y regenerar ×2 tras cada pelea
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        bob.Hp = bob.MaxHp / 2;
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        w.Combat.Pvp.Forfeit(bob, w.Map, w.Begin()).ShouldBeNull();
+        bob.Combat.Recovery.ShouldBeNull();
     }
 
     [Fact]

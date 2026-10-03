@@ -1,4 +1,7 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using PixelRealms.Persistence.Repositories;
+using PixelRealms.Server.Players;
 using PixelRealms.Server.Tests.Helpers;
 using Shouldly;
 using Xunit;
@@ -76,6 +79,52 @@ public sealed class TradeFlowTests
             var bobRow = store.Characters.Values.Single(c => c.Name == "Bob");
             anaRow.Items.ShouldNotContain(i => i.Id == itemId);
             bobRow.Items.ShouldContain(i => i.TemplateId == offered.GetProperty("templateId").GetString());
+            await ana.DisposeAsync(); await bob.DisposeAsync();
+        }
+    }
+
+    /// <summary>Anota qué personajes se escriben en cada llamada (uno suelto o un lote) y delega en el repositorio en memoria.</summary>
+    private sealed class RecordingRepository(ICharacterRepository inner) : ICharacterRepository
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<Guid[]> Writes { get; } = new();
+        public Task<IReadOnlyList<CharacterSummary>> ListByAccountAsync(Guid accountId, CancellationToken ct = default) => inner.ListByAccountAsync(accountId, ct);
+        public Task<int> CountByAccountAsync(Guid accountId, CancellationToken ct = default) => inner.CountByAccountAsync(accountId, ct);
+        public Task<bool> NameExistsAsync(string name, CancellationToken ct = default) => inner.NameExistsAsync(name, ct);
+        public Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default) => inner.CreateAsync(character, maxPerAccount, ct);
+        public Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default) => inner.LoadAsync(id, ct);
+        public Task SaveAsync(CharacterSaveDto character, CancellationToken ct = default) { Writes.Enqueue([character.Id]); return inner.SaveAsync(character, ct); }
+        public Task SaveManyAsync(IReadOnlyList<CharacterSaveDto> characters, CancellationToken ct = default) { Writes.Enqueue(characters.Select(c => c.Id).ToArray()); return inner.SaveManyAsync(characters, ct); }
+        public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default) => inner.SoftDeleteAsync(accountId, characterId, ct);
+    }
+
+    [Fact]
+    public async Task AnotherSaveInTheTickOfACompletedTrade_StillWritesBothTogether() // revisión de autoridad: orden de los guardados
+    {
+        RecordingRepository? repo = null;
+        await using var server = await TestServer.StartAsync(overrideServices: s =>
+        {
+            s.AddSingleton<PixelRealms.Persistence.InMemory.InMemoryCharacterRepository>();
+            s.AddSingleton<ICharacterRepository>(sp => repo = new RecordingRepository(sp.GetRequiredService<PixelRealms.Persistence.InMemory.InMemoryCharacterRepository>()));
+        });
+        var (anaApi, ana, _) = await Enter(server, "ana", "Ana", "priest");
+        var (bobApi, bob, _) = await Enter(server, "bob", "Bob", "mage");
+        using (anaApi) using (bobApi)
+        {
+            var players = server.Services.GetRequiredService<PlayerRegistry>();
+            var session = server.Services.GetRequiredService<WorldSession>();
+            var (anaId, bobId) = (players.ByName("Ana")!.CharacterId, players.ByName("Bob")!.CharacterId);
+            while (repo!.Writes.TryDequeue(out _)) { }
+            // Un intercambio acaba de completarse (marca) y en el mismo tick Ana cruza un portal: su guardado se lleva a Bob.
+            await server.RunOnTickAsync(t =>
+            {
+                var (a, b) = (players.ByName("Ana")!, players.ByName("Bob")!);
+                (a.TradeSavePartner, b.TradeSavePartner) = (b, a);
+                session.Save(a, t.NowMs, "change_map");
+            });
+            for (var i = 0; i < 40 && repo.Writes.IsEmpty; i++) await Task.Delay(50, TestContext.Current.CancellationToken);
+            repo.Writes.ShouldContain(w => w.Length == 2 && w.Contains(anaId) && w.Contains(bobId));
+            repo.Writes.ShouldNotContain(w => w.Length == 1 && (w[0] == anaId || w[0] == bobId));
+            await server.RunOnTickAsync(_ => players.ByName("Bob")!.TradeSavePartner.ShouldBeNull());
             await ana.DisposeAsync(); await bob.DisposeAsync();
         }
     }

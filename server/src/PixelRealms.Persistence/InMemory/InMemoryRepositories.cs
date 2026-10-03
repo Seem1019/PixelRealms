@@ -100,20 +100,25 @@ public sealed class InMemoryCharacterRepository(InMemoryStore store) : ICharacte
     public Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default) =>
         Task.FromResult(store.Characters.TryGetValue(id, out var c) && c.DeletedAt is null ? Map(c) : null);
 
-    public Task SaveAsync(CharacterSaveDto character, CancellationToken ct = default)
+    public Task SaveAsync(CharacterSaveDto character, CancellationToken ct = default) => SaveManyAsync([character], ct);
+
+    public Task SaveManyAsync(IReadOnlyList<CharacterSaveDto> characters, CancellationToken ct = default)
     {
-        lock (_lock)
-        {
-            if (!store.Characters.TryGetValue(character.Id, out var c)) return Task.CompletedTask;
-            c.Level = character.Level; c.Xp = character.Xp; c.Gold = character.Gold; c.MapId = character.MapId; c.X = character.X; c.Y = character.Y; c.Hp = character.Hp; c.Resource = character.Resource; c.ClassId = character.ClassId;
-            c.UpdatedAt = DateTime.UtcNow;
-            c.Items = character.Items.Select(i => new CharacterItem { Id = i.Id, CharacterId = c.Id, TemplateId = i.TemplateId, Quantity = i.Quantity, Container = i.Container, Slot = i.Slot }).ToList();
-            c.Hotbar = character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = c.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }).ToList();
-            c.Cooldowns = (character.Cooldowns ?? []).Select(x => new CharacterCooldown { CharacterId = c.Id, Kind = x.Kind, Ref = x.Ref, EndsAt = x.EndsAtUtc }).ToList();
-            foreach (var a in character.Audit)
-                store.Audit.Enqueue(new ItemAuditLog { Id = store.NextAuditId(), ItemId = a.ItemId, CharacterId = c.Id, Action = a.Action, TemplateId = a.TemplateId, Quantity = a.Quantity, At = DateTime.UtcNow, CounterpartyCharacterId = a.CounterpartyCharacterId });
-        }
+        lock (_lock) // todos bajo el mismo cerrojo: nadie ve a uno guardado sin el otro
+            foreach (var character in characters) Apply(character);
         return Task.CompletedTask;
+    }
+
+    private void Apply(CharacterSaveDto character)
+    {
+        if (!store.Characters.TryGetValue(character.Id, out var c)) return;
+        c.Level = character.Level; c.Xp = character.Xp; c.Gold = character.Gold; c.MapId = character.MapId; c.X = character.X; c.Y = character.Y; c.Hp = character.Hp; c.Resource = character.Resource; c.ClassId = character.ClassId;
+        c.UpdatedAt = DateTime.UtcNow;
+        c.Items = character.Items.Select(i => new CharacterItem { Id = i.Id, CharacterId = c.Id, TemplateId = i.TemplateId, Quantity = i.Quantity, Container = i.Container, Slot = i.Slot }).ToList();
+        c.Hotbar = character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = c.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }).ToList();
+        c.Cooldowns = (character.Cooldowns ?? []).Select(x => new CharacterCooldown { CharacterId = c.Id, Kind = x.Kind, Ref = x.Ref, EndsAt = x.EndsAtUtc }).ToList();
+        foreach (var a in character.Audit)
+            store.Audit.Enqueue(new ItemAuditLog { Id = store.NextAuditId(), ItemId = a.ItemId, CharacterId = c.Id, Action = a.Action, TemplateId = a.TemplateId, Quantity = a.Quantity, At = DateTime.UtcNow, CounterpartyCharacterId = a.CounterpartyCharacterId });
     }
 
     public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default)

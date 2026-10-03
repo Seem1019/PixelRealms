@@ -2,12 +2,12 @@
 
 ### HU-080 · Mapa "meadow" completo (Tier 1)
 **Como** jugador **quiero** un mundo variado con zonas por nivel **para** explorar mientras progreso.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-031, HU-055
 - Skills: `world-maps`, `pixel-art-assets`
 
 **Criterios de aceptación**
-1. **Dado** `maps/meadow.tmj` **entonces** contiene las zonas del Tier 1 del GDD (Aldea Robledal `safe`, Campos 1–3, Colinas 3–5 y la entrada a la Mina) con capas y propiedades de la skill `world-maps`. Cada zona se cruza a pie en 60–90 s (`rules.world.zoneCrossTimeSecTarget`, ~100×100 tiles útiles), tiene un punto de referencia visible, un sendero principal, 2–3 campamentos con subniveles (más bajos cerca de la entrada) y al menos una rama lateral con recompensa.
+1. **Dado** `maps/meadow.tmj` **entonces** contiene las zonas del Tier 1 del GDD (Aldea Robledal `safe`, Campos 1–3, Colinas 3–5 y la entrada a la Mina) con capas y propiedades de la skill `world-maps`. Cada zona se cruza a pie en 25–40 s (`rules.world.zoneCrossTimeSecTarget`, ~100×100 tiles útiles a 4 tiles/s; enmendado 2026-10-03: antes decía 60–90 s, que no cuadra con ese tamaño, y un mapa compacto junta a los amigos), tiene un punto de referencia visible, un sendero principal, 2–3 campamentos con subniveles (más bajos cerca de la entrada) y al menos una rama lateral con recompensa.
 2. **Dado** los spawns **entonces** hay suficientes monstruos para que 5 jugadores suban del 1 al 5 sin esperar respawns (≥ 20 slimes, 20 jabalíes, 15 bandidos, 20 lobos, 15 goblins).
 3. **Dado** el mapa **entonces** hay un punto seguro (`graveyards`) por zona (aldea, campos, colinas), el vendedor en la aldea y el portal a `mine` al final de las Colinas (`minLevel: 4`).
 4. **Dado** un recorrido a pie **entonces** no hay zonas inaccesibles ni huecos en las colisiones (verificado con un test de flood-fill desde el pueblo).
@@ -17,6 +17,7 @@
 - Spawns: 21 slimes (3 campamentos al oeste), 21 jabalíes, 20 bandidos (2 campamentos + escondite en rama lateral), 21 lobos, 20 goblins (2 + atalaya en rama lateral); subniveles de oeste a este. Portal `meadow_to_mine` (`minLevel: 4`) en la boca de mina al final de las Colinas.
 - CA4: el generador rellena cualquier bolsa inaccesible y `FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject` comprueba desde `gy_village` que toda casilla transitable, cada cementerio, NPC, portal y ≥ `count` casillas de cada spawn son alcanzables.
 - **Pendiente de validar en el editor**: la skill pide ~100×100 útiles por zona, que a 4 casillas/s se cruzan en ~25 s, no 60–90 s (contradicción documentada en el resumen). El arte sigue siendo el tileset placeholder (HU-082). El nombre del landmark de las Colinas ("Roble centenario") no está en el GDD: decisión provisional.
+- 2026-10-03 (rama `feat/phase1-close-out`): CA1 completo: objetivo de cruce enmendado a 25–40 s (`rules.world.zoneCrossTimeSecTarget`) y una recompensa en cada rama lateral: el "Jabalí de guerra" (`boar_alpha`, élite nv 3, 330 de vida) en el escondite de bandidos de Campos y el "Huargo de la atalaya" (`wolf_alpha`, élite nv 5, 500 de vida) en la atalaya goblin de Colinas, con botín garantizado propio (`lt_boar_alpha`, `lt_wolf_alpha`), reaparición de 10 min y el sprite de su especie (el arte propio queda para el compañero de arte). Spawns añadidos al final del generador (`tools/maps/gen_tier1_maps.py`) para no mover nada más del mapa. Números en `docs/design/balance-report.md`.
 
 ---
 ### HU-081 · Arte de clases y monstruos
@@ -61,12 +62,14 @@
 - CA2: hechizos y objetivos del jefe (`foreman_slam` área marcada, `foreman_whip` a `random_not_top_threat`, `foreman_rally` bajo 50 %) e inmunidad a aturdir/raíz/ralentizar ya estaban en HU-036/HU-088 (`rules.combat.bossImmuneToAuraKinds`).
 - CA3: **sin validar jugando** (HU-084/partida de prueba); el modelo de `tools/balance/` es la única referencia.
 - CA4: hecho con HU-062 CA4: `LootAnnouncedEvent` → `ChatMessage{global}` a todos los conectados cuando el monstruo es `boss` (test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`). El grupo de la tabla `lt_foreman` garantiza exactamente 1 raro (`Foreman_AlwaysDropsExactlyOneGroupItem`).
+- 2026-10-03 (rama `feat/phase1-close-out`): CA1 completo: puzle de la Sala 2 con dos palancas (`mine_lever_west`, `mine_lever_east`) que abren la puerta del pasillo de la sala del jefe (`mine_boss_door`); se cierra sola a los `rules.world.doorResetSec` (600 s) si no hay nadie debajo. Capas `levers`/`doors` en Tiled (generador), `MapObjectSystem` en el servidor (colisión propia de la instancia, puertas cerradas sólidas y opacas), mensajes `Interact` y `MapObjects`, y en el cliente `TmjMap` las aplica a la predicción y `MapObjectsLayer` las dibuja (placeholder hasta tener sprites). CA3 con el modelo de `tools/balance/` (1 400 de vida): 3 de nivel 4 con sanador 81–86 s, sin sanador 54 s (el tanque necesita poción y pan), 2 de nivel 6 ganan en 53–105 s; ver `balance-report.md`. **Falta** la partida de prueba que pide CA3.
+- 2026-10-03 (revisión de autoridad): un grupo podía quedarse encerrado con el jefe si la puerta se cerraba con él dentro. Ahora hay una palanca dentro de la sala que la abre sola (`mine_lever_inside`, `opensAlone`), tirar de una palanca con la puerta abierta renueva el plazo, la puerta no se cierra con alguien saltando a través y el cargador rechaza ids repetidos (`MapObjectSystemTests`, `TiledMapLoaderTests.RepeatedLeverOrDoorId_Fails`).
 
 ---
 
 ### HU-084 · Pasada de balance
 **Como** diseñador **quiero** revisar números con datos **para** que ninguna clase sea inútil o rota.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-041, HU-052, HU-062
 - Skills: `game-content`, `combat-system`
 
@@ -81,6 +84,7 @@
      punta de armadura en el pentagrama (medida 23, objetivo 25).
    - El **Capataz con Guerrero + Sacerdote de nivel 6** dura ~101 s (objetivo 60–100 s) y **3 de nivel 4 sin sanador** ~54 s; ver si la vida de 1 400 se queda.
    - Confirmar que el **ciclo real por monstruo** es de ~36 s (`killCycleSecTarget`); si no, se cambia ese valor y la curva de XP se recalcula sola (ADR-017).
+- 2026-10-03 (rama `feat/phase1-close-out`): CA1 y CA2 hechos por `content-designer`: `balance-report.md` (pasada de HU-084) con afinidad, XP por hora, pentagrama, economía y el triángulo PvP simulado (1 000 duelos por pareja a nivel 6 con equipo verde). Con `classAdvantage` todo en 1.0 los duelos salían 0–100 %; la matriz nueva (`content/rules.json`) deja a cada favorito en 63–68 %. Depende de supuestos (kiteo, ejecución): confirmarlo jugando. Commit propuesto: `content(balance): tune PvP classAdvantage so duel favourites win 60-75% (HU-084)`. **Faltan** CA3 y CA4 (partida con amigos).
 
 ---
 ### HU-090 · Animaciones de combate del cuerpo

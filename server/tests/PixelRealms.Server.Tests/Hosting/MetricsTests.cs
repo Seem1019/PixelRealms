@@ -87,5 +87,6 @@ public sealed class MetricsTests
         meadow.GetProperty("combatP99Ms").GetDouble().ShouldBeGreaterThanOrEqualTo(0);
         meadow.GetProperty("areasActive").GetInt32().ShouldBeGreaterThanOrEqualTo(0);
         meadow.GetProperty("aurasActive").GetInt32().ShouldBeGreaterThanOrEqualTo(0);
+        meadow.GetProperty("allocBytesPerSec").GetDouble().ShouldBeGreaterThanOrEqualTo(0); // HU-072 CA3: por instancia
     }
 }

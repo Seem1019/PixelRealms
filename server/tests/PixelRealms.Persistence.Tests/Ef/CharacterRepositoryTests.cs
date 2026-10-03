@@ -35,6 +35,31 @@ public sealed class CharacterRepositoryTests(PostgresFixture pg) : IClassFixture
     }
 
     [Fact]
+    public async Task SaveMany_IsAllOrNothing() // HU-059: los dos lados de un intercambio en una transacción
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var accounts = new EfAccountRepository(pg.Factory);
+        var chars = new EfCharacterRepository(pg.Factory);
+        var acc = (await accounts.CreateAsync("trato", "hash", ct)).ShouldNotBeNull();
+        var ana = (await chars.CreateAsync(new NewCharacter(acc.Id, "Tana", "warrior", "meadow", 10, 12, 60, 0, [], []), Max, ct)).Character.ShouldNotBeNull();
+        var bob = (await chars.CreateAsync(new NewCharacter(acc.Id, "Tbob", "mage", "meadow", 10, 12, 60, 0, [], []), Max, ct)).Character.ShouldNotBeNull();
+
+        // La BD rechaza el segundo (template_id más largo que su columna) cuando el primero ya se actualizó dentro de la transacción:
+        // no debe quedar nada del primero.
+        var bread0 = new SavedItem(Guid.CreateVersion7(), "bread", 1, 0, 0);
+        var tooLong = new SavedItem(Guid.CreateVersion7(), new string('x', 80), 1, 0, 0);
+        await Should.ThrowAsync<DbUpdateException>(() => chars.SaveManyAsync([ana with { Gold = 999, Items = [bread0] }, bob with { Items = [tooLong] }], ct));
+        var anaAfter = (await chars.LoadAsync(ana.Id, ct)).ShouldNotBeNull();
+        anaAfter.Gold.ShouldBe(ana.Gold);
+        anaAfter.Items.ShouldBeEmpty();
+
+        var bread = new SavedItem(Guid.CreateVersion7(), "bread", 1, 0, 0);
+        await chars.SaveManyAsync([ana with { Gold = 10 }, bob with { Items = [bread] }], ct);
+        (await chars.LoadAsync(ana.Id, ct)).ShouldNotBeNull().Gold.ShouldBe(10);
+        (await chars.LoadAsync(bob.Id, ct)).ShouldNotBeNull().Items.ShouldHaveSingleItem().Id.ShouldBe(bread.Id);
+    }
+
+    [Fact]
     public async Task Cooldowns_RoundTrip_AsUtc_AndEachSaveReplacesThePrevious() // HU-015 pendiente
     {
         var ct = TestContext.Current.CancellationToken;

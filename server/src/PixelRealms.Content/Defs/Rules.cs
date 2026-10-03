@@ -231,6 +231,7 @@ public sealed record PvpRuleset
     public required bool RequiresConsent { get; init; }
     public required double EndAtHpPct { get; init; }
     public required bool RestoreOnEnd { get; init; }
+    public required double LoserRegenMult { get; init; }
     public required double XpLoss { get; init; }
     public required double GoldLoss { get; init; }
     public required bool ItemLoss { get; init; }
@@ -390,4 +391,6 @@ public sealed record WorldRules
     public required string StartMapId { get; init; }
     public required int CurrentPhase { get; init; }
     public required IReadOnlyList<double> ZoneCrossTimeSecTarget { get; init; }
+    public required double InteractRangeTiles { get; init; }
+    public required double DoorResetSec { get; init; }
 }

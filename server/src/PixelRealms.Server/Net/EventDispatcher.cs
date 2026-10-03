@@ -89,6 +89,13 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                 case AuraAppliedEvent aa:
                     Broadcast(aa.MapInstanceId, aa.Target, ToAuraApplied(aa.Target, aa.Aura, ctx.NowMs));
                     break;
+                case Game.Map.MapObjectChangedEvent oc when world.GetInstance(oc.MapInstanceId) is { } objMap:
+                {
+                    // Una palanca o una puerta se ven desde todo el mapa (las salas son pequeñas): a todos los de la instancia.
+                    var msg = new MapObjects([new MapObjectDto(oc.ObjectId, oc.State)]);
+                    foreach (var p in objMap.Players.Values) if (p.ConnectionId >= 0) connections.Send(p.ConnectionId, msg);
+                    break;
+                }
                 case AuraRemovedEvent ar:
                     Broadcast(ar.MapInstanceId, ar.Target, new AuraRemoved(ar.Target.Id.Value, ar.AuraId, ar.CasterId?.Value));
                     break;
@@ -158,14 +165,11 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                         connections.Send(p.ConnectionId, new TradeUpdate(tr.State, tr.Trade.Partner(p).Id.Value, tr.Trade.Version, ToOffer(mine, p), ToOffer(theirs, tr.Trade.Partner(p)),
                             tr.Trade.ConfirmedBy(p), tr.Trade.ConfirmedBy(tr.Trade.Partner(p)), tr.Reason));
                     }
-                    // HU-026 CA6 / ADR-018: los dos en el mismo tick (antes esperaban al autosave, hasta 60 s: si el proceso moría
-                    // entre los dos, lo intercambiado quedaba en ambos). Son dos escrituras seguidas en la cola, no una transacción:
-                    // queda una ventana de milisegundos. Un intercambio vacío no mueve nada y no se guarda.
-                    if (tr.State == "completed" && (tr.Trade.OfferA.Items.Count + tr.Trade.OfferB.Items.Count > 0 || tr.Trade.OfferA.Gold + tr.Trade.OfferB.Gold > 0))
-                    {
-                        session.Save(tr.Trade.A, ctx.NowMs, "trade");
-                        session.Save(tr.Trade.B, ctx.NowMs, "trade");
-                    }
+                    // HU-026 CA6 / ADR-018: los dos en el mismo tick y en una sola transacción (antes esperaban al autosave, hasta
+                    // 60 s, y luego eran dos escrituras sueltas: si el proceso moría entre ellas, lo intercambiado quedaba en ambos o en
+                    // ninguno). Si otro guardado de este tick (cambio de mapa, autosave, salida) ya los escribió juntos, la marca de
+                    // `TradeSavePartner` ya no está. Un intercambio vacío no la pone y no se guarda.
+                    if (tr.State == "completed" && tr.Trade.A.TradeSavePartner is not null) session.Save(tr.Trade.A, ctx.NowMs, "trade");
                     break;
                 }
                 case ClassChangedEvent cc when cc.Player.ConnectionId >= 0:
@@ -179,6 +183,16 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         }
         FlushBatches(ctx.Tick);
         if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
+    }
+
+    /// <summary>HU-083: estado de todos los objetos del mapa (palancas y puertas) para quien entra; null si el mapa no tiene.</summary>
+    public static MapObjects? ToMapObjects(Game.Map.MapInstance map)
+    {
+        if (map.Data.Levers.Count + map.Data.Doors.Count == 0) return null;
+        var states = Game.Map.MapObjectSystem.States(map);
+        var list = new List<MapObjectDto>(states.Count);
+        foreach (var (id, state) in states) list.Add(new MapObjectDto(id, state));
+        return new MapObjects(list);
     }
 
     /// <summary>AuraApplied de un aura ya puesta (al aplicarse, al entrar alguien en la AOI o al reconectar).</summary>

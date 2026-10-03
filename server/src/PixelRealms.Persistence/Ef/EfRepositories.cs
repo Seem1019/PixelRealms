@@ -109,11 +109,21 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
     }
 
     /// <summary>Una transacción: UPDATE del personaje, DELETE + INSERT masivo de items y barra, INSERT de auditoría (architecture.md §5).</summary>
-    public async Task SaveAsync(CharacterSaveDto character, CancellationToken ct = default)
+    public Task SaveAsync(CharacterSaveDto character, CancellationToken ct = default) => SaveManyAsync([character], ct);
+
+    public async Task SaveManyAsync(IReadOnlyList<CharacterSaveDto> characters, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = DateTime.UtcNow;
+        foreach (var character in characters) await StageAsync(db, character, now, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+    }
+
+    /// <summary>Actualiza la fila, borra lo hijo y deja preparados los INSERT del personaje dentro de la transacción en curso.</summary>
+    private static async Task StageAsync(GameDbContext db, CharacterSaveDto character, DateTime now, CancellationToken ct)
+    {
         await db.Characters.Where(c => c.Id == character.Id).ExecuteUpdateAsync(s => s
             .SetProperty(c => c.Level, character.Level).SetProperty(c => c.Xp, character.Xp).SetProperty(c => c.Gold, character.Gold).SetProperty(c => c.ClassId, character.ClassId)
             .SetProperty(c => c.MapId, character.MapId).SetProperty(c => c.X, character.X).SetProperty(c => c.Y, character.Y)
@@ -125,8 +135,6 @@ public sealed class EfCharacterRepository(IDbContextFactory<GameDbContext> facto
         db.CharacterHotbar.AddRange(character.Hotbar.Select(h => new CharacterHotbarSlot { CharacterId = character.Id, Slot = h.Slot, Kind = h.Kind, Ref = h.Ref }));
         db.CharacterCooldowns.AddRange((character.Cooldowns ?? []).Select(c => new CharacterCooldown { CharacterId = character.Id, Kind = c.Kind, Ref = c.Ref, EndsAt = c.EndsAtUtc }));
         db.ItemAuditLog.AddRange(character.Audit.Select(a => new ItemAuditLog { ItemId = a.ItemId, CharacterId = character.Id, Action = a.Action, TemplateId = a.TemplateId, Quantity = a.Quantity, At = now, CounterpartyCharacterId = a.CounterpartyCharacterId }));
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
     }
 
     public async Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default)

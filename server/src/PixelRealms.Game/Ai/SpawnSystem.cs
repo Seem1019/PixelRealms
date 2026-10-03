@@ -27,7 +27,7 @@ public sealed class SpawnSystem(Func<ContentDb> content, World world) : IMapSyst
             if (!db.TryGetMonster(spawn.MonsterId, out var template) || template is null) continue;
             for (var i = 0; i < spawn.Count; i++)
             {
-                var pos = PickPosition(spawn, map.Data.Collision, rng);
+                var pos = PickPosition(spawn, map.Collision, rng);
                 var monster = Create(template, spawn, pos);
                 map.Add(monster);
                 created++;
@@ -54,7 +54,7 @@ public sealed class SpawnSystem(Func<ContentDb> content, World world) : IMapSyst
         var created = 0;
         for (var i = 0; i < count; i++)
         {
-            var monster = Create(template, adHoc, PickPosition(adHoc, map.Data.Collision, rng));
+            var monster = Create(template, adHoc, PickPosition(adHoc, map.Collision, rng));
             monster.Brain.Spawn = null; // sin reaparición
             map.Add(monster);
             created++;
@@ -106,7 +106,7 @@ public sealed class SpawnSystem(Func<ContentDb> content, World world) : IMapSyst
             if (p.AtMs > ctx.NowMs) continue;
             list.RemoveAt(i);
             if (!db.TryGetMonster(p.MonsterId, out var template) || template is null) continue;
-            var pos = map.Data.Collision.IsSolidAt(p.Position.X, p.Position.Y) ? PickPosition(p.Spawn, map.Data.Collision, ctx.Rng) : p.Position;
+            var pos = map.Collision.IsSolidAt(p.Position.X, p.Position.Y) ? PickPosition(p.Spawn, map.Collision, ctx.Rng) : p.Position;
             map.Add(Create(template, p.Spawn, pos));
         }
     }

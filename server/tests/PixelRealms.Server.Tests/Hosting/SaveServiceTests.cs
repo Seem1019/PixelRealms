@@ -92,6 +92,69 @@ public sealed class SaveServiceTests
         public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
+    /// <summary>Registra cada llamada: guardados sueltos y lotes (SaveManyAsync); los lotes fallan las primeras `failures` veces.</summary>
+    private sealed class BatchRecorderRepo(int failures) : ICharacterRepository
+    {
+        private int _calls;
+        public System.Collections.Concurrent.ConcurrentQueue<Guid[]> Batches { get; } = new();
+        public System.Collections.Concurrent.ConcurrentQueue<AuditEntry> Written { get; } = new();
+
+        public Task SaveAsync(CharacterSaveDto dto, CancellationToken ct = default) => SaveManyAsync([dto], ct);
+
+        public Task SaveManyAsync(IReadOnlyList<CharacterSaveDto> characters, CancellationToken ct = default)
+        {
+            if (Interlocked.Increment(ref _calls) <= failures) throw new InvalidOperationException("bd caída");
+            Batches.Enqueue(characters.Select(c => c.Id).ToArray());
+            foreach (var c in characters) foreach (var a in c.Audit) Written.Enqueue(a);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<CharacterSummary>> ListByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> CountByAccountAsync(Guid accountId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> NameExistsAsync(string name, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CreateCharacterResult> CreateAsync(NewCharacter character, int maxPerAccount, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CharacterSaveDto?> LoadAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> SoftDeleteAsync(Guid accountId, Guid characterId, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task EnqueueTogether_WritesBothInOneBatch() // HU-059: el intercambio se guarda en una transacción
+    {
+        var repo = new BatchRecorderRepo(0);
+        var svc = new SaveService(repo, NullLogger<SaveService>.Instance);
+        await svc.StartAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            var (ana, bob) = (Dto(), Dto() with { Name = "Bob" });
+            var gens = svc.EnqueueTogether(ana, bob);
+            await WaitUntil(() => svc.Saved == 2);
+            repo.Batches.Single().ShouldBe([ana.Id, bob.Id]);
+            svc.WrittenGeneration(ana.Id).ShouldBe(gens[0]);
+            svc.WrittenGeneration(bob.Id).ShouldBe(gens[1]);
+            svc.HasPending(ana.Id).ShouldBeFalse(); svc.HasPending(bob.Id).ShouldBeFalse();
+        }
+        finally { await svc.StopAsync(CancellationToken.None); }
+    }
+
+    [Fact]
+    public async Task EnqueueTogether_ThatFailsForGood_WritesNeither_AndKeepsBothAudits() // HU-059 + HU-057 CA3
+    {
+        var repo = new BatchRecorderRepo(3); // el lote agota sus 3 intentos
+        var svc = new SaveService(repo, NullLogger<SaveService>.Instance);
+        await svc.StartAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            var ana = Dto() with { Audit = [new AuditEntry(Guid.NewGuid(), "trade_out", "potion_minor", 1)] };
+            var bob = Dto() with { Name = "Bob", Audit = [new AuditEntry(Guid.NewGuid(), "trade_in", "potion_minor", 1)] };
+            svc.EnqueueTogether(ana, bob);
+            await WaitUntil(() => svc.UnwrittenAuditCount(ana.Id) == 1 && svc.UnwrittenAuditCount(bob.Id) == 1);
+            repo.Batches.ShouldBeEmpty();
+            svc.Failed.ShouldBe(2);
+            svc.WrittenGeneration(ana.Id).ShouldBe(0); svc.WrittenGeneration(bob.Id).ShouldBe(0);
+        }
+        finally { await svc.StopAsync(CancellationToken.None); }
+    }
+
     private static CharacterSaveDto Dto() => new(Guid.NewGuid(), Guid.NewGuid(), "Ana", "warrior", 1, 0, 0, "meadow", 1, 1, 10, 0, [], [], []);
 
     private static async Task WaitUntil(Func<bool> cond, int timeoutMs = 3000)

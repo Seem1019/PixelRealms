@@ -22,6 +22,32 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
 
     public ICastInterrupter? Interrupter { get; set; }
 
+    // HU-088 CA1: reserva de instancias. Lo quitado en un tick vuelve a la reserva al empezar el siguiente: los eventos del tick
+    // (AuraApplied lleva la instancia) se envían en el post-tick y no deben ver un aura reutilizada.
+    private readonly Stack<AuraInstance> _free = new();
+    private readonly List<AuraInstance> _released = new();
+    private long _releasedInTick = long.MinValue;
+
+    private AuraInstance Rent(AuraDef def, EntityId? casterId, TickContext ctx)
+    {
+        Recycle(ctx);
+        return (_free.Count > 0 ? _free.Pop() : new AuraInstance()).Reset(def, casterId, ctx.NowMs);
+    }
+
+    private void Release(AuraInstance aura, TickContext ctx)
+    {
+        Recycle(ctx);
+        _released.Add(aura);
+    }
+
+    private void Recycle(TickContext ctx)
+    {
+        if (ctx.Tick == _releasedInTick) return;
+        foreach (var a in _released) _free.Push(a);
+        _released.Clear();
+        _releasedInTick = ctx.Tick;
+    }
+
     /// <summary>Aplica un aura; devuelve la instancia o null si fue inmune (y emite el evento `immune`).</summary>
     public AuraInstance? Apply(Actor target, AuraDef def, Actor? caster, MapInstance map, TickContext ctx, string? spellId = null)
     {
@@ -60,10 +86,13 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
         var isControl = IsControl(def.Kind, rules);
         if (!isControl) EnforceCap(target, def.IsDebuff, map, ctx);
 
-        var aura = new AuraInstance(def, casterId, now) { Amount = amount };
+        var aura = Rent(def, casterId, ctx);
+        aura.Amount = amount;
         if (def.Kind == AuraKind.Shield) aura.ShieldRemaining = amount;
         if (def.Kind == AuraKind.Dot && def.School == School.Physical && caster is not null)
             aura.Mitigation = CombatCalculator.Mitigation(services.StatsOf(target).Armor, caster.Level, rules);
+        // Capacidad fija por actor: los dos topes de ADR-021 más los controles, reservada una vez.
+        target.Auras.Mutable.EnsureCapacity(ctx.Rules.Limits.MaxBuffsPerEntity + ctx.Rules.Limits.MaxDebuffsPerEntity + rules.ControlAuraKinds.Count);
         target.Auras.Mutable.Add(aura);
         ctx.Emit(new AuraAppliedEvent(map.Id, target, aura));
         AfterApply(target, def, map, ctx);
@@ -110,6 +139,7 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
     public void Remove(Actor target, AuraInstance aura, MapInstance map, TickContext ctx)
     {
         if (!target.Auras.Mutable.Remove(aura)) return;
+        Release(aura, ctx);
         ctx.Emit(new AuraRemovedEvent(map.Id, target, aura.AuraId, aura.CasterId));
         if (aura.Def.Mods?.Stats is not null) StatsChanged(target, map, ctx);
         if (ctx.Rules.Combat.HardControlKinds.Contains(aura.Kind) && !target.Auras.HasKind(aura.Kind))
@@ -130,6 +160,7 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
         {
             var a = target.Auras.Mutable[i];
             target.Auras.Mutable.RemoveAt(i);
+            Release(a, ctx);
             ctx.Emit(new AuraRemovedEvent(map.Id, target, a.AuraId, a.CasterId));
             hadStats |= a.Def.Mods?.Stats is not null;
         }
