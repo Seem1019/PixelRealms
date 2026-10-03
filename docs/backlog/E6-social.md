@@ -54,6 +54,7 @@
 **Notas de implementación**
 - Marcos de grupo (`social_panels.gd`) con nombre, clase, nivel, vida y estado, actualizados con `PartyUpdate` cada 500 ms (`EventDispatcher.PartyFrameEveryTicks`) aunque estén fuera de la AOI; clic o F1–F5 seleccionan. XP de grupo con la fórmula del GDD (`GroupXp.Split`: activos vivos a ≤ `xpRangeTiles` con acción en `activeWindowSec`, referencia nivel máximo, pesos `0.75^max(0, brecha−2)` mín. 0.10, `bonusBySize`); oro y botín para los miembros elegibles del grupo (`LootSystem.EligibleFor`).
 - Tests: `GroupXp_Example_10_8_5_vs_Normal9` (26.5 / 26.5 / 11.2), `GroupXp_InWorld_DeadOrFarMembersExcluded`. CA4: `LootAnnouncedEvent` al crear la bolsa → `ChatMessage{party}` a los miembros conectados del grupo del ganador (`EventDispatcher`); si el monstruo es jefe va al `global` (HU-083 CA4). Test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA1: `PartyUpdate.members[].resPct` y el marco muestra el recurso (`test_party_frames.gd`). CA3: el resto de la división (`GoldRemainder`) es para el primer elegible que lootea, no para `eligible[0]`.
 
 ---
 ### HU-063 · Lista de jugadores en línea
@@ -67,12 +68,13 @@
 2. **Dado** un nombre de la lista **cuando** hago clic derecho **entonces** puedo susurrar o invitar al grupo.
 
 **Notas de implementación**
-- `/who` (`ChatSend{channel: "who"}`) → mensaje de sistema con nombre, clase, nivel y zona de cada conectado. CA2 (clic derecho en la lista) y la tecla O quedan pendientes (la lista llega como texto en el chat).
+- `/who` (`ChatSend{channel: "who"}`) → mensaje de sistema con nombre, clase, nivel y zona de cada conectado. CA2 (clic derecho en la lista) y la tecla O quedaron pendientes (la lista llegaba como texto en el chat). *(cerrado el 2026-10-02: ver la última nota)*
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Tecla O (`toggle_online_list`) → `OnlineListRequest` → ventana con nombre, clase, nivel y zona; clic o clic derecho sobre otro jugador → Susurrar / Invitar al grupo (`test_online_list.gd`). `/who` sigue funcionando en el chat.
 
 ---
 ### HU-064 · Duelos (PvP amistoso)
 **Como** jugador **quiero** retar a un amigo a un duelo **para** medirnos sin perder nada.
-- Prioridad: Must · Estimación: L · Estado: Hecha
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-033, HU-035, HU-037, HU-060
 - Skills: `combat-system`, `net-protocol`, `godot-client`
 
@@ -94,6 +96,7 @@
 **Notas de implementación**
 - `Social/PvpService` (única puerta del PvP): `/duel` o clic derecho → `DuelUpdate{requested}` (caduca `requestExpireSec`), aceptar → `countdown` (`countdownSec`) → `active`; `CanAttack(a, b)` devuelve el ruleset o null (sin duelo, otro rival, `enabledRulesets` vacío); daño con `rules.classAdvantage`; al llegar a `endAtHpPct` el daño se recorta, nadie muere, ambos se restauran, se limpian auras y se anuncia en `say`; pierde quien se rinde, se aleja > `maxDistanceTiles`, se desconecta o cambia de mapa; los monstruos ignoran a los duelistas y estos no atacan a monstruos ni terceros; los `ally` no aceptan al rival; mismas reglas de auras (ADR-022). Cliente: diálogo, cuenta atrás, rival en naranja, resultado 3 s.
 - Tests: `SocialTests.Duel_*`, `SocialFlowTests.Duel_*`.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Exploit cerrado: no se puede retar ni aceptar en combate, rendirse antes de empezar solo cancela y al terminar cada uno vuelve a la vida y el recurso del inicio del duelo (no al máximo) y pierde las auras del rival. CA2: `classAdvantage` también en el básico y los DoT. CA6: `pvp_not_allowed`. **Falta una decisión:** CA3 dice "recuperan vida y recurso completos"; si se acepta la restauración al estado del inicio, cambiar ese texto y marcarla Hecha.
 
 ### HU-097 · Historial del chat
 **Como** jugador **quiero** subir en el chat **para** leer mensajes que ya pasaron.
@@ -105,3 +108,9 @@
 1. **Dado** el registro del chat **cuando** giro la rueda sobre él o pulso Re Pág / Av Pág **entonces** se desplaza por los mensajes anteriores (se guardan 200 líneas).
 2. **Dado** que estoy leyendo arriba **cuando** llega un mensaje **entonces** no salta al final y aparece el aviso "↓ nuevos"; al volver al final sigue al último mensaje.
 3. **Dado** el ratón sobre el chat o que estoy desplazado arriba **entonces** el chat no se desvanece.
+
+**Notas de implementación** (escritas en la auditoría del 2026-10-02, a partir de `7c279c1`)
+- `scripts/ui/chat_panel.gd`: guarda 200 líneas; rueda y Re Pág / Av Pág desplazan; leyendo arriba no salta al final y muestra
+  "↓ nuevos". El desvanecido por inactividad (8 s, `f88c107`, sin HU propia) se suspende con el ratón encima o leyendo arriba.
+- Tests: `test_chat_history.gd` (200 líneas, desplazar sin saltar, seguir al último, no desvanecer leyendo); la rueda y el
+  hover no tienen test.

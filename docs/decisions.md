@@ -26,6 +26,8 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - **Decisión:** mapas en Tiled (`.tmj`). Servidor lee capa `collision` y capa de objetos `spawns`/`npcs`/`graveyards`.
   Cliente importa con el plugin **YATI** (Yet Another Tiled Importer) para Godot 4.
 - **Consecuencias:** un solo archivo alimenta ambos lados. Convenciones de capas en skill `world-maps`.
+- *Nota 2026-10-02: el servidor lee el `.tmj` con `TiledMapLoader`; el cliente no usa YATI: lo lee con `TmjMap`
+  (`client/scripts/world/tmj_map.gd`) y lo hornea con `TerrainBaker`/`TerrainRenderer` (ADR-026).*
 
 ## ADR-005 · Contenido data-driven con JSON Schema
 - **Decisión:** clases, hechizos, items, monstruos y botín en `content/*.json`, validados por JSON Schema
@@ -169,6 +171,11 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   salida p95 > 40 KB/s por cliente; FPS web p5 < 45. Microbenchmarks: 1 millón de pruebas de forma < 5 ms; consulta de área
   con 100 candidatos < 20 µs. Se ejecuta en cada HU que toque áreas o auras y al cerrar M2 y M5.
 - **Consecuencias:** `CombatEvent` pasa a `CombatEvents` (cambio de protocolo antes de implementarlo). HU-088 y HU-089 nuevas.
+- *Nota 2026-10-02: hoy se guarda al salir (logout, cierre o linkdead vencido), cambiar de mapa, subir de nivel, cambiar de
+  clase, reemplazar la sesión, completar un intercambio (los dos en el mismo tick) y morir, más el autosave de 60 s si hubo
+  cambios y el apagado. Los cooldowns de hechizos y consumibles sí se guardan desde HU-015 (`character_cooldowns`); auras y
+  casteos no. `area_limit` ya se aplica: un área con casteo con `rules.limits.maxAreasPerInstance` marcas activas en la
+  instancia se rechaza, y al tope de impactos pendientes se resuelve el más antiguo en vez de descartarlo (HU-086, HU-088).*
 
 ## ADR-019 · Básico por arma y casteo en movimiento
 - **Decisión:** el ataque básico lo da el arma equipada y no ocupa ninguna de las 4 casillas. Cada tipo de arma define alcance,
@@ -277,4 +284,6 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   pantalla de inicio lo aprovecha como fondo). Las piezas del atlas y las filas de `TerrainBaker` deben coincidir con
   `tools/art/gen_tiles.py`. Las capturas de referencia están en `docs/screenshots/redesign/`
   (`client/tools/screenshots.gd`).
+- *Nota 2026-10-02: la fuente pasó a Alegreya Sans / Alegreya SC con suavizado gris (HU-092, `UiTheme`), y el guerrero y el
+  mago usan hojas importadas con `tools/art/import_heroes.py`, fuera de la paleta Resurrect 64 (HU-093).*
 

@@ -3,6 +3,14 @@
 > Archivo de trabajo del agente que implementa la Fase 1 en la rama `fase-1`. Se actualiza al cerrar cada HU para que otra
 > sesión pueda retomar desde donde quedó. La especificación es la documentación (`CLAUDE.md`, `docs/`, `.claude/`); este
 > archivo solo registra orden, estado, decisiones provisionales y bloqueos.
+>
+> **El estado vigente de cada HU está en `docs/backlog/README.md`** (revisado contra el código en la auditoría del 2026-10-02,
+> `main` @ `0cd4f508`). Las secciones "Entorno de la sesión", "Sin compilar" y "Bloqueos" describen la sesión de la rama
+> `fase-1` (2026-10-01) y se conservan como histórico, con una nota de lo que ya se resolvió.
+>
+> Tras la rama `fix/phase1-audit-blockers` (2026-10-02): 57 HUs hechas, 17 parciales y 1 pendiente (HU-084). De las
+> parciales, 8 esperan trabajo estético (HU-005, 024, 035, 038, 041, 050, 081 y 082) y las otras 9 esperan una decisión
+> o una prueba fuera del repo (HU-064 CA3, 072, 074, 075, 080, 083, 086 CA7b, 088, 089 CA3). Cada ficha dice qué le falta.
 
 ## Entorno de la sesión (2026-10-01)
 - Compilación y tests: SDK .NET 10 (10.0.112) en un sandbox Linux **sin acceso a NuGet**. El repo referencia los paquetes
@@ -30,6 +38,7 @@
 | 10 | HU-050 → HU-059 | M3 | | Hechas | ventanas por código sin arte |
 | 11 | HU-042 → HU-044, HU-060 → HU-064 | M4 | | Hechas (HU-063 parcial: lista como texto) | invitación de grupo reutiliza PartyUpdate |
 | 12 | HU-070 → HU-075, HU-080 → HU-083, HU-089 | M5 | | HU-070/071/072/080 hechas; HU-073/074/075/083/088/089 parciales; HU-081/082/084 fuera | despliegue escrito sin VPS; mapas generados con `tools/maps/gen_tier1_maps.py`; LoadBot en proceso |
+| 13 | HU-015, HU-090 → HU-098 (tras fusionar `fase-1`) | — | | ver README | se escribieron durante y después de la primera prueba de juego (2026-10-02); el rediseño visual de ADR-026 entró sin HU y cubre buena parte de HU-081/HU-082 |
 
 ## Decisiones provisionales (revisar)
 - **HU-003 · validación de schemas sin JsonSchema.Net.** Se eligió portar el `SchemaValidator` de `tools/ContentCheck`
@@ -51,7 +60,7 @@
   (`docs/protocol.md`); la conversión vive solo en `SnapshotBuilder`/`PlayerMapper` y el cliente predice en píxeles con
   `movement_step.gd`. Descartado: enviar tiles con decimales (rompería los vectores compartidos, que están en px).
 - **HU-023 · entidades remotas sin sprites.** `RemoteEntity` dibuja un rectángulo de color por tipo (jugador/monstruo/NPC) y
-  el nombre; los sprites y `walk_<dir>`/`idle_<dir>` llegan con HU-070. Reversible: sustituir el `ColorRect` por un
+  el nombre; los sprites y `walk_<dir>`/`idle_<dir>` llegaron después con el rediseño de ADR-026 (`fe8b10e`). Reversible: sustituir el `ColorRect` por un
   `AnimatedSprite2D` sin tocar la red.
 - **HU-027 · mapas en el cliente sin escenas .tscn.** La HU habla de `res://maps/<mapId>.tscn`; como no hay YATI ni tiles,
   el cliente carga el `.tmj` directamente (`TmjMap` + renderer placeholder). Descartado: generar `.tscn` vacíos. Reversible:
@@ -72,7 +81,8 @@
 - **HU-050 · "el cadáver brilla" = bit 8 de `EntitySpawn.flags`** reenviado solo a los ganadores (el protocolo no tiene mensaje
   para ello). Descartado: mensaje nuevo `LootAvailable`. Reversible: añadirlo y quitar el bit.
 - **HU-050 · oro del cadáver:** la parte de cada elegible se cobra al abrir (`LootOpen`), el resto de la división al primero
-  que abre; el oro no espera a `exclusiveSec`.
+  que abre (`LootBag.GoldRemainder`; hasta la auditoría se le daba siempre al primer elegible al crear la bolsa); el oro no
+  espera a `exclusiveSec`. `LootWindow.gold` muestra el oro cobrado (`GoldCollected`; antes salía siempre 0).
 - **HU-061 · invitación de grupo sin mensaje propio.** El protocolo no define la invitación; viaja como
   `PartyUpdate{leader: <quien invita>, members: []}` y el cliente la interpreta como "Aceptar/Rechazar". Descartado: mensaje
   nuevo `PartyInvited` (cambio de protocolo). Reversible: añadirlo y mantener el handler.
@@ -103,13 +113,16 @@
   palancas/puertas (ningún ADR ni skill lo define). Si se quiere, es una HU nueva (objeto `switch` en `maps/` + estado en
   `MapInstance`).
 - **HU-089 · prueba de carga en proceso (dominio puro) en vez de bots por WebSocket.** Descartado: un `LoadBot` de red (no
-  hay servidor ni Postgres levantados en el sandbox y lo que la HU mide es el coste del tick). La salida p95 por cliente y los
-  FPS del cliente web quedan para la medición real. Los ~200 auras se rellenan con sangrados porque los kits del Tier 1 no
+  hay servidor ni Postgres levantados en el sandbox y lo que la HU mide es el coste del tick). *Actualización 2026-10-02:
+  ya existe el modo de red (`--network`) y midió la salida p95 por cliente; los FPS del cliente web siguen sin medir.* Los ~200 auras se rellenan con sangrados porque los kits del Tier 1 no
   llegan solos; las "40 áreas duraderas" no existen en la Fase 1 (áreas instantáneas).
 - **HU-074 · enlace de actualización = `<servidor>/play/`** (la build web siempre es la última), configurable en
   `settings.cfg`. Descartado: una URL fija de itch.io en el código.
 
 ## Sin compilar / sin ejecutar en esta sesión
+> **Resuelto:** EF Core compila con los paquetes reales; la migración `InitialCreate` existe desde `a7a2dcb` (y
+> `CharacterCooldowns` desde `1a07ae1`); los tests de Testcontainers pasan en el CI y en el PC de Diego (2026-10-02).
+
 - `server/src/PixelRealms.Persistence/Ef/*` (GameDbContext, EfAccountRepository, EfCharacterRepository, EfPersistence) y
   `server/tests/PixelRealms.Persistence.Tests/Ef/*` (PostgresFixture con Testcontainers, CharacterRepositoryTests). Pasos en el
   PC: `dotnet build server/PixelRealms.sln` → corregir lo que marque → `dotnet ef migrations add Initial -p
@@ -120,6 +133,9 @@
   `dotnet package search <id>` y ajustar.
 
 ## Bloqueos
+> **Resuelto:** hay VPS y el despliegue funciona (2026-10-02, `docs/deploy.md`); Docker funciona en el PC de Diego; YATI ya no
+> hace falta (ADR-026: el cliente hornea el `.tmj`); el bundle de la rama ya se importó y `fase-1` está fusionada.
+
 - Sin Docker ni VPS: `server/Dockerfile`, `docker-compose.prod.yml`, `deploy/*` y los workflows de GitHub están escritos pero
   sin ejecutar (HU-073/074/075). Sin plantillas de exportación de Godot: `export_presets.cfg` sin probar (HU-074).
 - El dispositivo de Diego estuvo desconectado toda la sesión: el bundle `fase-1.bundle` (rama completa) queda en la

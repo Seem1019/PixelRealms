@@ -8,19 +8,19 @@ description: Implementación del combate híbrido (tab-target para un objetivo, 
 Diseño y fórmulas: **`docs/design/combat.md`** (léelo primero; es la especificación). Esta skill explica *cómo*
 está construido y cómo extenderlo sin romperlo.
 
-## Piezas (PixelRealms.Game/Combat)
+## Piezas (PixelRealms.Game/Combat; `StatCalculator` en `Progression/`, `PvpService` en `Social/`)
 | Clase | Responsabilidad |
 |---|---|
 | `StatCalculator` | stats primarios (clase + nivel + equipo **× afinidad** + auras) → derivados con la matriz `rules.classScaling` (`maxHp`, `attackPower`, `spellPower`, `crit`, `armor`, `haste`…). Cachea y se invalida con `actor.MarkStatsDirty()` |
-| `AffinityResolver` | `(classId, item) → mult` desde `rules.affinity`; lo usan `StatCalculator` (stats/armor/spellPower) y `AutoAttackSystem` (roll del arma) |
+| `rules.Affinity.MultiplierFor` | `(classId, itemType) → mult` desde `rules.affinity` (`AffinityRules`, no hay clase aparte); lo usan `StatCalculator` (stats/armor/spellPower) y `CombatServices` (arma del básico de `AutoAttackSystem`) |
 | `PvpService` | `CanAttack(a, b) → PvpRuleset?`; `DuelSession`s por `MapInstance`; fin de duelo al `endAtHpPct` (ADR-011) |
-| `CombatCalculator` | funciones **puras**: `RollPhysical`, `RollSpell`, `RollHeal`, `Mitigation(armor, level)`. Reciben `IRng` |
-| `CastSystem` | `TryBeginCast(caster, spell, target) → CastResult`, avance por tick, interrupciones, GCD y cooldowns |
+| `CombatCalculator` | funciones **puras**: `RollHit`, `RollVariance`, `RollWeapon`, `PhysicalDamage`, `MagicDamage`, `Heal`, `Mitigation(armor, attackerLevel, c)`. Las tiradas reciben `IRng` |
+| `CastSystem` | `TryBeginCast(caster, spell, targetId, targetPos, map, ctx) → string?` (código de error o null), avance por tick, interrupciones, GCD y cooldowns |
 | `EffectResolver` | aplica `EffectDef[]` sobre la lista de objetivos resuelta por `TargetResolver` |
 | `AuraSystem` | aplicar/refrescar/stack, ticks, expiración, `shield` absorbe, `stat_mod` invalida stats. ADR-021/022: instancia = (aura, lanzador); topes 16 beneficiosas / 16 perjudiciales sin contar controles; renovar no reinicia el ritmo de ticks; modificadores y controles del mismo tipo no se suman (manda el más fuerte / el más largo); inmunidad `hardControlImmunitySec` tras `stun|root|silence` |
 | `ThreatTable` | por monstruo: `Add(actor, amount)`, `Top()`, reglas 110 %/130 %, `taunt` |
 | `AutoAttackSystem` | swing timer `weapon.speedMs / haste` (o `attackSpeedMs` del monstruo) si `autoAttackOn` y en rango; escuela y poder según `weapon.scaling` (str/agi → físico; int → mágico); alcance, animación y proyectil de `rules.weapons` (ADR-019). Un hechizo instantáneo no reinicia el swing, pero abre `abilityLockMs` (250) sin básico. Sin coste de recurso; al impactar devuelve maná a quien lo tenga (`maxMana · rules.combat.manaPerBasicHitPctPerSec · swingMs/1000`, cualquier arma). El swing se pausa mientras el actor castea |
-| `DeathSystem` | hp ≤ 0 → `Dead`, limpia auras, crea `LootBag`, XP, evento `Died`; jugadores: espera `Respawn` |
+| `DeathSystem` | hp ≤ 0 → muerto, limpia auras y casteo, evento `ActorDiedEvent` (de él leen `LootSystem`, que crea la `LootBag`, y `ProgressionSystem`, que da la XP); jugadores: esperan `Respawn`; la reaparición de monstruos la programa `SpawnSystem` |
 
 ## Pipeline de un hechizo
 ```
@@ -53,13 +53,14 @@ EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto 
 6. Un actor muerto no castea, no recibe curas (salvo resurrección futura), no genera amenaza.
 7. En duelo, el daño que dejaría al rival por debajo de `endAtHpPct` se recorta a ese umbral y termina el duelo (`DuelUpdate{state: "ended"}`); nunca se llama a `DeathSystem`.
 
-## IA de monstruos (`Ai/MonsterBrain`)
-Máquina de estados: `Idle → Aggro → Chase → Attack → Evade`. Detalles en `docs/design/combat.md` §Monstruos.
+## IA de monstruos (`Ai/MonsterBrain`, `Ai/MonsterAiSystem`)
+Máquina de estados (`AiState`): `Idle → Chase → Attack → Evade`; el aggro es la transición `Idle → Chase` y el leash, la
+entrada en `Evade`. Detalles en `docs/design/combat.md` §Monstruos.
 - Percepción cada 250 ms (no cada tick) usando el grid AOI para buscar jugadores cercanos.
 - `Chase`: A* sobre `CollisionGrid` (8 direcciones, sin cortar esquinas), recalcular cada 500 ms o si el objetivo se
   mueve > 2 tiles. Límite 200 nodos expandidos; si falla → `Evade`.
 - Hechizos de monstruo: en `Attack`, por cada `spells[i]` listo (CD y `hpBelowPct`) lo castea en vez del auto-ataque.
-- `Evade`: inmune (`flags |= Evading`), velocidad × `rules.combat.evadeSpeedMult` (1.5), al llegar al spawn: vida completa, limpiar amenaza y auras.
+- `Evade`: inmune (`Combat.Evading = true`), velocidad × `rules.combat.evadeSpeedMult` (1.5), al llegar al spawn: vida completa, limpiar amenaza y auras.
 
 ## Cliente
 - `CastStarted` → barra de casteo (propia) o mini-barra sobre la entidad (otros). `CastEnded` la oculta (rojo si interrumpido).

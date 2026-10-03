@@ -61,7 +61,8 @@
 - `scripts/net/movement_step.gd` es traducción literal de `MovementStep.cs`; `tests/test_movement_vectors.gd` pasa los vectores (copiados a `client/tests/vectors/`).
 - `scripts/net/prediction.gd`: inputs pendientes, re-simulación con seq > ackSeq, corrección < 2 px suavizada en 100 ms y salto si es mayor (`test_prediction.gd`). Overlay F3 muestra inputs pendientes, ackSeq y error en px (CA4).
 - `Net.simulated_latency_ms` retrasa envío y recepción (mitad y mitad) para CA2; la comprobación visual "sin tirones" queda para probar jugando.
-- **Pendiente:** CA4b (`castMoveSpeedMult` en el cliente y vectores a velocidad reducida) y CA5 (desplazamientos por habilidad) dependen del casteo de M2 (HU-032/HU-087): se cierran allí.
+- Pendiente en su día: CA4b (`castMoveSpeedMult` en el cliente y vectores a velocidad reducida) y CA5 (desplazamientos por habilidad) dependían del casteo de M2 (HU-032/HU-087). *(cerrado el 2026-10-02: ver la última nota)*
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: `Net.simulated_latency_ms` (`[debug]` de `settings.cfg` o `--latency=150`) retrasa envío y recepción; `test_movement_driver.gd::test_150ms_round_trip_does_not_snap_back`. CA4b: `Prediction.set_casting` aplica `castMoveSpeedMult` entre el `CastStarted` y el `CastEnded` propios, y los vectores tienen 3 casos a velocidad 2 que pasan en xUnit y GUT.
 
 ---
 ### HU-023 · Ver a otros jugadores (AOI + interpolación)
@@ -84,12 +85,13 @@
 **Notas de implementación**
 - Servidor: `Game/Interest/InterestSystem` (celdas de 16 tiles, radio 1, recalculo solo al cambiar de celda) emite `EntityEnteredView`/`EntityLeftView`; `Net/EventDispatcher` los traduce a `EntitySpawn` (nombre, clase, nivel) y `EntityDespawn{reason:"left"}`. Tests `InterestSystemTests` + `MovementAndAoiTests` (dos clientes se ven, se alejan y dejan de verse).
 - Cliente: `scripts/net/interpolation_buffer.gd` (100 ms atrás, extrapola ≤ 100 ms y congela) y `scripts/world/remote_entity.gd` (placeholder de color por tipo + nombre); `world.gd` crea/borra remotos con spawn/despawn y les pasa el estado del snapshot.
-- **Pendiente:** CA4 (`tools/LoadBot`, 30 bots y medición p99/KB·s) se hace con HU-089; CA5 (animaciones `walk_<dir>`/`idle_<dir>`) necesita sprites (HU-070).
+- Pendiente en su día: CA4 (`tools/LoadBot`, 30 bots y medición p99/KB·s) con HU-089; CA5 (animaciones `walk_<dir>`/`idle_<dir>`) llegó con el rediseño de ADR-026 (`fe8b10e`/`8633b9a`). *(cerrado el 2026-10-02: ver la última nota)*
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: `Net.simulated_snapshot_loss_pct` (`--snapshot-loss=5`) descarta snapshots; `test_prediction.gd::test_interpolation_stays_smooth_with_5_percent_snapshot_loss`. CA4: `LoadBot --network` con 30 clientes reales midió p95 22,3 KB/s por cliente y tick p99 2,09 ms (HU-089).
 
 ---
 ### HU-024 · Cámara, capas y nombres sobre personajes
 **Como** jugador **quiero** una cámara que me siga y ver nombres **para** orientarme y reconocer a mis amigos.
-- Prioridad: Must · Estimación: S · Estado: Hecha
+- Prioridad: Must · Estimación: S · Estado: Parcial
 - Dependencias: HU-023
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -102,6 +104,7 @@
 **Notas de implementación**
 - Cámara hija de `PlayerSelf` con `position_smoothing` 8, límites al tamaño del mapa y `snap_2d_transforms_to_pixel` en `project.godot` (CA1); `Entities` con `y_sort_enabled`, capa `above` con z_index 10 (CA2); nombre propio en amarillo y remotos en blanco (`RemoteEntity.set_name_color` para el azul de HU-061) (CA3); etiqueta `ZoneName` con fade de 2 s al entrar en una zona de `zones` (CA4).
 - Sin verificar visualmente en el editor (sandbox headless): probar jugando.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Falta CA3 (nombres del grupo en azul): estético, lo lleva el compañero de arte/UI.
 
 ---
 ### HU-025 · Desconexión, linkdead y reconexión
@@ -141,6 +144,7 @@
 - `WorldSession.SweepLinkdead` (post-tick) encola el guardado de los jugadores `Dirty` cada `Persistence:AutosaveSec` (60 s, appsettings: es infraestructura, no regla de juego) y limpia `Dirty`; `WorldSession.Save(player, now, reason)` es el punto único de guardado por evento (salir, cambiar de mapa, subir de nivel, intercambio, cambio de clase, morir) que irán llamando las HUs de M2/M3.
 - `SaveService` (ya existente): cola fuera del tick, 3 intentos con backoff 200/400 ms, log `error` con el DTO al fallar; al apagar vacía la cola (máx. 10 s) y `GameLoopService.OnStopping` saca y guarda a todos en el hilo del tick.
 - Tests: `SaveServiceTests` (reintentos), `PersistenceFlowTests` (volver a la misma posición/vida/recurso, apagado guarda a todos, autosave solo si Dirty). CA5 (Testcontainers) está escrito en `Persistence.Tests/Ef` pero sin compilar (sin NuGet en el sandbox).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA6: también se guarda al completar un intercambio no vacío (los dos en el mismo tick) y al morir (`EventDispatcher`); `stop_grace_period: 40s` en `docker-compose.prod.yml` para que el apagado alcance a guardar. CA5: el test EF comprueba mapa, x, y, vida y recurso.
 
 ---
 ### HU-027 · Portales y cambio de mapa
@@ -166,4 +170,5 @@
 - Server: `Players/MapTransferService` (post-tick, antes del EventDispatcher): `InterestSystem.ForgetEntity` → `EntityDespawn{left}` a quienes lo veían, cambio de `MapInstance`, `ChangeMap{mapId,x,y}` en px, guardado inmediato (`WorldSession.Save`, HU-026 CA6); los `EntitySpawn` de la nueva AOI salen en el tick siguiente. `Error{level_too_low, "Necesitas nivel 4"}` con el nivel del portal (CA4).
 - Cliente: `world.gd._on_change_map`: fundido a negro 0,25 s, carga `res://maps/<mapId>.tmj` (no hay escenas .tscn por mapa: el mapa se dibuja desde el .tmj con el renderer placeholder), recoloca al jugador y reinicia la predicción; el HUD no se reinicia. El texto del `Error` del servidor se muestra 3 s.
 - Tests: `PortalSystemTests` (6) y `PortalTests` (integración: cruzar al entrar, volver con `UsePortal`, despawn para el otro, `mapId` guardado y reconexión en el mapa nuevo; `level_too_low` una sola vez; `out_of_range`/`not_found`).
-- **Pendiente:** CA5 (`say` por mapa, `party`/`global` y nombre del mapa en los marcos de grupo) se cierra con las HUs de chat y grupo (HU-060/HU-061).
+- Pendiente en su día: CA5 (`say` por mapa, `party`/`global` y nombre del mapa en los marcos de grupo), con las HUs de chat y grupo (HU-060/HU-061). *(cerrado el 2026-10-02: ver la última nota)*
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA5: el marco de grupo nombra el mapa del compañero (`UiText.map_name`) solo si no es el mío (`test_party_frames.gd`); `say` no cruza mapas y `party`/`global` sí (`SocialTests.Chat_AcrossMaps_SayStaysInTheMap_PartyAndGlobalArrive`).

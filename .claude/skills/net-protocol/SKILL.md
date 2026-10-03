@@ -18,15 +18,19 @@ Fuente de verdad: `docs/protocol.md`. Sobre: `{ "t": "<Tipo>", "d": { ...camelCa
    - Opcionales como `int?` con `[JsonIgnore(Condition = WhenWritingNull)]`.
 3. **Registro**: `MessageRegistry.Register<LootTake>("LootTake")` y `[JsonSerializable(typeof(LootTake))]` en
    `ProtocolJsonContext`. El `MessageRouter` deserializa `d` según `t` (lookup en diccionario, no reflexión por mensaje).
-4. **Handler** (C→S) en `PixelRealms.Server/Net/Handlers/LootTakeHandler.cs`, corre en el tick:
-   valida **todo** (existencia, propiedad, distancia, estado vivo, rate limit) → llama al servicio de dominio →
-   errores con `ctx.SendError(player, code, reqId)` usando códigos de `docs/protocol.md`.
+4. **Handler** (C→S): clase `LootTakeHandler : IMessageHandler<LootTake>` en el archivo de su dominio
+   (`PixelRealms.Server/Net/Handlers/InventoryHandlers.cs`), registrada con `router.Register(...)` en `Hosting/ServerApp.cs`;
+   corre en el tick: valida **todo** (existencia, propiedad, distancia, estado vivo, rate limit) → llama al servicio de
+   dominio → errores con `ctx.SendError(code, reqId)` (el `reqId` del mensaje si lo trae) usando `ErrorCodes` / códigos de `docs/protocol.md`.
 5. **Emisión** (S→C): desde `EventDispatcher`/`SnapshotBuilder`, nunca desde sistemas de dominio directamente.
-6. **Cliente**: `client/autoload/net.gd` → entrada en `_handlers` (`"LootWindow": _on_loot_window`) → actualiza
-   `GameState` o emite señal. Para C→S, función helper en `net.gd`: `func loot_take(loot_id: int, index: int) -> void`.
+6. **Cliente**: `net.gd` solo maneja `Pong`, `Error`, `Snapshot` y `CombatEvents`; el resto se registra con
+   `Net.register_handler("LootWindow", _on_loot_window)` desde `autoload/game_state.gd` (estado espejo) o
+   `scenes/world/world.gd` (que también escucha `Net.message_received`) → actualiza `GameState` o emite señal. Para C→S,
+   `Net.send("LootTake", {"lootId": id, "index": i})` desde la UI.
 7. **Tests**:
    - `PixelRealms.Protocol.Tests`: serializa → JSON esperado exacto (snapshot de string) → deserializa igual.
-   - Handler: test con `WorldBuilder` que cubra éxito + cada código de error.
+   - Handler: test de integración con `TestServer` + `TestGameClient` (`PixelRealms.Server.Tests/Net/*Tests.cs`) que cubra
+     éxito + cada código de error; la lógica de dominio, con `WorldBuilder` en `PixelRealms.Game.Tests`.
    - Cliente (GUT) si hay parseo no trivial.
 
 ## Cambiar un mensaje existente
@@ -51,6 +55,6 @@ Fuente de verdad: `docs/protocol.md`. Sobre: `{ "t": "<Tipo>", "d": { ...camelCa
 - Eventos de combate se envían solo a observadores de `src` o `dst`.
 
 ## Depurar desincronización
-1. Activa `Net.debug_overlay` (F3): muestra RTT, ackSeq, inputs pendientes, error de reconciliación.
+1. Activa el overlay de depuración (F3, `scripts/ui/debug_overlay.gd`): muestra RTT, ackSeq, inputs pendientes, error de reconciliación.
 2. Log servidor `Debug` de `MovementSystem` para el jugador (`/debug move on`).
 3. Reproduce con un test vector nuevo en `shared/test-vectors/movement.json` y hazlo pasar en ambos lados.

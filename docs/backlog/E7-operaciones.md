@@ -40,7 +40,7 @@
 ---
 ### HU-072 · Métricas y logs del servidor
 **Como** administrador **quiero** ver el estado del servidor **para** detectar problemas de rendimiento.
-- Prioridad: Should · Estimación: S · Estado: Hecha
+- Prioridad: Should · Estimación: S · Estado: Parcial
 - Dependencias: HU-023
 - Skills: `dotnet-server`
 
@@ -54,11 +54,12 @@
 - `GET /admin/stats` (JWT con claim admin; 401 sin token, 403 sin admin): uptime, tick p50/p99/max, conexiones, jugadores, monstruos, mensajes/s y bytes/s dentro/fuera (`NetMetrics`, muestra cada segundo desde el GameLoop), `allocBytesPerSec` del proceso, Gen2, working set y por instancia: jugadores, monstruos, `combatP50Ms`/`combatP99Ms` (sistemas casts/auras/monster_ai/auto_attack/resources/death, `Simulation.CombatTimings`), `areasActive` (impactos de área pendientes) y `aurasActive`.
 - CA2 **parcial**: sin NuGet no se puede añadir Serilog; en Producción se usa `AddJsonConsole` con scopes y el router abre un scope `ConnId`/`CharacterName`/`AccountId` por mensaje (decisión provisional en docs/progress/fase-1.md). Para pasar a Serilog: `Serilog.AspNetCore` + `UseSerilog` en `ServerApp.Build`.
 - Tests: `MetricsTests` (3) y `CombatTimingTests` (1).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: `/admin/stats` toma los recuentos por instancia de `WorldStats` (copia publicada por el tick). **Falta decidir** CA2 (Serilog o el `AddJsonConsole` actual) y la memoria por instancia de CA3 (.NET solo la da por proceso).
 
 ---
 ### HU-073 · Despliegue en VPS con TLS (wss)
 **Como** anfitrión **quiero** subir el servidor a un VPS **para** que mis amigos jueguen desde sus casas.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-026, HU-072
 - Skills: `dotnet-server`
 
@@ -68,17 +69,18 @@
 3. **Dado** `docs/deploy.md` **entonces** explica paso a paso: comprar VPS/dominio, DNS, firewall (solo 22, 80, 443), variables de entorno, primer despliegue, actualizar, ver logs.
 4. **Dado** un GitHub Action manual (`workflow_dispatch`) **entonces** construye la imagen, la sube a GHCR y despliega por SSH.
 
-**Notas de implementación (parcial, sin probar en un VPS)**
+**Notas de implementación** (escritas antes de probarlo en el VPS; el despliegue real está en la última nota)
 - `server/Dockerfile` multi-stage (`sdk:10.0` → `aspnet:10.0-alpine`, usuario `pixelrealms`, `InvariantGlobalization`, content/ y maps/ dentro, healthcheck); el Action falla si la imagen supera 150 MB. **Sin construir aquí** (sin Docker).
 - `docker-compose.prod.yml` con `postgres`, `server`, `caddy` (TLS automático, `/play` estático con COOP/COEP, `/ws` `/api` `/health` `/admin` al servidor) y `backup`; `deploy/Caddyfile`. El servidor honra `X-Forwarded-For/Proto` en Producción (`UseForwardedHeaders`) para que el tope por IP vea la IP real.
 - `docs/deploy.md`: VPS/dominio, DNS, firewall (22/80/443), variables, primer despliegue, actualizar, logs, backups y restauración.
-- `.github/workflows/deploy.yml` (`workflow_dispatch`): build+push a GHCR y despliegue por SSH (`appleboy/scp-action` + `ssh-action`); secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_PATH?`. **Pendiente**: ejecutarlo de verdad y corregir lo que falle.
+- `.github/workflows/deploy.yml` (`workflow_dispatch`): build+push a GHCR y despliegue por SSH (`appleboy/scp-action` + `ssh-action`); secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_PATH?`. Ya se ejecuta en cada push verde a `main` (ver `docs/deploy.md`). *(cerrado el 2026-10-02: ver la última nota)*
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Comprobado en producción: https con certificado válido, COOP/COEP en `/play/`, `wss://…/ws` responde 101 y `/health` OK. CA1: imagen de 56 MiB comprimida y ~136 MB descomprimida (< 150 MB). `UseForwardedHeaders` va antes de `UseRateLimiter` (con test), así que los límites de login y registro cuentan la IP real detrás de Caddy.
 
 ---
 
 ### HU-074 · Build web y de escritorio del cliente
 **Como** jugador **quiero** jugar desde el navegador o descargar el juego **para** entrar fácilmente.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-073
 - Skills: `godot-client`
 
@@ -87,15 +89,16 @@
 2. **Dado** el export Windows **entonces** se publica un `.zip` en itch.io (página privada con contraseña) vía `butler` desde CI.
 3. **Dado** una versión de cliente desactualizada **entonces** el servidor responde `bad_version` y el cliente muestra un enlace para actualizar.
 
-**Notas de implementación (parcial, sin probar en un VPS)**
+**Notas de implementación (parcial)**
 - `client/export_presets.cfg` (Web con hilos; Windows x86_64 con pck embebido) y `.github/workflows/release-client.yml` (`workflow_dispatch`): sync de contenido, fija `DEFAULT_SERVER_URL`, exporta, sube la web a `deploy/play` del VPS y el `.zip` a itch.io con `butler` (secrets `BUTLER_API_KEY`, `ITCH_TARGET`). **Sin ejecutar**: no hay plantillas de exportación ni Docker aquí; probar en Chrome y Firefox queda para Diego.
 - CA3: con `bad_version` el login muestra el aviso y un `LinkButton` "Descargar la versión actual" → `Settings.update_url()` (por defecto `<servidor>/play/`, configurable en `settings.cfg` → `[net] update_url`).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA1: el cliente web arranca en Chromium hasta el login (producción, Godot 4.7.2, WebGL 2). Falta probar Firefox y CA2 (build de Windows a itch.io: secrets y plantillas de exportación).
 
 ---
 
 ### HU-075 · Backups automáticos
 **Como** anfitrión **quiero** copias de seguridad diarias **para** no perder el progreso de mis amigos.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Parcial
 - Dependencias: HU-073
 - Skills: `dotnet-server`
 
@@ -111,7 +114,7 @@
 
 ### HU-089 · Prueba de carga del combate ("Mina llena")
 **Como** anfitrión **quiero** una prueba de carga del combate repetible **para** detectar lag, fugas de memoria y exceso de tráfico antes de que lo noten mis amigos.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-023, HU-088
 - Skills: `dotnet-server`, `combat-system`
 
@@ -130,4 +133,12 @@
 - Adaptaciones honestas respecto al CA1: no existen **áreas duraderas** en la Fase 1 (todas las áreas son instantáneas tras el casteo), así que "40 áreas activas" se informa como impactos pendientes (máx ~10); los kits del Tier 1 no generan ~200 auras, así que el escenario rellena hasta 200 con sangrados (`foreman_whip_bleed`) sobre monstruos. La intensidad decae con el tiempo porque los bots mueren a menudo (sin sanador).
 - Resultado en la máquina de desarrollo del agente (compartida, Release): 5 min → tick p50 0.33 / p99 2.4 / máx 26 ms; combate p99 0.26 ms; 0.22 MB/s; Gen2 0. 30 min → p99 1.4 / máx 24 ms; 0.19 MB/s; memoria 3.43 → 3.66 MB (+6,7 %). Microbench: 1 M pruebas de forma 3.2 ms (< 5), consulta de área 100 candidatos 2.1 µs (< 20). **Repetir en el PC** (`--duration 1800`) y anotar aquí.
 - Arreglos de HU-088 CA1 que salieron del perfilado: `Pathfinder` reutiliza sus buffers (`[ThreadStatic]`), `ThreatTable.Reevaluate` tiene sobrecarga sin closure, `InterestSystem` no asigna listas por tick. La IA pasó de 1,7 MB/s a 35 KB/s. Lo que queda asignando son los eventos del tick (records) → buffer de structs pendiente (HU-088).
-- CA3 (FPS del cliente web) y la salida p95 por cliente (requiere red) **no se pueden medir aquí**. Test determinista `LoadScenarioTests` (10 s, asignación y Gen2).
+- CA3 (FPS del cliente web) **sigue sin medir** (necesita el equipo de referencia). Test determinista `LoadScenarioTests` (10 s, asignación y Gen2).
+- 2026-10-02: `--network http://host:puerto` (`NetworkScenario`) lanza 30 clientes reales por WebSocket contra un servidor en
+  marcha (registran cuenta, crean personaje, entran con ticket, caminan, hacen ping y atacan monstruos) y mide los KB/s
+  recibidos por cliente y el tick p99 de `/health`. Medido en local: p95 22,3 KB/s por cliente (< 30 de HU-023 CA4 y < 40
+  de CA2) con tick p99 2,09 ms. El servidor de prueba necesita límites por IP altos (ver el comentario de la clase).
+- El modo en proceso aplica además combate p99 ≤ 4 ms (HU-088 CA5) e IA p99 < 3 ms (HU-036 CA6) y corre 120 s en cada CI
+  (`ci.yml`). Repetido el 2026-10-02: 300 s OK y 1800 s con +6 % de memoria. Los microbenchmarks (`--bench`, reescritos sin
+  ramas en `TargetResolver.DistanceSquaredToBody`) dan 3,9–4,9 ms por millón de pruebas de forma; no van al CI porque un
+  runner compartido los falsea.

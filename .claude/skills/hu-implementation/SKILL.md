@@ -6,7 +6,7 @@ description: Flujo completo para implementar una historia de usuario (HU-XXX) de
 # Implementar una historia de usuario
 
 ## 0. Localiza la HU
-- Busca el ID en `docs/backlog/*.md` (`grep -n "HU-XXX" docs/backlog`). Lee la HU completa, sus **dependencias**
+- Busca el ID en `docs/backlog/*.md` (`grep -rn "HU-XXX" docs/backlog`). Lee la HU completa, sus **dependencias**
   y la sección "Notas técnicas". Si una dependencia no está `Hecha`, detente y avisa.
 - Lee las skills listadas en la HU (campo **Skills**) antes de tocar código.
 
@@ -23,8 +23,8 @@ Espera aprobación del usuario.
 - Dominio (`PixelRealms.Game.Tests`): tests puros con `FakeClock`, `SeededRng`, `WorldBuilder` (helpers de test).
   Nombra: `MetodoOSistema_Escenario_ResultadoEsperado`.
 - Protocolo: test de serialización ida y vuelta por mensaje nuevo.
-- Servidor integración (`PixelRealms.Server.Tests`): `WebApplicationFactory` + cliente WebSocket de prueba
-  (`TestGameClient`) cuando la HU cruza red.
+- Servidor integración (`PixelRealms.Server.Tests`): `TestServer` (servidor real en `127.0.0.1:0`) + cliente WebSocket de
+  prueba (`TestGameClient`) cuando la HU cruza red.
 - Cliente: tests GUT en `client/tests/` para lógica pura (parsers, predicción, formateo, inventario UI-model).
 - Ejecuta y comprueba que **fallan** por la razón correcta.
 
@@ -37,6 +37,7 @@ Espera aprobación del usuario.
 dotnet build server/PixelRealms.sln -warnaserror
 dotnet test  server/PixelRealms.sln
 dotnet run --project server/tools/ContentValidator -- content/
+godot --path client --headless -s ../tools/sync_content.gd
 godot --path client --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
 ```
 - Si tocaste `server/`: lanza el subagente **server-authority-reviewer** sobre el diff y corrige sus hallazgos.

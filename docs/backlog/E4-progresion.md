@@ -21,7 +21,7 @@
 ---
 ### HU-041 · Subir de nivel y desbloquear hechizos
 **Como** jugador **quiero** subir de nivel y aprender hechizos **para** sentir que mi personaje se hace más fuerte.
-- Prioridad: Must · Estimación: M · Estado: Hecha
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-040
 - Skills: `combat-system`, `godot-client`
 
@@ -35,6 +35,7 @@
 **Notas de implementación**
 - Subida con sobrante y varios niveles de golpe, stats recalculados (+`statsPerLevel` vía `StatCalculator`), vida y recurso llenos, hechizos de `spellUnlockLevels` aprendidos (`LevelUp{newSpells}`), rangos en `spellRankLevels` (`LevelUp{rankUps}`; `SpellRanks.BaseMultiplier` aplica +`spellRankBonusPct` al `base` de daño/cura/escudo/auras de hechizos de clase), `StatsUpdate` al jugador, `EntitySpawn` renovado a la AOI (nivel sobre el nombre) y guardado inmediato. Cliente: hechizo nuevo a la primera casilla libre (`SetHotbar`, handler con validación de casillas 0–3 hechizos / 4–7 consumibles) y avisos de nivel/rango.
 - Tests: `XpCurveTests.Table_MatchesGdd_1To14` (100, 367, 933 … 24 850), `ProgressionSystemTests` (sobrante, nivel 4 → rankUps de los 3 conocidos; nivel 5 → newSpells sin rankUps; niveles de desbloqueo y rango de rules). El efecto visual de subida (CA3) llega con el arte.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Los demás ya reciben el nivel nuevo (`EntitySpawn` renovado). Falta CA3: el efecto visual de subida para los demás (estético).
 
 ---
 ### HU-042 · Panel de personaje
@@ -49,7 +50,10 @@
 3. **Dado** un cambio de equipo o aura **entonces** el panel se actualiza en vivo con `StatsUpdate`.
 
 **Notas de implementación**
-- `client/scripts/ui/character_panel.gd` (tecla C): muñeco de 9 slots (arrastrar desde la bolsa equipa, clic derecho desequipa), stats primarios y derivados de `StatsUpdate` (vida, recurso, poder de ataque/hechizo, crítico, esquiva, armadura y mitigación contra un nivel igual, velocidad de ataque) con tooltip "Base + Equipo×afinidad + Auras"; se refresca con cada StatsUpdate/InventoryUpdate. Sin arte (texto).
+- `client/scripts/ui/character_panel.gd` (tecla C): muñeco de 9 slots (arrastrar desde la bolsa equipa, clic derecho desequipa), stats primarios y derivados de `StatsUpdate` (vida, recurso, poder de ataque/hechizo, crítico, esquiva, armadura y mitigación contra un nivel igual, velocidad de ataque); se refresca con cada StatsUpdate/InventoryUpdate. Sin arte (texto).
+- 2026-10-02: CA2 con un tooltip por stat (`CharacterPanel.stat_origin`): "Base 9 + Equipo 1.7 (Guantes de bandido: afinidad
+  media ×0.85) + Auras 0.3"; las auras son lo que no explican base y equipo, porque el servidor solo manda el total. CA3: el
+  servidor emite `StatsUpdate` también al aplicar o quitar un aura con stats (`AuraSystem`), no solo al cambiar equipo.
 
 ---
 ### HU-043 · Libro de hechizos y barra (4 hechizos + 4 utilizables)
@@ -88,3 +92,4 @@
 **Notas de implementación**
 - NPC `class_change` ("Maestro Aldo", añadido a `maps/meadow.tmj` junto a Marta) y mensaje `ChangeClass{npcId, classId, reqId}`; `Social/ClassChangeService`: ≤ 3 casillas, vivo, fuera de combate, sin duelo/intercambio, solo mientras `world.currentPhase ≤ progression.classChange.npcUntilPhase`; conserva nivel/XP/items/equipo/oro, cambia clase, stats (afinidad nueva), recurso lleno, hechizos y barra; guardado inmediato y log. El cliente recibe un `Welcome` renovado. Cliente: ventana con las otras 3 clases (rol, recurso, descripción).
 - Tests: `SocialTests.ClassChange_*`, `SocialFlowTests.ChangeClass_AtNpc_NewWelcome_AndSaved`. Nota: la skill `world-maps` solo documenta `vendorId`; el objeto de la capa `npcs` lleva `kind: class_change` (ya previsto en `NpcDef.Kind`).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: `trade_busy` propio (antes daba `duel_busy`). CA4: `SocialPanels.class_change_available()` oculta la opción si `currentPhase > npcUntilPhase`. CA5: el handler loguea la clase anterior y la nueva.

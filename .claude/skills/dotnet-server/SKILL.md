@@ -10,31 +10,37 @@ description: Convenciones, arquitectura y comandos del servidor .NET 10 (ASP.NET
   `<ImplicitUsings>enable</ImplicitUsings>`, `InvariantGlobalization=true`.
 - ASP.NET Core minimal APIs, `System.Text.Json` con **source generation** (`ProtocolJsonContext`).
 - `Npgsql.EntityFrameworkCore.PostgreSQL`, `EFCore.NamingConventions`.
-- `Serilog.AspNetCore` (consola, JSON en prod). `JsonSchema.Net` (validador de contenido).
-- Tests: `xunit.v3`, `Shouldly`, `NSubstitute`, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`.
+- Logs con `Microsoft.Extensions.Logging` (consola; `AddJsonConsole` en Producción). Schemas de contenido con el validador
+  propio `PixelRealms.Content/Validation/SchemaValidator.cs` (subconjunto de JSON Schema 2020-12, sin paquete).
+- Tests: `xunit.v3`, `Shouldly`, `Testcontainers.PostgreSql` (+ `SSH.NET` fijado por la advertencia NU1903). Sin
+  `Mvc.Testing`: la integración arranca el servidor real (`TestServer`, ver §Tests al final).
 
 ## Estructura
 ```
 server/
-  PixelRealms.sln  Directory.Build.props  Directory.Packages.props  .editorconfig
+  PixelRealms.sln  Directory.Build.props  Directory.Packages.props  Dockerfile   (.editorconfig en la raíz del repo)
   src/PixelRealms.Protocol/    Messages/{ClientMessages.cs, ServerMessages.cs}, MessageRegistry.cs, ProtocolJsonContext.cs
-  src/PixelRealms.Content/     Defs/*.cs (records), ContentLoader.cs, ContentDb.cs, CrossRefValidator.cs
+  src/PixelRealms.Content/     Defs/*.cs (records), ContentLoader.cs, ContentDb.cs, ReloadableContent.cs,
+                               Validation/ (SchemaValidator.cs, CrossRefValidator.cs, EngineCapabilities.cs)
   src/PixelRealms.Game/
-    Core/        World.cs, EntityId.cs, IGameClock.cs, IRng.cs, GameEvents.cs, Vec2.cs
-    Entities/    Actor.cs, Player.cs, Monster.cs, LootBag.cs, Npc.cs
-    Map/         CollisionGrid.cs, TiledMapLoader.cs, LineOfSight.cs, Pathfinder.cs (A*)
+    Core/        World.cs, Simulation.cs, EntityId.cs, IGameClock.cs, IRng.cs, GameEvents.cs, Vec2.cs
+    Entities/    Actor.cs, Player.cs, Monster.cs, Npc.cs
+    Map/         CollisionGrid.cs, TiledMapLoader.cs, MapData.cs, MapInstance.cs
     Movement/    MovementSystem.cs, MovementStep.cs (algoritmo compartido con cliente)
-    Combat/      CombatCalculator.cs, CastSystem.cs, EffectResolver.cs, AuraSystem.cs, ThreatTable.cs
-    Ai/          AiSystem.cs, MonsterBrain.cs
-    Items/       Inventory.cs, Equipment.cs, ItemInstance.cs, InventoryOps.cs, LootSystem.cs, VendorService.cs
-    Progression/ XpService.cs, StatCalculator.cs
-    Social/      PartyService.cs, ChatService.cs
+    Combat/      CombatCalculator.cs, CastSystem.cs, EffectResolver.cs, AuraSystem.cs, ThreatTable.cs, LineOfSight.cs,
+                 ResourceSystem.cs, DeathSystem.cs
+    Ai/          MonsterAiSystem.cs, MonsterBrain.cs, Pathfinder.cs (A*), SpawnSystem.cs
+    Items/       ItemInstance.cs (+ Inventory, Equipment), InventoryOps.cs, LootSystem.cs (+ LootBag),
+                 ItemUseService.cs (+ VendorService)
+    Progression/ XpCurve.cs, ProgressionSystem.cs, StatCalculator.cs
+    Social/      PartyService.cs, ChatService.cs, TradeService.cs, PvpService.cs
     Interest/    InterestSystem.cs (grid AOI)
-  src/PixelRealms.Persistence/ GameDbContext.cs, Entities/*.cs, Repositories/*.cs, Migrations/
+  src/PixelRealms.Persistence/ Ef/GameDbContext.cs, Entities/Entities.cs, Repositories/*.cs, Migrations/
   src/PixelRealms.Server/
     Program.cs, Auth/ (JWT, tickets), Api/ (endpoints REST), Net/ (WebSocketSession, ConnectionManager,
-    MessageRouter, Handlers/*.cs, RateLimiter.cs, SnapshotBuilder.cs), Hosting/ (GameLoopService, SaveService)
-  tools/ContentValidator/
+    MessageRouter, Handlers/*.cs, MessageRateLimiter.cs, SnapshotBuilder.cs, EventDispatcher.cs),
+    Hosting/ (GameLoopService, SaveService), Players/ (WorldSession, PlayerMapper, MapTransferService)
+  tools/ContentValidator/  tools/LoadBot/
   tests/PixelRealms.Game.Tests  PixelRealms.Protocol.Tests  PixelRealms.Server.Tests  PixelRealms.Persistence.Tests
 ```
 
@@ -42,11 +48,13 @@ server/
 - `GameLoopService` crea un `Thread` dedicado. Bucle con `Stopwatch`, acumulador y `Thread.Sleep` fino
   (o `SpinWait` los últimos 2 ms). Tick = 50 ms. Métrica `tick_ms` (p50/p99) logueada cada 30 s.
 - Entrada: `Channel<InboundMessage>` (`BoundedChannelOptions(10_000){ FullMode = DropWrite }`); si se llena,
-  loguear `warn` y desconectar la conexión más ruidosa.
+  `WebSocketSession` loguea `warn` y descarta el mensaje (no desconecta). El tick saca como mucho 500 por tick.
 - Salida: cada `WebSocketSession` tiene su `Channel<ReadOnlyMemory<byte>>` (bounded 256); si se llena el cliente
   es lento → desconectar. El tick **serializa** y encola; la tarea de envío solo escribe al socket.
-- Handlers: `interface IMessageHandler<T> { void Handle(Player p, T msg, TickContext ctx); }` ejecutados en el tick.
-  Validan y **emiten errores** con `ctx.SendError(p, "on_cooldown", msg.ReqId)`.
+- Handlers: `interface IMessageHandler<T> { void Handle(T msg, HandlerContext ctx); }` ejecutados en el tick (el jugador
+  es `ctx.Player`, el tick `ctx.Tick`). Agrupados por dominio en `Net/Handlers/*.cs` (`CombatHandlers.cs`,
+  `InventoryHandlers.cs`, `SocialHandlers.cs`…) y registrados con `router.Register(...)` en `Hosting/ServerApp.cs`.
+  Validan y **emiten errores** con `ctx.SendError(ErrorCodes.OnCooldown, msg.ReqId)` (firma `SendError(code, reqId, message)`).
 - Eventos: los sistemas agregan `IGameEvent` a `ctx.Events`; al final del tick `EventDispatcher` los traduce a
   mensajes y los envía a los observadores (AOI).
 - Nada de `async` dentro de `PixelRealms.Game`. Nada de `DateTime.UtcNow` (usar `IGameClock.NowMs`).
@@ -63,7 +71,7 @@ server/
 - `POST /api/auth/register {username,password}` (3–20 chars `^[a-zA-Z0-9_]+$`, password ≥ 8) → 201.
 - `POST /api/auth/login` → `{ token }` JWT HS256 (clave desde config/secret, 15 min).
 - `GET/POST/DELETE /api/characters` (JWT). `POST /api/game/ticket {characterId}` → `{ ticket }` (32 bytes random,
-  base64url, guardado en `IMemoryCache` 30 s, un solo uso).
+  base64url, guardado en un `ConcurrentDictionary` de `TicketService` 30 s, un solo uso).
 - Rate limit REST con `Microsoft.AspNetCore.RateLimiting`: login 5/min por IP.
 
 ## Estilo C#
@@ -78,3 +86,5 @@ server/
 - `FakeClock` (avance manual), `SeededRng(seed)` y `FixedRng(params double[] rolls)`.
 - `WorldBuilder` fluido: `.WithMap(grid).WithPlayer("Ana", "mage", level: 3, at: (5,5)).WithMonster("wolf", at: (8,5)).Build()`.
 - `TickRunner.Run(world, ticks)`. `TestContent.Load()` carga `content/` real del repo.
+- Integración (`PixelRealms.Server.Tests/Helpers`): `TestServer` arranca el servidor real en `127.0.0.1:0` y `TestGameClient`
+  habla por WebSocket con él.

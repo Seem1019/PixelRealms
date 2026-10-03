@@ -10,36 +10,44 @@ cooldowns reales ni inventario. Puede *predecir* visualmente (movimiento propio,
 siempre acepta la corrección del servidor.
 
 ## Versión y ajustes de proyecto
-- Godot 4.5+ **edición estándar** (no .NET). Renderer `gl_compatibility` (necesario para Web y equipos modestos).
+- Godot 4.7 **edición estándar** (no .NET; la CI usa 4.7.2). Renderer `gl_compatibility` (necesario para Web y equipos modestos).
 - `display/window/size/viewport_width=480`, `viewport_height=270`, `window_width_override=1440`, `window_height_override=810`,
-  `stretch/mode="viewport"`, `stretch/aspect="keep"`, `stretch/scale_mode="integer"`.
+  `stretch/mode="canvas_items"` (ADR-025), `stretch/aspect="keep"`, `stretch/scale_mode="integer"`.
 - `rendering/textures/canvas_textures/default_texture_filter=0` (Nearest). `rendering/2d/snap/snap_2d_transforms_to_pixel=true`.
-- Plugins en `addons/`: **GUT** (tests), **YATI** (importador Tiled). Fuente pixel: `assets/fonts/` (p. ej. m5x7/m6x11, licencia libre).
+- Plugins en `addons/`: solo **GUT** 9.6.1 (tests). Los mapas se leen sin plugin (`scripts/world/tmj_map.gd`). Fuente:
+  Alegreya Sans / Alegreya SC (OFL) en `assets/fonts/` (HU-092).
 
 ## Estructura
 ```
 client/
-  project.godot
-  autoload/   net.gd  content.gd  game_state.gd  settings.gd  event_bus.gd
-  scenes/     boot/  login/  character_select/  world/ (world.tscn, entity.tscn, player_self.tscn, loot_bag.tscn)
-  scripts/    net/ (protocol.gd, prediction.gd, interpolation_buffer.gd, movement_step.gd)
-              ui/  (tooltip_builder.gd, money_format.gd) util/
-  ui/         hud.tscn, hotbar/, unit_frame/, cast_bar/, chat/, inventory/, character_panel/, loot_window/,
-              vendor_window/, party_frames/, floating_text/, theme/pixel_theme.tres
-  assets/     sprites/ tiles/ icons/ fonts/ sfx/
-  content/    ← copia de ../content (script tools/sync_content.gd o paso de export); NO editar aquí
-  tests/      test_*.gd (GUT)
+  project.godot  export_presets.cfg
+  autoload/   event_bus.gd  settings.gd  content.gd  net.gd  game_state.gd  ui_style.gd
+  scenes/     boot/  login/  character_select/  world/   (cada una su .tscn + .gd; sin escenas de entidad:
+              `RemoteEntity`/`EntityVisual` se instancian por código)
+  scripts/    net/   (protocol.gd, prediction.gd, interpolation_buffer.gd, movement_step.gd, api_client.gd…)
+              world/ (tmj_map.gd, terrain_baker.gd, terrain_renderer.gd, entity_visual.gd, remote_entity.gd…)
+              ui/    (UI construida por código: ui_theme.gd, combat_hud.gd, inventory_window.gd, tooltip_builder.gd,
+                      money_format.gd…)
+  assets/     sprites/ tiles/ icons/ fonts/ ui/
+  content/ maps/  ← copia de ../content y ../maps (script ../tools/sync_content.gd); NO editar aquí
+  tests/      test_*.gd (GUT), vectors/
+  tools/      screenshots.gd, capture_screenshots.gd
 ```
 
 ## Autoloads (orden)
-1. `EventBus` — solo señales globales (`ui_error(code)`, `target_changed(id)`).
+1. `EventBus` — solo señales globales (`ui_error(code, req_id)`, `target_changed(id)`, `connection_changed`, `rtt_updated`).
 2. `Settings` — config local (`user://settings.cfg`).
 3. `Content` — carga `res://content/*.json` en diccionarios tipados por id (`Content.spell("mage_fireball")`).
 4. `Net` — `WebSocketPeer`; `connect_to(url, ticket)`; `send(t: String, d: Dictionary)`; en `_process` hace `poll()`,
    lee todos los paquetes, `JSON.parse_string`, y despacha a `_handlers[t]` → emite señal `message_received(t, d)`
    y señales específicas (`snapshot(d)`, `combat_events(d)`…). Reconexión con backoff 1-2-4-8 s (máx 5 intentos).
+   Por sí mismo solo maneja `Pong`, `Error`, `Snapshot` y `CombatEvents`; el resto lo registran `game_state.gd` y
+   `scenes/world/world.gd` con `Net.register_handler(t, callable)`.
 5. `GameState` — estado espejo: `self_id`, `stats`, `inventory`, `equipment`, `hotbar`, `known_spells`, `target_id`,
    `party`, `cooldowns` (predichos). Emite señales `inventory_changed`, `stats_changed`, etc. La UI **solo** escucha a GameState.
+6. `Api` — `scripts/net/api_client.gd` (`ApiClient`): REST con `HTTPRequest` y `await`; guarda el JWT en memoria.
+7. `UiStyle` — fusiona el tema de `UiTheme.build()` con el tema por defecto del motor (los `Control` de un `CanvasLayer` no
+   heredan el de la ventana).
 
 ## Estilo GDScript (obligatorio)
 - Tipado estático en todo: `var speed: float = 64.0`, `func apply(d: Dictionary) -> void:`, `Array[int]`.
@@ -52,7 +60,7 @@ client/
 ## Red en el cliente
 - Envío: `Net.send("CastSpell", {"spellId": id, "targetId": GameState.target_id, "reqId": Net.next_req_id()})`.
 - Protocolo: nombres y campos **idénticos** a `docs/protocol.md`. Nunca inventar campos.
-- Errores: `Error{code, reqId}` → `EventBus.ui_error.emit(code)` → texto rojo centrado ("Fuera de alcance").
+- Errores: `Error{code, reqId}` → `EventBus.ui_error.emit(code, req_id)` → texto rojo centrado ("Fuera de alcance").
 
 ## Movimiento
 - `scripts/net/movement_step.gd` es una **traducción literal** de `MovementStep.cs`. Debe pasar
@@ -72,20 +80,25 @@ client/
   ocultan) → resto. Ticks de una misma aura agrupados; más de 6 números por entidad y segundo → uno sumado.
 
 ## UI pixel art
-- `Theme` único `ui/theme/pixel_theme.tres` (NinePatch 9-slice, fuente pixel tamaño 16/8, sin antialias).
+- `Theme` único creado por código (`scripts/ui/ui_theme.gd`, `UiTheme.build()`, aplicado por `UiStyle`): `StyleBoxTexture`
+  9-slice con texturas de `assets/ui/`, Alegreya Sans / Alegreya SC a 8/16 px lógicos con suavizado gris (HU-092, ADR-025/026).
 - Colores de rareza: junk `#9d9d9d`, common `#ffffff`, uncommon `#1eff00`, rare `#0070dd`, epic `#a335ee`.
-- Ventanas arrastrables (`ui/common/draggable_window.tscn`), cerrar con Esc, posición guardada en Settings.
+- Cerrar con Esc. Ventanas arrastrables con posición guardada en Settings: pendiente (hoy las ventanas son fijas; no existe
+  `draggable_window.tscn`).
 - Atajos: WASD mover, Espacio ataque básico (se acerca solo si está lejos; mantener muestra el alcance), Tab ciclar objetivo, 1–4 hechizos y 5–8 utilizables (las áreas se apuntan con el ratón), I inventario, C personaje, P hechizos, Enter chat, Esc cerrar/deseleccionar.
 - Drag & drop con `_get_drag_data` / `_can_drop_data` / `_drop_data` → el drop **envía** `InventoryMove` y no mueve
   nada localmente hasta recibir `InventoryUpdate` (se puede mostrar el ícono "fantasma" mientras tanto).
 
 ## Tests (GUT)
 ```bash
+godot --path client --headless -s ../tools/sync_content.gd   # copia content/ y maps/ al cliente (como la CI)
 godot --path client --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
 ```
 - Testear lógica pura: `movement_step`, `interpolation_buffer`, `money_format`, parseo de mensajes, modelo de inventario.
 - Las escenas se prueban manualmente; describe al usuario los pasos.
 
 ## Export
-- Presets: `Windows Desktop`, `Linux`, `Web` (threads OFF para compatibilidad con itch.io; sin SharedArrayBuffer), `Android`.
-- URL del servidor por `Settings` / feature tag (`debug` → `ws://localhost:5080/ws`, `release` → `wss://<dominio>/ws`).
+- Presets (`export_presets.cfg`): solo `Web` (`variant/thread_support=true`) y `Windows Desktop`.
+- URL del servidor: `Settings.server_url()` → `[net] server_url` de `user://settings.cfg` o `DEFAULT_SERVER_URL`
+  (`http://localhost:5080`; los workflows de deploy y release lo sustituyen por `SERVER_URL`); el WebSocket se deriva
+  (`ws(s)://host/ws`).

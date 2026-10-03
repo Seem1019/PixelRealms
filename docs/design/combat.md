@@ -205,7 +205,8 @@ Los duelistas no generan aggro ni amenaza mientras dura el duelo.
 
 ## Muerte y reaparición
 `hp ≤ 0` → `Dead`, se limpian auras, los monstruos lo olvidan, `Died`. Reaparece en el punto seguro más cercano con
-`respawnHpPct`/`respawnResourcePct` (50 %). En duelo no se muere: al llegar a `endAtHpPct` el duelo termina y ambos se restauran.
+`respawnHpPct`/`respawnResourcePct` (50 %). En duelo no se muere: al llegar a `endAtHpPct` el duelo termina y ambos vuelven a la vida y el recurso que tenían al
+empezar (no al máximo) y pierden las auras que les puso el rival.
 
 ## Referencia de balance (calculado con estas fórmulas, ver `docs/design/balance-notes.md`)
 Nivel 5 con equipo verde contra Goblin arquero (nv 5), **solo ataque básico**:

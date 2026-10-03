@@ -41,12 +41,15 @@ Cambiar equipo ⇒ `actor.MarkStatsDirty()` ⇒ `StatsUpdate`. Si baja `maxHp`, 
   `rng.Next(min, max+1)`; de cada `groups[j]` caen exactamente `rolls` items por peso sin repetir; se ordenan por rareza
   y los de `entries` se cortan a `maxItems`. Oro `rng.Next(min, max+1)`.
 - **Asignación por item:** `elegibles` = quien hizo el primer daño o los miembros de su grupo vivos a ≤ `eligibleRangeTiles`.
-  Cada item se asigna `elegibles[rng.Next(count)]` (uniforme, independiente por item). `LootBag { Id, MapInstanceId, Position,
-  ExpiresAtMs = now + corpseLifetimeSec, Gold, Entries: { templateId, qty, ownerCharacterId, freeAtMs = now + exclusiveSec } }`.
+  Cada item se asigna `elegibles[rng.Next(count)]` (uniforme, independiente por item). `LootBag { LootId, Position,
+  ExpiresAtMs = now + rules.combat.corpseLifetimeSec, GoldShares, GoldRemainder, Eligible,
+  Entries: { index, templateId, qty, ownerCharacterId, freeAtMs = now + exclusiveSec } }` (en `Items/LootSystem.cs`).
 - El cadáver brilla para quien tiene ≥ 1 entrada propia; `LootOpen` lo puede hacer cualquier elegible y ve todas las entradas con su dueño.
 - `LootTake`: distancia ≤ `lootRangeTiles`, `owner == yo` o `now ≥ freeAtMs`, `AddItem` ok → quita entrada; si no, `Error{not_owner|bag_full}`.
-  Oro se reparte a partes iguales entre elegibles al abrir (el resto al que lootea). Todo `LootTake` genera instancias nuevas con Id nuevo.
-- Items de rareza ≥ `announceRarityFrom` muestran aviso en chat de grupo al caer: "[Espada de hierro] → Ana".
+  Oro a partes iguales entre elegibles; cada uno cobra su parte al abrir (`LootOpen`) y el resto de la división
+  (`GoldRemainder`) se lo lleva el primero que abre. Todo `LootTake` genera instancias nuevas con Id nuevo.
+- Items de rareza ≥ uncommon muestran aviso en chat de grupo al caer (global si los suelta un jefe): "Ana ha conseguido [Espada de hierro] (poco común)".
+  El umbral está fijo en `LootSystem`; `rules.loot.announceRarityFrom` aún no se lee (pendiente).
 
 ## Vendedor
 - Precio de compra: `vendorPrice ?? sellPrice × rules.economy.vendorBuyMultiplier`. Venta: `sellPrice × qty`. `sellPrice == 0` → no se puede vender.
@@ -55,9 +58,10 @@ Cambiar equipo ⇒ `actor.MarkStatsDirty()` ⇒ `StatsUpdate`. Si baja `maxHp`, 
 
 ## Persistencia
 - El inventario completo se guarda con el personaje (ver skill `dotnet-server` §Persistencia).
-- `container`: 0 bag, 1 equip; `slot` = índice. Restricción `UNIQUE(character_id, container, slot)`.
-- Al cargar: si un `template_id` ya no existe en `content/`, el item se mueve a un "correo perdido" (log `warn`) y no
-  se crashea. Si hay dos items en el mismo slot (no debería), se mueve el segundo al primer hueco y se loguea `error`.
+- `container`: 0 bag, 1 equip, 2 apartado; `slot` = índice. Restricción `UNIQUE(character_id, container, slot)`.
+- Al cargar (`PlayerMapper.ToPlayer`): un item con `template_id` que ya no existe en `content/`, o en una casilla repetida o
+  fuera de rango, va a `Player.Unplaced` con aviso (`WARN`) y se guarda en el contenedor 2: nunca se borra. Vuelve a la
+  bolsa al cargar cuando su plantilla existe y hay hueco. No hay "correo perdido" (HU-057 CA4).
 
 ## Cliente (UI)
 - `InventoryUpdate` trae el estado completo → `GameState.inventory` → la UI se redibuja entera (24 celdas, barato).

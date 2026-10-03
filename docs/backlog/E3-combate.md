@@ -32,6 +32,7 @@
 **Notas de implementación**
 - `Ai/SpawnSystem`: al arrancar crea `count` monstruos por spawn (casilla libre del rectángulo) con los datos de monsters.json y programa la reaparición `respawnSec` tras la muerte (independiente del cadáver de HU-037). `Ai/MonsterAiSystem`: patrulla en `wanderRadius` con pausas de 2–6 s. Cliente: placeholder de color, nombre y nivel coloreado por diferencia (`RemoteEntity.level_color`).
 - Tests: `MonsterAiTests.Wander_StaysInRadius_WithPauses_Spawn_PopulatesAndRespawns`.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: la patrulla elige un punto uniforme dentro del círculo de `wanderRadius` (radio `√rng · r` y ángulo), no del cuadrado; pausas y velocidad en `rules.ai`. CA4: el color del nivel de los monstruos a la vista se recalcula también al subir yo de nivel (`RemoteEntity` escucha `GameState.leveled_up`; `test_acceptance_gaps.gd`).
 
 ---
 ### HU-032 · Ataque básico (todas las clases, melee y varita)
@@ -53,7 +54,7 @@
 
 **Notas de implementación**
 - `Combat/AutoAttackSystem`: `AutoAttack{on}` sobre el objetivo; swing `speedMs / haste` (monstruos: `attackSpeedMs`), alcance por tipo de arma (`rules.weapons`), escuela por `scaling` (int → magic con spellPower), pausa fuera de alcance / casteando sin reiniciar, bloqueo `abilityLockMs` tras un instantáneo (el básico sale al terminar), fórmula de combat.md con afinidad, tabla de impacto, armadura y crit; ira al impactar; maná por golpe normalizado por swing. Sin arma equipada no hay básico (decisión provisional).
-- Tests: `CombatCalculatorTests` (hit/crit/miss/dodge/mitigación exactos), `AutoAttackTests` (Sacerdote con varita mata un Slime sin gastar maná; pausa; ira; mismo maná/s espada vs bastón; pausa por casteo y bloqueo de 250 ms), integración `CombatFlowTests`. CA1b visual (proyectil del básico) queda para el arte de HU-070.
+- Tests: `CombatCalculatorTests` (hit/crit/miss/dodge/mitigación exactos), `AutoAttackTests` (Sacerdote con varita mata un Slime sin gastar maná; pausa; ira; mismo maná/s espada vs bastón; pausa por casteo y bloqueo de 250 ms), integración `CombatFlowTests`. CA1b visual (proyectil del básico): HU-091.
 
 ---
 ### HU-033 · Lanzar hechizos (casteo, GCD, CD, recurso)
@@ -77,6 +78,7 @@
 **Notas de implementación**
 - `Combat/CastSystem`: validaciones en el orden de la skill (conocido/disponible, nivel, muerto, aturdido, silenciado, bloqueo, CD, GCD/abilityLock, recurso, objetivo/alcance/LOS o `targetPos` válido), GCD al empezar, recurso y cooldown al terminar, revalidación con `castRangeToleranceTiles` (`CastEnded{failed, reason}` sin coste), punto fijo en áreas y saltos, cancelación por otro hechizo, interrupción por stun/silence/`interrupt` con `interruptLockoutMs`, proyectiles a `distancia / speed` resueltos aunque muera el lanzador; `ally` sin aliado → sobre mí. `Cooldown{spellId,remainingMs}`/`{gcdMs}` al lanzador. Cliente: GCD predicho al enviar, corregido por `Cooldown`, revertido con `Error`.
 - Tests: `CastSystemTests` (Bola de fuego 39/40 ticks y coste leído del contenido; impacto a distancia/speed; velocidad ×0,5; stun interrumpe sin coste + locked_out; root/slow no cortan; fuera de alcance al terminar sin coste ni CD; punto fijo; cancelación; un test por código de error).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA4: `area_limit` cuando la instancia ya tiene `rules.limits.maxAreasPerInstance` áreas con casteo activas. `CastSpell` solo acepta hechizos de clase: los de objeto entran solo por `UseItem` y los de monstruo nunca (`not_found`); cierra la cura sin coste con `item_minor_heal` (`CastSystemTests`).
 
 ---
 ### HU-034 · Resolución de efectos y fórmulas
@@ -99,7 +101,7 @@
 ---
 ### HU-035 · Auras
 **Como** jugador **quiero** aplicar efectos en el tiempo (venenos, curas periódicas, escudos, aturdimientos) **para** tener un combate con más profundidad.
-- Prioridad: Must · Estimación: L · Estado: Hecha
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-034
 - Skills: `combat-system`
 
@@ -122,6 +124,7 @@
 **Notas de implementación**
 - `Combat/AuraSystem` + `AuraSet`: instancia = (aura, lanzador); renovar refresca la duración sin reiniciar el ritmo de ticks; cargas solo con `maxStacks` > 1; ticks que no fallan ni critican con mitigación fijada al aplicar; `shield` por orden de caducidad; `removesKinds`/`immuneKinds`; jefes inmunes a `bossImmuneToAuraKinds` (evento `immune`); topes 16/16 sin contar controles con expulsión de la de menos tiempo (ADR-021); manda la ralentización más fuerte (tope `maxSlowPct`) y el bono de velocidad mayor; inmunidad `hardControlImmunitySec` tras stun/root/silence (ADR-022). Cliente: iconos (texto) con tiempo y cargas, en gris las que no mandan.
 - Tests: `AuraSystemTests` (12 CA).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Las auras ya llegan al entrar en la AOI. Falta CA6 en el HUD: mostrar el tiempo junto a las cargas en el icono (estético).
 
 ---
 ### HU-036 · IA de monstruos: aggro, persecución, amenaza, evadir
@@ -143,7 +146,8 @@
 
 **Notas de implementación**
 - `Ai/MonsterAiSystem` + `Ai/Pathfinder` (A* 8 direcciones sin cortar esquinas, 200 nodos) + `Combat/ThreatTable`: percepción cada 250 ms con `aggroRange` y LOS (0 = solo si le pegan), persecución recalculando cada 500 ms o si el objetivo se mueve > 2 casillas, cambio de objetivo 110 %/130 %, Provocar fija `durationMs`, evasión al superar `leashRange` (inmune, ×`evadeSpeedMult`, vida completa y amenaza limpia), hechizos de monstruo listos por CD y `hpBelowPct` con `target` (current / random_not_top_threat / self); los que atacan a distancia no se acercan.
-- **Pendiente:** CA5c (duelistas sin aggro) con HU-064 (hook `CanBeAggroed` listo); CA5d cubierto por AuraSystem; CA6 (benchmark 300 monstruos) con HU-089.
+- Pendiente en su día: CA5c (duelistas sin aggro) con HU-064 (hook `CanBeAggroed`); CA5d cubierto por AuraSystem; CA6 (benchmark 300 monstruos) con HU-089. *(cerrado el 2026-10-02: ver la última nota)*
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA6: el LoadBot falla si la IA pasa de 3 ms de p99 con 300 monstruos, y corre 120 s en cada CI (`ci.yml`).
 
 ---
 ### HU-037 · Muerte y reaparición
@@ -160,12 +164,13 @@
 
 **Notas de implementación**
 - `Combat/DeathSystem`: hp ≤ 0 → auras fuera, casteo cancelado, los monstruos lo olvidan, `Died{killerId}`; `Respawn` → cementerio más cercano con `respawnHpPct`/`respawnResourcePct`; muerto no se mueve ni castea (`is_dead`); cadáver de monstruo `corpseLifetimeSec` (o saqueado, hook `IsLooted` para HU-050). Cliente: panel "Has muerto" + "Reaparecer", cuerpo translúcido para `anim: dead`.
-- Tests: `DeathAndResourceTests`, `CombatFlowTests.Death_SendsDied_RespawnRestoresAtGraveyard`. La animación `death` llega con los sprites (HU-070).
+- Tests: `DeathAndResourceTests`, `CombatFlowTests.Death_SendsDied_RespawnRestoresAtGraveyard`. La animación `death` llegó con HU-090.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA3: un muerto no puede abrir ni saquear un cadáver (`is_dead` en `LootSystem`, también en `LootTakeAll`).
 
 ---
 ### HU-038 · HUD de combate
 **Como** jugador **quiero** ver mi vida, recurso, objetivo, casteos y daño **para** tomar decisiones en combate.
-- Prioridad: Must · Estimación: L · Estado: Hecha
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-033, HU-035
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -180,7 +185,8 @@
 
 **Notas de implementación**
 - `client/scripts/ui/combat_hud.gd` (construido por código, sin arte): marco propio (nombre, nivel, vida roja, recurso con color por tipo), marco de objetivo con vida y auras, barra de casteo que sigue llenándose en movimiento y termina en "Interrumpido" (rojo) / "Fuera de alcance" (gris) / nada al cancelar, barra 4+4 según `rules.loadout` con tecla, barrido de CD/GCD y oscurecido sin recurso o fuera de alcance (visual), error del servidor en rojo 2 s, auras en gris si no mandan e "Inmune" como texto flotante. `FloatingText`: reserva de 48, 40 visibles, > 6 por entidad y segundo → uno sumado; `AoeReticle`: hasta 24 marcas, las enemigas nunca se ocultan.
-- **Parcial:** sin iconos ni retratos (texto), sin reservas de proyectiles/impactos (no hay VFX todavía); todo pendiente de comprobar en el editor y de los assets (HU-070/HU-071).
+- **Parcial:** sin iconos ni retratos (texto), sin reservas de proyectiles/impactos (no hay VFX todavía); todo pendiente de comprobar en el editor y de los assets (luego llegaron los íconos y marcos de `2fa0192` y los VFX de HU-091).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): Falta CA4b (gris de los modificadores de daño, hoy solo en ralentizaciones) y CA6 (reservas de VFX separadas y agrupar ticks): estético.
 
 ---
 ### HU-039 · Recursos: maná, ira, energía y regeneración
@@ -199,11 +205,12 @@
 **Notas de implementación**
 - `Combat/ResourceSystem`: maná por `spi`/`int` cada tick (por 5 s → por segundo) con penalización tras gastar; energía `energyPerSec`; ira +`ragePerHitDealt`/+`ragePerHitTaken` en `DamagePipeline` y decaimiento fuera de combate; vida fuera de combate tras `hpRegenDelaySec`. Acumuladores de fracciones.
 - Tests: `DeathAndResourceTests` (números leídos de rules.json).
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: la ira empieza en 0 en cada entrada al mundo (`PlayerMapper.ToPlayer`); al subir de nivel se llena porque así lo pide HU-041 CA1.
 
 ---
 ### HU-086 · Hechizos de área apuntados (combate híbrido)
 **Como** jugador **quiero** lanzar los hechizos de área donde apunte con el ratón y ver las áreas enemigas antes de que golpeen **para** que el combate tenga esquiva y posicionamiento sin perder el tab-target.
-- Prioridad: Must · Estimación: L · Estado: Hecha
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-034, HU-038
 - Skills: `combat-system`, `net-protocol`, `godot-client`, `game-content`
 
@@ -225,6 +232,7 @@
 **Notas de implementación**
 - Servidor: `ground_aoe_*` con `targetPos` obligatorio (NaN/fuera del mapa → `invalid_payload`), alcance + tolerancia y LOS al punto al iniciar, punto fijo en `CastState`, objetivos dentro de `aoeRadius` al terminar (más cercanos al centro, `maxTargets` ≤ tope), sin fuego amigo; los monstruos usan el mismo camino (Golpe de pico apunta a la posición del objetivo al empezar). Cliente: retícula de `aoeRadius` bajo el cursor (roja fuera de alcance), clic envía `targetPos`, marcas en el suelo con `CastStarted{targetPos}` hasta `CastEnded` (las enemigas nunca se ocultan).
 - **Pendiente (HU-088):** la búsqueda recorre los actores de la instancia en vez de la rejilla AOI; con ≤ 300 actores es suficiente para la Fase 1.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): `area_limit` ya se aplica (HU-033 CA4). **Falta decidir** CA7b: la búsqueda recorre los actores de la instancia en vez de la rejilla AOI (que se rehace por tick); con ≤ 300 actores el combate p99 queda muy por debajo de 4 ms, así que la propuesta es enmendar el criterio.
 
 ---
 ### HU-085 · Hechizo de área del Sacerdote (`ground_aoe_all`)
@@ -266,11 +274,12 @@
 **Notas de implementación**
 - `Combat/ForcedMovement.LeapDestination`: destino recortado a `maxRange` y a la última casilla libre con LOS (nunca sale del mapa ni atraviesa colisión); `rooted`/`stunned` lo rechazan sin coste; los efectos posteriores se resuelven en el punto de llegada; cancela el casteo propio sin coste. Cliente: tras un `CastStarted` propio de salto/Carga la corrección grande se suaviza ~100 ms en vez de saltar.
 - Tests: `Leap_ClampsToFreeTile_WithLos_EffectsAtLanding`, `Leap_CancelsOwnCast_WithoutCost`, `Rooted` en `ErrorCodes_EachValidation`.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA1: `travelMs` se respeta: el lanzador vuela ese tiempo (`CombatState.Flight`), sin moverse ni castear, y aterriza al final. En pleno vuelo no cruza portales (se evalúan al aterrizar) y un cambio de mapa anula vuelo y casteo (`PortalSystemTests`, `AdminCommandTests.TpTo_AnotherMap_CancelsTheCastInProgress`).
 
 ---
 ### HU-088 · Rendimiento del combate
 **Como** anfitrión **quiero** que el combate aguante muchas áreas y auras a la vez **para** que no haya lag ni el servidor se caiga en las peleas grandes.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Parcial
 - Dependencias: HU-034, HU-035, HU-086
 - Skills: `combat-system`, `dotnet-server`, `net-protocol`
 
@@ -288,6 +297,7 @@
 - Hecho con el dominio de M2: \`CombatEvents\` agrupado por observador y tick (máx. 64 entradas, CA4); topes de `rules.limits` para objetivos por área, impactos pendientes por instancia y auras 16/16 sin controles (CA2 en parte); listas reutilizadas en `TargetResolver`/`CastSystem`/`AutoAttackSystem`.
 - 2026-10-01 (HU-089): sin asignaciones por tick en `Pathfinder` (buffers `[ThreadStatic]`), `ThreatTable.Reevaluate<TState>` sin closure e `InterestSystem` con listas reutilizadas; medición por sistema en `Simulation.SystemTimings/SystemAllocs` (LoadBot).
 - Pendiente: reservas de capacidad fija y buffer circular de eventos (CA1), áreas duraderas (no hay hechizos con área persistente en la Fase 1; CA2/CA3), búsqueda de objetivos con la rejilla AOI (hoy recorre los actores de la instancia), microbenchmarks y la medición p99 del escenario de HU-089 (CA5). Se cierra junto con HU-089.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA5: combate p99 ≤ 4 ms comprobado por el LoadBot (y en cada CI). Falta CA1 (reservas de capacidad fija y buffer circular de eventos) y CA2/CA3 de áreas duraderas, que no existen hasta la Fase 2.
 
 ### HU-094 · Ataque básico con Espacio
 **Como** jugador **quiero** atacar con la barra espaciadora **para** no depender del clic derecho en mitad del combate.
@@ -299,6 +309,12 @@
 1. **Dado** un objetivo hostil vivo **cuando** pulso Espacio (acción `basic_attack`) **entonces** se envía `AutoAttack{on:true}`.
 2. **Dado** que no tengo objetivo hostil **cuando** pulso Espacio **entonces** se selecciona el enemigo vivo más cercano (≤ 12 casillas) y se ataca; sin ninguno no pasa nada.
 3. **Dado** un enemigo **cuando** hago clic derecho sobre él **entonces** ya no ataca; sobre un jugador sigue abriendo el menú (invitar, duelo, intercambio, susurro).
+
+**Notas de implementación** (escritas en la auditoría del 2026-10-02, a partir de `5485b91`)
+- Acción `basic_attack` (Espacio) en `project.godot`; `world.gd` envía `AutoAttack{on:true}` al objetivo hostil vivo o, sin él,
+  selecciona el enemigo vivo más cercano a ≤ `TARGET_CYCLE_RANGE_TILES` (12, el mismo radio que Tab de HU-030).
+- El clic derecho sobre un enemigo ya no ataca; sobre un jugador abre el menú de siempre (sin test GUT).
+- Tests: `test_combat_controls.gd` (acción, objetivo en alcance, el más cercano sin objetivo, sin enemigos no hace nada).
 
 ### HU-095 · Acercarse solo al objetivo fuera de alcance
 **Como** jugador **quiero** que mi personaje camine hasta el objetivo cuando ataco o lanzo un hechizo fuera de alcance **para** no recibir "Fuera de alcance" y tener que acercarme a mano.
@@ -314,6 +330,9 @@
 
 **Notas de implementación**
 - Lógica pura en `scripts/world/approach.gd` (dirección de 8 vías, margen de llegada, atasco) con tests GUT.
+- `world.gd` envía el `AutoAttack` al pulsar (el servidor pausa el swing fuera de alcance, HU-032 CA2) y camina con `MoveInput`
+  normales hasta entrar en alcance; con un hechizo `enemy`, lo lanza al llegar. Sin arma no hay alcance de básico y no se acerca.
+- Tests: `test_approach.gd` y `test_combat_controls.gd` (cancelar por cambio de objetivo o Esc; WASD y muerte del objetivo sin test).
 
 ### HU-096 · Ver el alcance al mantener la tecla
 **Como** jugador **quiero** ver hasta dónde llega mi básico o un hechizo mientras mantengo su tecla **para** saber si necesito acercarme.
@@ -325,6 +344,11 @@
 1. **Dado** que mantengo Espacio o una tecla de hechizo 1–4 **entonces** se dibuja un círculo punteado del alcance alrededor de mi personaje; al soltar desaparece.
 2. **Dado** un objetivo **entonces** el círculo es verde si está dentro del alcance y rojo si no.
 3. **Dado** que pulso la tecla **entonces** el ataque o hechizo sale al pulsar, como antes (el círculo no retrasa nada). Las áreas apuntadas siguen con su retícula.
+
+**Notas de implementación** (escritas en la auditoría del 2026-10-02, a partir de `5485b91`)
+- `scripts/world/range_ring.gd` dibuja el círculo punteado; `world.gd` lo muestra mientras la acción sigue pulsada
+  (`is_action_pressed`) con el alcance del básico o del hechizo: verde dentro, rojo fuera, crema sin objetivo o con hechizos de aliado.
+- Tests: `test_combat_controls.gd::test_range_ring_colors` (solo el color; mantener y soltar no tiene test).
 
 ### HU-098 · Estados (buffos, perjuicios y control) legibles
 **Como** jugador **quiero** distinguir a simple vista quién está aturdido, inmovilizado, ralentizado, protegido o recibiendo daño o curación en el tiempo **para** reaccionar en combate.
@@ -342,3 +366,4 @@
 - `AuraStyle` (puro) da categoría, color de marco e insignia de 5×5; `AuraIndicator` dibuja estrellas, hielo y burbuja; `EntityVisual.set_auras` aplica además el tinte de ralentizado y los mini-íconos de `Nameplate` (máx. 6, perjudiciales primero, cuentan en `plate_size` para no pisarse). El mundo escucha `GameState.auras_changed` para cualquier entidad.
 - Limitación: `EntitySpawn` no trae auras, así que una entidad que entra en tu AOI con un aura ya puesta no la muestra hasta el siguiente `AuraApplied`.
 - Tests: `test_status_display.gd`. Capturas: `docs/screenshots/combat/status_*.png`, `range_ring.png`.
+- 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: quien entra en la AOI (o reconecta) recibe las auras activas de cada entidad (`EventDispatcher.ToAuraApplied`).
