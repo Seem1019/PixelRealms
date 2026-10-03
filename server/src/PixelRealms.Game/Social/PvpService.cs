@@ -41,6 +41,7 @@ public sealed record DuelChangedEvent(int MapInstanceId, DuelSession Duel, strin
 public sealed class PvpService(AuraSystem auras)
 {
     private readonly Dictionary<int, List<DuelSession>> _duels = new();
+    private readonly List<DuelSession> _ticking = new();
 
     public DuelSession? DuelOf(Player p)
     {
@@ -208,7 +209,9 @@ public sealed class PvpService(AuraSystem auras)
     public void Tick(MapInstance map, TickContext ctx)
     {
         if (!_duels.TryGetValue(map.Id, out var list) || list.Count == 0) return;
-        foreach (var duel in list.ToList())
+        _ticking.Clear();
+        _ticking.AddRange(list); // terminar un duelo lo quita de `list`
+        foreach (var duel in _ticking)
         {
             var rs = ctx.Rules.Pvp.Rulesets[duel.Ruleset];
             switch (duel.State)

@@ -93,7 +93,9 @@ public sealed class CombatModule
             if (party.Contains(p.CharacterId) && p.IsAlive && Vec2.Distance(p.Position, monster.Position) <= rules.Group.XpRangeTiles && p.IsActive(now, rules.Group.ActiveWindowSec))
                 active.Add(p);
         if (active.Count == 0) return [(tagger, PixelRealms.Game.Progression.XpCurve.SoloKillXp(rules.Progression, monster.Template, tagger.Level))];
-        var shares = GroupXp.Split(rules.Progression, rules.Group, monster.Template, active.Select(p => p.Level).ToList());
+        var levels = new List<int>(active.Count);
+        foreach (var p in active) levels.Add(p.Level);
+        var shares = GroupXp.Split(rules.Progression, rules.Group, monster.Template, levels);
         var result = new List<(Entities.Player, int)>(active.Count);
         for (var i = 0; i < active.Count; i++) result.Add((active[i], (int)Math.Round(shares[i], MidpointRounding.AwayFromZero)));
         return result;

@@ -18,6 +18,8 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
     // Ritmos de la IA (percepción, A*, patrulla, llegada): `rules.ai` (regla 4, ADR-008).
 
     private readonly List<Monster> _monsters = new(128);
+    private readonly List<EntityId> _threatIds = new(8);
+    private readonly List<Actor> _candidates = new(8);
 
     public string Name => "monster_ai";
 
@@ -172,13 +174,12 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
         return false;
     }
 
-    private static Actor RandomNotTop(Monster m, Actor current, MapInstance map, TickContext ctx)
+    private Actor RandomNotTop(Monster m, Actor current, MapInstance map, TickContext ctx)
     {
-        var ranked = m.Threat.Ranked();
-        if (ranked.Count <= 1) return current;
-        var candidates = new List<Actor>(ranked.Count - 1);
-        for (var i = 1; i < ranked.Count; i++) if (map.Find(ranked[i]) is { IsAlive: true } a) candidates.Add(a);
-        return candidates.Count == 0 ? current : candidates[ctx.Rng.Next(0, candidates.Count)];
+        m.Threat.AllButTop(_threatIds);
+        _candidates.Clear();
+        foreach (var id in _threatIds) if (map.Find(id) is { IsAlive: true } a) _candidates.Add(a);
+        return _candidates.Count == 0 ? current : _candidates[ctx.Rng.Next(0, _candidates.Count)];
     }
 
     private static bool EnsurePath(Monster m, Vec2 targetPos, MapInstance map, TickContext ctx)

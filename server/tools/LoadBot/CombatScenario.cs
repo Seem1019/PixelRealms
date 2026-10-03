@@ -23,7 +23,7 @@ public static class CombatScenario
     // Umbrales de HU-089 CA2, HU-088 CA5 (combate ≤ 4 ms p99, ADR-018) y HU-036 CA6 (IA < 3 ms): técnicos, no de balance.
     public const double TickP99LimitMs = 15, TickMaxLimitMs = 50, CombatP99LimitMs = 4, AiP99LimitMs = 3, AllocLimitBytesPerSec = 2 * 1024 * 1024, MemoryGrowthLimitPct = 10;
 
-    private const int TicksPerSecond = 1000 / GameConstants.TickMs;
+    public const int TicksPerSecond = 1000 / GameConstants.TickMs;
 
     public sealed record Result(int Ticks, double TickP50, double TickP99, double TickMax, double CombatP50, double CombatP99, double AllocPerSec, int Gen2,
         long MemStart, long MemEnd, int AurasAvg, int AurasMax, int AreasAvg, int AreasMax, int Casts, int Kills, int BotDeaths, double WallSec, bool MemoryChecked, double AiP99)

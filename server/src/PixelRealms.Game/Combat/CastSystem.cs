@@ -35,7 +35,7 @@ public static class CastErrors
 /// </summary>
 public sealed class CastSystem(CombatServices services, EffectResolver effects, DamagePipeline damage) : IMapSystem, ICastInterrupter
 {
-    private sealed record PendingImpact(long AtMs, Actor Caster, SpellDef Spell, EntityId? TargetId, Vec2? TargetPos, Vec2 Origin);
+    private readonly record struct PendingImpact(long AtMs, Actor Caster, SpellDef Spell, EntityId? TargetId, Vec2? TargetPos, Vec2 Origin);
 
     private readonly Dictionary<int, List<PendingImpact>> _impacts = new();
     private readonly List<Actor> _casting = new(32);
@@ -66,7 +66,9 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     /// <summary>Descarta los impactos en vuelo de quien sale del mundo (HU-015): no resuelven a nombre de un ausente.</summary>
     public void ForgetCaster(Actor caster, MapInstance map)
     {
-        if (_impacts.TryGetValue(map.Id, out var list)) list.RemoveAll(i => i.Caster.Id == caster.Id);
+        if (!_impacts.TryGetValue(map.Id, out var list)) return;
+        for (var i = list.Count - 1; i >= 0; i--)
+            if (list[i].Caster.Id == caster.Id) list.RemoveAt(i);
     }
 
     /// <summary>Intenta lanzar; devuelve el código de error o null si el hechizo empezó (o se resolvió si es instantáneo).</summary>
@@ -258,7 +260,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         if (spell.Projectile is { Speed: > 0 } proj && targetId is { } tid && map.Find(tid) is { } target && !ReferenceEquals(target, caster))
         {
             var travelMs = (long)Math.Round(Vec2.Distance(caster.Position, target.Position) / proj.Speed * 1000);
-            if (!_impacts.TryGetValue(map.Id, out var list)) _impacts[map.Id] = list = new List<PendingImpact>();
+            // HU-088 CA1: reserva de capacidad fija, el tope de la instancia; no crece porque el tope se respeta abajo.
+            if (!_impacts.TryGetValue(map.Id, out var list)) _impacts[map.Id] = list = new List<PendingImpact>(ctx.Rules.Limits.MaxPendingImpactsPerInstance);
             if (list.Count >= ctx.Rules.Limits.MaxPendingImpactsPerInstance)
             {
                 // Tope de seguridad: el más antiguo se resuelve ya en vez de perderse (su lanzador ya pagó el coste).

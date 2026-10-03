@@ -21,7 +21,7 @@ public sealed class ThreatTable
 
     public double Of(EntityId id) => _threat.GetValueOrDefault(id.Value);
 
-    public IEnumerable<int> Ids => _threat.Keys;
+    public Dictionary<int, double>.KeyCollection Ids => _threat.Keys;
 
     public void Add(EntityId id, double amount)
     {
@@ -85,11 +85,11 @@ public sealed class ThreatTable
         return Current;
     }
 
-    /// <summary>Ids con amenaza ordenados de mayor a menor (para `random_not_top_threat`).</summary>
-    public List<EntityId> Ranked()
+    /// <summary>Ids con amenaza salvo el de más amenaza (para `random_not_top_threat`), en `into` (se vacía antes).</summary>
+    public void AllButTop(List<EntityId> into)
     {
-        var list = new List<EntityId>(_threat.Count);
-        foreach (var kv in _threat.OrderByDescending(k => k.Value)) list.Add(new EntityId(kv.Key));
-        return list;
+        into.Clear();
+        var top = Top();
+        foreach (var id in _threat.Keys) if (top is not { } t || t.Value != id) into.Add(new EntityId(id));
     }
 }

@@ -57,14 +57,15 @@ public sealed class PortalSystem : IMapSystem
             if (player.RequestedPortalId is { } requested)
             {
                 player.RequestedPortalId = null;
-                var p = map.Data.Portals.FirstOrDefault(x => x.PortalId == requested);
+                PortalDef? p = null;
+                foreach (var x in map.Data.Portals) if (x.PortalId == requested) { p = x; break; }
                 if (p is null) { ctx.Emit(new PortalRejected(map.Id, player, new PortalDef(requested, "", 0, 0, null, Vec2.Zero, Vec2.Zero), "not_found")); continue; }
                 if (PortalPolicy.DistanceTo(p, player.Position) > ctx.Rules.Movement.PortalUseRangeTiles) { ctx.Emit(new PortalRejected(map.Id, player, p, PortalPolicy.OutOfRange)); continue; }
                 portal = p;
             }
             else
             {
-                portal = map.Data.Portals.FirstOrDefault(x => x.Contains(player.Position));
+                foreach (var x in map.Data.Portals) if (x.Contains(player.Position)) { portal = x; break; }
                 if (portal is null) { player.RejectedPortalId = null; continue; }
                 if (player.RejectedPortalId == portal.PortalId) continue;
             }
