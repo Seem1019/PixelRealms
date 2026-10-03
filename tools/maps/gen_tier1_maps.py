@@ -262,6 +262,11 @@ def build_meadow() -> tuple[dict, dict]:
         if g.walls[g.i(x, y)] == 0 and g.ground[g.i(x, y)] == GRASS:
             g.detail[g.i(x, y)] = DIRT
 
+    # Recompensa de las ramas laterales (HU-080 CA1): un élite en el centro del escondite de bandidos (Campos) y otro en la
+    # atalaya goblin (Colinas), con sus guardias alrededor. Van al final para no mover los ids ni el azar del resto del mapa.
+    spawns.append(obj(nid(), "war_boar", "spawn", 135, 10, 0, 0, [prop("monsterId", "boar_alpha"), prop("count", 1), prop("wanderRadius", 1.0, "float")], point=True))
+    spawns.append(obj(nid(), "watchtower_warg", "spawn", 227, 10, 0, 0, [prop("monsterId", "wolf_alpha"), prop("count", 1), prop("wanderRadius", 1.0, "float")], point=True))
+
     origin = (graveyards[0]["x"] // TS, graveyards[0]["y"] // TS)
     sealed = g.seal_unreachable(origin, WALL)
     report = check_map(g, origin, spawns, graveyards, npcs, portals)
