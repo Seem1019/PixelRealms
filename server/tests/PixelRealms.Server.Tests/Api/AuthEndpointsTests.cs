@@ -90,6 +90,31 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task Login_BehindTheProxy_LimitsEachPlayerByTheirRealIp() // HU-011 CA3 + HU-073: Caddy reenvía X-Forwarded-For
+    {
+        await using var server = await TestServer.StartAsync(new() { ["JWT_SIGNING_KEY"] = new string('k', 40) }, environment: "Production");
+        using var api = new ApiClient(server);
+        (await api.Register("ana", "segura123")).StatusCode.ShouldBe(HttpStatusCode.Created);
+        // Seis jugadores distintos entran a la vez: todos llegan desde la IP del proxy, cada uno con su IP real reenviada.
+        for (var i = 1; i <= 6; i++)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login") { Content = JsonContent.Create(new { username = "ana", password = "segura123" }) };
+            req.Headers.Add("X-Forwarded-For", $"203.0.113.{i}");
+            (await api.Http.SendAsync(req, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+        // El mismo jugador sí sigue limitado: 5 por minuto desde su IP.
+        for (var i = 0; i < 5; i++)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login") { Content = JsonContent.Create(new { username = "ana", password = "mal" }) };
+            req.Headers.Add("X-Forwarded-For", "198.51.100.7");
+            await api.Http.SendAsync(req, TestContext.Current.CancellationToken);
+        }
+        using var sixth = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login") { Content = JsonContent.Create(new { username = "ana", password = "segura123" }) };
+        sixth.Headers.Add("X-Forwarded-For", "198.51.100.7");
+        (await api.Http.SendAsync(sixth, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
     public async Task ExpiredOrTamperedToken_IsRejected() // HU-011 CA5
     {
         var jwt = new JwtService(new string('k', 40), TimeSpan.FromMinutes(15));

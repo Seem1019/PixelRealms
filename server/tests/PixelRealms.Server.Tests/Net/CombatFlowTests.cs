@@ -92,6 +92,71 @@ public sealed class CombatFlowTests
     }
 
     [Fact]
+    public async Task LevelUp_OthersSeeTheNewLevel_AndItIsSaved() // HU-041 CA3 (el número; el efecto visual es del cliente), HU-026 CA6
+    {
+        await using var server = await TestServer.StartAsync();
+        var (ana, anaId) = await Enter(server, "ana", "Ana", "warrior");
+        var (bob, _) = await Enter(server, "bob", "Bob", "mage");
+        await using var _ = ana;
+        await using var __ = bob;
+        await bob.ExpectForIdAsync("EntitySpawn", anaId);
+        var registry = server.Services.GetRequiredService<PlayerRegistry>();
+        var combat = server.Services.GetRequiredService<CombatModule>();
+        var world = server.Services.GetRequiredService<World>();
+        var saver = server.Services.GetRequiredService<PixelRealms.Server.Hosting.SaveService>();
+        var anaPlayer = registry.All.First(p => p.Id.Value == anaId);
+        var savedBefore = saver.Saved;
+        await server.RunOnTickAsync(t =>
+            combat.Progression.GrantXp(anaPlayer, PixelRealms.Game.Progression.XpCurve.XpToNextLevel(combat.Services.Content.Rules.Progression, 1), null, world.GetInstance(anaPlayer.MapInstanceId)!, t));
+        var spawn = await bob.ExpectAsync("EntitySpawn", m => m.GetProperty("id").GetInt32() == anaId && m.GetProperty("level").GetInt32() == 2);
+        spawn.GetProperty("name").GetString().ShouldBe("Ana");
+        for (var i = 0; i < 40 && saver.Saved == savedBefore; i++) await Task.Delay(50, TestContext.Current.CancellationToken);
+        saver.Saved.ShouldBeGreaterThan(savedBefore);
+    }
+
+    [Fact]
+    public async Task EnteringTheAoi_BringsTheAurasAlreadyOnTheEntity() // HU-035 CA6 / HU-098 CA2
+    {
+        await using var server = await TestServer.StartAsync();
+        var (ana, anaId) = await Enter(server, "ana", "Ana", "priest");
+        await using var _ = ana;
+        var registry = server.Services.GetRequiredService<PlayerRegistry>();
+        var combat = server.Services.GetRequiredService<CombatModule>();
+        var world = server.Services.GetRequiredService<World>();
+        var anaPlayer = registry.All.First(p => p.Id.Value == anaId);
+        await server.RunOnTickAsync(t =>
+            combat.Auras.Apply(anaPlayer, combat.Services.Content.Aura("priest_renew_hot"), anaPlayer, world.GetInstance(anaPlayer.MapInstanceId)!, t));
+
+        var (bob, _) = await Enter(server, "bob", "Bob", "mage"); // mismo cementerio: Ana ya está en su AOI con el aura puesta
+        await using var __ = bob;
+        await bob.ExpectForIdAsync("EntitySpawn", anaId);
+        var aura = await bob.ExpectAsync("AuraApplied", m => m.GetProperty("targetId").GetInt32() == anaId);
+        aura.GetProperty("auraId").GetString().ShouldBe("priest_renew_hot");
+        aura.GetProperty("durationMs").GetInt32().ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task SelectTarget_OnlyKeepsEntitiesOfTheSameMap() // HU-030 CA4: un id inventado no se guarda
+    {
+        await using var server = await TestServer.StartAsync();
+        var (ana, selfId) = await Enter(server, "ana", "Ana", "mage");
+        await using var _ = ana;
+        var player = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId);
+        var (slimeId, _, _) = PlaceNextToMonster(server, selfId, "slime");
+        await ana.SendAsync("SelectTarget", $$"""{"targetId":{{slimeId}}}""");
+        await ana.SendAsync("Ping", """{"clientTime":0}""");
+        await ana.ExpectAsync("Pong");
+        int? target = null;
+        await server.RunOnTickAsync(_ => target = player.Combat.TargetId?.Value);
+        target.ShouldBe(slimeId);
+        await ana.SendAsync("SelectTarget", """{"targetId":987654}""");
+        await ana.SendAsync("Ping", """{"clientTime":0}""");
+        await ana.ExpectAsync("Pong");
+        await server.RunOnTickAsync(_ => target = player.Combat.TargetId?.Value);
+        target.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task CastSpell_WithAPotionOrMonsterSpell_IsRejected_AndHealsNothing()
     {
         // Cliente tramposo: el hechizo de la poción por CastSpell no tiene recarga, coste ni GCD.
@@ -119,9 +184,13 @@ public sealed class CombatFlowTests
         var world = server.Services.GetRequiredService<World>();
         var registry = server.Services.GetRequiredService<PlayerRegistry>();
         var player = registry.All.First(p => p.Id.Value == selfId);
+        var saver = server.Services.GetRequiredService<PixelRealms.Server.Hosting.SaveService>();
+        var savedBefore = saver.Saved;
         player.Hp = 1; // la muerte la provoca el jabalí: lo colocamos encima y lo agitamos
         var (boarId, _, _) = PlaceNextToMonster(server, selfId, "boar");
         var died = await ana.ExpectAsync("Died", 15000);
+        for (var i = 0; i < 40 && saver.Saved == savedBefore; i++) await Task.Delay(50, TestContext.Current.CancellationToken);
+        saver.Saved.ShouldBeGreaterThan(savedBefore); // HU-026 CA6: morir guarda
         var killerId = died.GetProperty("killerId").GetInt32();
         world.GetInstance(player.MapInstanceId)!.Monsters.ContainsKey(killerId).ShouldBeTrue(); // lo mató un monstruo
         var snap = await ana.LatestAsync("Snapshot");

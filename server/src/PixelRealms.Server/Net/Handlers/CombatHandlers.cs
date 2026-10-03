@@ -14,14 +14,16 @@ public sealed class CombatHandlerDeps(World world, CombatModule combat)
     public Game.Map.MapInstance? MapOf(Game.Entities.Player p) => World.GetInstance(p.MapInstanceId);
 }
 
-/// <summary>HU-030 CA4: el servidor guarda el objetivo seleccionado (lo usan otros jugadores como "objetivo de mi objetivo").</summary>
-public sealed class SelectTargetHandler : IMessageHandler<SelectTarget>
+/// <summary>HU-030 CA4: el servidor guarda el objetivo seleccionado (lo usan otros jugadores como "objetivo de mi objetivo").
+/// Solo entidades de su mapa: un id inventado no se guarda ni se reenvía en `EntState.tgt`.</summary>
+public sealed class SelectTargetHandler(CombatHandlerDeps deps) : IMessageHandler<SelectTarget>
 {
     public void Handle(SelectTarget msg, HandlerContext ctx)
     {
         var player = ctx.Player;
         if (player is null) return;
-        player.Combat.TargetId = msg.TargetId is { } id && id > 0 ? new EntityId(id) : null;
+        var exists = msg.TargetId is { } id && id > 0 && deps.MapOf(player)?.Find(new EntityId(id)) is not null;
+        player.Combat.TargetId = exists ? new EntityId(msg.TargetId!.Value) : null;
         if (player.Combat.TargetId is null) player.Combat.AutoAttackOn = false;
     }
 }

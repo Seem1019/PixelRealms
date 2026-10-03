@@ -134,7 +134,7 @@ public static class ServerApp
         router.Register(new MoveInputHandler(app.Services.GetRequiredService<ILogger<MoveInputHandler>>()));
         router.Register(new UsePortalHandler());
         var combatDeps = app.Services.GetRequiredService<CombatHandlerDeps>();
-        router.Register(new SelectTargetHandler());
+        router.Register(new SelectTargetHandler(combatDeps));
         router.Register(new CastSpellHandler(combatDeps));
         router.Register(new CancelCastHandler(combatDeps));
         router.Register(new AutoAttackHandler(combatDeps));
@@ -182,17 +182,19 @@ public static class ServerApp
         };
 
         var net = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<NetOptions>>().Value;
-        app.UseRateLimiter();
-        AuthEndpoints.Map(app);
-        CharacterEndpoints.Map(app);
-        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
         if (app.Environment.IsProduction())
         {
-            // HU-073: detrás de Caddy, la IP real llega en X-Forwarded-For (tope por IP de HU-071) y el esquema en X-Forwarded-Proto.
+            // HU-073: detrás de Caddy, la IP real llega en X-Forwarded-For (tope por IP de HU-071 y límites de login/registro de
+            // HU-010/011) y el esquema en X-Forwarded-Proto. Va antes que UseRateLimiter: si no, todos los jugadores compartirían
+            // el cupo de la IP del proxy (5 logins/min y 5 registros/hora para el servidor entero).
             var fwd = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions { ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto };
             fwd.KnownIPNetworks.Clear(); fwd.KnownProxies.Clear(); // el proxy es el contenedor `caddy` de la misma red de compose
             app.UseForwardedHeaders(fwd);
         }
+        app.UseRateLimiter();
+        AuthEndpoints.Map(app);
+        CharacterEndpoints.Map(app);
+        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.Zero });
         app.MapGet("/health", (GameLoopService loop, ConnectionManager cm, NetMetrics metrics) =>
         {
             var (_, p99) = loop.Stats.Percentiles();

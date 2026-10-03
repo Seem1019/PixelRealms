@@ -17,9 +17,12 @@ services:
       retries: 10
 
   server:
-    image: ${SERVER_IMAGE:-ghcr.io/OWNER/pixelrealms-server:latest}
+    image: ${SERVER_IMAGE:-ghcr.io/seem1019/pixelrealms-server:latest} # GHCR exige minúsculas (8927dd1)
     build: { context: ., dockerfile: server/Dockerfile }
     restart: unless-stopped
+    # Al apagar, el servidor guarda a todos los conectados (HU-026 CA2) y espera a la BD hasta el ShutdownTimeout del host (30 s).
+    # Con los 10 s por defecto de Docker, un SIGKILL a mitad del vaciado perdería guardados en cada despliegue.
+    stop_grace_period: 40s
     depends_on:
       postgres: { condition: service_healthy }
     environment:

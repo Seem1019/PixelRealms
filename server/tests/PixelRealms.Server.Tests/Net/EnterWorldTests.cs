@@ -123,6 +123,37 @@ public sealed class EnterWorldTests
     }
 
     [Fact]
+    public async Task EnteringWithAnotherCharacter_WhileTheFirstIsInCombat_IsRefused() // revisión de autoridad: escapar de la pelea
+    {
+        await using var server = await TestServer.StartAsync();
+        var (api, id, ticket1) = await NewCharacterWithTicket(server);
+        using (api)
+        {
+            var otherId = await api.CreateCharacterId("Bea", "mage");
+            await using var first = await TestGameClient.ConnectAsync(server.WsUrl);
+            await first.SendAsync("Hello", $$"""{"protocolVersion":1,"ticket":"{{ticket1}}"}""");
+            await first.ExpectAsync("Welcome");
+            var registry = (PlayerRegistry)server.Services.GetService(typeof(PlayerRegistry))!;
+            var ana = registry.ByCharacter(id)!;
+            await server.RunOnTickAsync(t => ana.EnterCombat(t.NowMs));
+
+            await using var second = await TestGameClient.ConnectAsync(server.WsUrl);
+            await second.SendAsync("Hello", $$"""{"protocolVersion":1,"ticket":"{{await api.Ticket(otherId)}}"}""");
+            (await second.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("in_combat");
+            (await second.ExpectCloseAsync()).ShouldBe("in_combat");
+            registry.ByCharacter(id).ShouldNotBeNull(); // Ana sigue en el mundo, en su pelea
+            registry.ByCharacter(otherId).ShouldBeNull();
+
+            // Fuera de combate, el reemplazo funciona como siempre (HU-014 CA5).
+            await server.RunOnTickAsync(_ => ana.LastCombatAtMs = long.MinValue);
+            await using var third = await TestGameClient.ConnectAsync(server.WsUrl);
+            await third.SendAsync("Hello", $$"""{"protocolVersion":1,"ticket":"{{await api.Ticket(otherId)}}"}""");
+            await third.ExpectAsync("Welcome");
+            (await first.ExpectCloseAsync()).ShouldBe("replaced");
+        }
+    }
+
+    [Fact]
     public async Task Disconnect_SavesCharacter()
     {
         await using var server = await TestServer.StartAsync();

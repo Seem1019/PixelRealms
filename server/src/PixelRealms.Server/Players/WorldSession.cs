@@ -82,6 +82,14 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         // HU-014 CA5: la cuenta ya tiene otro personaje dentro → la sesión anterior se guarda y se desconecta primero.
         if (previous is not null)
         {
+            // Salvo en combate: sacarlo sería escapar de la pelea con vida (ADR-018: un desconectado en combate sigue dentro
+            // hasta salir de combate). Se rechaza la entrada; el cliente reintenta con un ticket nuevo.
+            if (previous.IsInCombat(ctx.Tick.NowMs, content.Current.Rules.Combat.InCombatWindowSec))
+            {
+                ctx.SendError(ErrorCodes.InCombat, message: $"{previous.Name} sigue en combate");
+                ctx.Close(ErrorCodes.InCombat);
+                return;
+            }
             var prevConn = previous.ConnectionId;
             Leave(previous, "replaced");
             if (prevConn >= 0) ctx.Connections.Close(prevConn, "replaced");
@@ -119,6 +127,8 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         if (instance is not null) interest.ResetObserver(instance, player);
         ctx.Send(mapper.ToStatsUpdate(player)); // stats y oro tras el Welcome (ver OnPlayerJoin)
         foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd);
+        // Las auras propias siguieron corriendo mientras estaba linkdead: el cliente nuevo no las conoce (HU-098 CA2).
+        foreach (var aura in player.Auras.All) ctx.Send(EventDispatcher.ToAuraApplied(player, aura, ctx.Tick.NowMs));
         logger.LogInformation("{Name} reconectó (conexión {Conn})", player.Name, connectionId);
     }
 

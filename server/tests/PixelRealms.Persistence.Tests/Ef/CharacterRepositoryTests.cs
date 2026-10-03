@@ -20,12 +20,17 @@ public sealed class CharacterRepositoryTests(PostgresFixture pg) : IClassFixture
         var sword = new SavedItem(Guid.CreateVersion7(), "worn_sword", 1, 1, 7);
         var created = (await chars.CreateAsync(new NewCharacter(acc.Id, "Ana", "warrior", "meadow", 10, 12, 60, 0, [sword], [new SavedHotbarSlot(0, 0, "warrior_heroic_strike")]), Max, TestContext.Current.CancellationToken)).Character.ShouldNotBeNull();
         var bread = new SavedItem(Guid.CreateVersion7(), "bread", 5, 0, 0);
-        await chars.SaveAsync(created with { Level = 3, Xp = 50, Gold = 120, X = 20, Y = 21, Hp = 44, Items = [sword, bread], Audit = [new AuditEntry(bread.Id, "loot", "bread", 5)] }, TestContext.Current.CancellationToken);
+        var lost = new SavedItem(Guid.CreateVersion7(), "espada_retirada", 1, 2, 0); // apartado (HU-057 CA4): contenedor 2
+        await chars.SaveAsync(created with { Level = 3, Xp = 50, Gold = 120, MapId = "mine", X = 20.25f, Y = 21.5f, Hp = 44, Resource = 17, Items = [sword, bread, lost], Audit = [new AuditEntry(bread.Id, "loot", "bread", 5)] }, TestContext.Current.CancellationToken);
         var loaded = (await chars.LoadAsync(created.Id, TestContext.Current.CancellationToken)).ShouldNotBeNull();
         loaded.Level.ShouldBe(3);
+        loaded.Xp.ShouldBe(50);
         loaded.Gold.ShouldBe(120);
-        loaded.Items.Count.ShouldBe(2);
+        (loaded.MapId, loaded.X, loaded.Y, loaded.Hp, loaded.Resource).ShouldBe(("mine", 20.25f, 21.5f, 44, 17)); // HU-026 CA5
+        loaded.Items.Count.ShouldBe(3);
         loaded.Items.ShouldContain(i => i.TemplateId == "bread" && i.Quantity == 5 && i.Container == 0);
+        loaded.Items.ShouldContain(i => i.Id == sword.Id && i.Container == 1 && i.Slot == 7);
+        loaded.Items.ShouldContain(i => i.Id == lost.Id && i.Container == 2); // lo apartado se conserva
         loaded.Hotbar.ShouldHaveSingleItem().Ref.ShouldBe("warrior_heroic_strike");
     }
 
