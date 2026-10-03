@@ -61,7 +61,7 @@ public static class ServerApp
         builder.Services.AddSingleton(new TicketService(TimeSpan.FromSeconds(30)));
         builder.Services.AddSingleton<Passwords>();
         builder.Services.AddSingleton<CharacterFactory>();
-        AuthEndpoints.AddRateLimiting(builder.Services);
+        AuthEndpoints.AddRateLimiting(builder.Services, builder.Configuration);
 
         var world = new World();
         // HU-020 CA1/CA2: un MapData por .tmj y una MapInstance de cada uno; un mapa inválido impide arrancar.

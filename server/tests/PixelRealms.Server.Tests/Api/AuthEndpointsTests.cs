@@ -115,6 +115,47 @@ public sealed class AuthEndpointsTests
     }
 
     [Fact]
+    public async Task Refresh_WithAValidToken_IssuesANewOne_WithTheAdminFlagFromTheDatabase() // HU-015 CA1
+    {
+        await using var server = await TestServer.StartAsync();
+        using var api = await new ApiClient(server).RegisterAndLogin("ana");
+        var store = (Persistence.InMemory.InMemoryStore)server.Services.GetService(typeof(Persistence.InMemory.InMemoryStore))!;
+        var accountId = store.Accounts.Values.Single().Id;
+        var accounts = (Persistence.Repositories.IAccountRepository)server.Services.GetService(typeof(Persistence.Repositories.IAccountRepository))!;
+        await accounts.SetAdminAsync(accountId, true, TestContext.Current.CancellationToken);
+
+        var r = await api.Http.PostAsync("/api/auth/refresh", null, TestContext.Current.CancellationToken);
+        r.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await r.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        var jwt = (JwtService)server.Services.GetService(typeof(JwtService))!;
+        var claims = jwt.Validate(body.GetProperty("token").GetString()!, DateTimeOffset.UtcNow)!;
+        claims.AccountId.ShouldBe(accountId);
+        claims.Admin.ShouldBeTrue(); // releído de la BD, no copiado del token anterior
+
+        using var anon = new HttpClient { BaseAddress = new Uri(server.BaseUrl) };
+        (await anon.PostAsync("/api/auth/refresh", null, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Refresh_KeepsTheLoginTime_AndStopsAfterTheMaximumSession() // revisión de autoridad: sesiones sin fin
+    {
+        await using var server = await TestServer.StartAsync();
+        using var api = await new ApiClient(server).RegisterAndLogin("ana");
+        var jwt = (JwtService)server.Services.GetService(typeof(JwtService))!;
+        var accountId = jwt.Validate(api.Token!, DateTimeOffset.UtcNow)!.AccountId;
+        var now = DateTimeOffset.UtcNow;
+        // Login de hace 13 h renovado hasta hoy: el token aún no caduca, pero la sesión ya pasó el tope de 12 h.
+        var (old, _) = jwt.Issue(accountId, "ana", false, now, authTime: now.AddHours(-13));
+        using var stale = new HttpClient { BaseAddress = new Uri(server.BaseUrl) };
+        stale.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", old);
+        (await stale.PostAsync("/api/auth/refresh", null, TestContext.Current.CancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        // Uno reciente sí se renueva y conserva su hora de login.
+        var r = await api.Http.PostAsync("/api/auth/refresh", null, TestContext.Current.CancellationToken);
+        var renewed = jwt.Validate((await r.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("token").GetString()!, DateTimeOffset.UtcNow)!;
+        renewed.AuthTime.ShouldBe(jwt.Validate(api.Token!, DateTimeOffset.UtcNow)!.AuthTime);
+    }
+
+    [Fact]
     public async Task ExpiredOrTamperedToken_IsRejected() // HU-011 CA5
     {
         var jwt = new JwtService(new string('k', 40), TimeSpan.FromMinutes(15));

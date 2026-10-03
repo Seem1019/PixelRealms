@@ -15,14 +15,27 @@ class ApiResult:
 		return status >= 200 and status < 300
 
 
+## El JWT dura 15 min y una partida dura más: se renueva antes (HU-015 CA1) para volver a la selección de personaje o pedir
+## un ticket de reconexión (HU-025) sin pedir la contraseña.
+const REFRESH_EVERY_SEC := 600.0
+## Si la renovación falla por la red se reintenta pronto: esperar otros 10 min dejaría caducar el token.
+const REFRESH_RETRY_SEC := 45.0
+
 var token: String = ""
 var token_expires_at: String = ""
 
 var _base_url: String = ""
+var _refresh_timer: Timer
+## Sube en cada login y cierre de sesión: una renovación que vuelve tarde de una sesión ya cerrada no la resucita.
+var _session: int = 0
 
 
 func _ready() -> void:
 	_base_url = Settings.server_url()
+	_refresh_timer = Timer.new()
+	_refresh_timer.wait_time = REFRESH_EVERY_SEC
+	_refresh_timer.timeout.connect(refresh_token)
+	add_child(_refresh_timer)
 
 
 func set_base_url(url: String) -> void:
@@ -36,6 +49,33 @@ func has_token() -> bool:
 func clear_token() -> void:
 	token = ""
 	token_expires_at = ""
+	_session += 1
+	if _refresh_timer != null:
+		_refresh_timer.stop()
+
+
+func is_refreshing_scheduled() -> bool:
+	return _refresh_timer != null and not _refresh_timer.is_stopped()
+
+
+func _set_token(new_token: String, expires_at: String) -> void:
+	token = new_token
+	token_expires_at = expires_at
+	if _refresh_timer != null and not token.is_empty():
+		_refresh_timer.start(REFRESH_EVERY_SEC)
+
+
+## POST /api/auth/refresh → JWT nuevo con la sesión actual. Si ya no vale (401), _request limpia el token.
+func refresh_token() -> ApiResult:
+	var session := _session
+	var r := await _request(HTTPClient.METHOD_POST, "/api/auth/refresh", null, true)
+	if session != _session:
+		return r  # se cerró sesión (o se volvió a entrar) mientras tanto: esta respuesta ya no vale
+	if r.ok() and r.data is Dictionary:
+		_set_token(str((r.data as Dictionary).get("token", "")), str((r.data as Dictionary).get("expiresAt", "")))
+	elif r.error_code == "network" and has_token():
+		_refresh_timer.start(REFRESH_RETRY_SEC)
+	return r
 
 
 ## POST /api/auth/register
@@ -47,8 +87,8 @@ func register(username: String, password: String) -> ApiResult:
 func login(username: String, password: String) -> ApiResult:
 	var r := await _request(HTTPClient.METHOD_POST, "/api/auth/login", {"username": username, "password": password}, false)
 	if r.ok() and r.data is Dictionary:
-		token = str((r.data as Dictionary).get("token", ""))
-		token_expires_at = str((r.data as Dictionary).get("expiresAt", ""))
+		_session += 1
+		_set_token(str((r.data as Dictionary).get("token", "")), str((r.data as Dictionary).get("expiresAt", "")))
 	return r
 
 
