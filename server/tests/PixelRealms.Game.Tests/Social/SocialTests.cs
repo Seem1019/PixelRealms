@@ -567,6 +567,59 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void Trade_PropertyTest_RandomTradesBetweenTwo_KeepItemsGoldAndUniqueIds() // HU-059 CA5
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rng = new SeededRng(4242);
+        string[] templates = ["bread", "minor_healing_potion", "iron_sword", "slime_goo", "worn_dagger"];
+        foreach (var p in new[] { ana, bob })
+        {
+            p.Gold = 500;
+            for (var i = 0; i < 10; i++) p.Inventory.Bag[i] = ItemInstance.New(templates[rng.Next(0, templates.Length)], 1);
+        }
+        Dictionary<string, int> Totals()
+        {
+            var d = new Dictionary<string, int>();
+            foreach (var it in ana.Inventory.Bag.Concat(bob.Inventory.Bag).Concat(ana.Equipment.Slots).Concat(bob.Equipment.Slots))
+                if (it is not null) d[it.TemplateId] = d.GetValueOrDefault(it.TemplateId) + it.Qty;
+            return d;
+        }
+        var totals = Totals(); var gold = ana.Gold + bob.Gold;
+
+        List<(Guid, int)> RandomOffer(Player p)
+        {
+            var offer = new List<(Guid, int)>();
+            foreach (var it in p.Inventory.Bag)
+                if (it is not null && offer.Count < w.Content.Rules.Social.TradeMaxItems && rng.Next(0, 3) == 0) offer.Add((it.Id, rng.Next(1, it.Qty + 1)));
+            return offer;
+        }
+        var completed = 0;
+        for (var round = 0; round < 300; round++)
+        {
+            var ctx = w.Begin();
+            w.Combat.Trades.Request(ana, bob, w.Map, ctx).ShouldBeNull();
+            w.Combat.Trades.Respond(bob, true, w.Map, ctx).ShouldBeNull();
+            var trade = w.Combat.Trades.TradeOf(ana)!;
+            w.Combat.Trades.Offer(ana, RandomOffer(ana), rng.Next(0, (int)Math.Min(ana.Gold, 50) + 1), w.Map, ctx).ShouldBeNull();
+            w.Combat.Trades.Offer(bob, RandomOffer(bob), rng.Next(0, (int)Math.Min(bob.Gold, 50) + 1), w.Map, ctx).ShouldBeNull();
+            if (rng.Next(0, 5) == 0) { w.Combat.Trades.CancelBy(ana, "test", w.Map, ctx); continue; }
+            w.Combat.Trades.Confirm(ana, trade.Version, w.Map, ctx).ShouldBeNull();
+            var result = w.Combat.Trades.Confirm(bob, trade.Version, w.Map, ctx);
+            if (result is null) completed++;
+            else { result.ShouldBe("bag_full"); w.Combat.Trades.CancelBy(ana, "test", w.Map, ctx); }
+            w.Combat.Trades.TradeOf(ana).ShouldBeNull();
+
+            Totals().ShouldBe(totals, ignoreOrder: true);
+            (ana.Gold + bob.Gold).ShouldBe(gold);
+            ana.Gold.ShouldBeGreaterThanOrEqualTo(0); bob.Gold.ShouldBeGreaterThanOrEqualTo(0);
+            var ids = ana.Inventory.Bag.Concat(bob.Inventory.Bag).Where(i => i is not null).Select(i => i!.Id).ToList();
+            ids.Distinct().Count().ShouldBe(ids.Count); // ningún id repetido entre los dos
+        }
+        completed.ShouldBeGreaterThan(100); // el test ejerce intercambios reales, no solo cancelaciones
+    }
+
+    [Fact]
     public void Trade_Request_Offer_Confirm_Atomic_Conservation_Cancel() // HU-059
     {
         var w = Arena();
