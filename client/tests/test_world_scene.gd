@@ -75,6 +75,12 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	assert_eq(GameState.auras_of(7).size(), 1)
 	_dispatch("AuraRemoved", {"targetId": 7, "auraId": "mage_chill", "casterId": 1})
 	assert_eq(GameState.auras_of(7).size(), 0)
+	# HU-035 CA6: el icono enseña a la vez las cargas y el tiempo que queda.
+	_dispatch("AuraApplied", {"targetId": 1, "auraId": "rogue_poison", "casterId": 7, "stacks": 3, "durationMs": 9000})
+	await get_tree().process_frame
+	var aura_cell: Control = _world._hud._self_auras.get_child(_world._hud._self_auras.get_child_count() - 1)
+	assert_eq((aura_cell.get_node("Stacks") as Label).text, "3")
+	assert_eq((aura_cell.get_node("Time") as Label).text, "9")
 	_dispatch("Cooldown", {"spellId": "mage_frost_nova", "remainingMs": 18000})
 	assert_gt(GameState.cooldown_remaining_ms("mage_frost_nova"), 17000)
 

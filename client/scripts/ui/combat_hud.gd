@@ -547,41 +547,57 @@ func _rebuild_auras(box: HBoxContainer, entity_id: int) -> void:
 		time.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		time.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(time)
+		# HU-035 CA6: las cargas arriba a la derecha (la insignia de categoría ocupa la esquina izquierda) y el tiempo abajo.
+		var stacks := Label.new()
+		stacks.name = "Stacks"
+		stacks.theme_type_variation = "OutlinedLabel"
+		stacks.position = Vector2(7, -2)
+		stacks.size = Vector2(10, 9)
+		stacks.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		stacks.add_theme_color_override("font_color", UiTheme.ACCENT)
+		stacks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(stacks)
 		var is_dominant: bool = dominant.has(str(ad["auraId"]))
 		cell.modulate = Color.WHITE if is_dominant else Color(0.55, 0.55, 0.55)
 		box.add_child(cell)
 	_refresh_aura_times(box, entity_id)
 
 
-## Entre varias ralentizaciones manda la más fuerte y entre bonos de velocidad el mayor (ADR-022): las demás en gris.
+## Los modificadores del mismo tipo no se suman (ADR-022): manda la ralentización más fuerte, el mayor bono de velocidad y el
+## mayor daño hecho y daño recibido en valor absoluto (HU-038 CA4b); los demás en gris. Mismo criterio que `AuraSet.IsDominant`.
 static func _dominant_ids(list: Array) -> Dictionary:
-	var best_slow := -1.0
-	var best_slow_id := ""
-	var best_speed := -1.0
-	var best_speed_id := ""
+	var max_slow := 0.0
+	var max_speed := 0.0
+	var max_done := 0.0
+	var max_taken := 0.0
+	for a: Variant in list:
+		var def := Content.aura(str((a as Dictionary)["auraId"]))
+		var mods := _aura_mods(def)
+		if str(def.get("kind", "")) == "slow":
+			max_slow = maxf(max_slow, float(def.get("pct", 0.0)))
+		max_speed = maxf(max_speed, float(mods.get("speedPct", 0.0)))
+		max_done = maxf(max_done, absf(float(mods.get("damageDonePct", 0.0))))
+		max_taken = maxf(max_taken, absf(float(mods.get("damageTakenPct", 0.0))))
 	var result := {}
 	for a: Variant in list:
-		var ad: Dictionary = a
-		var def := Content.aura(str(ad["auraId"]))
-		var kind := str(def.get("kind", ""))
-		var mods: Dictionary = def.get("mods", {}) if def.get("mods") != null else {}
-		if kind == "slow":
-			var pct := float(def.get("pct", 0.0))
-			if pct > best_slow:
-				best_slow = pct
-				best_slow_id = str(ad["auraId"])
-		elif float(mods.get("speedPct", 0.0)) > 0.0:
-			var sp := float(mods.get("speedPct", 0.0))
-			if sp > best_speed:
-				best_speed = sp
-				best_speed_id = str(ad["auraId"])
+		var id := str((a as Dictionary)["auraId"])
+		var def := Content.aura(id)
+		var mods := _aura_mods(def)
+		var dominant := true
+		if str(def.get("kind", "")) == "slow":
+			dominant = float(def.get("pct", 0.0)) >= max_slow
 		else:
-			result[str(ad["auraId"])] = true
-	if not best_slow_id.is_empty():
-		result[best_slow_id] = true
-	if not best_speed_id.is_empty():
-		result[best_speed_id] = true
+			var speed := float(mods.get("speedPct", 0.0))
+			var done := absf(float(mods.get("damageDonePct", 0.0)))
+			var taken := absf(float(mods.get("damageTakenPct", 0.0)))
+			dominant = not ((speed > 0.0 and speed < max_speed) or (done > 0.0 and done < max_done) or (taken > 0.0 and taken < max_taken))
+		if dominant:
+			result[id] = true
 	return result
+
+
+static func _aura_mods(def: Dictionary) -> Dictionary:
+	return def.get("mods", {}) if def.get("mods") is Dictionary else {}
 
 
 func _refresh_aura_times(box: HBoxContainer, _entity_id: int) -> void:
@@ -595,7 +611,10 @@ func _refresh_aura_times(box: HBoxContainer, _entity_id: int) -> void:
 		var stacks := int(ad.get("stacks", 1))
 		var time := cell.get_node_or_null("Time") as Label
 		if time != null:
-			time.text = ("x%d" % stacks) if stacks > 1 else ("%d" % ceili(remaining / 1000.0))
+			time.text = "%d" % ceili(remaining / 1000.0)
+		var stack_label := cell.get_node_or_null("Stacks") as Label
+		if stack_label != null:
+			stack_label.text = str(stacks) if stacks > 1 else ""
 
 
 # --- Errores y muerte -----------------------------------------------------------------------------------------------------------
