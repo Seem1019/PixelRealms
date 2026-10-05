@@ -18,8 +18,33 @@ public sealed class DuelSession(Player a, Player b, string ruleset, long request
     public long RequestedAtMs { get; } = requestedAtMs;
     public long StartsAtMs { get; set; }
     public Player? Winner { get; set; }
-    /// <summary>Punto medio al activarse: quien se aleja más de él pierde por distancia.</summary>
+    /// <summary>Centro de la zona del duelo (HU-101): el punto medio entre los dos al aceptar.</summary>
     public Vec2 Center { get; set; }
+
+    /// <summary>Radio y plazo de la zona, fijados al aceptar: un `/reload rules` a mitad del duelo no mueve la línea que ven.</summary>
+    public double ZoneRadiusTiles { get; set; }
+
+    public long ZoneGraceMs { get; set; }
+
+    /// <summary>Tiempo fuera de la zona gastado por cada uno (ms): sube fuera y baja al mismo ritmo dentro, así que salir y volver
+    /// un tick no devuelve el plazo entero.</summary>
+    public long OutsideMsA { get; set; }
+
+    public long OutsideMsB { get; set; }
+
+    public bool OutsideA { get; set; }
+
+    public bool OutsideB { get; set; }
+
+    public long OutsideMs(Player p) => ReferenceEquals(p, A) ? OutsideMsA : OutsideMsB;
+
+    public bool IsOutside(Player p) => ReferenceEquals(p, A) ? OutsideA : OutsideB;
+
+    public void SetOutside(Player p, bool outside, long usedMs)
+    {
+        if (ReferenceEquals(p, A)) { OutsideA = outside; OutsideMsA = usedMs; }
+        else { OutsideB = outside; OutsideMsB = usedMs; }
+    }
 
     /// <summary>Vida y recurso de cada uno al activarse: al terminar vuelven a esto, no al máximo (el duelo no cura ni hiere).</summary>
     public (int Hp, int Resource) StartA { get; set; }
@@ -33,10 +58,14 @@ public sealed class DuelSession(Player a, Player b, string ruleset, long request
 /// <summary>Cambio de estado de un duelo: el servidor envía DuelUpdate a ambos (y anuncia el final en `say`).</summary>
 public sealed record DuelChangedEvent(int MapInstanceId, DuelSession Duel, string State, string? Reason) : IGameEvent;
 
+/// <summary>HU-101: `Player` salió de la zona del duelo y pierde a `LosesAtMs` si no vuelve, o volvió (null). Solo a él.</summary>
+public sealed record DuelZoneEvent(int MapInstanceId, DuelSession Duel, Player Player, long? LosesAtMs) : IGameEvent;
+
 /// <summary>
 /// Única puerta del PvP (skill combat-system): `CanAttack(a, b)` devuelve el ruleset aplicable o null. En el MVP solo `duel`:
 /// solicitud (caduca `requestExpireSec`), cuenta atrás `countdownSec`, activo; termina al bajar a `endAtHpPct` (nadie muere), al
-/// alejarse > `maxDistanceTiles`, desconectarse, cambiar de mapa o rendirse. Los duelistas no generan aggro ni amenaza.
+/// pasar más de `zoneGraceSec` fuera de la zona del duelo (HU-101), desconectarse, cambiar de mapa o rendirse. Los duelistas no
+/// generan aggro ni amenaza: la zona impide que lo usen para cruzar el mapa ignorados por los monstruos.
 /// </summary>
 public sealed class PvpService(AuraSystem auras)
 {
@@ -78,7 +107,7 @@ public sealed class PvpService(AuraSystem auras)
         if (DuelOf(from) is not null || DuelOf(to) is not null) return "duel_busy";
         if (InTrade(from) || InTrade(to)) return "trade_busy";
         if (!rs.AllowedInSafeZones && (map.Data.IsSafeZone(from.Position) || map.Data.IsSafeZone(to.Position))) return "pvp_not_allowed";
-        if (Vec2.Distance(from.Position, to.Position) > rs.MaxDistanceTiles) return "out_of_range";
+        if (Vec2.Distance(from.Position, to.Position) > MaxStartDistance(rs)) return "out_of_range";
         var duel = new DuelSession(from, to, ruleset, ctx.NowMs);
         if (!_duels.TryGetValue(map.Id, out var list)) _duels[map.Id] = list = new List<DuelSession>();
         list.Add(duel);
@@ -104,7 +133,7 @@ public sealed class PvpService(AuraSystem auras)
             : duel.A.MapInstanceId != duel.B.MapInstanceId ? "invalid_target"
             : InTrade(duel.A) || InTrade(duel.B) ? "trade_busy"
             : InCombat(duel.A, ctx) || InCombat(duel.B, ctx) ? "in_combat"
-            : Vec2.Distance(duel.A.Position, duel.B.Position) > rs.MaxDistanceTiles ? "out_of_range"
+            : Vec2.Distance(duel.A.Position, duel.B.Position) > MaxStartDistance(rs) ? "out_of_range"
             : !rs.AllowedInSafeZones && (map.Data.IsSafeZone(duel.A.Position) || map.Data.IsSafeZone(duel.B.Position)) ? "pvp_not_allowed"
             : null;
         if (invalid is not null)
@@ -114,6 +143,9 @@ public sealed class PvpService(AuraSystem auras)
         }
         duel.State = DuelState.Countdown;
         duel.StartsAtMs = ctx.NowMs + (long)(rs.CountdownSec * 1000);
+        duel.Center = (duel.A.Position + duel.B.Position) * 0.5f; // la zona se ve ya en la cuenta atrás, para colocarse dentro
+        duel.ZoneRadiusTiles = rs.ZoneRadiusTiles;
+        duel.ZoneGraceMs = (long)(rs.ZoneGraceSec * 1000);
         ctx.Emit(new DuelChangedEvent(map.Id, duel, "countdown", null));
         return null;
     }
@@ -200,12 +232,42 @@ public sealed class PvpService(AuraSystem auras)
 
     private static bool InCombat(Player p, TickContext ctx) => p.IsInCombat(ctx.NowMs, ctx.Rules.Combat.InCombatWindowSec);
 
+    /// <summary>Distancia para retar y aceptar: como mucho el diámetro de la zona, para que los dos empiecen dentro (HU-101).</summary>
+    private static double MaxStartDistance(PvpRuleset rs) => Math.Min(rs.MaxDistanceTiles, 2 * rs.ZoneRadiusTiles);
+
     private void Remove(MapInstance map, DuelSession duel)
     {
         if (_duels.TryGetValue(map.Id, out var list)) list.Remove(duel);
     }
 
-    /// <summary>Caducidad de solicitudes, arranque tras la cuenta atrás y distancia máxima.</summary>
+    /// <summary>
+    /// HU-101: fuera de la zona (más de su radio del centro) se gasta el plazo `zoneGraceSec`, que dentro se recupera al mismo
+    /// ritmo (salir y volver un tick no lo reinicia); para contar como dentro otra vez hay que entrar `zoneReturnMarginTiles`, así
+    /// el aviso no parpadea en el borde. Avisa al salir y al volver. Devuelve quien pierde por agotar el plazo (si son los dos, el
+    /// que más tiempo lleva fuera y, a la vez, el más lejano). Sin asignar: corre cada tick.
+    /// </summary>
+    private static Player? ZoneLoser(DuelSession duel, PvpRuleset rs, MapInstance map, TickContext ctx)
+    {
+        Player? loser = null;
+        for (var i = 0; i < 2; i++)
+        {
+            var p = i == 0 ? duel.A : duel.B;
+            var wasOutside = duel.IsOutside(p);
+            var limit = wasOutside ? duel.ZoneRadiusTiles - rs.ZoneReturnMarginTiles : duel.ZoneRadiusTiles;
+            var outside = Vec2.Distance(p.Position, duel.Center) > limit;
+            var used = outside ? duel.OutsideMs(p) + ctx.DeltaMs : Math.Max(0, duel.OutsideMs(p) - ctx.DeltaMs);
+            duel.SetOutside(p, outside, used);
+            if (outside != wasOutside)
+                ctx.Emit(new DuelZoneEvent(map.Id, duel, p, outside ? ctx.NowMs + Math.Max(0, duel.ZoneGraceMs - used) : null));
+            if (!outside || used < duel.ZoneGraceMs) continue;
+            if (loser is null || used > duel.OutsideMs(loser)
+                || (used == duel.OutsideMs(loser) && Vec2.Distance(p.Position, duel.Center) > Vec2.Distance(loser.Position, duel.Center)))
+                loser = p;
+        }
+        return loser;
+    }
+
+    /// <summary>Caducidad de solicitudes, arranque tras la cuenta atrás y zona del duelo.</summary>
     public void Tick(MapInstance map, TickContext ctx)
     {
         if (!_duels.TryGetValue(map.Id, out var list) || list.Count == 0) return;
@@ -227,7 +289,6 @@ public sealed class PvpService(AuraSystem auras)
                     break;
                 case DuelState.Countdown when ctx.NowMs >= duel.StartsAtMs:
                     duel.State = DuelState.Active;
-                    duel.Center = (duel.A.Position + duel.B.Position) * 0.5f;
                     duel.StartA = (duel.A.Hp, duel.A.Resource);
                     duel.StartB = (duel.B.Hp, duel.B.Resource);
                     ctx.Emit(new DuelChangedEvent(map.Id, duel, "active", null));
@@ -237,14 +298,7 @@ public sealed class PvpService(AuraSystem auras)
                     if (duel.B.MapInstanceId != map.Id) { End(duel, duel.A, "left_map", map, ctx); break; }
                     if (duel.A.IsDead) { End(duel, duel.B, "died", map, ctx); break; }
                     if (duel.B.IsDead) { End(duel, duel.A, "died", map, ctx); break; }
-                    // Lejos del rival o del punto de inicio: sin el segundo, los dos podían viajar juntos ignorados por los monstruos.
-                    if (Vec2.Distance(duel.A.Position, duel.B.Position) > rs.MaxDistanceTiles
-                        || Vec2.Distance(duel.A.Position, duel.Center) > rs.MaxDistanceTiles || Vec2.Distance(duel.B.Position, duel.Center) > rs.MaxDistanceTiles)
-                    {
-                        // Pierde quien se alejó: el más lejos del punto medio inicial.
-                        var loser = Vec2.Distance(duel.A.Position, duel.Center) >= Vec2.Distance(duel.B.Position, duel.Center) ? duel.A : duel.B;
-                        End(duel, duel.Opponent(loser), "distance", map, ctx);
-                    }
+                    if (ZoneLoser(duel, rs, map, ctx) is { } loser) End(duel, duel.Opponent(loser), "zone", map, ctx);
                     break;
                 default:
                     break;

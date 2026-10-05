@@ -133,6 +133,14 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	assert_eq(_world._social._frames.get_child_count(), 1)
 	_dispatch("DuelUpdate", {"state": "countdown", "opponentId": 8, "startsInMs": 3000})
 	assert_string_contains(_world._social._duel_label.text, "Duelo en")
+	# HU-101: fuera de la zona, el rótulo cuenta los segundos; al perder por eso, lo dice.
+	_dispatch("DuelUpdate", {"state": "active", "opponentId": 8, "zone": {"x": 100.0, "y": 100.0, "r": 192.0}})
+	_dispatch("DuelUpdate", {"state": "active", "opponentId": 8, "zone": {"x": 100.0, "y": 100.0, "r": 192.0}, "outsideMs": 5000})
+	await get_tree().process_frame
+	assert_string_contains(_world._social._duel_label.text, "Vuelve a la zona del duelo")
+	_dispatch("DuelUpdate", {"state": "ended", "opponentId": 8, "winnerId": 8, "reason": "zone"})
+	await get_tree().process_frame
+	assert_eq(_world._social._duel_label.text, "Has perdido el duelo: saliste de la zona")
 	_dispatch("TradeUpdate", {"state": "open", "partnerId": 8, "version": 1, "mine": {"items": [], "gold": 0}, "theirs": {"items": [], "gold": 5}, "confirmedMine": false, "confirmedTheirs": false})
 	assert_true(_world._social._trade.visible)
 	_dispatch("TradeUpdate", {"state": "cancelled", "partnerId": 8, "version": 2, "mine": {"items": [], "gold": 0}, "theirs": {"items": [], "gold": 0}, "confirmedMine": false, "confirmedTheirs": false, "reason": "distance"})

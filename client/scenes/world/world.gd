@@ -103,6 +103,7 @@ func _ready() -> void:
 	_map_objects.z_index = -6  # sobre el suelo, bajo la retícula y las entidades
 	add_child(_map_objects)
 	GameState.map_objects_changed.connect(_apply_map_objects)
+	add_child(DuelZoneRing.new())  # HU-101: solo dibuja mientras hay zona de duelo
 	_social.whisper_requested.connect(func(player_name: String) -> void:
 		_chat._input.text = "/w %s " % player_name
 		_chat._input.grab_focus())

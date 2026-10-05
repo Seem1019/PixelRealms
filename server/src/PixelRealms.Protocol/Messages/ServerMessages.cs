@@ -59,7 +59,15 @@ public sealed record LootWindow(int LootId, long Gold, IReadOnlyList<LootEntryDt
 
 public sealed record ChangeMap(string MapId, float X, float Y) : IServerMessage;
 
-public sealed record DuelUpdate(string State, int OpponentId, int? WinnerId, int? StartsInMs) : IServerMessage;
+/// <summary>HU-101: zona del duelo en píxeles (centro y radio); solo la reciben los dos duelistas.</summary>
+public sealed record DuelZoneDto(float X, float Y, float R);
+
+/// <summary>
+/// Ciclo de vida del duelo. `Zone` va en `countdown` y `active`; `OutsideMs` = ms que le quedan a quien está fuera de la zona
+/// para volver (se reenvía `active` solo a él al salir y al volver, sin el campo). `Reason` en `ended`/`declined` (HU-101).
+/// </summary>
+public sealed record DuelUpdate(string State, int OpponentId, int? WinnerId, int? StartsInMs, DuelZoneDto? Zone = null, int? OutsideMs = null,
+    string? Reason = null) : IServerMessage;
 
 /// <summary>Objeto de una oferta de intercambio tal como lo ven los dos: id de la instancia, plantilla y cantidad.</summary>
 public sealed record OfferedItemDto(string ItemId, string TemplateId, int Qty);

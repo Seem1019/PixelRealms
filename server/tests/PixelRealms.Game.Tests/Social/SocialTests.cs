@@ -434,7 +434,7 @@ public sealed class SocialTests
     }
 
     [Fact]
-    public void Duel_StrayingFromTheStartPoint_EndsIt() // revisión de autoridad: viajar juntos ignorados por los monstruos
+    public void Duel_LeavingTheZoneTogether_EndsItAfterTheGrace() // revisión de autoridad: viajar juntos ignorados por los monstruos
     {
         var w = Arena();
         var ana = w.Player("Ana"); var bob = w.Player("Bob");
@@ -442,9 +442,94 @@ public sealed class SocialTests
         w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
         w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
         TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
-        var far = (float)rs.MaxDistanceTiles + 3;
-        ana.Position = new Vec2(10.5f + far, 10); bob.Position = new Vec2(11.5f + far, 10); // juntos, lejos del punto de inicio
-        TickRunner.Run(w, 1).OfType<DuelChangedEvent>().ShouldContain(e => e.State == "ended");
+        var far = (float)rs.ZoneRadiusTiles + 3;
+        ana.Position = new Vec2(10.5f + far, 10); bob.Position = new Vec2(11.5f + far, 10); // juntos, fuera de la zona
+        TickRunner.Run(w, 1).OfType<DuelZoneEvent>().Count(e => e.LosesAtMs is not null).ShouldBe(2);
+        var ended = TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000)).OfType<DuelChangedEvent>().Single(e => e.State == "ended");
+        ended.Reason.ShouldBe("zone");
+        ended.Duel.Winner.ShouldBe(ana); // salieron a la vez: pierde el más lejano (Bob)
+    }
+
+    [Fact]
+    public void Duel_Zone_IsSetOnAccept_ReturningInTimeKeepsTheDuel_ThePersonWhoStaysOutLoses() // HU-101 CA1-CA3
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        var duel = w.Combat.Pvp.DuelOf(ana).ShouldNotBeNull();
+        duel.Center.ShouldBe(new Vec2(10.5f, 10)); // ya en la cuenta atrás
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+
+        // Bob sale, ve el aviso y vuelve antes de que acabe el plazo: sigue el duelo.
+        bob.Position = new Vec2(10.5f + (float)rs.ZoneRadiusTiles + 1, 10);
+        var warn = TickRunner.Run(w, 1).OfType<DuelZoneEvent>().Single();
+        warn.Player.ShouldBe(bob);
+        (warn.LosesAtMs!.Value - w.Clock.NowMs).ShouldBeInRange((long)(rs.ZoneGraceSec * 1000) - GameConstants.TickMs, (long)(rs.ZoneGraceSec * 1000));
+        TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000) - 500);
+        bob.Position = new Vec2(12, 10);
+        TickRunner.Run(w, 1).OfType<DuelZoneEvent>().Single().LosesAtMs.ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000) + 100).OfType<DuelChangedEvent>().ShouldBeEmpty();
+        w.Combat.Pvp.InActiveDuel(bob).ShouldBeTrue();
+
+        // Dentro el plazo se recupera al mismo ritmo: tras el mismo tiempo dentro vuelve a estar entero; si sale y no vuelve, pierde.
+        bob.Position = new Vec2(10.5f, 10 + (float)rs.ZoneRadiusTiles + 1);
+        var events = TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000) + 100);
+        var ended = events.OfType<DuelChangedEvent>().Single(e => e.State == "ended");
+        ended.Reason.ShouldBe("zone");
+        ended.Duel.Winner.ShouldBe(ana);
+    }
+
+    [Fact]
+    public void Duel_SteppingBackInForOneTick_DoesNotRefillTheZoneGrace() // revisión de autoridad: oscilar en el borde
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        var outside = new Vec2(10.5f + (float)rs.ZoneRadiusTiles + 1, 10);
+        var inside = new Vec2(11, 10);
+        var events = new List<IGameEvent>();
+        for (var i = 0; i < 4 && w.Combat.Pvp.DuelOf(bob) is not null; i++)
+        {
+            bob.Position = outside;
+            events.AddRange(TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000 * 0.6)));
+            bob.Position = inside;
+            events.AddRange(TickRunner.Run(w, 1)); // un tick dentro no devuelve el plazo
+        }
+        var ended = events.OfType<DuelChangedEvent>().Single(e => e.State == "ended");
+        ended.Reason.ShouldBe("zone");
+        ended.Duel.Winner.ShouldBe(ana);
+    }
+
+    [Fact]
+    public void Duel_BothOutsideTheZone_WhoLeftFirstLoses() // HU-101 CA3
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        var far = (float)rs.ZoneRadiusTiles + 3;
+        bob.Position = new Vec2(10.5f, 10 + far);
+        TickRunner.RunMs(w, 1000);
+        ana.Position = new Vec2(10.5f, 10 - far - 2); // sale después pero más lejos
+        var ended = TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000)).OfType<DuelChangedEvent>().Single(e => e.State == "ended");
+        ended.Duel.Winner.ShouldBe(ana);
+    }
+
+    [Fact]
+    public void Duel_TooFarToStartInsideTheZone_CannotBeRequested() // HU-101: los dos empiezan dentro
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        bob.Position = new Vec2(10 + 2 * (float)rs.ZoneRadiusTiles + 1, 10);
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBe("out_of_range");
     }
 
     [Fact]
@@ -542,9 +627,9 @@ public sealed class SocialTests
         w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
         w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
         TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
-        bob.Position = new Vec2(11 + (float)rs.MaxDistanceTiles + 2, 10);
-        var ev = TickRunner.Run(w, 1).OfType<DuelChangedEvent>().Single(e => e.State == "ended");
-        ev.Duel.Winner.ShouldBe(ana); // el que se alejó pierde
+        bob.Position = new Vec2(11 + (float)rs.ZoneRadiusTiles + 2, 10);
+        var ev = TickRunner.RunMs(w, (int)(rs.ZoneGraceSec * 1000) + 100).OfType<DuelChangedEvent>().Single(e => e.State == "ended");
+        ev.Duel.Winner.ShouldBe(ana); // el que se fue de la zona y no volvió pierde
     }
 
     [Fact]

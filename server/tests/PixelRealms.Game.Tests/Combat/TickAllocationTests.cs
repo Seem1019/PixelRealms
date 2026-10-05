@@ -26,4 +26,21 @@ public sealed class TickAllocationTests
 
         perTick.ShouldBe(0, "bytes por tick en un mundo sin combate");
     }
+
+    [Fact]
+    public void ActiveDuel_BothInsideTheZone_AllocatesNothingPerTick() // HU-101: la zona se comprueba cada tick
+    {
+        var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "warrior", 5, (10, 10)).WithPlayer("Bob", "mage", 5, (12, 10)).BuildWithCombat();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.Run(w, 400); // cuenta atrás y calentamiento
+        w.Combat.Pvp.InActiveDuel(ana).ShouldBeTrue();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 400; i++) w.Simulation.RunTick();
+        var perTick = (GC.GetAllocatedBytesForCurrentThread() - before) / 400.0;
+
+        perTick.ShouldBe(0, "bytes por tick con un duelo en marcha y los dos dentro de la zona");
+    }
 }

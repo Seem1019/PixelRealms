@@ -22,6 +22,7 @@ signal duel_changed(state: String, opponent_id: int, winner_id: int, starts_in_m
 signal trade_changed(d: Dictionary)
 signal online_list_received(players: Array)  ## HU-063: respuesta a OnlineListRequest
 signal map_objects_changed  ## HU-083: palancas o puertas del mapa actual
+signal duel_zone_changed  ## HU-101: zona del duelo o aviso de estar fuera de ella
 
 var self_id: int = -1
 var character_name: String = ""
@@ -41,6 +42,9 @@ var map_objects: Dictionary = {}  # HU-083: id → estado ("on"/"off", "open"/"c
 var last_combat_ms: int = -1000000
 var duel_opponent_id: int = -1
 var duel_state: String = ""
+var duel_reason: String = ""  # motivo del último `ended`/`declined` ("zone", "forfeit", "hp"…)
+var duel_zone: Dictionary = {}  # HU-101: {x, y, r} en píxeles durante la cuenta atrás y el duelo
+var duel_outside_until_ms: int = -1  # HU-101: `Time.get_ticks_msec` en que pierdo si sigo fuera de la zona; −1 = dentro
 var trade: Dictionary = {}  # último TradeUpdate o vacío
 var cooldowns: Dictionary = {}  # spellId → msec de fin (predicho por el cliente, corregido por `Cooldown`)
 var item_cooldowns: Dictionary = {}  # templateId → msec de fin (`Cooldown{templateId}`, compartida por plantilla)
@@ -425,8 +429,18 @@ func party_member_names() -> Array[String]:
 
 
 func _on_duel_update(d: Dictionary) -> void:
+	var previous := duel_state
 	duel_state = str(d.get("state", ""))
 	duel_opponent_id = int(d.get("opponentId", -1)) if duel_state in ["requested", "countdown", "active"] else -1
+	duel_reason = str(d.get("reason", "")) if d.get("reason") != null else ""
+	var zone: Variant = d.get("zone")
+	duel_zone = {}
+	if zone is Dictionary and duel_state in ["countdown", "active"]:
+		duel_zone = zone
+	duel_outside_until_ms = Time.get_ticks_msec() + int(d.get("outsideMs")) if d.get("outsideMs") != null else -1
+	duel_zone_changed.emit()
+	if previous == "active" and duel_state == "active":
+		return  # HU-101: solo cambia el aviso de la zona; el duelo sigue igual
 	duel_changed.emit(duel_state, int(d.get("opponentId", -1)), int(d.get("winnerId", -1)) if d.get("winnerId") != null else -1, int(d.get("startsInMs", 0)) if d.get("startsInMs") != null else 0)
 
 

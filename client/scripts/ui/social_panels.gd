@@ -13,6 +13,7 @@ var _prompt: ConfirmationDialog
 var _prompt_kind: String = ""
 var _duel_label: Label
 var _duel_until: float = 0.0
+var _zone_warning: bool = false  # HU-101: el rótulo cuenta los segundos para volver a la zona
 var _trade: TradeWindow
 ## Nombre de una entidad por id (lo rellena el mundo): para los avisos y la ventana de intercambio.
 var entity_name: Callable = Callable():
@@ -57,15 +58,31 @@ func _ready() -> void:
 	GameState.party_changed.connect(_refresh_party)
 	GameState.party_invited.connect(_on_party_invited)
 	GameState.duel_changed.connect(_on_duel)
+	GameState.duel_zone_changed.connect(_on_duel_zone)
 	GameState.trade_changed.connect(_on_trade)
 	GameState.online_list_received.connect(_show_online_list)
 	_refresh_party()
 
 
 func _process(_delta: float) -> void:
-	if _duel_until > 0.0 and Time.get_ticks_msec() / 1000.0 >= _duel_until:
+	if _zone_warning:
+		var left := maxi(0, GameState.duel_outside_until_ms - Time.get_ticks_msec())
+		_duel_label.text = "¡Vuelve a la zona del duelo! %d" % ceili(left / 1000.0)
+	elif _duel_until > 0.0 and Time.get_ticks_msec() / 1000.0 >= _duel_until:
 		_duel_until = 0.0
 		_duel_label.text = ""
+
+
+## HU-101: fuera de la zona, el rótulo del duelo pasa a rojo y cuenta atrás; al volver se borra.
+func _on_duel_zone() -> void:
+	var outside := GameState.duel_outside_until_ms >= 0 and GameState.duel_state == "active"
+	if outside == _zone_warning:
+		return
+	_zone_warning = outside
+	_duel_label.add_theme_color_override("font_color", DuelZoneRing.OUTSIDE if outside else Color(1, 0.6, 0.2))
+	if not outside:
+		_duel_label.text = ""
+		_duel_until = 0.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -168,6 +185,8 @@ func _on_duel(state: String, opponent_id: int, winner_id: int, starts_in_ms: int
 			_duel_until = Time.get_ticks_msec() / 1000.0 + 1.5
 		"ended":
 			_duel_label.text = "¡Has ganado el duelo!" if winner_id == GameState.self_id else "Has perdido el duelo"
+			if winner_id != GameState.self_id and GameState.duel_reason == "zone":
+				_duel_label.text = "Has perdido el duelo: saliste de la zona"
 			_duel_until = Time.get_ticks_msec() / 1000.0 + 3.0
 		"declined":
 			_duel_label.text = "Duelo rechazado"
