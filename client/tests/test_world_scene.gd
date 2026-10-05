@@ -30,6 +30,21 @@ func _floating_texts() -> Array[String]:
 	return out
 
 
+## Lo que el servidor manda junto con ChangeMap (NPC y jugadores al lado del destino) no se pierde con el fundido.
+func test_spawns_that_arrive_during_the_map_fade_are_kept() -> void:
+	_dispatch("Welcome", {
+		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "mine",
+		"self": {"x": 100.0, "y": 100.0, "level": 4, "xp": 0, "xpNext": 100, "hp": 80, "maxHp": 100, "res": 40, "maxRes": 60, "resource": "rage", "classId": "warrior", "name": "Ana"},
+		"inventory": [], "equipment": [], "hotbar": [], "knownSpells": [], "rulesHash": "x",
+	})
+	_dispatch("EntitySpawn", {"id": 40, "kind": "monster", "templateId": "kobold_miner", "name": "Kóbold", "x": 120.0, "y": 100.0, "dir": "s", "level": 5, "hpPct": 100, "flags": 0})
+	_dispatch("ChangeMap", {"mapId": "meadow", "x": 368.0, "y": 960.0})
+	_dispatch("EntitySpawn", {"id": 9, "kind": "npc", "templateId": "vendor", "name": "Marta la tendera", "x": 272.0, "y": 768.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
+	await get_tree().create_timer(0.6).timeout
+	assert_false(_world._remotes.has(40), "lo del mapa anterior se va")
+	assert_true(_world._remotes.has(9), "lo que llegó durante el fundido se queda")
+
+
 ## `/level` estando muerto revive con un Welcome por la misma conexión: el panel de muerte se cierra como al reaparecer.
 func test_a_renewed_welcome_that_revives_counts_as_a_respawn() -> void:
 	var welcome := {

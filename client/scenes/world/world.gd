@@ -996,16 +996,18 @@ func _view_rect() -> Rect2:
 # --- Cambio de mapa (HU-027 CA2) ---------------------------------------------------------------------------------------
 
 ## Fundido a negro, carga del nuevo .tmj y recolocación del jugador; el HUD (misma escena) no se reinicia.
+## Las entidades del mapa anterior se borran ya, no tras el fundido: el servidor manda las del nuevo en el mismo tick y, si se
+## borraban al terminar los 0,25 s, se perdían las que ya estaban junto al destino (NPC y jugadores al hacer /tpto a la aldea).
 func _on_change_map(d: Dictionary) -> void:
 	GameState._on_change_map(d)
 	in_world = false
 	_stop_aiming()
+	_clear_remotes()
+	_reticle.clear_all()
 	var target := Vector2(float(d.get("x", 0)), float(d.get("y", 0)))
 	var tween := create_tween()
 	tween.tween_property(_fade, "modulate:a", 1.0, 0.25)
 	await tween.finished
-	_clear_remotes()
-	_reticle.clear_all()
 	_current_zone = ""
 	_load_map(GameState.map_id)
 	var grid: CollisionGrid = map.collision if map != null else CollisionGrid.new()
