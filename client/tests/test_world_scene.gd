@@ -134,6 +134,17 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("LootWindow", {"lootId": 11, "gold": 5, "items": []})
 	assert_false(_world._loot.visible)
 	assert_signal_not_emitted(GameState, "notice")
+	# HU-050 CA1: el cadáver con botín para mí (bit 8) brilla hasta que no queda nada mío.
+	_dispatch("EntitySpawn", {"id": 13, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 130.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 0, "flags": 2 | 8})
+	var corpse: EntityVisual = (_world._remotes[13] as RemoteEntity).visual
+	assert_true(corpse.lootable)
+	_dispatch("LootWindow", {"lootId": 13, "gold": 0, "items": [{"index": 0, "templateId": "slime_goo", "qty": 1, "ownerId": 1, "freeInMs": 30000}, {"index": 1, "templateId": "bread", "qty": 1, "ownerId": 8, "freeInMs": 30000}]})
+	assert_true(corpse.lootable, "aún queda algo mío")
+	_dispatch("LootWindow", {"lootId": 13, "gold": 0, "items": [{"index": 1, "templateId": "bread", "qty": 1, "ownerId": 8, "freeInMs": 30000}]})
+	assert_false(corpse.lootable, "solo queda lo de otro: deja de brillar")
+	_world._loot.visible = false
+	_dispatch("EntitySpawn", {"id": 12, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 140.0, "y": 100.0, "dir": "s", "level": 1, "hpPct": 0, "flags": 2})
+	assert_false((_world._remotes[12] as RemoteEntity).visual.lootable, "sin el bit, no brilla")
 	_dispatch("EntitySpawn", {"id": 9, "kind": "npc", "templateId": "vendor", "name": "Marta la tendera", "x": 100.0, "y": 110.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
 	_dispatch("VendorWindow", {"npcId": 9, "items": [{"templateId": "bread", "price": 4}, {"templateId": "minor_healing_potion", "price": 20}]})
 	assert_true(_world._vendor.visible)

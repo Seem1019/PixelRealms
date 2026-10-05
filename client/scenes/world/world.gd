@@ -796,6 +796,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 				names[r.entity_id] = r.display_name
 			names[GameState.self_id] = GameState.character_name
 			_loot.show_window(d, names)
+			_refresh_loot_glow(d)
 		"VendorWindow":
 			var npc_id := int(d.get("npcId", -1))
 			var vendor_name: String = (_remotes[npc_id] as RemoteEntity).display_name if _remotes.has(npc_id) else "Vendedor"
@@ -913,6 +914,17 @@ func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_
 		if r.kind == "player":
 			r.hostile = r.entity_id == opponent_id and state == "active"
 			r.queue_redraw()
+
+
+## HU-050 CA1: el cadáver deja de brillar cuando en su botín ya no queda nada mío.
+func _refresh_loot_glow(d: Dictionary) -> void:
+	var r := _remotes.get(int(d.get("lootId", -1))) as RemoteEntity
+	if r == null or r.visual == null:
+		return
+	for e: Variant in d.get("items", []):
+		if int((e as Dictionary).get("ownerId", 0)) == GameState.self_id:
+			return
+	r.visual.lootable = false
 
 
 func _sell_item(item: Dictionary) -> void:

@@ -12,6 +12,8 @@ const NPC_COLOR := Color("1ebc73")
 const FLASH_MS := EntityVisual.FLASH_MS
 ## Distancia en px que cuenta como "se está moviendo" entre dos cuadros (anima caminar).
 const MOVE_EPSILON := 0.05
+## Bit de `EntitySpawn.flags`: cadáver con botín para quien lo recibe (HU-050 CA1, docs/protocol.md).
+const FLAG_LOOTABLE := 8
 
 var entity_id: int = -1
 var kind: String = "player"
@@ -89,6 +91,8 @@ func setup(d: Dictionary) -> void:
 	_apply_identity()
 	_refresh_health_bar()
 	refresh_level_color()
+	if visual != null:
+		visual.lootable = (int(d.get("flags", 0)) & FLAG_LOOTABLE) != 0
 
 
 func _apply_identity() -> void:

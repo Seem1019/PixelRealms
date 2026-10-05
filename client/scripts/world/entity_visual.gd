@@ -15,6 +15,9 @@ const RECOIL_MS := 120
 const DEFAULT_ONE_SHOT_MS := 300
 ## Ralentizado (HU-098): tinte azul del cuerpo mientras dure.
 const SLOW_TINT := Color(0.62, 0.78, 1.0)
+## Cadáver con botín para mí (HU-050 CA1): late entre su color y este dorado.
+const LOOT_GLOW := Color(1.7, 1.45, 0.6)
+const LOOT_GLOW_PERIOD_MS := 1400.0
 
 var sprite: AnimatedSprite2D
 var placeholder: PlaceholderSprite
@@ -23,6 +26,8 @@ var plate: Nameplate
 ## Aturdido, inmovilizado y escudo sobre la entidad (HU-098).
 var status: AuraIndicator
 var slowed: bool = false
+## Bit 8 de `EntitySpawn.flags` (el servidor solo lo pone a quien ganó algo de este cadáver); lo apaga el mundo al cogerlo.
+var lootable: bool = false
 var sprite_ref: String = ""
 ## Alto visible del sprite sobre los pies (para anclar la placa).
 var body_height: float = 24.0
@@ -242,6 +247,8 @@ func is_flashing() -> bool:
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec()
 	var tint := _flash_color if is_flashing() else (SLOW_TINT if slowed and not dead else Color.WHITE)
+	if dead and lootable and not is_flashing():
+		tint = Color.WHITE.lerp(LOOT_GLOW, 0.5 + 0.5 * sin(TAU * now / LOOT_GLOW_PERIOD_MS))
 	if sprite != null:
 		sprite.modulate = tint
 		sprite.position = _sprite_base + (_recoil if now < _recoil_until_ms and not dead else Vector2.ZERO)
