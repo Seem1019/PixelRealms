@@ -47,12 +47,12 @@ public sealed class MapObjectsFlowTests
             far.GetProperty("code").GetString().ShouldBe("out_of_range");
             far.GetProperty("reqId").GetInt32().ShouldBe(1);
 
-            await ana.SendAsync("AdminCommand", """{"text":"/tp 48.5 23"}""");
+            await ana.SendAsync("AdminCommand", """{"text":"/tp 51.5 33"}""");
             await System(ana);
             await ana.SendAsync("Interact", """{"objectId":"mine_lever_west"}""");
             States(await ana.ExpectAsync("MapObjects")).ShouldBe(new Dictionary<string, string> { ["mine_lever_west"] = "on" });
 
-            await ana.SendAsync("AdminCommand", """{"text":"/tp 65.5 23"}""");
+            await ana.SendAsync("AdminCommand", """{"text":"/tp 62.5 33"}""");
             await System(ana);
             await ana.SendAsync("Interact", """{"objectId":"mine_lever_east"}""");
             States(await ana.ExpectAsync("MapObjects")).ShouldBe(new Dictionary<string, string> { ["mine_lever_east"] = "on" });

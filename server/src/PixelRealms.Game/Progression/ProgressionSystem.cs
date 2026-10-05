@@ -16,6 +16,10 @@ public sealed record LevelUpEvent(int MapInstanceId, Player Player, int Level, I
 /// <summary>Stats del jugador cambiaron (nivel, equipo, auras con stats): el servidor envía StatsUpdate.</summary>
 public sealed record StatsChangedEvent(int MapInstanceId, Player Player) : IGameEvent;
 
+/// <summary>`/level` hacia abajo: el jugador olvidó hechizos y la barra perdió casillas; el cliente necesita su lista y su barra
+/// otra vez (el servidor reenvía Welcome, como al cambiar de clase).</summary>
+public sealed record KnownSpellsResetEvent(int MapInstanceId, Player Player) : IGameEvent;
+
 /// <summary>
 /// HU-040/HU-041: XP al matar (al jugador que taggeó al monstruo; grupos en HU-062), tope de nivel de la fase, subida de nivel
 /// con sobrante (varios niveles de golpe), stats +statsPerLevel vía StatCalculator, vida y recurso llenos, hechizos nuevos de
@@ -76,9 +80,18 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
             player.KnownSpells.RemoveAll(id => db.TryGetSpell(id, out var s) && s is not null && s.LevelReq > target);
             for (var i = 0; i < player.Hotbar.Length; i++)
                 if (player.Hotbar[i] is { Kind: "spell" } slot && !player.KnownSpells.Contains(slot.Ref)) player.Hotbar[i] = null;
+            if (player.Combat.Cast is { } cast)
+            {
+                // Puede ser un hechizo que acaba de olvidar; el Welcome renovado borra además la barra de casteo del cliente.
+                player.Combat.Cast = null;
+                ctx.Emit(new CastEndedEvent(map.Id, player, cast.Spell, CastResults.Cancelled, null));
+            }
             services.Recalculate(player);
             player.Hp = player.MaxHp;
             player.Resource = player.MaxResource;
+            // Sin esto el cliente seguía mostrando en la barra hechizos que el servidor ya había quitado y, al volver a subir, no
+            // los colocaba otra vez: "Ese hechizo no está en tu barra".
+            ctx.Emit(new KnownSpellsResetEvent(map.Id, player));
         }
         player.Xp = 0;
         player.Dirty = true;

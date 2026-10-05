@@ -141,6 +141,11 @@
             },
             "description": "Mientras dura, el objetivo ignora auras nuevas de estos tipos."
           },
+          "breaksOnDamage": {
+            "type": "boolean",
+            "default": false,
+            "description": "Recibir daño (también el que absorbe un escudo) quita el aura (comer: la curación se corta)."
+          },
           "provisional": {
             "type": "boolean",
             "description": "true = números provisionales; false = medidos con tools/balance/ (docs/design/balance-report.md)."

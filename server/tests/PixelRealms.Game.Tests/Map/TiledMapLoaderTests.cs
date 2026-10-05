@@ -17,6 +17,41 @@ public sealed class TiledMapLoaderTests
         return new TiledMapLoader.ContentCheck(id => db.TryGetMonster(id, out _), db.HasVendor);
     }
 
+    /// <summary>HU-083: con la puerta cerrada no hay otro camino de la entrada de la Mina a la sala del jefe; abierta, sí.</summary>
+    [Fact]
+    public void Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss()
+    {
+        var mine = TiledMapLoader.Load(Path.Combine(MapsDir, "mine.tmj"), Check(), _ => true);
+        var map = new MapInstance(1, mine);
+        var from = mine.DefaultGraveyard.Position;
+        var boss = mine.Spawns.Single(s => s.MonsterId == "foreman_grask").Position;
+        Reachable(map.Collision, from, boss).ShouldBeFalse("la puerta cerrada tiene que tapar todo el paso");
+        map.SetDoorTiles(mine.Doors.Single(), closed: false);
+        Reachable(map.Collision, from, boss).ShouldBeTrue();
+    }
+
+    /// <summary>Búsqueda en anchura por casillas (4 vecinos) sobre las no sólidas.</summary>
+    private static bool Reachable(CollisionGrid grid, Vec2 from, Vec2 to)
+    {
+        var start = ((int)from.X, (int)from.Y);
+        var goal = ((int)to.X, (int)to.Y);
+        var seen = new HashSet<(int, int)> { start };
+        var queue = new Queue<(int X, int Y)>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var (x, y) = queue.Dequeue();
+            if ((x, y) == goal) return true;
+            foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                var n = (x + dx, y + dy);
+                if (n.Item1 < 0 || n.Item2 < 0 || n.Item1 >= grid.Width || n.Item2 >= grid.Height || grid.IsSolid(n.Item1, n.Item2) || !seen.Add(n)) continue;
+                queue.Enqueue(n);
+            }
+        }
+        return false;
+    }
+
     [Fact]
     public void TestSmall_CollisionAndSight()
     {

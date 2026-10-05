@@ -125,7 +125,7 @@
 
   "pvp": {
     "rulesets": {
-      "duel": { "requiresConsent": true, "endAtHpPct": 0.01, "restoreOnEnd": false, "loserRegenMult": 2, "xpLoss": 0, "goldLoss": 0, "itemLoss": false, "allowedInSafeZones": true, "requestExpireSec": 30, "countdownSec": 3, "maxDistanceTiles": 30 }
+      "duel": { "requiresConsent": true, "endAtHpPct": 0.01, "restoreOnEnd": false, "loserRegenMult": 2, "xpLoss": 0, "goldLoss": 0, "itemLoss": false, "allowedInSafeZones": true, "requestExpireSec": 30, "countdownSec": 3, "maxDistanceTiles": 24, "zoneRadiusTiles": 12, "zoneGraceSec": 5, "zoneReturnMarginTiles": 1 }
     },
     "defaultRuleset": "duel",
     "enabledRulesets": ["duel"]

@@ -52,6 +52,42 @@ public sealed class CastSystemTests
     }
 
     [Fact]
+    public void Bread_OnlyOutOfCombat_ADamageStopsIt_AndItHasAMinuteCooldown() // decisión 2026-10-03
+    {
+        var w = Arena("warrior", level: 3, distance: 8f);
+        var ana = w.Player("Ana"); var slime = w.Monster("slime");
+        ana.Hp = ana.MaxHp / 2;
+        var bread = ItemInstance.New("bread", 3);
+        ana.Inventory.Bag[0] = bread;
+
+        ana.EnterCombat(w.Clock.NowMs);
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBe(CastErrors.InCombat); // en combate no se come
+        bread.Qty.ShouldBe(3);
+
+        ana.LastCombatAtMs = long.MinValue;
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBeNull();
+        bread.Qty.ShouldBe(2);
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBe(CastErrors.OnCooldown);
+        w.Content.Item("bread").UseCooldownMs.ShouldBe(60000);
+        var hp = ana.Hp;
+        TickRunner.RunMs(w, w.Content.Aura("bread_hot").TickMs);
+        ana.Hp.ShouldBeGreaterThan(hp); // cura mientras nadie le pega
+
+        w.Combat.Damage.Deal(slime, ana, 1, School.Physical, false, null, w.Map, w.Begin()); // un golpe corta la comida
+        ana.Auras.All.ShouldNotContain(a => a.AuraId == "bread_hot");
+
+        // También si un escudo para el golpe entero: el golpe fue real.
+        ana.LastCombatAtMs = long.MinValue;
+        ana.ItemCooldownEndsAtMs.Clear();
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Auras.Apply(ana, w.Content.Aura("priest_power_shield_aura"), ana, w.Map, w.Begin()).ShouldNotBeNull();
+        var hpBefore = ana.Hp;
+        w.Combat.Damage.Deal(slime, ana, 1, School.Physical, false, null, w.Map, w.Begin());
+        ana.Hp.ShouldBe(hpBefore);
+        ana.Auras.All.ShouldNotContain(a => a.AuraId == "bread_hot");
+    }
+
+    [Fact]
     public void GroundArea_AimedInsideAWallThatBlocksSight_IsRejected()
     {
         // Un muro de una casilla en (12, 10) y el slime detrás: apuntar dentro del muro alcanzaba al otro lado.
@@ -247,6 +283,13 @@ public sealed class CastSystemTests
         var wr = Arena("rogue", level: 3);
         w.Combat.Auras.Apply(wr.Player("Ana"), wr.Content.Aura("mage_frost_nova_root"), wr.Monster("slime"), wr.Map, wr.Begin());
         Cast(wr, "rogue_shadowstep", null, new Vec2(13, 10)).ShouldBe(CastErrors.Rooted); // rooted (salto)
+
+        var ww = Arena("warrior", level: 3, distance: 5f); // decisión 2026-10-03: la Carga tampoco sale de una raíz
+        ww.Player("Ana").Resource = ww.Player("Ana").MaxResource;
+        ww.Combat.Auras.Apply(ww.Player("Ana"), ww.Content.Aura("mage_frost_nova_root"), ww.Monster("slime"), ww.Map, ww.Begin());
+        Cast(ww, "warrior_charge", ww.Monster("slime").Id).ShouldBe(CastErrors.Rooted); // rooted (carga)
+        ww.Combat.Auras.ClearAll(ww.Player("Ana"), ww.Map, ww.Begin());
+        Cast(ww, "warrior_charge", ww.Monster("slime").Id).ShouldBeNull();
 
         Cast(w, "mage_meteor", null, slime.Position).ShouldBe(CastErrors.NotFound); // no conocido (nivel 13)
         Cast(w, "mage_flame_burst", null, new Vec2(float.NaN, 1)).ShouldBe(CastErrors.NotFound); // no conocido a nivel 3

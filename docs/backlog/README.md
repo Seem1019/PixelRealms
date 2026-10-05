@@ -23,7 +23,7 @@
 | HU-002 | Infra local con Docker (PostgreSQL) | E0 | Must | S | Hecha |
 | HU-003 | Carga y validación de contenido (ContentValidator) | E0 | Must | M | Hecha |
 | HU-004 | Esqueleto del game loop de 20 Hz | E0 | Must | M | Hecha |
-| HU-005 | Proyecto Godot base (autoloads, pixel-perfect, GUT) | E0 | Must | M | Parcial |
+| HU-005 | Proyecto Godot base (autoloads, pixel-perfect, GUT) | E0 | Must | M | Hecha |
 | HU-006 | Protocolo base: sobre, registro, Ping/Pong | E0 | Must | M | Hecha |
 | HU-010 | Registro de cuenta | E1 | Must | S | Hecha |
 | HU-011 | Inicio de sesión | E1 | Must | S | Hecha |
@@ -35,7 +35,7 @@
 | HU-021 | Movimiento autoritativo con colisión | E2 | Must | L | Hecha |
 | HU-022 | Predicción y reconciliación del jugador propio | E2 | Must | L | Hecha |
 | HU-023 | Ver a otros jugadores (AOI + interpolación) | E2 | Must | L | Hecha |
-| HU-024 | Cámara, capas y nombres sobre personajes | E2 | Must | S | Parcial |
+| HU-024 | Cámara, capas y nombres sobre personajes | E2 | Must | S | Hecha |
 | HU-025 | Desconexión, linkdead y reconexión | E2 | Must | M | Hecha |
 | HU-026 | Guardado de posición y estado | E2 | Must | M | Hecha |
 | HU-027 | Portales y cambio de mapa | E2 | Must | M | Hecha |
@@ -44,17 +44,17 @@
 | HU-032 | Ataque básico (todas las clases, melee y varita) | E3 | Must | M | Hecha |
 | HU-033 | Lanzar hechizos (casteo, GCD, CD, recurso) | E3 | Must | L | Hecha |
 | HU-034 | Resolución de efectos y fórmulas | E3 | Must | L | Hecha |
-| HU-035 | Auras (DoT, HoT, stun, root, slow, shield, stat_mod) | E3 | Must | L | Parcial |
+| HU-035 | Auras (DoT, HoT, stun, root, slow, shield, stat_mod) | E3 | Must | L | Hecha |
 | HU-036 | IA de monstruos: aggro, persecución, amenaza, evadir | E3 | Must | L | Hecha |
 | HU-037 | Muerte y reaparición | E3 | Must | M | Hecha |
-| HU-038 | HUD de combate (marcos, cast bar, hotbar, textos) | E3 | Must | L | Parcial |
+| HU-038 | HUD de combate (marcos, cast bar, hotbar, textos) | E3 | Must | L | Hecha |
 | HU-039 | Recursos: maná, ira, energía y regeneración | E3 | Must | M | Hecha |
 | HU-040 | Ganar experiencia | E4 | Must | S | Hecha |
-| HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Parcial |
+| HU-041 | Subir de nivel y desbloquear hechizos | E4 | Must | M | Hecha |
 | HU-042 | Panel de personaje (stats) | E4 | Should | M | Hecha |
 | HU-043 | Libro de hechizos y barra (4 hechizos + 4 utilizables) | E4 | Must | M | Hecha |
 | HU-044 | Cambio de clase en NPC (Fases 1–2) | E4 | Must | M | Hecha |
-| HU-050 | Botín de monstruos | E5 | Must | L | Parcial |
+| HU-050 | Botín de monstruos | E5 | Must | L | Hecha |
 | HU-051 | Inventario (bolsa de 24) | E5 | Must | L | Hecha |
 | HU-052 | Equipar y desequipar (equipo libre con afinidad) | E5 | Must | M | Hecha |
 | HU-053 | Tooltips y comparación | E5 | Must | M | Hecha |
@@ -77,7 +77,7 @@
 | HU-075 | Backups automáticos | E7 | Must | S | Parcial |
 | HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Hecha |
 | HU-081 | Arte de clases y monstruos | E8 | Must | L | Parcial |
-| HU-082 | Íconos de items y hechizos | E8 | Must | M | Parcial |
+| HU-082 | Íconos de items y hechizos | E8 | Must | M | Hecha |
 | HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Parcial |
 | HU-084 | Pasada de balance | E8 | Must | M | Parcial |
 | HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Hecha |
@@ -96,6 +96,7 @@
 | HU-098 | Estados (buffos, perjuicios y control) legibles | E3 | Must | M | Hecha |
 | HU-099 | Héroes en alta resolución | E8 | Should | M | Hecha |
 | HU-100 | Áreas duraderas (Fase 2) | E3 | Should | M | Pendiente |
+| HU-101 | Zona del duelo | E6 | Must | M | Hecha |
 
 ## Pendiente de diseño
 - **Números de los 16 hechizos de las Fases 2 y 3** con el `content-designer` (`tools/balance/`, pentagrama al nivel 15).

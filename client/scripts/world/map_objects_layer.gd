@@ -1,11 +1,19 @@
 class_name MapObjectsLayer
 extends Node2D
 ## HU-083: palancas y puertas del mapa (capas `levers`/`doors` del .tmj) con el estado que manda el servidor en `MapObjects`.
-## Dibujo provisional hasta que haya sprites: la puerta cerrada es un bloque de madera; la palanca, un poste con el mango a la
-## izquierda (sin activar) o a la derecha (activada).
+## Sprites de `tools/art/gen_objects.py` (cuadros de 16×16: sin activar | activada, cerrada | abierta; la puerta repite su
+## cuadro en cada casilla). Si faltan las hojas, un dibujo sencillo: bloque de madera y poste con el mango a un lado.
 
 ## Distancia en píxeles del mundo a la que un clic cuenta como "sobre la palanca".
 const LEVER_PICK_RADIUS_PX := 12.0
+const LEVER_SHEET := "res://assets/sprites/objects/lever.png"
+const DOOR_SHEET := "res://assets/sprites/objects/door.png"
+const FRAME := Vector2(16, 16)
+## Pie del poste dentro del cuadro de la palanca: va sobre el punto del .tmj.
+const LEVER_FOOT := Vector2(8, 12)
+
+var _lever_tex: Texture2D = UiTheme.texture(LEVER_SHEET)
+var _door_tex: Texture2D = UiTheme.texture(DOOR_SHEET)
 
 var _map: TmjMap
 ## id → estado ("on"/"off", "open"/"closed"); lo que falta cuenta como sin activar / cerrada.
@@ -37,7 +45,13 @@ func _draw() -> void:
 		return
 	for d: Dictionary in _map.doors:
 		var rect: Rect2 = d["rect"]
-		if str(_states.get(d["id"], "closed")) == "open":
+		var open := str(_states.get(d["id"], "closed")) == "open"
+		if _door_tex != null:
+			var frame := Rect2(Vector2(FRAME.x if open else 0.0, 0), FRAME)
+			for y: int in int(rect.size.y / FRAME.y):
+				for x: int in int(rect.size.x / FRAME.x):
+					draw_texture_rect_region(_door_tex, Rect2(rect.position + Vector2(x, y) * FRAME, FRAME), frame)
+		elif open:
 			draw_rect(rect, Color(0.45, 0.3, 0.15, 0.35), false, 1.0)
 		else:
 			draw_rect(rect, Color(0.35, 0.22, 0.1), true)
@@ -45,6 +59,9 @@ func _draw() -> void:
 	for l: Dictionary in _map.levers:
 		var p: Vector2 = l["pos"]
 		var on := str(_states.get(l["id"], "off")) == "on"
+		if _lever_tex != null:
+			draw_texture_rect_region(_lever_tex, Rect2((p - LEVER_FOOT).round(), FRAME), Rect2(Vector2(FRAME.x if on else 0.0, 0), FRAME))
+			continue
 		draw_rect(Rect2(p + Vector2(-3, -2), Vector2(6, 4)), Color(0.3, 0.3, 0.32), true)
 		var tip := p + (Vector2(4, -7) if on else Vector2(-4, -7))
 		draw_line(p, tip, Color(0.55, 0.38, 0.2), 2.0)

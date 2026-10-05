@@ -66,7 +66,11 @@ var _approach: Approach = Approach.new()
 var _range_ring: RangeRing
 ## Palancas y puertas del mapa (HU-083).
 var _map_objects: MapObjectsLayer
+var _fx_bench: FxBench
 const STUCK_TEXT := "No puedes llegar hasta el objetivo"
+## Color del nombre de los miembros del grupo (HU-024 CA3) y del rival de un duelo (HU-064).
+const PARTY_NAME_COLOR := Color("8fd3ff")
+const DUEL_NAME_COLOR := Color(1, 0.6, 0.2)
 ## Envío de mensajes (los tests lo sustituyen para ver qué se manda sin servidor).
 var send_fn: Callable = func(type: String, data: Dictionary) -> void: Net.send(type, data)
 const LOGOUT_REJECTED_TEXT := "No se pudo salir: el servidor rechazó la petición"
@@ -90,6 +94,9 @@ func _ready() -> void:
 		_stop_aiming()
 		_approach.cancel())
 	GameState.xp_gained.connect(func(amount: int) -> void: _floating.show_event(GameState.self_id, "xp", amount, false, _player.position))
+	GameState.leveled_up.connect(func(level: int, _spells: Array, _ranks: Array) -> void:
+		_self_visual.plate.level_text = "%d" % level
+		_play_level_up(GameState.self_id, level, _player.position))
 	_hud.respawn_requested.connect(func() -> void: _send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
@@ -103,12 +110,15 @@ func _ready() -> void:
 	_map_objects.z_index = -6  # sobre el suelo, bajo la retícula y las entidades
 	add_child(_map_objects)
 	GameState.map_objects_changed.connect(_apply_map_objects)
+	GameState.map_object_toggled.connect(_announce_map_object)
+	add_child(DuelZoneRing.new())  # HU-101: solo dibuja mientras hay zona de duelo
 	_social.whisper_requested.connect(func(player_name: String) -> void:
 		_chat._input.text = "/w %s " % player_name
 		_chat._input.grab_focus())
 	_social.entity_name = func(entity_id: int) -> String: return (_remotes[entity_id] as RemoteEntity).display_name if _remotes.has(entity_id) else ""
 	_inventory.offer_requested.connect(_social.offer_item)
 	GameState.duel_changed.connect(_on_duel_changed)
+	GameState.party_changed.connect(_refresh_name_colors)
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
@@ -186,6 +196,8 @@ func _refresh_self_visual() -> void:
 	_self_visual.set_sprite(EntitySprites.ref_for("player", GameState.class_id, GameState.class_id), RemoteEntity.PLAYER_COLOR, GameState.character_name)
 	_self_visual.plate.display_name = GameState.character_name
 	_self_visual.plate.name_color = UiTheme.ACCENT
+	_self_visual.plate.level_text = "%d" % GameState.level
+	_self_visual.plate.level_color = UiTheme.TEXT_MUTED
 
 
 ## Capas de efectos: los brillos de casteo bajo los cuerpos (encima de la marca de área) y el resto por encima de las
@@ -317,6 +329,39 @@ func _apply_map_objects() -> void:
 	_map_objects.set_states(GameState.map_objects)
 
 
+## HU-083: avisos del puzle (se oyen en toda la instancia): cuántas palancas faltan y cuándo se abre o se cierra la puerta, con un
+## estallido de polvo en la puerta si está a la vista.
+func _announce_map_object(id: String, state: String) -> void:
+	if map == null:
+		return
+	for d: Dictionary in map.doors:
+		if str(d["id"]) != id:
+			continue
+		if state == "open":
+			GameState.notice.emit("Se oye un mecanismo: se ha abierto una puerta")
+			var rect: Rect2 = d["rect"]
+			for x: int in int(rect.size.x / 16.0):
+				_vfx.play_once("area_steel", rect.position + Vector2(8 + x * 16, 8), x * 60)
+		else:
+			GameState.notice.emit("Una puerta se ha cerrado")
+		return
+	for l: Dictionary in map.levers:
+		if str(l["id"]) != id or state != "on" or bool(l.get("opens_alone", false)):
+			continue
+		var door := str(l["door"])
+		if str(GameState.map_objects.get(door, "closed")) == "open":
+			return
+		var needed := 0
+		var on := 0
+		for other: Dictionary in map.levers:
+			if str(other["door"]) == door and not bool(other.get("opens_alone", false)):
+				needed += 1
+				on += int(str(GameState.map_objects.get(other["id"], "off")) == "on")
+		if on < needed:
+			GameState.notice.emit("Palanca activada (%d/%d): falta otra para abrir la puerta" % [on, needed])
+		return
+
+
 # --- Movimiento propio (HU-021 CA1, HU-022) -------------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
@@ -398,13 +443,18 @@ func _on_entity_spawn(d: Dictionary) -> void:
 	if id < 0 or id == GameState.self_id:
 		return
 	var r: RemoteEntity
+	var old_level := -1
 	if _remotes.has(id):
 		r = _remotes[id]
+		old_level = r.level
 	else:
 		r = RemoteEntity.new()
 		_entities.add_child(r)
 		_remotes[id] = r
 	r.setup(d)
+	if r.kind == "player" and old_level > 0 and r.level > old_level:
+		_play_level_up(id, r.level, r.position)  # HU-041 CA3: el servidor reenvía su EntitySpawn con el nivel nuevo
+	r.set_name_color(_name_color(r))
 	if id == GameState.duel_opponent_id and GameState.duel_state == "active":
 		r.hostile = true  # vuelve a entrar en la AOI en pleno duelo
 	if r.visual != null:
@@ -781,6 +831,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 				names[r.entity_id] = r.display_name
 			names[GameState.self_id] = GameState.character_name
 			_loot.show_window(d, names)
+			_refresh_loot_glow(d)
 		"VendorWindow":
 			var npc_id := int(d.get("npcId", -1))
 			var vendor_name: String = (_remotes[npc_id] as RemoteEntity).display_name if _remotes.has(npc_id) else "Vendedor"
@@ -836,10 +887,24 @@ func _on_chat_command(name: String, args: String) -> void:
 		"trade":
 			_social.mark_outgoing("trade")
 			_send("TradeRequest", {"name": args})
+		"fxbench": _start_fx_bench()  # HU-089 CA3: solo en este cliente
 		"tp", "tpto", "spawn", "give", "level", "heal", "kill", "gold", "god", "debug", "announce":
 			# HU-070: comandos de administrador; el servidor responde forbidden si la cuenta no lo es.
 			_send("AdminCommand", {"text": ("/%s %s" % [name, args]).strip_edges()})
 		_: GameState.notice.emit("Comando desconocido: /%s" % name)
+
+
+## HU-089 CA3: `/fxbench` llena la pantalla de marcas y números durante 20 s y avisa del FPS p5.
+func _start_fx_bench() -> void:
+	if _fx_bench != null and _fx_bench.running:
+		return
+	if _fx_bench == null:
+		_fx_bench = FxBench.new()
+		_fx_bench.reticle = _reticle
+		_fx_bench.floating = _floating
+		_fx_bench.center = func() -> Vector2: return _player.position
+		add_child(_fx_bench)
+	_fx_bench.start()
 
 
 ## Burbuja de chat 4 s sobre la cabeza (HU-060 CA2).
@@ -870,14 +935,45 @@ func _show_bubble(from: String, text: String) -> void:
 	get_tree().create_timer(4.0).timeout.connect(holder.queue_free)
 
 
-## HU-064: marco del rival en naranja durante el duelo.
-func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
+## HU-041 CA3: estallido dorado a los pies y "¡Nivel N!" encima, lo vean uno mismo o los demás de la AOI.
+func _play_level_up(entity_id: int, level: int, pos: Vector2) -> void:
+	_vfx.play_once("area_holy", pos)
+	_floating.show_event(entity_id, "level", level, true, pos)
+
+
+## HU-024 CA3: el rival del duelo en naranja (HU-064), los del grupo en azul y el resto en el color del texto.
+func _name_color(r: RemoteEntity) -> Color:
+	if r.entity_id == GameState.duel_opponent_id and GameState.duel_state in ["countdown", "active"]:
+		return DUEL_NAME_COLOR
+	if r.kind == "player" and GameState.in_party() and r.entity_id in GameState.party_entity_ids():
+		return PARTY_NAME_COLOR
+	return UiTheme.TEXT
+
+
+func _refresh_name_colors() -> void:
 	for r: RemoteEntity in _remotes.values():
-		r.set_name_color(Color(1, 0.6, 0.2) if r.entity_id == opponent_id and state in ["countdown", "active"] else Color.WHITE)
+		r.set_name_color(_name_color(r))
+
+
+## HU-064: nombre del rival en naranja durante el duelo (al terminar vuelve a su color: azul si es del grupo).
+func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
+	_refresh_name_colors()
+	for r: RemoteEntity in _remotes.values():
 		# En pleno duelo el rival es enemigo: Espacio lo ataca, el clic derecho no abre el menú, Tab lo selecciona, anillo rojo.
 		if r.kind == "player":
 			r.hostile = r.entity_id == opponent_id and state == "active"
 			r.queue_redraw()
+
+
+## HU-050 CA1: el cadáver deja de brillar cuando en su botín ya no queda nada mío.
+func _refresh_loot_glow(d: Dictionary) -> void:
+	var r := _remotes.get(int(d.get("lootId", -1))) as RemoteEntity
+	if r == null or r.visual == null:
+		return
+	for e: Variant in d.get("items", []):
+		if int((e as Dictionary).get("ownerId", 0)) == GameState.self_id:
+			return
+	r.visual.lootable = false
 
 
 func _sell_item(item: Dictionary) -> void:
@@ -934,16 +1030,18 @@ func _view_rect() -> Rect2:
 # --- Cambio de mapa (HU-027 CA2) ---------------------------------------------------------------------------------------
 
 ## Fundido a negro, carga del nuevo .tmj y recolocación del jugador; el HUD (misma escena) no se reinicia.
+## Las entidades del mapa anterior se borran ya, no tras el fundido: el servidor manda las del nuevo en el mismo tick y, si se
+## borraban al terminar los 0,25 s, se perdían las que ya estaban junto al destino (NPC y jugadores al hacer /tpto a la aldea).
 func _on_change_map(d: Dictionary) -> void:
 	GameState._on_change_map(d)
 	in_world = false
 	_stop_aiming()
+	_clear_remotes()
+	_reticle.clear_all()
 	var target := Vector2(float(d.get("x", 0)), float(d.get("y", 0)))
 	var tween := create_tween()
 	tween.tween_property(_fade, "modulate:a", 1.0, 0.25)
 	await tween.finished
-	_clear_remotes()
-	_reticle.clear_all()
 	_current_zone = ""
 	_load_map(GameState.map_id)
 	var grid: CollisionGrid = map.collision if map != null else CollisionGrid.new()

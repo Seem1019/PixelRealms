@@ -2,13 +2,15 @@ class_name VfxLayer
 extends Node2D
 ## Efectos de hechizo (HU-091): brillo bajo los pies al castear, proyectiles, impactos, chispas de cura y estallidos de área,
 ## con las hojas de tools/art/gen_vfx.py en assets/sprites/vfx/<nombre>.png (+ .json con frameSize, frames, fps, loop y,
-## en los proyectiles, una fila por cada una de las 8 direcciones: no se rotan). Reserva fija de nodos: con MAX_ACTIVE vivos,
-## uno nuevo recicla el más antiguo; fuera de la vista (`view_rect` + CULL_MARGIN) no se crea nada.
+## en los proyectiles, una fila por cada una de las 8 direcciones: no se rotan). Una reserva fija de nodos por tipo (POOLS,
+## ADR-018 / HU-038 CA6): con el tope de un tipo vivo, uno nuevo recicla el más antiguo de ese tipo, así una lluvia de impactos
+## no deja sin proyectiles; fuera de la vista (`view_rect` + CULL_MARGIN) no se crea nada.
 ## Los brillos de casteo van en `ground` (bajo los cuerpos); el resto en este nodo, que el mundo pone por encima de las
 ## entidades y por debajo de las placas, los números y la interfaz.
 
-const POOL_SIZE := 64
-const MAX_ACTIVE := 48
+## Tipo → [nodos precreados, máximo visible]. Los brillos de casteo van aparte para que 30 jugadores casteando no se coman
+## los impactos.
+const POOLS := {"projectile": [64, 48], "impact": [32, 32], "glow": [32, 32]}
 const CULL_MARGIN := 32.0
 const DIRS8 := ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
 
@@ -20,19 +22,22 @@ var view_rect: Rect2 = Rect2()
 static var _frames_cache: Dictionary = {}  # nombre → SpriteFrames (null si falta la hoja)
 static var _meta_cache: Dictionary = {}
 
-var _pool: Array[AnimatedSprite2D] = []
-## Activos, del más antiguo al más nuevo: {sprite, name, end_ms (-1 = hasta que lo quiten), from, to, start_ms, travel_ms,
-## follow (Callable → Vector2), on_arrive (Callable), key}
+var _pools: Dictionary = {}  # tipo → Array[AnimatedSprite2D]
+## Activos, del más antiguo al más nuevo: {sprite, kind, name, end_ms (-1 = hasta que lo quiten), from, to, start_ms,
+## travel_ms, follow (Callable → Vector2), on_arrive (Callable), key}
 var _active: Array[Dictionary] = []
 
 
 func _ready() -> void:
-	for i: int in POOL_SIZE:
-		var s := AnimatedSprite2D.new()
-		s.centered = true
-		s.visible = false
-		add_child(s)
-		_pool.append(s)
+	for kind: String in POOLS:
+		var pool: Array[AnimatedSprite2D] = []
+		for i: int in int(POOLS[kind][0]):
+			var s := AnimatedSprite2D.new()
+			s.centered = true
+			s.visible = false
+			add_child(s)
+			pool.append(s)
+		_pools[kind] = pool
 
 
 static func meta(sheet: String) -> Dictionary:
@@ -91,8 +96,14 @@ static func dir8(v: Vector2) -> String:
 	return DIRS8[idx]
 
 
-func active_count() -> int:
-	return _active.size()
+## Efectos vivos (de un tipo de POOLS, o todos).
+func active_count(kind: String = "") -> int:
+	if kind.is_empty():
+		return _active.size()
+	var n := 0
+	for e: Dictionary in _active:
+		n += int(e["kind"] == kind)
+	return n
 
 
 func visible_on_screen(p: Vector2) -> bool:
@@ -103,7 +114,7 @@ func visible_on_screen(p: Vector2) -> bool:
 func play_once(sheet: String, pos: Vector2, delay_ms: int = 0) -> bool:
 	if not visible_on_screen(pos):
 		return false
-	var e := _take(sheet, pos, false)
+	var e := _take(sheet, pos, false, "impact")
 	if e.is_empty():
 		return false
 	var now := Time.get_ticks_msec()
@@ -122,7 +133,7 @@ func play_loop(sheet: String, key: String, follow: Callable) -> bool:
 	var pos: Vector2 = follow.call()
 	if not visible_on_screen(pos):
 		return false
-	var e := _take(sheet, pos, true)
+	var e := _take(sheet, pos, true, "glow")
 	if e.is_empty():
 		return false
 	e["key"] = key
@@ -145,7 +156,7 @@ func launch(sheet: String, from: Vector2, to: Callable, travel_ms: int, on_arriv
 	if not visible_on_screen(from) and not visible_on_screen(dest):
 		get_tree().create_timer(travel_ms / 1000.0).timeout.connect(on_arrive)
 		return false
-	var e := _take(sheet, from, false)
+	var e := _take(sheet, from, false, "projectile")
 	if e.is_empty():
 		on_arrive.call()
 		return false
@@ -168,22 +179,22 @@ func clear_all() -> void:
 		_release(i)
 
 
-## Toma un nodo de la reserva; con MAX_ACTIVE vivos recicla el más antiguo (sin llamar a su llegada: un proyectil
-## reciclado entrega su número al momento).
-func _take(sheet: String, pos: Vector2, under_feet: bool) -> Dictionary:
+## Toma un nodo de la reserva de `kind`; con su tope vivo recicla el más antiguo de ese tipo (un proyectil reciclado
+## entrega su número al momento).
+func _take(sheet: String, pos: Vector2, under_feet: bool, kind: String) -> Dictionary:
 	var frames := frames_for(sheet)
 	if frames == null:
 		return {}
-	if _active.size() >= MAX_ACTIVE:
-		_release(0, true)
+	if active_count(kind) >= int(POOLS[kind][1]):
+		_release(_oldest(kind), true)
 	var s: AnimatedSprite2D = null
-	for cand: AnimatedSprite2D in _pool:
+	for cand: AnimatedSprite2D in _pools[kind]:
 		if not cand.visible and not _in_use(cand):
 			s = cand
 			break
 	if s == null:
-		_release(0, true)
-		return _take(sheet, pos, under_feet)
+		_release(_oldest(kind), true)
+		return _take(sheet, pos, under_feet, kind)
 	var parent: Node2D = ground if under_feet and ground != null else self
 	if s.get_parent() != parent:
 		s.reparent(parent, false)
@@ -191,9 +202,16 @@ func _take(sheet: String, pos: Vector2, under_feet: bool) -> Dictionary:
 	s.position = pos.round()
 	s.offset = Vector2(0, -2) if under_feet else Vector2.ZERO
 	s.visible = true
-	var e := {"sprite": s, "name": sheet, "start_ms": Time.get_ticks_msec()}
+	var e := {"sprite": s, "kind": kind, "name": sheet, "start_ms": Time.get_ticks_msec()}
 	_active.append(e)
 	return e
+
+
+func _oldest(kind: String) -> int:
+	for i: int in _active.size():
+		if _active[i]["kind"] == kind:
+			return i
+	return 0
 
 
 func _in_use(s: AnimatedSprite2D) -> bool:

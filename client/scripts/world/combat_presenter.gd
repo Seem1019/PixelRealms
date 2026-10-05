@@ -149,11 +149,13 @@ func _show(ed: Dictionary, with_impact: bool) -> void:
 	if pos == Vector2.INF:
 		return
 	var kind := str(ed.get("kind", ""))
-	if floating != null:
-		floating.show_event(dst, kind, int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos)
 	var v := _visual(dst)
 	var spell := Content.spell(str(ed.get("spellId", ""))) if ed.get("spellId") != null else {}
 	var aura_tick := ed.get("spellId") != null and spell.is_empty()
+	if floating != null:
+		# HU-038 CA6: ticks de una misma aura agrupados (el servidor manda el auraId en spellId).
+		var group := "%d:%s:%s" % [dst, str(ed.get("spellId")), kind] if aura_tick and kind in ["dmg", "heal"] else ""
+		floating.show_event(dst, kind, int(ed.get("amount", 0)), bool(ed.get("crit", false)), pos, group)
 	if v != null:
 		if kind == "dmg" and int(ed.get("amount", 0)) > 0:
 			var from := _pos(src)

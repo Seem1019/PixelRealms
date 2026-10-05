@@ -24,6 +24,7 @@ public static class CastErrors
     public const string NoLos = "no_los";
     public const string InvalidPayload = "invalid_payload";
     public const string AreaLimit = "area_limit";
+    public const string InCombat = "in_combat";
     public const string PvpNotAllowed = "pvp_not_allowed";
     public const string Forbidden = "forbidden";
 }
@@ -94,11 +95,13 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         // pociones (y atacar con el arma, que no pasa por aquí).
         if (!viaItem && caster.Auras.IsSilenced) return CastErrors.Silenced;
         if (!viaItem && combat.IsLockedOut(now)) return CastErrors.LockedOut;
+        if (spell.OutOfCombatOnly && caster.IsInCombat(now, ctx.Rules.Combat.InCombatWindowSec)) return CastErrors.InCombat;
         if (combat.IsOnCooldown(spell.Id, now)) return CastErrors.OnCooldown;
         if (caster is Player && spell.Source != SpellSource.Item && ((combat.IsOnGcd(now) && spell.TriggersGcd) || combat.IsAbilityLocked(now))) return CastErrors.OnGcd;
         var hasLeap = false; EffectDef? dash = null;
         foreach (var e in spell.Effects) { if (e.Type == EffectType.Leap) hasLeap = true; if (e.Type == EffectType.Dash) dash = e; }
-        if (hasLeap && caster.Auras.IsRooted) return CastErrors.Rooted;
+        // Enraizado no se mueve: ni salta ni carga (una Carga enraizada lo sacaba de la raíz hasta el objetivo).
+        if ((hasLeap || dash is not null) && caster.Auras.IsRooted) return CastErrors.Rooted;
 
         if (caster is Player pc && spell.Cost is { Amount: > 0 } cost)
         {
@@ -237,6 +240,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     {
         var spell = cast.Spell;
         if (caster is Player p && spell.Cost is { Amount: > 0 } cost && p.Resource < cost.Amount) return CastErrors.NotEnoughResource;
+        // Una comida con casteo no termina si entretanto ha entrado en combate (hoy el pan es instantáneo).
+        if (spell.OutOfCombatOnly && caster.IsInCombat(ctx.NowMs, ctx.Rules.Combat.InCombatWindowSec)) return CastErrors.InCombat;
         if (spell.Targeting is Targeting.Enemy or Targeting.Ally && cast.TargetId is { } id)
         {
             var target = map.Find(id);

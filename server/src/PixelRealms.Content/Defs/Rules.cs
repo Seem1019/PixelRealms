@@ -239,6 +239,9 @@ public sealed record PvpRuleset
     public required double RequestExpireSec { get; init; }
     public required double CountdownSec { get; init; }
     public required double MaxDistanceTiles { get; init; }
+    public required double ZoneRadiusTiles { get; init; }
+    public required double ZoneGraceSec { get; init; }
+    public required double ZoneReturnMarginTiles { get; init; }
 }
 
 public sealed record PvpRules

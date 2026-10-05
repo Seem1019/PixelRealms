@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Entities;
+using PixelRealms.Persistence.Repositories;
 using PixelRealms.Server.Players;
 using PixelRealms.Server.Tests.Helpers;
 using Shouldly;
@@ -107,11 +108,48 @@ public sealed class SocialFlowTests
             await bob.SendAsync("DuelRespond", """{"accept":true}""");
             var cd = await ana.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "countdown");
             cd.GetProperty("startsInMs").GetInt32().ShouldBeGreaterThan(0);
-            (await ana.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "active", 5000)).GetProperty("opponentId").GetInt32().ShouldBe(bobId);
+            cd.GetProperty("zone").GetProperty("r").GetSingle().ShouldBeGreaterThan(0); // HU-101: la zona ya en la cuenta atrás
+            var active = await ana.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "active", 5000);
+            active.GetProperty("opponentId").GetInt32().ShouldBe(bobId);
+            active.GetProperty("zone").GetProperty("x").GetSingle().ShouldBe(cd.GetProperty("zone").GetProperty("x").GetSingle());
             await bob.SendAsync("DuelForfeit");
             var ended = await ana.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended");
             ended.GetProperty("winnerId").GetInt32().ShouldBe(anaId);
+            ended.GetProperty("reason").GetString().ShouldBe("forfeit");
+            ended.TryGetProperty("zone", out _).ShouldBeFalse();
             (await ana.ExpectAsync("ChatMessage", x => x.GetProperty("channel").GetString() == "system")).GetProperty("text").GetString()!.ShouldContain("ganado el duelo");
+        }
+    }
+
+    [Fact]
+    public async Task Duel_OnlyWhoLeavesTheZoneIsWarned_AndLosesIfTheyDoNotReturn() // HU-101
+    {
+        await using var server = await TestServer.StartAsync();
+        var (ana, anaId) = await Enter(server, "ana", "Ana", "warrior");
+        using var api = await new ApiClient(server).RegisterAndLogin("bob");
+        var bobChar = await api.CreateCharacterId("Bob", "mage");
+        var accounts = server.Services.GetRequiredService<IAccountRepository>();
+        var ct = TestContext.Current.CancellationToken;
+        await accounts.SetAdminAsync((await accounts.FindByUsernameAsync("bob", ct))!.Id, true, ct);
+        await api.Login("bob", "segura123"); // el ticket lleva el claim admin (para /tp)
+        var bob = await TestGameClient.ConnectAsync(server.WsUrl);
+        await bob.SendAsync("Hello", $$"""{"protocolVersion":1,"ticket":"{{await api.Ticket(bobChar)}}"}""");
+        await bob.ExpectAsync("Welcome");
+        await using (ana) await using (bob)
+        {
+            await ana.SendAsync("DuelRequest", """{"name":"Bob"}""");
+            await bob.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "requested");
+            await bob.SendAsync("DuelRespond", """{"accept":true}""");
+            var zone = (await bob.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "active", 5000)).GetProperty("zone");
+            var (cx, cy, r) = (zone.GetProperty("x").GetSingle() / 16, zone.GetProperty("y").GetSingle() / 16, zone.GetProperty("r").GetSingle() / 16);
+
+            await bob.SendAsync("AdminCommand", $$"""{"text":"/tp {{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}} {{(cy + r + 2).ToString(System.Globalization.CultureInfo.InvariantCulture)}}"}""");
+            var warn = await bob.ExpectAsync("DuelUpdate", x => x.TryGetProperty("outsideMs", out _));
+            warn.GetProperty("state").GetString().ShouldBe("active");
+            warn.GetProperty("outsideMs").GetInt32().ShouldBeInRange(1, 5000);
+            var ended = await ana.ExpectAsync("DuelUpdate", x => x.GetProperty("state").GetString() == "ended", 8000);
+            ended.GetProperty("reason").GetString().ShouldBe("zone");
+            ended.GetProperty("winnerId").GetInt32().ShouldBe(anaId);
         }
     }
 

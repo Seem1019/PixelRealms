@@ -52,7 +52,7 @@ EffectResolver: TargetResolver(targeting) ─► por objetivo: tabla de impacto 
 4. Daño se aplica en este orden: `damageTakenPct`/`damageDonePct` → `shield` absorbe → hp. Evento reporta `absorb` aparte.
 5. Curar a un objetivo en combate agrega amenaza del sanador a **todos** los monstruos que tienen al objetivo en su tabla.
 6. Un actor muerto no castea, no recibe curas (salvo resurrección futura), no genera amenaza.
-7. En duelo, el daño que dejaría al rival por debajo de `endAtHpPct` se recorta a ese umbral y termina el duelo (`DuelUpdate{state: "ended"}`); nunca se llama a `DeathSystem`.
+7. En duelo, el daño que dejaría al rival por debajo de `endAtHpPct` se recorta a ese umbral y termina el duelo (`DuelUpdate{state: "ended"}`); nunca se llama a `DeathSystem`. Quien pasa más de `zoneGraceSec` fuera de la zona del duelo pierde (HU-101).
 
 ## IA de monstruos (`Ai/MonsterBrain`, `Ai/MonsterAiSystem`)
 Máquina de estados (`AiState`): `Idle → Chase → Attack → Evade`; el aggro es la transición `Idle → Chase` y el leash, la
@@ -83,5 +83,5 @@ entrada en `Evade`. Detalles en `docs/design/combat.md` §Monstruos.
 
 ## Tests mínimos por cambio de combate
 - Fórmula: valores exactos con `FixedRng`, para las 4 clases y al menos una combinación fuera de rol (Mago + espada + placas).
-- Validaciones: un test por código de error (`out_of_range`, `no_los`, `on_cooldown`, `on_gcd`, `not_enough_resource`, `invalid_target`, `is_dead`, `stunned`, `rooted` (saltos), `silenced`, `locked_out`, `area_limit`).
+- Validaciones: un test por código de error (`out_of_range`, `no_los`, `on_cooldown`, `on_gcd`, `not_enough_resource`, `invalid_target`, `is_dead`, `stunned`, `rooted` (saltos y cargas), `silenced`, `in_combat` (hechizos `outOfCombatOnly`, como comer), `locked_out`, `area_limit`).
 - Integración de tick: castear Bola de fuego (2 s) → tras 39 ticks no hay `CastEnded`, tras 40 sí; el daño llega `distancia / projectile.speed` después (con un hechizo sin `projectile`, en el mismo tick).

@@ -144,7 +144,9 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     {
                         if (p.ConnectionId < 0) continue;
                         var startsIn = duel.State == "countdown" ? (int?)Math.Max(0, duel.Duel.StartsAtMs - ctx.NowMs) : null;
-                        connections.Send(p.ConnectionId, new DuelUpdate(duel.State, duel.Duel.Opponent(p).Id.Value, duel.Duel.Winner?.Id.Value, startsIn));
+                        var zone = duel.State is "countdown" or "active" ? ToDuelZone(duel.Duel) : null;
+                        connections.Send(p.ConnectionId, new DuelUpdate(duel.State, duel.Duel.Opponent(p).Id.Value, duel.Duel.Winner?.Id.Value, startsIn, zone,
+                            Reason: duel.Reason));
                     }
                     if (duel.State == "ended" && duel.Duel.Winner is { } winner && world.GetInstance(duel.MapInstanceId) is { } dmap)
                     {
@@ -172,10 +174,20 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     if (tr.State == "completed" && tr.Trade.A.TradeSavePartner is not null) session.Save(tr.Trade.A, ctx.NowMs, "trade");
                     break;
                 }
+                case DuelZoneEvent dz when dz.Player.ConnectionId >= 0:
+                {
+                    // HU-101: solo a quien salió o volvió; el aviso lo cuenta el cliente desde `outsideMs`.
+                    var outsideMs = dz.LosesAtMs is { } at ? (int?)Math.Max(0, at - ctx.NowMs) : null;
+                    connections.Send(dz.Player.ConnectionId, new DuelUpdate("active", dz.Duel.Opponent(dz.Player).Id.Value, null, null, ToDuelZone(dz.Duel), outsideMs));
+                    break;
+                }
+                case KnownSpellsResetEvent ks when ks.Player.ConnectionId >= 0:
+                    // `/level` hacia abajo: hechizos, barra y nivel otra vez, como al cambiar de clase.
+                    SendRenewedWelcome(ks.Player, ks.MapInstanceId, ctx);
+                    break;
                 case ClassChangedEvent cc when cc.Player.ConnectionId >= 0:
                     // El cliente necesita hechizos y barra nuevos: Welcome renovado es lo más simple y completo.
-                    connections.Send(cc.Player.ConnectionId, mapper.ToWelcome(cc.Player, session.MapIdOf(cc.Player), ctx.Tick));
-                    Broadcast(cc.MapInstanceId, cc.Player, SnapshotBuilder.ToSpawn(cc.Player));
+                    SendRenewedWelcome(cc.Player, cc.MapInstanceId, ctx);
                     break;
                 default:
                     break;
@@ -184,6 +196,21 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         FlushBatches(ctx.Tick);
         if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
     }
+
+    /// <summary>
+    /// Welcome por la misma conexión (cambio de clase, `/level` hacia abajo). El cliente lo toma como una actualización: borra
+    /// sus recargas y el estado de palancas y puertas, así que van detrás, como al entrar; los demás ven el nivel y la clase nuevos.
+    /// </summary>
+    private void SendRenewedWelcome(Player player, int mapInstanceId, TickContext ctx)
+    {
+        connections.Send(player.ConnectionId, mapper.ToWelcome(player, session.MapIdOf(player), ctx.Tick));
+        foreach (var cd in mapper.ToCooldowns(player)) connections.Send(player.ConnectionId, cd);
+        if (world.GetInstance(mapInstanceId) is { } map && ToMapObjects(map) is { } objects) connections.Send(player.ConnectionId, objects);
+        Broadcast(mapInstanceId, player, SnapshotBuilder.ToSpawn(player));
+    }
+
+    private static DuelZoneDto ToDuelZone(DuelSession duel) =>
+        new(SnapshotBuilder.Px(duel.Center.X), SnapshotBuilder.Px(duel.Center.Y), SnapshotBuilder.Px((float)duel.ZoneRadiusTiles));
 
     /// <summary>HU-083: estado de todos los objetos del mapa (palancas y puertas) para quien entra; null si el mapa no tiene.</summary>
     public static MapObjects? ToMapObjects(Game.Map.MapInstance map)

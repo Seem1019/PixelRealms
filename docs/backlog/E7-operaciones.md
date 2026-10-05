@@ -17,6 +17,7 @@
 - El flag admin viaja en el ticket (`GameTicket.Admin` desde el claim del JWT) y queda en `WebSocketSession.IsAdmin`; con `dev:<id>` se consulta la cuenta. Cuentas normales → `Error{forbidden}` + `warn` con nombre y cuenta; cada comando se loguea en `info` con el autor.
 - `/give` y `/gold` auditan `admin_give` (el oro con `item_id = 00000000-…` y `template_id = gold`, decisión provisional: la tabla no tiene columna de oro). `/god` y `/debug move` son flags de sesión en `Player` (no se persisten). `/spawn` crea monstruos sin punto de spawn (no reaparecen). `/level` baja también (quita hechizos y casillas de barra que ya no cumplen el nivel).
 - `make-admin <usuario>` en `Program.cs` (construye el host, `IAccountRepository.SetAdminAsync`, sale). Tests: `AdminCommandTests` (3, WebSocket) y `AdminToolsTests` (3, dominio).
+- 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): `/level` hacia abajo olvidaba hechizos y vaciaba casillas en el servidor sin decírselo al cliente: al volver a subir, la barra mostraba hechizos que el servidor no tenía ("Ese hechizo no está en tu barra"). Ahora reenvía `Welcome` como el cambio de clase (`KnownSpellsResetEvent`, `LevelUpHotbarTests`); tras la revisión de autoridad, los dos reenvíos mandan detrás las recargas y el estado de palancas y puertas (el cliente los borra con el Welcome), bajar de nivel cancela el casteo en curso y revivir así cierra el panel de muerte. `/tpto` a otro mapa no mostraba NPC ni jugadores: el cliente borraba las entidades al terminar el fundido y se llevaba las que el servidor había mandado durante él (ver HU-027, `AdminTeleportTests`).
 
 ---
 ### HU-071 · Rate limiting y protección de mensajes
@@ -144,3 +145,5 @@
   (`ci.yml`). Repetido el 2026-10-02: 300 s OK y 1800 s con +6 % de memoria. Los microbenchmarks (`--bench`, reescritos sin
   ramas en `TargetResolver.DistanceSquaredToBody`) dan 3,9–4,9 ms por millón de pruebas de forma; no van al CI porque un
   runner compartido los falsea.
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA3 preparado: `/fxbench` en el chat mantiene 24 marcas de área y 40 números durante 20 s y avisa del FPS p5, solo en el propio cliente (`FxBench`, `test_fx_bench.gd`). Falta medirlo en el navegador del equipo de referencia (apartado 5 de `docs/design/playtest-notes.md`).
+- 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): `/fxbench` en el cliente de escritorio del PC de Diego: FPS p5 60,0 en 1 170 cuadros (topado por la sincronía vertical). Sigue faltando la medida en el navegador.

@@ -118,12 +118,12 @@ determinista donde agregar sistemas.
 ### HU-005 · Proyecto Godot base
 **Como** desarrollador **quiero** el proyecto Godot configurado para pixel art y con la arquitectura de autoloads
 **para** construir pantallas sobre una base consistente.
-- Prioridad: Must · Estimación: M · Estado: Parcial
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-001
 - Skills: `godot-client`, `pixel-art-assets`
 
 **Criterios de aceptación**
-1. **Dado** `client/project.godot` **cuando** lo abro en Godot 4.5+ **entonces** arranca en la escena `Boot` sin errores y muestra "PixelRealms" con fuente pixel nítida a escala entera.
+1. **Dado** `client/project.godot` **cuando** lo abro en Godot 4.5+ **entonces** arranca en la escena `Boot` sin errores y muestra "PixelRealms" con la fuente del tema nítida a escala entera (Alegreya, HU-092; la fuente pixel se descartó el 2026-10-04).
 2. **Dado** una ventana redimensionada **entonces** el juego escala solo por factores enteros con barras negras (sin sprites borrosos).
 3. **Dado** los autoloads **entonces** existen `EventBus`, `Settings`, `Content`, `Net`, `GameState` con tipado estático y sin errores del analizador.
 4. **Dado** `Content` **cuando** arranca **entonces** carga `res://content/*.json` y `Content.spell("mage_fireball").name == "Bola de fuego"`.
@@ -133,13 +133,14 @@ determinista donde agregar sistemas.
 **Notas técnicas**
 - Ajustes exactos de ventana/filtros en skill `godot-client`.
 - Input Map: `move_up/down/left/right` (WASD + flechas), `target_next` (Tab), `spell_1..4` (teclas 1–4), `usable_1..4` (teclas 5–8), `toggle_inventory` (I), `toggle_character` (C), `toggle_spellbook` (P), `chat_focus` (Enter), `ui_cancel` (Esc).
-- `Theme` pixel inicial con fuente libre (ver `CREDITS.md`).
+- `Theme` inicial con fuente libre (ver `CREDITS.md`).
 
 **Notas de implementación**
 - `client/project.godot` escrito a mano (Godot 4.7, GL Compatibility, 480×270, stretch viewport/keep/integer, filtro Nearest, snap a píxel, Input Map completo, F3 = `debug_overlay`).
 - Autoloads tipados en orden: `EventBus`, `Settings` (user://settings.cfg, URL del servidor), `Content` (res://content/*.json → diccionarios por id, `rule(section, key)`), `Net`, `GameState`. Escena `Boot` con título, estado y `DebugOverlay`.
 - GUT 9.6.1 copiado desde su repo oficial a `client/addons/gut` (MIT, en `assets/CREDITS.md`); 8 tests GUT pasan en headless. `tools/sync_content.gd` copia `../content` a `client/content/` (ignorada).
 - Pendiente que requiere decisión: la fuente pixel (se usa la de Godot por defecto; CA1 solo parcial) y YATI (no descargable en la sesión). La comprobación visual del escalado entero (CA2) queda para el editor.
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): decisión del equipo: se queda la fuente actual (Alegreya, HU-092), sin fuente pixel; CA1 enmendado. CA2 comprobado con capturas de la pantalla de entrada: 1000×700 y 1280×720 → ×2 (960×540) y 1700×1000 → ×3 (1440×810), nítido. YATI ya no hace falta (ADR-026) y el escalado es `canvas_items` (ADR-025), no `viewport` como dice la nota de arriba.
 
 ---
 ### HU-006 · Protocolo base: sobre, registro, Ping/Pong

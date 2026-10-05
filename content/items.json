@@ -33,7 +33,7 @@
 
     {"id": "minor_healing_potion", "name": "Poción menor de vida", "type": "consumable", "rarity": "common", "maxStack": 20, "useSpellId": "item_minor_heal", "useCooldownMs": 60000, "sellPrice": 5, "icon": "items/potion_red", "description": "Restaura 60 de vida."},
     {"id": "minor_mana_potion", "name": "Poción menor de maná", "type": "consumable", "rarity": "common", "maxStack": 20, "useSpellId": "item_minor_mana", "useCooldownMs": 60000, "sellPrice": 5, "icon": "items/potion_blue", "description": "Restaura 60 de maná."},
-    {"id": "bread", "name": "Pan", "type": "consumable", "rarity": "common", "maxStack": 20, "useSpellId": "item_eat_bread", "useCooldownMs": 1000, "sellPrice": 1, "icon": "items/bread", "description": "Restaura 50 de vida en 15 s."},
+    {"id": "bread", "name": "Pan", "type": "consumable", "rarity": "common", "maxStack": 20, "useSpellId": "item_eat_bread", "useCooldownMs": 60000, "sellPrice": 1, "icon": "items/bread", "description": "Restaura 50 de vida en 15 s. Solo fuera de combate; recibir daño interrumpe la comida."},
 
     {"id": "slime_goo", "name": "Baba de slime", "type": "junk", "rarity": "junk", "maxStack": 50, "sellPrice": 3, "icon": "items/goo"},
     {"id": "boar_tusk", "name": "Colmillo de jabalí", "type": "junk", "rarity": "junk", "maxStack": 50, "sellPrice": 6, "icon": "items/tusk"},

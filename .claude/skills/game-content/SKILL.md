@@ -39,7 +39,7 @@ Tipos compartidos (ids, enums, stats): `schemas/common.schema.json`.
 Campos comunes: `applyTo: "self"` aplica el efecto al lanzador aunque el hechizo sea de área o de salto; `heal` admite
 `bonusBelowHpPct` + `bonusMult` (cura más si el objetivo está por debajo de ese % de vida).
 Tipos de aura: `dot`, `hot`, `stat_mod` (`mods.stats`, `damageTakenPct`, `damageDonePct`, `speedPct`), `stun`, `root`, `silence`, `shield`, `slow`.
-Campos extra de aura: `removesKinds` (quita esas auras al aplicarse), `immuneKinds` (bloquea esas auras mientras dura). Los `boss: true` ignoran `rules.combat.bossImmuneToAuraKinds`.
+Campos extra de aura: `removesKinds` (quita esas auras al aplicarse), `immuneKinds` (bloquea esas auras mientras dura), `breaksOnDamage` (recibir daño la quita: comida). En el hechizo, `outOfCombatOnly: true` solo deja usarlo fuera de combate (`in_combat`). Los `boss: true` ignoran `rules.combat.bossImmuneToAuraKinds`.
 Escuelas: solo `physical` y `magic` (ADR-010).
 Targeting (combate híbrido, ADR-015): un objetivo (tab-target) `self`, `enemy`, `ally`; área `self_aoe_enemies`,
 `self_aoe_allies` y, desde HU-086, `ground_aoe_enemies`, `ground_aoe_allies`, `ground_aoe_all` (punto apuntado; `ground_aoe_all`

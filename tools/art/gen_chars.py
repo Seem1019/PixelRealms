@@ -670,7 +670,7 @@ def quadruped(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndar
         shaded_rect(img, hx + 2, hy, 5, 3, snout)
         put(img, hx + 6, hy, "outline")
         put(img, hx + 1, hy - 1, "outline")
-        put(img, hx + 1, hy - 2, "white")
+        put(img, hx + 1, hy - 2, spec.get("eye", "white"))
         for ex in (hx - 2, hx):
             rect(img, ex, hy - 6, 2, 3, fur["d"])
         if spec.get("tusk"):
@@ -701,14 +701,54 @@ def quadruped(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndar
             put(img, 17, hy + 1, "outline")
             rect(img, 13, hy - 2, 1, 2, "outline")
             rect(img, 19, hy - 2, 1, 2, "outline")
-            put(img, 13, hy - 2, "white")
-            put(img, 19, hy - 2, "white")
+            put(img, 13, hy - 2, spec.get("eye", "white"))
+            put(img, 19, hy - 2, spec.get("eye", "white"))
             for ex in (11, 19):
                 rect(img, ex, hy - 6, 2, 3, fur["d"])
             if spec.get("tusk"):
                 put(img, 13, hy + 4, "mist")
                 put(img, 19, hy + 4, "mist")
+    beast_extras(img, spec, direction, body_y)
     return outline(img)
+
+
+def beast_extras(img, spec: dict, direction: str, body_y: int) -> None:
+    """Rasgos de los élites (HU-080): cresta (`mane`), arnés o armadura sobre el lomo (`armor`) y colmillos largos (`big_tusk`).
+    Sin esas claves no dibuja nada: las hojas normales no cambian."""
+    mane, armor = spec.get("mane"), spec.get("armor")
+    if direction == "e":
+        if mane:
+            for k, x in enumerate(range(11, 23, 2)):
+                vline(img, x, body_y - 3 - k % 2, body_y - 1, mane["d"])
+                put(img, x, body_y - 3 - k % 2, mane["l"])
+        if armor:
+            shaded_rect(img, 12, body_y - 1, 8, 3, armor)
+            for x in (13, 18):
+                put(img, x, body_y, "mist")
+        if spec.get("big_tusk"):
+            hx, hy = 24, body_y - 2
+            put(img, hx + 5, hy + 1, "white")
+            put(img, hx + 6, hy + 1, "mist")
+    elif direction == "n":
+        if mane:
+            for y in range(body_y - 1, body_y + 7, 2):
+                put(img, 15, y, mane["d"])
+                put(img, 17, y, mane["d"])
+                put(img, 16, y, mane["l"])
+        if armor:
+            shaded_rect(img, 12, body_y + 2, 9, 3, armor)
+    else:
+        hy = body_y + 1
+        if mane:
+            for x, h in ((14, 1), (16, 2), (18, 1)):
+                vline(img, x, hy - 5 - h, hy - 5, mane["d"])
+                put(img, x, hy - 5 - h, mane["l"])
+        if armor:
+            shaded_rect(img, 11, body_y + 6, 11, 2, armor)
+            put(img, 16, body_y + 6, "mist")
+        if spec.get("big_tusk"):
+            put(img, 12, hy + 3, "white")
+            put(img, 20, hy + 3, "white")
 
 
 def slime_shape(spec: dict, direction: str, rx: float, ry: float, hop: float, fwd: int, eyes: str, size: int = 32) -> np.ndarray:
@@ -895,6 +935,12 @@ CHARACTERS = {
     "monsters/wolf": (quadruped, {"fur": mat("lavgray", "silver", "plum"), "belly": mat("silver", "mist", "lavgray"),
                                    "snout": mat("silver", "mist", "lavgray")}),
     "monsters/boar": (quadruped, {"fur": mat("rust", "clay", "wine"), "snout": mat("dusty", "taupe", "mauve"), "tusk": True}),
+    # Élites de las ramas de la pradera (HU-080): misma silueta que su especie, otro pelaje, ojos que brillan y equipo.
+    "monsters/boar_alpha": (quadruped, {"fur": mat("ink", "plum", "outline"), "snout": mat("mauve", "dusty", "grape_d"), "tusk": True,
+                                        "big_tusk": True, "eye": "scarlet", "mane": mat("plum", "lavgray", "ink"), "armor": STEEL}),
+    "monsters/wolf_alpha": (quadruped, {"fur": mat("coal", "sage_d", "outline"), "belly": mat("sage_d", "sage", "coal"),
+                                        "snout": mat("sage_d", "sage", "coal"), "eye": "gold", "mane": mat("ink", "plum", "outline"),
+                                        "armor": LEATHER}),
     "monsters/bandit": (humanoid, {"skin": SKIN_DARK, "hair": HAIR_BLACK, "head": "bandana", "bandana": mat("red", "redl", "blood"),
                                     "beard": "ink", "top": mat("mud", "olive", "outline"), "sleeve": LEATHER,
                                     "pants": mat("plum", "lavgray", "ink"), "boots": BOOTS, "belt": "outline", "weapon": "dagger",

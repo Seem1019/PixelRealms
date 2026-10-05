@@ -290,7 +290,7 @@
       "properties": { "warrior": { "type": "number" }, "rogue": { "type": "number" }, "mage": { "type": "number" }, "priest": { "type": "number" } } },
     "pvpRuleset": {
       "type": "object", "additionalProperties": false,
-      "required": ["requiresConsent", "endAtHpPct", "restoreOnEnd", "loserRegenMult", "xpLoss", "goldLoss", "itemLoss", "allowedInSafeZones", "requestExpireSec", "countdownSec", "maxDistanceTiles"],
+      "required": ["requiresConsent", "endAtHpPct", "restoreOnEnd", "loserRegenMult", "xpLoss", "goldLoss", "itemLoss", "allowedInSafeZones", "requestExpireSec", "countdownSec", "maxDistanceTiles", "zoneRadiusTiles", "zoneGraceSec", "zoneReturnMarginTiles"],
       "properties": {
         "requiresConsent": { "type": "boolean" },
         "endAtHpPct": { "type": "number", "minimum": 0, "maximum": 1, "description": "El combate termina cuando un participante baja a este % de vida (0 = muerte real)." },
@@ -299,7 +299,10 @@
         "xpLoss": { "type": "number" }, "goldLoss": { "type": "number" }, "itemLoss": { "type": "boolean" },
         "allowedInSafeZones": { "type": "boolean" },
         "requestExpireSec": { "type": "number" }, "countdownSec": { "type": "number" },
-        "maxDistanceTiles": { "type": "number", "description": "Si un duelista se aleja más, pierde el duelo." }
+        "maxDistanceTiles": { "type": "number", "description": "Distancia máxima entre los dos para retar y para aceptar; nunca más que 2 × zoneRadiusTiles (los dos empiezan dentro de la zona)." },
+        "zoneRadiusTiles": { "type": "number", "minimum": 1, "description": "Radio de la zona del duelo (HU-101), centrada en el punto medio entre los dos al aceptar; solo la ven los duelistas." },
+        "zoneGraceSec": { "type": "number", "minimum": 0, "description": "Segundos fuera de la zona antes de perder el duelo (HU-101); dentro se recuperan al mismo ritmo." },
+        "zoneReturnMarginTiles": { "type": "number", "minimum": 0, "description": "Cuánto hay que entrar en la zona para contar como dentro otra vez (el aviso no parpadea en el borde)." }
       }
     }
   }

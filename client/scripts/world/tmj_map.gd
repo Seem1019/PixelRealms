@@ -91,7 +91,8 @@ func _parse(path: String) -> bool:
 			for o: Variant in l.get("objects", []):
 				var lo: Dictionary = o
 				var lp := _props(lo)
-				levers.append({"id": str(lp.get("leverId", lo.get("name", ""))), "door": str(lp.get("doorId", "")), "pos": Vector2(float(lo.get("x", 0)), float(lo.get("y", 0)))})
+				levers.append({"id": str(lp.get("leverId", lo.get("name", ""))), "door": str(lp.get("doorId", "")), "pos": Vector2(float(lo.get("x", 0)), float(lo.get("y", 0))),
+					"opens_alone": bool(lp.get("opensAlone", false))})
 		elif str(l.get("type", "")) == "objectgroup" and name == "doors":
 			for o: Variant in l.get("objects", []):
 				var dobj: Dictionary = o

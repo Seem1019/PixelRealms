@@ -12,6 +12,8 @@ const NPC_COLOR := Color("1ebc73")
 const FLASH_MS := EntityVisual.FLASH_MS
 ## Distancia en px que cuenta como "se está moviendo" entre dos cuadros (anima caminar).
 const MOVE_EPSILON := 0.05
+## Bit de `EntitySpawn.flags`: cadáver con botín para quien lo recibe (HU-050 CA1, docs/protocol.md).
+const FLAG_LOOTABLE := 8
 
 var entity_id: int = -1
 var kind: String = "player"
@@ -89,6 +91,8 @@ func setup(d: Dictionary) -> void:
 	_apply_identity()
 	_refresh_health_bar()
 	refresh_level_color()
+	if visual != null:
+		visual.lootable = (int(d.get("flags", 0)) & FLAG_LOOTABLE) != 0
 
 
 func _apply_identity() -> void:
@@ -171,6 +175,11 @@ func _refresh_health_bar() -> void:
 ## HU-031 CA4: nivel coloreado según la diferencia con el mío (gris ≤ −5, verde −3..−4, amarillo ±2, naranja +3..+4, rojo ≥ +5).
 func refresh_level_color() -> void:
 	if visual == null:
+		return
+	if kind == "player":
+		# HU-041 CA3: los demás ven el nivel sobre el nombre (sin color de dificultad: no es un enemigo).
+		visual.plate.level_text = "%d" % level
+		visual.plate.level_color = UiTheme.TEXT_MUTED
 		return
 	if kind != "monster":
 		visual.plate.level_text = ""
