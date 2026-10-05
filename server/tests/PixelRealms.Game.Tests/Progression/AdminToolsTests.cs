@@ -26,6 +26,7 @@ public sealed class AdminToolsTests
         var atCap = ana.KnownSpells.Count;
         atCap.ShouldBeGreaterThan(0);
         ctx.Events.OfType<LevelUpEvent>().Count().ShouldBe(cap - 1);
+        ctx.Events.OfType<KnownSpellsResetEvent>().ShouldBeEmpty("subir no olvida nada");
         ana.Hotbar[0] = ("spell", ana.KnownSpells[^1]);
 
         w.Combat.Progression.SetLevel(ana, 1, w.Map, ctx).ShouldBe(1);
@@ -34,6 +35,9 @@ public sealed class AdminToolsTests
         ana.KnownSpells.Count.ShouldBeLessThan(atCap);
         if (w.Content.Spell(ana.Hotbar[0]?.Ref ?? ana.KnownSpells[0]).LevelReq > 1) ana.Hotbar[0].ShouldBeNull();
         ana.Hp.ShouldBe(ana.MaxHp);
+        ctx.Events.OfType<KnownSpellsResetEvent>().Count().ShouldBe(1, "bajar olvida hechizos: el cliente recibe su lista y su barra");
+        w.Combat.Progression.SetLevel(ana, 1, w.Map, ctx);
+        ctx.Events.OfType<KnownSpellsResetEvent>().Count().ShouldBe(1, "sin cambio de nivel no hay nada que reenviar");
     }
 
     [Fact]

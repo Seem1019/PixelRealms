@@ -30,6 +30,22 @@ func _floating_texts() -> Array[String]:
 	return out
 
 
+## `/level` estando muerto revive con un Welcome por la misma conexión: el panel de muerte se cierra como al reaparecer.
+func test_a_renewed_welcome_that_revives_counts_as_a_respawn() -> void:
+	var welcome := {
+		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "meadow",
+		"self": {"x": 100.0, "y": 100.0, "level": 4, "xp": 0, "xpNext": 100, "hp": 0, "maxHp": 100, "res": 0, "maxRes": 100, "resource": "rage", "classId": "warrior", "name": "Ana"},
+		"inventory": [], "equipment": [], "hotbar": [], "knownSpells": [], "rulesHash": "x",
+	}
+	_dispatch("Welcome", welcome)
+	assert_true(GameState.is_dead)
+	watch_signals(GameState)
+	(welcome["self"] as Dictionary)["hp"] = 100
+	_dispatch("Welcome", welcome)
+	assert_false(GameState.is_dead)
+	assert_signal_emitted(GameState, "respawned")
+
+
 func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("Welcome", {
 		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "meadow",

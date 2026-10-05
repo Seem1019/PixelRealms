@@ -181,10 +181,13 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     connections.Send(dz.Player.ConnectionId, new DuelUpdate("active", dz.Duel.Opponent(dz.Player).Id.Value, null, null, ToDuelZone(dz.Duel), outsideMs));
                     break;
                 }
+                case KnownSpellsResetEvent ks when ks.Player.ConnectionId >= 0:
+                    // `/level` hacia abajo: hechizos, barra y nivel otra vez, como al cambiar de clase.
+                    SendRenewedWelcome(ks.Player, ks.MapInstanceId, ctx);
+                    break;
                 case ClassChangedEvent cc when cc.Player.ConnectionId >= 0:
                     // El cliente necesita hechizos y barra nuevos: Welcome renovado es lo más simple y completo.
-                    connections.Send(cc.Player.ConnectionId, mapper.ToWelcome(cc.Player, session.MapIdOf(cc.Player), ctx.Tick));
-                    Broadcast(cc.MapInstanceId, cc.Player, SnapshotBuilder.ToSpawn(cc.Player));
+                    SendRenewedWelcome(cc.Player, cc.MapInstanceId, ctx);
                     break;
                 default:
                     break;
@@ -192,6 +195,18 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         }
         FlushBatches(ctx.Tick);
         if (ctx.Tick % PartyFrameEveryTicks == 0) foreach (var party in parties.All) SendPartyUpdate(party);
+    }
+
+    /// <summary>
+    /// Welcome por la misma conexión (cambio de clase, `/level` hacia abajo). El cliente lo toma como una actualización: borra
+    /// sus recargas y el estado de palancas y puertas, así que van detrás, como al entrar; los demás ven el nivel y la clase nuevos.
+    /// </summary>
+    private void SendRenewedWelcome(Player player, int mapInstanceId, TickContext ctx)
+    {
+        connections.Send(player.ConnectionId, mapper.ToWelcome(player, session.MapIdOf(player), ctx.Tick));
+        foreach (var cd in mapper.ToCooldowns(player)) connections.Send(player.ConnectionId, cd);
+        if (world.GetInstance(mapInstanceId) is { } map && ToMapObjects(map) is { } objects) connections.Send(player.ConnectionId, objects);
+        Broadcast(mapInstanceId, player, SnapshotBuilder.ToSpawn(player));
     }
 
     private static DuelZoneDto ToDuelZone(DuelSession duel) =>

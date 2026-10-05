@@ -136,6 +136,7 @@ func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	resource = int(self_state.get("res", 0))
 	max_resource = int(self_state.get("maxRes", 0))
 	resource_kind = str(self_state.get("resource", "mana"))
+	var was_dead := is_dead
 	is_dead = hp <= 0
 	own_cast = {}
 	cooldowns.clear()
@@ -155,6 +156,8 @@ func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	stats_changed.emit()
 	inventory_changed.emit()
 	map_changed.emit(map_id)
+	if same_connection and was_dead and not is_dead:
+		respawned.emit()  # `/level` estando muerto: el panel de muerte se cierra como al reaparecer
 
 
 func _on_stats_update(d: Dictionary) -> void:
