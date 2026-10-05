@@ -64,7 +64,9 @@ func test_monster_plate_colors_its_level_against_mine() -> void:  # HU-031 CA4
 	var player := RemoteEntity.new()
 	add_child_autofree(player)
 	player.setup({"id": 8, "kind": "player", "name": "Bob", "level": 12, "classId": "warrior", "hpPct": 100})
-	assert_eq(player.visual.plate.level_text, "", "el nivel coloreado es solo de los monstruos")
+	# HU-041 CA3: el nivel de un jugador se ve sobre su nombre, pero sin color de dificultad (eso es solo de los monstruos).
+	assert_eq(player.visual.plate.level_text, "12")
+	assert_eq(player.visual.plate.level_color, UiTheme.TEXT_MUTED, "el nivel coloreado es solo de los monstruos")
 
 
 func test_monster_level_colors_follow_my_level_up() -> void:  # HU-031 CA4 (borde: subo de nivel con monstruos a la vista)

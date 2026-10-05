@@ -172,6 +172,11 @@ func _refresh_health_bar() -> void:
 func refresh_level_color() -> void:
 	if visual == null:
 		return
+	if kind == "player":
+		# HU-041 CA3: los demás ven el nivel sobre el nombre (sin color de dificultad: no es un enemigo).
+		visual.plate.level_text = "%d" % level
+		visual.plate.level_color = UiTheme.TEXT_MUTED
+		return
 	if kind != "monster":
 		visual.plate.level_text = ""
 		return

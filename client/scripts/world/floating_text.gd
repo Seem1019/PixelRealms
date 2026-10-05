@@ -2,7 +2,8 @@ class_name FloatingText
 extends Node2D
 ## Números flotantes de combate (HU-038 CA2/CA6, ADR-018): reserva fija de etiquetas, suben y se desvanecen en 1 s.
 ## Colores de la skill combat-system: blanco daño, amarillo crit con "!", verde cura, gris "Falla"/"Esquiva", azul "Absorbe",
-## "Inmune" para controles bloqueados, morado "+N XP" sobre uno mismo. Más de MAX_PER_ENTITY_PER_SEC números por entidad y
+## "Inmune" para controles bloqueados, morado "+N XP" sobre uno mismo, "¡Nivel N!" dorado al subir de nivel (HU-041 CA3; lo ven
+## todos los de la AOI). Más de MAX_PER_ENTITY_PER_SEC números por entidad y
 ## segundo → uno sumado. Los ticks de una misma aura sobre la misma entidad que llegan a menos de GROUP_WINDOW_SEC (varios
 ## lanzadores con el mismo sangrado) suman en el número que ya está subiendo (HU-038 CA6).
 
@@ -59,6 +60,9 @@ func show_event(entity_id: int, kind: String, amount: int, crit: bool, world_pos
 		"xp":
 			text = "+%d XP" % amount
 			color = Color("a884f3")
+		"level":
+			text = "¡Nivel %d!" % amount
+			color = UiTheme.ACCENT
 		_:
 			return
 	if not _allow(entity_id, kind, amount, world_pos):

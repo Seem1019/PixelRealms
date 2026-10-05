@@ -23,6 +23,13 @@ func _dispatch(type: String, d: Dictionary) -> void:
 	Net._dispatch(JSON.stringify({"t": type, "d": d}))
 
 
+func _floating_texts() -> Array[String]:
+	var out: Array[String] = []
+	for e: Dictionary in _world._floating._active:
+		out.append((e["label"] as Label).text)
+	return out
+
+
 func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("Welcome", {
 		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "meadow",
@@ -95,6 +102,12 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("LevelUp", {"level": 4, "newSpells": ["mage_flame_burst"], "rankUps": [{"spellId": "mage_fireball", "rank": 1}]})
 	assert_eq(GameState.level, 4)
 	assert_true(GameState.known_spells.has("mage_flame_burst"))
+	# HU-041 CA3: efecto y "¡Nivel N!" propio, y el nivel sobre el nombre; también al ver subir a otro jugador.
+	assert_eq(_world._self_visual.plate.level_text, "4")
+	assert_true(_floating_texts().has("¡Nivel 4!"))
+	_dispatch("EntitySpawn", {"id": 8, "kind": "player", "templateId": "warrior", "name": "Bob", "x": 90.0, "y": 100.0, "dir": "s", "level": 3, "classId": "warrior", "hpPct": 100, "flags": 0})
+	assert_true(_floating_texts().has("¡Nivel 3!"))
+	assert_eq((_world._remotes[8] as RemoteEntity).visual.plate.level_text, "3")
 	var placed := false
 	for h: Variant in GameState.hotbar:
 		if str((h as Dictionary).get("ref", "")) == "mage_flame_burst" and int((h as Dictionary).get("slot", -1)) == 2:

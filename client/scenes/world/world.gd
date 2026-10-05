@@ -93,6 +93,9 @@ func _ready() -> void:
 		_stop_aiming()
 		_approach.cancel())
 	GameState.xp_gained.connect(func(amount: int) -> void: _floating.show_event(GameState.self_id, "xp", amount, false, _player.position))
+	GameState.leveled_up.connect(func(level: int, _spells: Array, _ranks: Array) -> void:
+		_self_visual.plate.level_text = "%d" % level
+		_play_level_up(GameState.self_id, level, _player.position))
 	_hud.respawn_requested.connect(func() -> void: _send("Respawn"))
 	_hud.hotbar_pressed.connect(_use_slot)
 	_hud.in_range_check = _spell_in_range
@@ -191,6 +194,8 @@ func _refresh_self_visual() -> void:
 	_self_visual.set_sprite(EntitySprites.ref_for("player", GameState.class_id, GameState.class_id), RemoteEntity.PLAYER_COLOR, GameState.character_name)
 	_self_visual.plate.display_name = GameState.character_name
 	_self_visual.plate.name_color = UiTheme.ACCENT
+	_self_visual.plate.level_text = "%d" % GameState.level
+	_self_visual.plate.level_color = UiTheme.TEXT_MUTED
 
 
 ## Capas de efectos: los brillos de casteo bajo los cuerpos (encima de la marca de área) y el resto por encima de las
@@ -403,13 +408,17 @@ func _on_entity_spawn(d: Dictionary) -> void:
 	if id < 0 or id == GameState.self_id:
 		return
 	var r: RemoteEntity
+	var old_level := -1
 	if _remotes.has(id):
 		r = _remotes[id]
+		old_level = r.level
 	else:
 		r = RemoteEntity.new()
 		_entities.add_child(r)
 		_remotes[id] = r
 	r.setup(d)
+	if r.kind == "player" and old_level > 0 and r.level > old_level:
+		_play_level_up(id, r.level, r.position)  # HU-041 CA3: el servidor reenvía su EntitySpawn con el nivel nuevo
 	r.set_name_color(_name_color(r))
 	if id == GameState.duel_opponent_id and GameState.duel_state == "active":
 		r.hostile = true  # vuelve a entrar en la AOI en pleno duelo
@@ -874,6 +883,12 @@ func _show_bubble(from: String, text: String) -> void:
 	anchor.add_child(holder)
 	bubble.resized.connect(func() -> void: bubble.position = Vector2(-roundf(bubble.size.x / 2.0), -bubble.size.y))
 	get_tree().create_timer(4.0).timeout.connect(holder.queue_free)
+
+
+## HU-041 CA3: estallido dorado a los pies y "¡Nivel N!" encima, lo vean uno mismo o los demás de la AOI.
+func _play_level_up(entity_id: int, level: int, pos: Vector2) -> void:
+	_vfx.play_once("area_holy", pos)
+	_floating.show_event(entity_id, "level", level, true, pos)
 
 
 ## HU-024 CA3: el rival del duelo en naranja (HU-064), los del grupo en azul y el resto en el color del texto.
