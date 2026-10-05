@@ -131,8 +131,11 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("PartyUpdate", {"leader": "Bob", "members": [{"name": "Ana", "entityId": 1, "classId": "mage", "level": 4, "hpPct": 100, "online": true, "mapId": "meadow"}, {"name": "Bob", "entityId": 8, "classId": "warrior", "level": 2, "hpPct": 55, "online": true, "mapId": "meadow"}]})
 	assert_true(GameState.in_party())
 	assert_eq(_world._social._frames.get_child_count(), 1)
+	var bob_plate: Nameplate = (_world._remotes[8] as RemoteEntity).visual.plate
+	assert_eq(bob_plate.name_color, _world.PARTY_NAME_COLOR, "HU-024 CA3: los del grupo en azul")
 	_dispatch("DuelUpdate", {"state": "countdown", "opponentId": 8, "startsInMs": 3000})
 	assert_string_contains(_world._social._duel_label.text, "Duelo en")
+	assert_eq(bob_plate.name_color, _world.DUEL_NAME_COLOR, "el rival del duelo en naranja, aunque sea del grupo")
 	# HU-101: fuera de la zona, el rótulo cuenta los segundos; al perder por eso, lo dice.
 	_dispatch("DuelUpdate", {"state": "active", "opponentId": 8, "zone": {"x": 100.0, "y": 100.0, "r": 192.0}})
 	_dispatch("DuelUpdate", {"state": "active", "opponentId": 8, "zone": {"x": 100.0, "y": 100.0, "r": 192.0}, "outsideMs": 5000})
@@ -141,6 +144,7 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("DuelUpdate", {"state": "ended", "opponentId": 8, "winnerId": 8, "reason": "zone"})
 	await get_tree().process_frame
 	assert_eq(_world._social._duel_label.text, "Has perdido el duelo: saliste de la zona")
+	assert_eq(bob_plate.name_color, _world.PARTY_NAME_COLOR, "al terminar vuelve al azul del grupo")
 	_dispatch("TradeUpdate", {"state": "open", "partnerId": 8, "version": 1, "mine": {"items": [], "gold": 0}, "theirs": {"items": [], "gold": 5}, "confirmedMine": false, "confirmedTheirs": false})
 	assert_true(_world._social._trade.visible)
 	_dispatch("TradeUpdate", {"state": "cancelled", "partnerId": 8, "version": 2, "mine": {"items": [], "gold": 0}, "theirs": {"items": [], "gold": 0}, "confirmedMine": false, "confirmedTheirs": false, "reason": "distance"})

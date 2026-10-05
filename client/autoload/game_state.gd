@@ -421,6 +421,16 @@ func in_party() -> bool:
 	return not party.is_empty() and (party.get("members", []) as Array).size() > 1
 
 
+## Ids de entidad de los miembros visibles del grupo (los de otro mapa no tienen).
+func party_entity_ids() -> Array[int]:
+	var out: Array[int] = []
+	for m: Variant in party.get("members", []):
+		var ent: Variant = (m as Dictionary).get("entityId")
+		if ent != null:
+			out.append(int(ent))
+	return out
+
+
 func party_member_names() -> Array[String]:
 	var out: Array[String] = []
 	for m: Variant in party.get("members", []):

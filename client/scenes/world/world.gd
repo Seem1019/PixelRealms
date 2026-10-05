@@ -67,6 +67,9 @@ var _range_ring: RangeRing
 ## Palancas y puertas del mapa (HU-083).
 var _map_objects: MapObjectsLayer
 const STUCK_TEXT := "No puedes llegar hasta el objetivo"
+## Color del nombre de los miembros del grupo (HU-024 CA3) y del rival de un duelo (HU-064).
+const PARTY_NAME_COLOR := Color("8fd3ff")
+const DUEL_NAME_COLOR := Color(1, 0.6, 0.2)
 ## Envío de mensajes (los tests lo sustituyen para ver qué se manda sin servidor).
 var send_fn: Callable = func(type: String, data: Dictionary) -> void: Net.send(type, data)
 const LOGOUT_REJECTED_TEXT := "No se pudo salir: el servidor rechazó la petición"
@@ -110,6 +113,7 @@ func _ready() -> void:
 	_social.entity_name = func(entity_id: int) -> String: return (_remotes[entity_id] as RemoteEntity).display_name if _remotes.has(entity_id) else ""
 	_inventory.offer_requested.connect(_social.offer_item)
 	GameState.duel_changed.connect(_on_duel_changed)
+	GameState.party_changed.connect(_refresh_name_colors)
 	_vendor.sell_junk_requested.connect(_inventory.sell_junk)
 	Net.disconnected.connect(_on_disconnected)
 	EventBus.ui_error.connect(_on_ui_error)
@@ -406,6 +410,7 @@ func _on_entity_spawn(d: Dictionary) -> void:
 		_entities.add_child(r)
 		_remotes[id] = r
 	r.setup(d)
+	r.set_name_color(_name_color(r))
 	if id == GameState.duel_opponent_id and GameState.duel_state == "active":
 		r.hostile = true  # vuelve a entrar en la AOI en pleno duelo
 	if r.visual != null:
@@ -871,10 +876,24 @@ func _show_bubble(from: String, text: String) -> void:
 	get_tree().create_timer(4.0).timeout.connect(holder.queue_free)
 
 
-## HU-064: marco del rival en naranja durante el duelo.
-func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
+## HU-024 CA3: el rival del duelo en naranja (HU-064), los del grupo en azul y el resto en el color del texto.
+func _name_color(r: RemoteEntity) -> Color:
+	if r.entity_id == GameState.duel_opponent_id and GameState.duel_state in ["countdown", "active"]:
+		return DUEL_NAME_COLOR
+	if r.kind == "player" and GameState.in_party() and r.entity_id in GameState.party_entity_ids():
+		return PARTY_NAME_COLOR
+	return UiTheme.TEXT
+
+
+func _refresh_name_colors() -> void:
 	for r: RemoteEntity in _remotes.values():
-		r.set_name_color(Color(1, 0.6, 0.2) if r.entity_id == opponent_id and state in ["countdown", "active"] else Color.WHITE)
+		r.set_name_color(_name_color(r))
+
+
+## HU-064: nombre del rival en naranja durante el duelo (al terminar vuelve a su color: azul si es del grupo).
+func _on_duel_changed(state: String, opponent_id: int, _winner_id: int, _starts_in_ms: int) -> void:
+	_refresh_name_colors()
+	for r: RemoteEntity in _remotes.values():
 		# En pleno duelo el rival es enemigo: Espacio lo ataca, el clic derecho no abre el menú, Tab lo selecciona, anillo rojo.
 		if r.kind == "player":
 			r.hostile = r.entity_id == opponent_id and state == "active"
