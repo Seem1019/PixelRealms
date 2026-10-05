@@ -39,6 +39,7 @@ public sealed class DamagePipeline(CombatServices services)
         target.EnterCombat(ctx.NowMs);
         if (target is Player tp) tp.Dirty = true;
         if (source is Player sp) sp.Dirty = true;
+        if (scaled > 0) Auras?.BreakOnDamage(target, map, ctx); // un golpe, aunque lo pare un escudo, corta la comida
 
         // Ira: +ragePerHitDealt al impactar, +ragePerHitTaken al recibir (combat.md §Recursos).
         GrantRage(source, rules.RagePerHitDealt, ctx);

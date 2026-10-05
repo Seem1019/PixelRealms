@@ -31,6 +31,10 @@ public sealed class AuraInstance
     /// <summary>Mitigación por armadura calculada al aplicar un DoT físico (snapshot, combat.md §Tabla de impacto).</summary>
     public double Mitigation { get; set; }
 
+    /// <summary>Tick en que `AuraSystem.Tick` ya la procesó: si un tick quita auras de la lista, el recorrido vuelve a empezar
+    /// sin repetir las ya hechas.</summary>
+    internal long ProcessedTick { get; set; } = -1;
+
     public string AuraId => Def.Id;
 
     public AuraKind Kind => Def.Kind;
@@ -51,6 +55,7 @@ public sealed class AuraInstance
         Amount = 0;
         ShieldRemaining = 0;
         Mitigation = 0;
+        ProcessedTick = -1;
         return this;
     }
 }

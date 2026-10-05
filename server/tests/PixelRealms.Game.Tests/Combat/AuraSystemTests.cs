@@ -241,6 +241,23 @@ public sealed class AuraSystemTests
     }
 
     [Fact]
+    public void ADotTickThatBreaksAnEarlierAura_DoesNotSkipTheNextAura() // comer + dos DoT en el mismo tick
+    {
+        var w = Arena();
+        var bob = w.Player("Bob"); var boss = w.Monster("foreman_grask"); var slime = w.Monster("slime");
+        Apply(w, bob, "bread_hot", bob).ShouldNotBeNull();           // [0] se corta al recibir daño
+        Apply(w, bob, "foreman_whip_bleed", boss).ShouldNotBeNull(); // [1] su tick quita el pan y la lista se corre
+        Apply(w, bob, "rogue_poison", slime).ShouldNotBeNull();      // [2] tiene que hacer su tick igualmente
+        w.Clock.Advance(3000);
+        var ctx = w.Begin();
+        w.Combat.Auras.Tick(w.Map, ctx);
+        var hits = ctx.Events.OfType<CombatHitEvent>().Where(e => ReferenceEquals(e.Target, bob) && e.Kind == HitKinds.Damage).ToList();
+        hits.ShouldContain(e => e.SpellId == "foreman_whip_bleed");
+        hits.ShouldContain(e => e.SpellId == "rogue_poison");
+        bob.Auras.All.ShouldNotContain(a => a.AuraId == "bread_hot");
+    }
+
+    [Fact]
     public void TwoShields_DifferentCasters_Coexist_EarliestExpiryConsumedFirst() // CA11
     {
         var w = Arena();

@@ -448,6 +448,28 @@ public sealed class SocialTests
     }
 
     [Fact]
+    public void Duel_EndingInAnAuraTick_DoesNotSkipTheLoserOwnHotThatTick() // revisión de autoridad: AuraSystem.Tick
+    {
+        var w = Arena();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob");
+        var rs = w.Content.Rules.Pvp.Rulesets["duel"];
+        w.Combat.Pvp.Request(ana, bob, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Pvp.Respond(bob, true, w.Map, w.Begin()).ShouldBeNull();
+        TickRunner.RunMs(w, (int)(rs.CountdownSec * 1000) + 50);
+        // [ralentización de Ana, bono propio, veneno de Ana, renovar propio]: el veneno termina el duelo y quita las dos de Ana.
+        w.Combat.Auras.Apply(bob, w.Content.Aura("mage_chill"), ana, w.Map, w.Begin()).ShouldNotBeNull();
+        w.Combat.Auras.Apply(bob, w.Content.Aura("priest_path_speed"), bob, w.Map, w.Begin()).ShouldNotBeNull();
+        w.Combat.Auras.Apply(bob, w.Content.Aura("rogue_poison"), ana, w.Map, w.Begin()).ShouldNotBeNull();
+        w.Combat.Auras.Apply(bob, w.Content.Aura("priest_renew_hot"), bob, w.Map, w.Begin()).ShouldNotBeNull();
+        bob.Hp = Math.Max(1, (int)Math.Ceiling(bob.MaxHp * rs.EndAtHpPct)) + 1;
+        w.Clock.Advance(3000);
+        var ctx = w.Begin();
+        w.Combat.Auras.Tick(w.Map, ctx);
+        ctx.Events.OfType<DuelChangedEvent>().ShouldContain(e => e.State == "ended");
+        ctx.Events.OfType<CombatHitEvent>().ShouldContain(e => ReferenceEquals(e.Target, bob) && e.SpellId == "priest_renew_hot");
+    }
+
+    [Fact]
     public void Duel_InCombat_CannotBeRequestedNorAccepted_AndCombatCancelsTheCountdown()
     {
         var w = Arena();

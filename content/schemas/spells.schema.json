@@ -71,6 +71,11 @@
           "type": "boolean",
           "default": true
         },
+        "outOfCombatOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Solo se puede usar fuera de combate (rules.combat.inCombatWindowSec); en combate responde in_combat (comida)."
+        },
         "cost": {
           "type": "object",
           "additionalProperties": false,

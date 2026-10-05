@@ -152,6 +152,14 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
             if (target.Auras.Mutable[i].Kind == kind) Remove(target, target.Auras.Mutable[i], map, ctx);
     }
 
+    /// <summary>Recibir daño quita las auras `breaksOnDamage` (comer: la curación se corta).</summary>
+    public void BreakOnDamage(Actor target, MapInstance map, TickContext ctx)
+    {
+        var auras = target.Auras.Mutable;
+        for (var i = auras.Count - 1; i >= 0; i--)
+            if (i < auras.Count && auras[i].Def.BreaksOnDamage) Remove(target, auras[i], map, ctx);
+    }
+
     /// <summary>Muerte o evasión: se pierden todas las auras (HU-037 CA1) sin conceder inmunidad.</summary>
     public void ClearAll(Actor target, MapInstance map, TickContext ctx)
     {
@@ -207,6 +215,9 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
             for (var i = 0; i < auras.Count; i++)
             {
                 var a = auras[i];
+                if (a.ProcessedTick == ctx.Tick) continue;
+                a.ProcessedTick = ctx.Tick;
+                var count = auras.Count;
                 while (a.NextTickAtMs <= now && a.NextTickAtMs <= a.ExpiresAtMs)
                 {
                     ApplyTick(actor, a, map, ctx);
@@ -214,6 +225,9 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
                     if (actor.IsDead || !auras.Contains(a)) break; // el tick pudo quitarla (fin de duelo): no seguir aplicándola
                 }
                 if (actor.IsDead) break;
+                // El tick pudo cambiar la lista (fin de duelo, un DoT que corta la comida): se vuelve a recorrer desde el
+                // principio y las ya procesadas en este tick se saltan.
+                if (auras.Count != count || !ReferenceEquals(auras[i], a)) i = -1;
             }
             for (var i = auras.Count - 1; i >= 0; i--)
                 if (auras.Count > i && auras[i].ExpiresAtMs <= now) Remove(actor, auras[i], map, ctx);

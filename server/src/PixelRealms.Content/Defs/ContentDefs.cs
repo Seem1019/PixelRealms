@@ -106,6 +106,8 @@ public sealed record SpellDef
     public required int CastMs { get; init; }
     public required int CooldownMs { get; init; }
     public bool TriggersGcd { get; init; } = true;
+    /// <summary>Solo fuera de combate (`in_combat`), como comer.</summary>
+    public bool OutOfCombatOnly { get; init; }
     public CostDef? Cost { get; init; }
     public required double Range { get; init; }
     public required Targeting Targeting { get; init; }
@@ -158,6 +160,8 @@ public sealed record AuraDef
     public required string Icon { get; init; }
     public IReadOnlyList<AuraKind> RemovesKinds { get; init; } = [];
     public IReadOnlyList<AuraKind> ImmuneKinds { get; init; } = [];
+    /// <summary>Recibir daño la quita (comer).</summary>
+    public bool BreaksOnDamage { get; init; }
     public bool Provisional { get; init; }
 }
 

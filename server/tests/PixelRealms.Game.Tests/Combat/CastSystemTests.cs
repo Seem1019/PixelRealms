@@ -52,6 +52,42 @@ public sealed class CastSystemTests
     }
 
     [Fact]
+    public void Bread_OnlyOutOfCombat_ADamageStopsIt_AndItHasAMinuteCooldown() // decisión 2026-10-03
+    {
+        var w = Arena("warrior", level: 3, distance: 8f);
+        var ana = w.Player("Ana"); var slime = w.Monster("slime");
+        ana.Hp = ana.MaxHp / 2;
+        var bread = ItemInstance.New("bread", 3);
+        ana.Inventory.Bag[0] = bread;
+
+        ana.EnterCombat(w.Clock.NowMs);
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBe(CastErrors.InCombat); // en combate no se come
+        bread.Qty.ShouldBe(3);
+
+        ana.LastCombatAtMs = long.MinValue;
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBeNull();
+        bread.Qty.ShouldBe(2);
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBe(CastErrors.OnCooldown);
+        w.Content.Item("bread").UseCooldownMs.ShouldBe(60000);
+        var hp = ana.Hp;
+        TickRunner.RunMs(w, w.Content.Aura("bread_hot").TickMs);
+        ana.Hp.ShouldBeGreaterThan(hp); // cura mientras nadie le pega
+
+        w.Combat.Damage.Deal(slime, ana, 1, School.Physical, false, null, w.Map, w.Begin()); // un golpe corta la comida
+        ana.Auras.All.ShouldNotContain(a => a.AuraId == "bread_hot");
+
+        // También si un escudo para el golpe entero: el golpe fue real.
+        ana.LastCombatAtMs = long.MinValue;
+        ana.ItemCooldownEndsAtMs.Clear();
+        w.Combat.ItemUse.Use(ana, bread.Id, w.Map, w.Begin()).ShouldBeNull();
+        w.Combat.Auras.Apply(ana, w.Content.Aura("priest_power_shield_aura"), ana, w.Map, w.Begin()).ShouldNotBeNull();
+        var hpBefore = ana.Hp;
+        w.Combat.Damage.Deal(slime, ana, 1, School.Physical, false, null, w.Map, w.Begin());
+        ana.Hp.ShouldBe(hpBefore);
+        ana.Auras.All.ShouldNotContain(a => a.AuraId == "bread_hot");
+    }
+
+    [Fact]
     public void GroundArea_AimedInsideAWallThatBlocksSight_IsRejected()
     {
         // Un muro de una casilla en (12, 10) y el slime detrás: apuntar dentro del muro alcanzaba al otro lado.
