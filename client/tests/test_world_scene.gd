@@ -105,6 +105,16 @@ func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("LootWindow", {"lootId": 7, "gold": 5, "items": [{"index": 0, "templateId": "slime_goo", "qty": 2, "ownerId": 1, "freeInMs": 30000}, {"index": 1, "templateId": "bread", "qty": 1, "ownerId": 8, "freeInMs": 30000}]})
 	assert_true(_world._loot.visible)
 	assert_eq(_world._loot._list.get_child_count(), 2)
+	# Tras coger lo último se cierra sola, aunque siga mostrando el oro ya cobrado.
+	watch_signals(GameState)
+	_dispatch("LootWindow", {"lootId": 7, "gold": 5, "items": []})
+	assert_false(_world._loot.visible)
+	assert_signal_not_emitted(GameState, "notice", "el oro ya se vio en la ventana")
+	# Un cadáver con solo oro no abre una ventana vacía ni lo repite en el chat en cada clic.
+	_dispatch("LootWindow", {"lootId": 11, "gold": 5, "items": []})
+	_dispatch("LootWindow", {"lootId": 11, "gold": 5, "items": []})
+	assert_false(_world._loot.visible)
+	assert_signal_not_emitted(GameState, "notice")
 	_dispatch("EntitySpawn", {"id": 9, "kind": "npc", "templateId": "vendor", "name": "Marta la tendera", "x": 100.0, "y": 110.0, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
 	_dispatch("VendorWindow", {"npcId": 9, "items": [{"templateId": "bread", "price": 4}, {"templateId": "minor_healing_potion", "price": 20}]})
 	assert_true(_world._vendor.visible)

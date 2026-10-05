@@ -63,9 +63,13 @@ func show_window(d: Dictionary, names: Dictionary) -> void:
 		var index := int(e.get("index", 0))
 		b.pressed.connect(func() -> void: Net.send("LootTake", {"lootId": loot_id, "index": index}))
 		_list.add_child(b)
-	visible = true
-	if items.is_empty() and gold <= 0:
+	# Sin items no queda nada que hacer aquí: se cierra aunque muestre oro, que es el ya cobrado al abrir (no se recoge con
+	# botones). Tampoco se avisa del oro en el chat: el servidor solo lo da una vez y repetirlo en cada clic confundía (un
+	# canal de botín en el chat lo mostrará más adelante).
+	if items.is_empty():
 		visible = false
+		return
+	visible = true
 	UiTheme.dock(self, Control.PRESET_CENTER)
 	UiTheme.bring_to_front(self)
 
