@@ -98,7 +98,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         if (caster is Player && spell.Source != SpellSource.Item && ((combat.IsOnGcd(now) && spell.TriggersGcd) || combat.IsAbilityLocked(now))) return CastErrors.OnGcd;
         var hasLeap = false; EffectDef? dash = null;
         foreach (var e in spell.Effects) { if (e.Type == EffectType.Leap) hasLeap = true; if (e.Type == EffectType.Dash) dash = e; }
-        if (hasLeap && caster.Auras.IsRooted) return CastErrors.Rooted;
+        // Enraizado no se mueve: ni salta ni carga (una Carga enraizada lo sacaba de la raíz hasta el objetivo).
+        if ((hasLeap || dash is not null) && caster.Auras.IsRooted) return CastErrors.Rooted;
 
         if (caster is Player pc && spell.Cost is { Amount: > 0 } cost)
         {

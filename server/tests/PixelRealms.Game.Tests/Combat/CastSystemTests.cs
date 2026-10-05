@@ -248,6 +248,13 @@ public sealed class CastSystemTests
         w.Combat.Auras.Apply(wr.Player("Ana"), wr.Content.Aura("mage_frost_nova_root"), wr.Monster("slime"), wr.Map, wr.Begin());
         Cast(wr, "rogue_shadowstep", null, new Vec2(13, 10)).ShouldBe(CastErrors.Rooted); // rooted (salto)
 
+        var ww = Arena("warrior", level: 3, distance: 5f); // decisión 2026-10-03: la Carga tampoco sale de una raíz
+        ww.Player("Ana").Resource = ww.Player("Ana").MaxResource;
+        ww.Combat.Auras.Apply(ww.Player("Ana"), ww.Content.Aura("mage_frost_nova_root"), ww.Monster("slime"), ww.Map, ww.Begin());
+        Cast(ww, "warrior_charge", ww.Monster("slime").Id).ShouldBe(CastErrors.Rooted); // rooted (carga)
+        ww.Combat.Auras.ClearAll(ww.Player("Ana"), ww.Map, ww.Begin());
+        Cast(ww, "warrior_charge", ww.Monster("slime").Id).ShouldBeNull();
+
         Cast(w, "mage_meteor", null, slime.Position).ShouldBe(CastErrors.NotFound); // no conocido (nivel 13)
         Cast(w, "mage_flame_burst", null, new Vec2(float.NaN, 1)).ShouldBe(CastErrors.NotFound); // no conocido a nivel 3
 
