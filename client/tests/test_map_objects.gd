@@ -40,3 +40,5 @@ func test_a_click_on_the_lever_picks_it() -> void:
 	var west := Vector2(48.5, 22.5) * 16.0
 	assert_eq(layer.lever_at(west + Vector2(3, -4)), "mine_lever_west")
 	assert_eq(layer.lever_at(west + Vector2(40, 0)), "")
+	assert_not_null(layer._lever_tex, "palanca con sprite (tools/art/gen_objects.py)")
+	assert_not_null(layer._door_tex, "puerta con sprite")
