@@ -120,13 +120,14 @@ func test_every_spell_projectile_cast_impact_and_area_sheet_exists() -> void:
 func test_vfx_pool_is_capped_drops_the_oldest_and_skips_offscreen() -> void:
 	var layer := VfxLayer.new()
 	add_child_autofree(layer)
+	var max_impacts := int(VfxLayer.POOLS["impact"][1])
 	for i: int in 100:
 		layer.play_once("impact_fire", Vector2(i, 0))
-	assert_eq(layer.active_count(), VfxLayer.MAX_ACTIVE)
+	assert_eq(layer.active_count(), max_impacts)
 	var visible := 0
 	for c: Node in layer.get_children():
 		visible += int((c as CanvasItem).visible)
-	assert_eq(visible, VfxLayer.MAX_ACTIVE, "nunca más nodos dibujándose que el tope")
+	assert_eq(visible, max_impacts, "nunca más nodos dibujándose que el tope")
 	layer.clear_all()
 	layer.view_rect = Rect2(0, 0, 480, 270)
 	assert_false(layer.play_once("impact_fire", Vector2(2000, 2000)), "fuera de la vista no se crea")
@@ -135,6 +136,33 @@ func test_vfx_pool_is_capped_drops_the_oldest_and_skips_offscreen() -> void:
 	layer.launch("fireball", Vector2(2000, 0), func() -> Vector2: return Vector2(2100, 0), 10, func() -> void: arrived[0] = true)
 	await get_tree().create_timer(0.05).timeout
 	assert_true(arrived[0], "un proyectil fuera de pantalla entrega igual su número")
+
+
+## HU-038 CA6: una reserva por tipo; una lluvia de impactos no recicla los proyectiles en vuelo.
+func test_vfx_pools_are_separate_per_kind() -> void:
+	var layer := VfxLayer.new()
+	add_child_autofree(layer)
+	var target := func() -> Vector2: return Vector2(300, 0)
+	for i: int in 70:
+		layer.launch("fireball", Vector2(i, 0), target, 5000, func() -> void: pass)
+	assert_eq(layer.active_count("projectile"), int(VfxLayer.POOLS["projectile"][1]), "48 proyectiles a la vez como mucho")
+	for i: int in 50:
+		layer.play_once("impact_fire", Vector2(i, 10))
+	assert_eq(layer.active_count("projectile"), int(VfxLayer.POOLS["projectile"][1]), "los impactos no se comen proyectiles")
+	assert_eq(layer.active_count("impact"), int(VfxLayer.POOLS["impact"][1]))
+
+
+## HU-038 CA6: los ticks de una misma aura que llegan juntos salen en un solo número, sumado.
+func test_aura_ticks_of_the_same_aura_are_grouped() -> void:
+	var ft := FloatingText.new()
+	add_child_autofree(ft)
+	ft.show_event(7, "dmg", 4, false, Vector2(100, 100), "7:rogue_poison:dmg")
+	ft.show_event(7, "dmg", 6, false, Vector2(100, 100), "7:rogue_poison:dmg")
+	ft.show_event(7, "dmg", 5, false, Vector2(100, 100), "7:foreman_whip_bleed:dmg")
+	assert_eq(ft._active.size(), 2, "otra aura es otro número")
+	assert_eq((ft._active[0]["label"] as Label).text, "10")
+	ft.show_event(7, "dmg", 9, false, Vector2(100, 100))
+	assert_eq(ft._active.size(), 3, "un golpe normal no se agrupa")
 
 
 func _presenter() -> Dictionary:
