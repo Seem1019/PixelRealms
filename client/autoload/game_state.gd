@@ -22,6 +22,7 @@ signal duel_changed(state: String, opponent_id: int, winner_id: int, starts_in_m
 signal trade_changed(d: Dictionary)
 signal online_list_received(players: Array)  ## HU-063: respuesta a OnlineListRequest
 signal map_objects_changed  ## HU-083: palancas o puertas del mapa actual
+signal map_object_toggled(id: String, state: String)  ## HU-083: una palanca o una puerta cambió (no el estado al entrar)
 signal duel_zone_changed  ## HU-101: zona del duelo o aviso de estar fuera de ella
 
 var self_id: int = -1
@@ -230,7 +231,12 @@ func is_in_combat() -> bool:
 func _on_map_objects(d: Dictionary) -> void:
 	for o: Variant in d.get("objects", []):
 		var od: Dictionary = o
-		map_objects[str(od.get("id", ""))] = str(od.get("state", ""))
+		var id := str(od.get("id", ""))
+		var state := str(od.get("state", ""))
+		var before: Variant = map_objects.get(id)
+		map_objects[id] = state
+		if before != null and str(before) != state:
+			map_object_toggled.emit(id, state)  # el estado completo al entrar en el mapa no se anuncia
 	map_objects_changed.emit()
 
 

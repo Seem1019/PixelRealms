@@ -61,6 +61,23 @@ func test_a_renewed_welcome_that_revives_counts_as_a_respawn() -> void:
 	assert_signal_emitted(GameState, "respawned")
 
 
+## HU-083: el puzle de la Mina avisa de cuántas palancas faltan y de cuándo se abre la puerta.
+func test_mine_puzzle_tells_what_is_missing_and_when_the_door_opens() -> void:
+	_dispatch("Welcome", {
+		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "mine",
+		"self": {"x": 776.0, "y": 360.0, "level": 4, "xp": 0, "xpNext": 100, "hp": 80, "maxHp": 100, "res": 0, "maxRes": 100, "resource": "rage", "classId": "warrior", "name": "Ana"},
+		"inventory": [], "equipment": [], "hotbar": [], "knownSpells": [], "rulesHash": "x",
+	})
+	_dispatch("MapObjects", {"objects": [{"id": "mine_lever_west", "state": "off"}, {"id": "mine_lever_east", "state": "off"}, {"id": "mine_lever_inside", "state": "off"}, {"id": "mine_boss_door", "state": "closed"}]})
+	watch_signals(GameState)
+	_dispatch("MapObjects", {"objects": [{"id": "mine_lever_west", "state": "on"}]})
+	assert_signal_emitted_with_parameters(GameState, "notice", ["Palanca activada (1/2): falta otra para abrir la puerta"])
+	_dispatch("MapObjects", {"objects": [{"id": "mine_lever_east", "state": "on"}]})
+	_dispatch("MapObjects", {"objects": [{"id": "mine_boss_door", "state": "open"}]})
+	assert_signal_emitted_with_parameters(GameState, "notice", ["Se oye un mecanismo: se ha abierto una puerta"])
+	assert_eq(get_signal_emit_count(GameState, "notice"), 2, "la segunda palanca no repite el aviso: ya lo dice la puerta")
+
+
 func test_welcome_spawn_snapshot_combat_death() -> void:
 	_dispatch("Welcome", {
 		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "meadow",

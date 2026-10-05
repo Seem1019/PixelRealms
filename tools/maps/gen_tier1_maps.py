@@ -344,15 +344,16 @@ def build_mine() -> tuple[dict, dict]:
     portals = [obj(nid(), "to_meadow", "portal", 9, 27, 2, 3, [prop("portalId", "mine_to_meadow"), prop("targetMapId", "meadow"), prop("targetX", 238), prop("targetY", 54)])]
     zones = [obj(nid(), "Mina Abandonada", "zone", 1, 1, W - 2, H - 2,
                  [prop("name", "Mina Abandonada"), prop("safe", False), prop("minLevel", 4), prop("maxLevel", 6), prop("landmark", "Linterna del Capataz")])]
-    # Puzle de la Sala 2 (HU-083 CA1): una palanca a cada lado de la sala; con las dos activadas se abre la puerta del pasillo que
-    # baja a la sala del jefe (x 56..58), y se cierra sola a los `rules.world.doorResetSec`. La puerta cubre el pasillo de pared a pared.
+    # Puzle de la Sala 2 (HU-083 CA1): una palanca a cada lado de la boca del pasillo que baja a la sala del jefe (x 56..58) y la
+    # puerta justo en esa boca, para que se vean juntas en pantalla (con las palancas lejos, en la fila 22, nadie veía la puerta);
+    # con las dos activadas se abre y se cierra sola a los `rules.world.doorResetSec`. La puerta cubre el pasillo de pared a pared.
     # Del lado del jefe hay una tercera palanca que abre sola (`opensAlone`): quien se quede dentro al cerrarse puede salir.
     levers = [
-        obj(nid(), "lever_west", "lever", 48.5, 22.5, props=[prop("leverId", "mine_lever_west"), prop("doorId", "mine_boss_door")], point=True),
-        obj(nid(), "lever_east", "lever", 65.5, 22.5, props=[prop("leverId", "mine_lever_east"), prop("doorId", "mine_boss_door")], point=True),
+        obj(nid(), "lever_west", "lever", 51.5, 32.5, props=[prop("leverId", "mine_lever_west"), prop("doorId", "mine_boss_door")], point=True),
+        obj(nid(), "lever_east", "lever", 62.5, 32.5, props=[prop("leverId", "mine_lever_east"), prop("doorId", "mine_boss_door")], point=True),
         obj(nid(), "lever_inside", "lever", 57.5, 40.5, props=[prop("leverId", "mine_lever_inside"), prop("doorId", "mine_boss_door"), prop("opensAlone", True)], point=True),
     ]
-    doors = [obj(nid(), "boss_door", "door", 55, 38, 5, 1, [prop("doorId", "mine_boss_door")])]
+    doors = [obj(nid(), "boss_door", "door", 55, 36, 5, 1, [prop("doorId", "mine_boss_door")])]
     origin = (11, 31)
     sealed = g.seal_unreachable(origin, ROCK)
     report = check_map(g, origin, spawns, graveyards, [], portals)

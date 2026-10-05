@@ -110,6 +110,7 @@ func _ready() -> void:
 	_map_objects.z_index = -6  # sobre el suelo, bajo la retícula y las entidades
 	add_child(_map_objects)
 	GameState.map_objects_changed.connect(_apply_map_objects)
+	GameState.map_object_toggled.connect(_announce_map_object)
 	add_child(DuelZoneRing.new())  # HU-101: solo dibuja mientras hay zona de duelo
 	_social.whisper_requested.connect(func(player_name: String) -> void:
 		_chat._input.text = "/w %s " % player_name
@@ -326,6 +327,39 @@ func _apply_map_objects() -> void:
 	for d: Dictionary in map.doors:
 		map.set_door_open(str(d["id"]), str(GameState.map_objects.get(d["id"], "closed")) == "open")
 	_map_objects.set_states(GameState.map_objects)
+
+
+## HU-083: avisos del puzle (se oyen en toda la instancia): cuántas palancas faltan y cuándo se abre o se cierra la puerta, con un
+## estallido de polvo en la puerta si está a la vista.
+func _announce_map_object(id: String, state: String) -> void:
+	if map == null:
+		return
+	for d: Dictionary in map.doors:
+		if str(d["id"]) != id:
+			continue
+		if state == "open":
+			GameState.notice.emit("Se oye un mecanismo: se ha abierto una puerta")
+			var rect: Rect2 = d["rect"]
+			for x: int in int(rect.size.x / 16.0):
+				_vfx.play_once("area_steel", rect.position + Vector2(8 + x * 16, 8), x * 60)
+		else:
+			GameState.notice.emit("Una puerta se ha cerrado")
+		return
+	for l: Dictionary in map.levers:
+		if str(l["id"]) != id or state != "on" or bool(l.get("opens_alone", false)):
+			continue
+		var door := str(l["door"])
+		if str(GameState.map_objects.get(door, "closed")) == "open":
+			return
+		var needed := 0
+		var on := 0
+		for other: Dictionary in map.levers:
+			if str(other["door"]) == door and not bool(other.get("opens_alone", false)):
+				needed += 1
+				on += int(str(GameState.map_objects.get(other["id"], "off")) == "on")
+		if on < needed:
+			GameState.notice.emit("Palanca activada (%d/%d): falta otra para abrir la puerta" % [on, needed])
+		return
 
 
 # --- Movimiento propio (HU-021 CA1, HU-022) -------------------------------------------------------------------------
