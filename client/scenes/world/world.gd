@@ -66,6 +66,7 @@ var _approach: Approach = Approach.new()
 var _range_ring: RangeRing
 ## Palancas y puertas del mapa (HU-083).
 var _map_objects: MapObjectsLayer
+var _fx_bench: FxBench
 const STUCK_TEXT := "No puedes llegar hasta el objetivo"
 ## Color del nombre de los miembros del grupo (HU-024 CA3) y del rival de un duelo (HU-064).
 const PARTY_NAME_COLOR := Color("8fd3ff")
@@ -852,10 +853,24 @@ func _on_chat_command(name: String, args: String) -> void:
 		"trade":
 			_social.mark_outgoing("trade")
 			_send("TradeRequest", {"name": args})
+		"fxbench": _start_fx_bench()  # HU-089 CA3: solo en este cliente
 		"tp", "tpto", "spawn", "give", "level", "heal", "kill", "gold", "god", "debug", "announce":
 			# HU-070: comandos de administrador; el servidor responde forbidden si la cuenta no lo es.
 			_send("AdminCommand", {"text": ("/%s %s" % [name, args]).strip_edges()})
 		_: GameState.notice.emit("Comando desconocido: /%s" % name)
+
+
+## HU-089 CA3: `/fxbench` llena la pantalla de marcas y números durante 20 s y avisa del FPS p5.
+func _start_fx_bench() -> void:
+	if _fx_bench != null and _fx_bench.running:
+		return
+	if _fx_bench == null:
+		_fx_bench = FxBench.new()
+		_fx_bench.reticle = _reticle
+		_fx_bench.floating = _floating
+		_fx_bench.center = func() -> Vector2: return _player.position
+		add_child(_fx_bench)
+	_fx_bench.start()
 
 
 ## Burbuja de chat 4 s sobre la cabeza (HU-060 CA2).

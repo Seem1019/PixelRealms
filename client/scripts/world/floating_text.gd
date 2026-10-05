@@ -100,6 +100,10 @@ func _allow(entity_id: int, kind: String, amount: int, world_pos: Vector2) -> bo
 	return allowed
 
 
+func visible_count() -> int:
+	return _active.size()
+
+
 ## Saca una etiqueta de la reserva; false si ya hay MAX_VISIBLE o no queda ninguna libre.
 func _spawn(text: String, color: Color, world_pos: Vector2, big: bool = false) -> bool:
 	if _active.size() >= MAX_VISIBLE:
