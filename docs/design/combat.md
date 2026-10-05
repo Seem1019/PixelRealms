@@ -29,7 +29,7 @@ aquí se citan los valores por defecto para poder leer las fórmulas. Cambio de 
   la Fase 1 (HU-086) y el cono y la línea cuando un hechizo los use (hasta entonces, los hechizos que los usan quedan **no disponibles**: ver §Contenido no disponible).
 - **Salto a un punto** (efecto `leap`: `maxRange`, `travelMs`; `travelMs = 0` = teletransporte; HU-087): el lanzador va hasta
   `targetPos`, recortado a la última casilla libre con LOS dentro de `maxRange`. Lo mueve el servidor; el cliente no lo
-  predice y suaviza la posición recibida (~100 ms). `root` y `stun` impiden saltar. Los efectos del mismo hechizo que van
+  predice y suaviza la posición recibida (~100 ms). `root` y `stun` impiden saltar y cargar (decisión 2026-10-03: enraizado no se mueve, tampoco con Carga). Los efectos del mismo hechizo que van
   después del `leap` se aplican en el punto de llegada (p. ej. un área al caer). Carga (`dash` a un objetivo) sigue igual.
 - **Inmunidad tras un control fuerte (ADR-022):** cuando termina un `stun`, `root` o `silence`
   (`rules.combat.hardControlKinds`), el objetivo es inmune a los tres durante `hardControlImmunitySec` (1,5 s). Vale para
@@ -158,7 +158,7 @@ tick (`CombatEvents`). Detalle y umbrales de verificación en ADR-018.
 
 ## Auras (`content/auras.json`)
 Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `tickMs`, `maxStacks`, `base`, `apCoef`,
-`spCoef`, `pct`, `mods`, `removesKinds`, `immuneKinds`.
+`spCoef`, `pct`, `mods`, `removesKinds`, `immuneKinds`, `breaksOnDamage`.
 - La cantidad (`base + coef · poder`) se calcula **al aplicarse** (snapshot) y no cambia aunque el lanzador cambie de equipo.
 - **Acumulación (ADR-022).** Cada aura activa se identifica por (aura, lanzador).
   - **Mismo lanzador, misma aura:** se renueva a la duración completa (no se suma tiempo). Solo suma cargas un aura con
@@ -184,6 +184,9 @@ Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `t
   clase, física o mágica (interrumpe), pero sí pociones y el ataque con el arma; el bloqueo tras una interrupción funciona igual
   (decisión 2026-10-03). `slow`: `speed × (1 − pct)`.
 - `removesKinds`: al aplicarse quita esas auras del objetivo. `immuneKinds`: mientras dura, ignora auras nuevas de esos tipos (Carrera: root, slow).
+- `breaksOnDamage`: recibir daño (también el que absorbe un escudo) quita el aura. Con el hechizo `outOfCombatOnly` (solo fuera
+  de combate, si no `in_combat`) forma la comida: el pan (`bread_hot`, 50 de vida en 15 s, recarga de 60 s) se come fuera de
+  combate y un golpe corta la curación (decisión 2026-10-03).
 - Monstruos con `boss: true` ignoran `bossImmuneToAuraKinds` (stun, root, slow).
 
 ## Amenaza (monstruos)
@@ -195,7 +198,8 @@ Campos: `kind: dot|hot|stat_mod|stun|root|silence|shield|slow`, `durationMs`, `t
 `Idle` (patrulla en `wanderRadius` del spawn) → `Aggro` (jugador a ≤ `aggroRange` con LOS) → `Chase` (A*, recalcula
 cada 500 ms) → `Attack` (en rango; usa `spells[]` listos según su `cooldownMs` en `spells.json` y `hpBelowPct`) →
 `Evade` si se aleja > `leashRange`: vuelve inmune, se cura al 100 %, resetea amenaza. Respawn tras `respawnSec`.
-Los duelistas no generan aggro ni amenaza mientras dura el duelo.
+Los duelistas no generan aggro ni amenaza mientras dura el duelo; la zona del duelo (§Muerte y reaparición) impide usarlo para
+cruzar el mapa ignorados por los monstruos.
 
 ## Recursos
 - Ira: `+ragePerHitDealt` por golpe/habilidad propia que impacta, `+ragePerHitTaken` por golpe recibido,
@@ -210,7 +214,13 @@ Los duelistas no generan aggro ni amenaza mientras dura el duelo.
 `respawnHpPct`/`respawnResourcePct` (50 %). En duelo no se muere: al llegar a `endAtHpPct` el duelo termina; cada uno se queda
 con la vida y el recurso con que acabó y pierde las auras que le puso el rival. Quien pierde por vida regenera × `loserRegenMult`
 (2) y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo (solo recupera lo que el duelo le quitó) o hasta volver a
-entrar en combate; rendirse o alejarse no da recuperación, y el ganador regenera como siempre (HU-064 CA3).
+entrar en combate; rendirse o salir de la zona no da recuperación, y el ganador regenera como siempre (HU-064 CA3).
+- **Zona del duelo (HU-101):** al aceptar se fija un círculo de `zoneRadiusTiles` (12) alrededor del punto medio entre los dos; solo
+  lo ven los duelistas, desde la cuenta atrás. Fuera de él se gasta un plazo de `zoneGraceSec` (5 s), con un aviso que cuenta los
+  segundos; dentro se recupera al mismo ritmo (salir y volver un instante no lo rellena) y, para contar como dentro otra vez, hay
+  que entrar `zoneReturnMarginTiles` (1). Quien agota el plazo pierde (si son los dos, el que más tiempo lleva fuera y, a la vez,
+  el más lejano). Para retar y aceptar hay que estar a ≤ `maxDistanceTiles` (24) y nunca a más de 2 × `zoneRadiusTiles`: los
+  dos empiezan dentro.
 
 ## Referencia de balance (calculado con estas fórmulas, ver `docs/design/balance-notes.md`)
 Nivel 5 con equipo verde contra Goblin arquero (nv 5), **solo ataque básico**:

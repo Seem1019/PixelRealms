@@ -91,7 +91,7 @@
 ---
 ### HU-024 · Cámara, capas y nombres sobre personajes
 **Como** jugador **quiero** una cámara que me siga y ver nombres **para** orientarme y reconocer a mis amigos.
-- Prioridad: Must · Estimación: S · Estado: Parcial
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-023
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -105,6 +105,7 @@
 - Cámara hija de `PlayerSelf` con `position_smoothing` 8, límites al tamaño del mapa y `snap_2d_transforms_to_pixel` en `project.godot` (CA1); `Entities` con `y_sort_enabled`, capa `above` con z_index 10 (CA2); nombre propio en amarillo y remotos en blanco (`RemoteEntity.set_name_color` para el azul de HU-061) (CA3); etiqueta `ZoneName` con fade de 2 s al entrar en una zona de `zones` (CA4).
 - Sin verificar visualmente en el editor (sandbox headless): probar jugando.
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Falta CA3 (nombres del grupo en azul): estético, lo lleva el compañero de arte/UI.
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA3: los miembros del grupo con el nombre en azul (`world.gd::_name_color`, `PARTY_NAME_COLOR`); el rival del duelo sigue en naranja aunque sea del grupo y al terminar vuelve al azul. Se aplica al aparecer la entidad, al cambiar el grupo (`party_changed`) y al cambiar el duelo (`test_world_scene.gd`).
 
 ---
 ### HU-025 · Desconexión, linkdead y reconexión
@@ -172,3 +173,4 @@
 - Tests: `PortalSystemTests` (6) y `PortalTests` (integración: cruzar al entrar, volver con `UsePortal`, despawn para el otro, `mapId` guardado y reconexión en el mapa nuevo; `level_too_low` una sola vez; `out_of_range`/`not_found`).
 - Pendiente en su día: CA5 (`say` por mapa, `party`/`global` y nombre del mapa en los marcos de grupo), con las HUs de chat y grupo (HU-060/HU-061). *(cerrado el 2026-10-02: ver la última nota)*
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): CA5: el marco de grupo nombra el mapa del compañero (`UiText.map_name`) solo si no es el mío (`test_party_frames.gd`); `say` no cruza mapas y `party`/`global` sí (`SocialTests.Chat_AcrossMaps_SayStaysInTheMap_PartyAndGlobalArrive`).
+- 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): al cambiar de mapa, el cliente borra las entidades del mapa anterior al recibir `ChangeMap`, antes del fundido de 0,25 s; antes lo hacía al terminarlo y perdía las que el servidor manda en el mismo tick (NPC y jugadores junto al destino), que no volvían porque el servidor ya las daba por enviadas (`test_world_scene.gd::test_spawns_that_arrive_during_the_map_fade_are_kept`).

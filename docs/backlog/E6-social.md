@@ -81,8 +81,8 @@
 **Criterios de aceptación**
 1. **Dado** otro jugador visible **cuando** hago clic derecho → "Retar a duelo" o `/duel Nombre` **entonces** recibe `DuelUpdate{state:"requested"}` con Aceptar/Rechazar (expira en `rules.pvp.rulesets.duel.requestExpireSec`).
 2. **Dado** que acepta **entonces** ambos ven una cuenta atrás de `countdownSec` y luego pueden atacarse: los hechizos con `targeting: enemy` aceptan al rival, los `ally` no; el daño aplica `rules.classAdvantage[atacante][defensor]`.
-3. **Dado** que un duelista baja a `endAtHpPct` (1 %) de vida **entonces** no muere: el duelo termina (`DuelUpdate{state:"ended", winner}`) y se anuncia en `say`; nadie se cura: cada uno se queda con la vida y el recurso con que acabó y pierde las auras que le puso el rival. Quien pierde por vida regenera × `rules.pvp.rulesets.duel.loserRegenMult` (2) y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo o hasta volver a entrar en combate (rendirse o alejarse no la da); el ganador regenera como siempre (decisión 2026-10-03, como en Albion).
-4. **Dado** que un duelista se aleja > `maxDistanceTiles`, se desconecta, usa un portal o escribe `/rendirse` **entonces** pierde el duelo.
+3. **Dado** que un duelista baja a `endAtHpPct` (1 %) de vida **entonces** no muere: el duelo termina (`DuelUpdate{state:"ended", winner}`) y se anuncia en `say`; nadie se cura: cada uno se queda con la vida y el recurso con que acabó y pierde las auras que le puso el rival. Quien pierde por vida regenera × `rules.pvp.rulesets.duel.loserRegenMult` (2) y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo o hasta volver a entrar en combate (rendirse o salir de la zona no la da); el ganador regenera como siempre (decisión 2026-10-03, como en Albion).
+4. **Dado** que un duelista se queda fuera de la zona del duelo más de `zoneGraceSec` (HU-101; antes: se aleja > `maxDistanceTiles`), se desconecta, usa un portal o escribe `/rendirse` **entonces** pierde el duelo.
 5. **Dado** el duelo **entonces** no se pierde XP, oro, items ni durabilidad; los monstruos ignoran a los duelistas y estos no pueden atacar monstruos ni a terceros mientras dure.
 6. **Dado** la aldea (`safe=true`) **entonces** los duelos están permitidos (`allowedInSafeZones`); cualquier otro daño entre jugadores sigue prohibido (`Error{pvp_not_allowed}`).
 7. **Dado** `PvpService.CanAttack(a, b)` **entonces** devuelve el ruleset aplicable o `null`; tests: sin duelo → null; en duelo → `duel`; con `enabledRulesets: []` → siempre null.
@@ -98,6 +98,7 @@
 - Tests: `SocialTests.Duel_*`, `SocialFlowTests.Duel_*`.
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Exploit cerrado: no se puede retar ni aceptar en combate, rendirse antes de empezar solo cancela y al terminar cada uno vuelve a la vida y el recurso del inicio del duelo (no al máximo) y pierde las auras del rival. CA2: `classAdvantage` también en el básico y los DoT. CA6: `pvp_not_allowed`. *(La restauración al estado del inicio se sustituyó el 2026-10-03, ver la nota siguiente.)*
 - 2026-10-03 (rama `feat/phase1-close-out`): CA3 según la decisión: `restoreOnEnd: false` y `loserRegenMult: 2` en el ruleset `duel`; `PvpService.End` quita las auras del rival y deja al perdedor con `CombatState.Recovery`, que `ResourceSystem` aplica (sin espera, × 2) hasta llenarse o volver a entrar en combate (`SocialTests.Duel_Loser_RecoversFasterAndWithoutTheDelay_TheWinnerRegeneratesNormally`, `Duel_LoserRecovery_EndsWhenFull`).
+- 2026-10-03 (revisión de autoridad): la recuperación del perdedor se daba por cualquier final y hasta llenarse (retar, rendirse y regenerar × 2 tras cada pelea). Ahora solo al perder por vida y hasta la vida del inicio (`PostDuelRecovery.UntilHp`): `SocialTests.Duel_LoserRecovery_OnlyGivesBackWhatTheDuelTook`, `Duel_LostByForfeit_GivesNoRecovery`.
 
 ### HU-097 · Historial del chat
 **Como** jugador **quiero** subir en el chat **para** leer mensajes que ya pasaron.
@@ -115,4 +116,40 @@
   "↓ nuevos". El desvanecido por inactividad (8 s, `f88c107`, sin HU propia) se suspende con el ratón encima o leyendo arriba.
 - Tests: `test_chat_history.gd` (200 líneas, desplazar sin saltar, seguir al último, no desvanecer leyendo); la rueda y el
   hover no tienen test.
-- 2026-10-03 (revisión de autoridad): la recuperación del perdedor se daba por cualquier final y hasta llenarse (retar, rendirse y regenerar × 2 tras cada pelea). Ahora solo al perder por vida y hasta la vida del inicio (`PostDuelRecovery.UntilHp`): `SocialTests.Duel_LoserRecovery_OnlyGivesBackWhatTheDuelTook`, `Duel_LostByForfeit_GivesNoRecovery`.
+
+---
+
+### HU-101 · Zona del duelo
+**Como** duelista **quiero** que el duelo tenga una zona marcada **para** que nadie lo use para cruzar el mapa sin que le ataquen los monstruos ni gane huyendo.
+- Prioridad: Must · Estimación: M · Estado: Hecha
+- Dependencias: HU-064
+- Skills: `combat-system`, `net-protocol`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** que se acepta un duelo **entonces** se fija una zona circular de `rules.pvp.rulesets.duel.zoneRadiusTiles` alrededor del punto medio entre los dos, y los dos duelistas (y nadie más) ven la línea que la delimita desde la cuenta atrás hasta el final.
+2. **Dado** un duelo activo **cuando** un duelista sale de la zona **entonces** ve un aviso con los segundos que le quedan del plazo (`zoneGraceSec`, 5); si vuelve a tiempo (entrando `zoneReturnMarginTiles`), el aviso desaparece y el plazo se recupera al mismo ritmo mientras sigue dentro: salir y volver un instante no lo rellena.
+3. **Dado** que agota el plazo **entonces** pierde el duelo (`DuelUpdate{ended, reason: "zone"}`, "Has perdido el duelo: saliste de la zona"); si se quedan fuera los dos, pierde el que más tiempo lleva fuera y, a la vez, el más lejano.
+4. **Dado** el duelo **entonces** `maxDistanceTiles` (24, nunca más de 2 × `zoneRadiusTiles`) solo limita la distancia para retar y aceptar, así los dos empiezan dentro; la regla de alejarse > `maxDistanceTiles` de HU-064 CA4 la sustituye la zona.
+
+**Notas técnicas**
+- Pedida el 2026-10-03: durante un duelo los monstruos ignoran a los duelistas (HU-064 CA5), y con 30 casillas de margen dos
+  amigos podían cruzar zonas de monstruos sin que les atacaran.
+
+**Notas de implementación**
+- Servidor: al aceptar se fijan en `DuelSession` el centro, el radio y el plazo (un `/reload rules` no mueve la línea);
+  `PvpService.ZoneLoser` (cada tick, sin asignar) suma el tiempo fuera por duelista (`OutsideMs`, que dentro baja al mismo ritmo),
+  emite `DuelZoneEvent` al salir y al volver y, al agotar el plazo, `End(..., "zone")`.
+- Protocolo (aditivo, v1): `DuelUpdate.zone {x, y, r}` en px, `outsideMs` (reenvío de `active` solo a quien sale o vuelve) y
+  `reason`.
+- Cliente: `GameState.duel_zone`/`duel_outside_until_ms`, `DuelZoneRing` (línea naranja; roja y parpadeando fuera) y el
+  rótulo del duelo cuenta los segundos (`social_panels.gd`).
+- Tests: `SocialTests.Duel_Zone_IsSetOnAccept_ReturningInTimeKeepsTheDuel_ThePersonWhoStaysOutLoses`,
+  `Duel_LeavingTheZoneTogether_EndsItAfterTheGrace`, `Duel_SteppingBackInForOneTick_DoesNotRefillTheZoneGrace`,
+  `Duel_BothOutsideTheZone_WhoLeftFirstLoses`, `Duel_TooFarToStartInsideTheZone_CannotBeRequested`,
+  `TickAllocationTests.ActiveDuel_BothInsideTheZone_AllocatesNothingPerTick`,
+  `SocialFlowTests.Duel_OnlyWhoLeavesTheZoneIsWarned_AndLosesIfTheyDoNotReturn`, `test_duel_zone.gd` y el rótulo en
+  `test_world_scene.gd`.
+- Revisión de autoridad (2026-10-04): volver a pisar la zona un tick reiniciaba el plazo (con ~2,4 s fuera y un tick dentro,
+  el radio real pasaba de 12 a ~22 casillas, ignorado por los monstruos); se podía aceptar a 30 casillas con los dos fuera; el
+  radio se leía en vivo de las reglas. Corregido con el plazo acumulado, el margen de vuelta, `maxDistanceTiles` ≤ 2 × radio y
+  la zona fijada al aceptar.

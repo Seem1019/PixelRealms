@@ -291,11 +291,14 @@ Cambiar de clase nunca debe ser tedioso.
 
 ## PvP amistoso (duelos)
 - `/duel Nombre` o clic derecho → "Retar". El otro acepta o rechaza (expira en 30 s). Cuenta atrás de 3 s y empieza.
-- Termina cuando un participante baja al 1 % de vida (`endAtHpPct`), se aleja más de 30 tiles, se desconecta o se rinde
+- Termina cuando un participante baja al 1 % de vida (`endAtHpPct`), pasa más de 5 s fuera de la zona del duelo, se desconecta o se rinde
   (`/rendirse`). Al terminar nadie se cura: cada uno se queda con la vida con que acabó y pierde las auras del rival. Como en
   Albion, quien pierde por vida se recupera un poco más rápido (× 2 y sin esperar a salir de combate) hasta la vida con que
   empezó el duelo o hasta volver a pelear; rendirse no da recuperación y el ganador se cura como siempre. Sin pérdida de XP, oro, items ni durabilidad. No se puede retar ni aceptar en
   combate, y un duelista en duelo activo no es aliado de nadie más (ni cura ni lo curan).
+- **Zona del duelo (HU-101):** al aceptar aparece un círculo de 12 casillas alrededor de los dos, que solo ven ellos. Quien sale
+  ve un aviso y tiene 5 s para volver (el plazo se recupera estando dentro, no por volver un instante); si lo agota, pierde. Así
+  nadie gana huyendo ni usa el duelo para cruzar el mapa.
 - Permitido en la aldea y en cualquier zona. Los monstruos ignoran a los duelistas y viceversa (no se puede usar un mob de escudo).
 - Nota técnica (ADR-011): un `PvpRuleset` (`rules.pvp.rulesets`) define quién puede atacar a quién, cómo termina y qué
   se pierde. El MVP solo activa `duel`; PvP grupal y abierto son post-MVP.

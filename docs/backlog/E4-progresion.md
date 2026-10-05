@@ -21,7 +21,7 @@
 ---
 ### HU-041 · Subir de nivel y desbloquear hechizos
 **Como** jugador **quiero** subir de nivel y aprender hechizos **para** sentir que mi personaje se hace más fuerte.
-- Prioridad: Must · Estimación: M · Estado: Parcial
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-040
 - Skills: `combat-system`, `godot-client`
 
@@ -36,6 +36,7 @@
 - Subida con sobrante y varios niveles de golpe, stats recalculados (+`statsPerLevel` vía `StatCalculator`), vida y recurso llenos, hechizos de `spellUnlockLevels` aprendidos (`LevelUp{newSpells}`), rangos en `spellRankLevels` (`LevelUp{rankUps}`; `SpellRanks.BaseMultiplier` aplica +`spellRankBonusPct` al `base` de daño/cura/escudo/auras de hechizos de clase), `StatsUpdate` al jugador, `EntitySpawn` renovado a la AOI (nivel sobre el nombre) y guardado inmediato. Cliente: hechizo nuevo a la primera casilla libre (`SetHotbar`, handler con validación de casillas 0–3 hechizos / 4–7 consumibles) y avisos de nivel/rango.
 - Tests: `XpCurveTests.Table_MatchesGdd_1To14` (100, 367, 933 … 24 850), `ProgressionSystemTests` (sobrante, nivel 4 → rankUps de los 3 conocidos; nivel 5 → newSpells sin rankUps; niveles de desbloqueo y rango de rules). El efecto visual de subida (CA3) llega con el arte.
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Los demás ya reciben el nivel nuevo (`EntitySpawn` renovado). Falta CA3: el efecto visual de subida para los demás (estético).
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA3: al subir de nivel, uno mismo y los demás de la AOI ven el estallido `area_holy` y "¡Nivel N!" (el cliente lo detecta en el `EntitySpawn` renovado con un nivel mayor), y el nivel aparece sobre el nombre de los jugadores en color atenuado: el de dificultad sigue siendo solo de los monstruos (`world.gd::_play_level_up`, `test_world_scene.gd`, `test_acceptance_gaps.gd`).
 
 ---
 ### HU-042 · Panel de personaje

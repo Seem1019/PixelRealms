@@ -18,6 +18,7 @@
 - CA4: el generador rellena cualquier bolsa inaccesible y `FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject` comprueba desde `gy_village` que toda casilla transitable, cada cementerio, NPC, portal y ≥ `count` casillas de cada spawn son alcanzables.
 - **Pendiente de validar en el editor**: la skill pide ~100×100 útiles por zona, que a 4 casillas/s se cruzan en ~25 s, no 60–90 s (contradicción documentada en el resumen). El arte sigue siendo el tileset placeholder (HU-082). El nombre del landmark de las Colinas ("Roble centenario") no está en el GDD: decisión provisional.
 - 2026-10-03 (rama `feat/phase1-close-out`): CA1 completo: objetivo de cruce enmendado a 25–40 s (`rules.world.zoneCrossTimeSecTarget`) y una recompensa en cada rama lateral: el "Jabalí de guerra" (`boar_alpha`, élite nv 3, 330 de vida) en el escondite de bandidos de Campos y el "Huargo de la atalaya" (`wolf_alpha`, élite nv 5, 500 de vida) en la atalaya goblin de Colinas, con botín garantizado propio (`lt_boar_alpha`, `lt_wolf_alpha`), reaparición de 10 min y el sprite de su especie (el arte propio queda para el compañero de arte). Spawns añadidos al final del generador (`tools/maps/gen_tier1_maps.py`) para no mover nada más del mapa. Números en `docs/design/balance-report.md`.
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): los dos élites tienen hoja propia (`monsters/boar_alpha`, `monsters/wolf_alpha`): la silueta de su especie con otro pelaje, ojos que brillan, cresta y montura de acero o arnés de cuero (`gen_chars.beast_extras`, sin cambios en las hojas existentes).
 
 ---
 ### HU-081 · Arte de clases y monstruos
@@ -28,20 +29,22 @@
 
 **Criterios de aceptación**
 1. **Dado** las 4 clases y los 8 monstruos del Tier 1 (`monsters.json`: Slime, Jabalí, Bandido, Lobo, Goblin arquero, Kóbold, Gólem y Capataz Grask) **entonces** cada uno tiene `idle`, `walk`, `attack` o `cast`, `hurt`, `death` en las direcciones de la skill.
-2. **Dado** el script `build_sprite_frames.gd` **entonces** genera los `SpriteFrames` desde hoja + JSON de metadatos.
+2. **Dado** una hoja `<ref>.png` con su `<ref>.json` (`frameSize`, `anims`) **entonces** `scripts/world/entity_sprites.gd` genera los `SpriteFrames` al cargarla (enmendado el 2026-10-04: desde ADR-026 se hace al cargar y el script `build_sprite_frames.gd` no se llegó a crear).
 3. **Dado** `client/assets/CREDITS.md` **entonces** lista origen y licencia de cada asset.
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA1 lo cubren HU-090/HU-099 (`test_combat_animations.gd`) y CA2 queda enmendado. Falta CA3: el origen y la licencia de las hojas de referencia `tools/art/refs/*_sheet.webp` en `CREDITS.md` (lo cierra el compañero de arte).
 
 ---
 
 ### HU-082 · Íconos de items y hechizos
 **Como** jugador **quiero** íconos claros **para** reconocer mis hechizos y objetos de un vistazo.
-- Prioridad: Must · Estimación: M · Estado: Parcial
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-038, HU-051
 - Skills: `pixel-art-assets`, `game-content`
 
 **Criterios de aceptación**
 1. **Dado** cada `icon` referenciado en `content/*.json` **entonces** existe su PNG 16×16 (test que recorre el contenido y comprueba archivos).
 2. **Dado** un ícono faltante en tiempo de ejecución **entonces** se muestra un ícono "?" y se loguea un warning (no crashea).
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA2: `UiTheme.icon` devuelve un "?" de 16×16 dibujado en código y avisa una vez por referencia en el log cuando falta el PNG, sin casillas vacías que parezcan otra cosa (`test_ui_theme.gd`). CA1 ya lo cubría `test_visual_redesign.gd`.
 
 ---
 
@@ -64,6 +67,9 @@
 - CA4: hecho con HU-062 CA4: `LootAnnouncedEvent` → `ChatMessage{global}` a todos los conectados cuando el monstruo es `boss` (test `UncommonPlus_EmitsLootAnnounced_GlobalForBoss_PartyOtherwise`). El grupo de la tabla `lt_foreman` garantiza exactamente 1 raro (`Foreman_AlwaysDropsExactlyOneGroupItem`).
 - 2026-10-03 (rama `feat/phase1-close-out`): CA1 completo: puzle de la Sala 2 con dos palancas (`mine_lever_west`, `mine_lever_east`) que abren la puerta del pasillo de la sala del jefe (`mine_boss_door`); se cierra sola a los `rules.world.doorResetSec` (600 s) si no hay nadie debajo. Capas `levers`/`doors` en Tiled (generador), `MapObjectSystem` en el servidor (colisión propia de la instancia, puertas cerradas sólidas y opacas), mensajes `Interact` y `MapObjects`, y en el cliente `TmjMap` las aplica a la predicción y `MapObjectsLayer` las dibuja (placeholder hasta tener sprites). CA3 con el modelo de `tools/balance/` (1 400 de vida): 3 de nivel 4 con sanador 81–86 s, sin sanador 54 s (el tanque necesita poción y pan), 2 de nivel 6 ganan en 53–105 s; ver `balance-report.md`. **Falta** la partida de prueba que pide CA3.
 - 2026-10-03 (revisión de autoridad): un grupo podía quedarse encerrado con el jefe si la puerta se cerraba con él dentro. Ahora hay una palanca dentro de la sala que la abre sola (`mine_lever_inside`, `opensAlone`), tirar de una palanca con la puerta abierta renueva el plazo, la puerta no se cierra con alguien saltando a través y el cargador rechaza ids repetidos (`MapObjectSystemTests`, `TiledMapLoaderTests.RepeatedLeverOrDoorId_Fails`).
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): palancas y puerta con sprites (`sprites/objects/lever.png` y `door.png`, `tools/art/gen_objects.py`) en lugar del dibujo provisional; `MapObjectsLayer` lo conserva solo si faltan las hojas (`test_map_objects.gd`).
+- 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): en la prueba, la puerta se abría lejos y sin avisar, y la abierta apenas se ve: parecía que las palancas no hacían nada. Ahora la primera palanca dice "Palanca activada (1/2): falta otra para abrir la puerta", al abrirse se oye "Se oye un mecanismo: se ha abierto una puerta" (con polvo en la puerta si se ve) y al cerrarse "Una puerta se ha cerrado"; el estado al entrar en el mapa no se anuncia (`GameState.map_object_toggled`, `test_world_scene.gd`, `test_map_objects.gd`). `TiledMapLoaderTests.Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss` comprueba que la puerta cerrada tapa el único camino al jefe.
+- 2026-10-05 (prueba local): las palancas estaban en la fila 22 y la puerta en la 38, a más de una pantalla: nadie las relacionaba. Ahora la puerta está en la boca del pasillo (fila 36) y las palancas a cada lado, en (51.5, 32.5) y (62.5, 32.5), visibles a la vez (`gen_tier1_maps.py`; `Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss` sigue en verde).
 
 ---
 
@@ -85,6 +91,7 @@
    - El **Capataz con Guerrero + Sacerdote de nivel 6** dura ~101 s (objetivo 60–100 s) y **3 de nivel 4 sin sanador** ~54 s; ver si la vida de 1 400 se queda.
    - Confirmar que el **ciclo real por monstruo** es de ~36 s (`killCycleSecTarget`); si no, se cambia ese valor y la curva de XP se recalcula sola (ADR-017).
 - 2026-10-03 (rama `feat/phase1-close-out`): CA1 y CA2 hechos por `content-designer`: `balance-report.md` (pasada de HU-084) con afinidad, XP por hora, pentagrama, economía y el triángulo PvP simulado (1 000 duelos por pareja a nivel 6 con equipo verde). Con `classAdvantage` todo en 1.0 los duelos salían 0–100 %; la matriz nueva (`content/rules.json`) deja a cada favorito en 63–68 %. Depende de supuestos (kiteo, ejecución): confirmarlo jugando. Commit propuesto: `content(balance): tune PvP classAdvantage so duel favourites win 60-75% (HU-084)`. **Faltan** CA3 y CA4 (partida con amigos).
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): plantilla de la sesión con amigos en `docs/design/playtest-notes.md` (CA3 y CA4, con HU-083 CA3 y HU-089 CA3).
 
 ---
 ### HU-090 · Animaciones de combate del cuerpo

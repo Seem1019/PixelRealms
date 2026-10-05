@@ -4,7 +4,7 @@
 
 ### HU-050 · Botín de monstruos
 **Como** jugador **quiero** recoger el botín de los monstruos que mato **para** conseguir equipo y oro.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-037, HU-051
 - Skills: `inventory-items`, `net-protocol`, `godot-client`
 
@@ -22,6 +22,7 @@
 - `Items/LootSystem`: tirada de la tabla (`entries` independientes, `groups` por peso sin repetir, orden por rareza, corte a `maxItems`), elegibles = quien taggeó (vivos a ≤ `eligibleRangeTiles`; el grupo llega con HU-062 por `EligibleFor`), cada item asignado al azar uniforme, oro a partes iguales (resto al primero que abre), `LootOpen`/`LootTake`/`LootTakeAll` con `lootRangeTiles`, `not_owner` hasta `exclusiveSec`, `bag_full` deja el item; el cadáver brilla para los ganadores (`EntitySpawn.flags` bit 8) y desaparece al quedar saqueado o a los `corpseLifetimeSec`. Cliente: clic en el cadáver → ventana con oro, items con color de rareza y dueño (ajenos atenuados), "Tomar todo".
 - Tests: `LootAndVendorTests` (FixedRng, Capataz siempre 1 del grupo, 1 000 kills ≈ 25 % ±3 % y ≈ 1/16, open/take/exclusive/bag_full, flujo en tick). CA5 (dos `LootTake` en el mismo tick): la cola única del tick serializa los mensajes, el segundo recibe `not_found`.
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): CA2: la ventana muestra la parte del oro de cada uno (`LootBag.GoldFor`). Falta CA1 en el cliente: el brillo del cadáver (estético; el servidor ya manda el bit 8 de `flags`).
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA1 en el cliente: el cadáver con el bit 8 de `flags` late en dorado (`EntityVisual.lootable`) y se apaga cuando la ventana de botín ya no trae nada mío (`world.gd::_refresh_loot_glow`, `test_world_scene.gd`). Además, la ventana vuelve a cerrarse sola al coger lo último: desde `fe05ad6` mostraba el oro ya cobrado y la condición de cierre (sin items y sin oro) no se cumplía; un cadáver con solo oro no abre una ventana vacía. *2026-10-05: tampoco lo avisa en el chat: el servidor da el oro una sola vez, pero la ventana trae el ya cobrado y el aviso salía en cada clic (parecía oro infinito); un canal de botín en el chat lo mostrará más adelante.*
 
 ---
 ### HU-051 · Inventario (bolsa de 24)
@@ -94,6 +95,7 @@
 **Notas de implementación**
 - `Items/ItemUseService`: `useCooldownMs` compartido por plantilla (`Player.ItemCooldownEndsAtMs`), lanza `useSpellId` con el jugador como lanzador sin cancelar su casteo ni activar GCD (ADR-019), `Qty -= 1` solo si el hechizo se acepta, el último deja la casilla vacía; `on_cooldown` no consume. Poción 60 de vida, Pan HoT de 50 en 15 s (contenido).
 - Tests: `UseItem_Potion_Heals_Consumes_SharedCooldown_Bread_Hot`.
+- 2026-10-03 (decisión): comer es solo fuera de combate y un golpe corta la curación. Dos campos genéricos de contenido: `outOfCombatOnly` en el hechizo (`item_eat_bread`; en combate `in_combat`) y `breaksOnDamage` en el aura (`bread_hot`; `AuraSystem.BreakOnDamage` desde `DamagePipeline.Deal`, también con el golpe absorbido por un escudo). El pan pasa a 60 s de recarga y su descripción lo dice. `AuraSystem.Tick` marca cada aura procesada en el tick y, si un tick cambia la lista, la recorre otra vez sin repetirlas (`CastSystemTests.Bread_*`, `AuraSystemTests.ADotTickThatBreaksAnEarlierAura_DoesNotSkipTheNextAura`, `SocialTests.Duel_EndingInAnAuraTick_DoesNotSkipTheLoserOwnHotThatTick`). Una comida con casteo se revalida al terminar (`in_combat`).
 
 ---
 ### HU-055 · Oro y vendedor NPC

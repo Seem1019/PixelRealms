@@ -15,6 +15,10 @@
 > Tras la rama `feat/phase1-close-out` (2026-10-03, decisiones del 2026-10-03 aplicadas): 63 hechas, 13 parciales y HU-100
 > pendiente (áreas duraderas, Fase 2). Las parciales son 8 estéticas (HU-005, 024, 035, 038, 041, 050, 081, 082) y 5 que esperan
 > una prueba fuera del repo o la partida con amigos (HU-074, 075, 083 CA3, 084 CA3/CA4, 089 CA3).
+>
+> Tras la rama `feat/duel-zone-and-polish` (2026-10-04): 71 hechas (con la nueva HU-101, zona del duelo), 6 parciales y HU-100
+> pendiente. Las parciales esperan la partida con amigos o una prueba fuera del repo (HU-074, 075, 083 CA3, 084 CA3/CA4, 089 CA3,
+> con la plantilla `docs/design/playtest-notes.md`) y HU-081 CA3, la licencia de las hojas de referencia (compañero de arte).
 
 ## Entorno de la sesión (2026-10-01)
 - Compilación y tests: SDK .NET 10 (10.0.112) en un sandbox Linux **sin acceso a NuGet**. El repo referencia los paquetes
@@ -94,7 +98,8 @@
   sus propias solicitudes salientes para no mostrarse el diálogo a sí mismo. Reversible con un campo `requesterId`.
 - **HU-044 · tras el cambio de clase el servidor reenvía `Welcome`** (hechizos, barra, recurso, equipo). Descartado: tres
   mensajes separados (StatsUpdate + InventoryUpdate + uno nuevo para hechizos conocidos).
-- **HU-064 · pierde por distancia quien está más lejos del punto medio inicial del duelo.**
+- **HU-064 · pierde por distancia quien está más lejos del punto medio inicial del duelo.** *Sustituido el 2026-10-03 por la zona
+  del duelo (HU-101): pierde quien pasa más de `zoneGraceSec` fuera de ella.*
 - **Logging:** se usa `Microsoft.Extensions.Logging` (consola) en vez de Serilog (skill dotnet-server). Reversible al añadir
   `Serilog.AspNetCore`; los mensajes ya son estructurados (`{Name}`).
 - **HU-072 · JSON por consola con `AddJsonConsole` (Producción) + scope `ConnId`/`CharacterName`/`AccountId` en el router**,
@@ -119,7 +124,7 @@
   decisiones del generador.
 - **HU-083 · el "puzle de palancas" de la Sala 2 se deja como pilares sin mecánica.** Descartado: inventar un sistema de
   palancas/puertas (ningún ADR ni skill lo define). Si se quiere, es una HU nueva (objeto `switch` en `maps/` + estado en
-  `MapInstance`).
+  `MapInstance`). *Hecho el 2026-10-03 (rama `feat/phase1-close-out`): capas `levers`/`doors` y `MapObjectSystem`.*
 - **HU-089 · prueba de carga en proceso (dominio puro) en vez de bots por WebSocket.** Descartado: un `LoadBot` de red (no
   hay servidor ni Postgres levantados en el sandbox y lo que la HU mide es el coste del tick). *Actualización 2026-10-02:
   ya existe el modo de red (`--network`) y midió la salida p95 por cliente; los FPS del cliente web siguen sin medir.* Los ~200 auras se rellenan con sangrados porque los kits del Tier 1 no

@@ -97,11 +97,12 @@
 **Notas de implementación**
 - `Combat/EffectResolver` + `TargetResolver`: `damage`, `heal` (+`bonusBelowHpPct`), `restore_resource`, `apply_aura`, `taunt`, `dash` (adyacente, exige `minRange`), `interrupt` y `leap`; `applyTo: self` una vez por lanzamiento; una tirada por objetivo enemigo (los de solo auras también fallan). Targetings `self`/`enemy`/`ally`/`self_aoe_*`/`ground_aoe_*` con radio al cuadrado, LOS desde el centro, más cercanos primero y `maxTargets` ≤ `aoeMaxTargetsCap`.
 - Tests: `TargetingAndEffectsTests`: posiciones concretas (CA2), derivados exactos de las 4 clases a nivel 1/5/15 con espada + placas (CA3), balance CA3b con `iron_sword + recruit_mail_shirt` leyendo `rules.balanceTargets` (Sacerdote/Pícaro ≈ 0,61; Mago/Guerrero ≈ 0,51), y test paramétrico sobre los 32 hechizos de clase: los disponibles lanzan sin excepción y producen eventos; cono/línea no se aprenden (CA4).
+- 2026-10-03 (decisión): la Carga (`dash`) tampoco se puede usar enraizado (`rooted`), como los saltos; antes sacaba al Guerrero de una raíz hasta el objetivo (`CastSystemTests` "rooted (carga)").
 
 ---
 ### HU-035 · Auras
 **Como** jugador **quiero** aplicar efectos en el tiempo (venenos, curas periódicas, escudos, aturdimientos) **para** tener un combate con más profundidad.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-034
 - Skills: `combat-system`
 
@@ -126,6 +127,7 @@
 - Tests: `AuraSystemTests` (12 CA).
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Las auras ya llegan al entrar en la AOI. Falta CA6 en el HUD: mostrar el tiempo junto a las cargas en el icono (estético).
 - 2026-10-03 (rama `feat/phase1-close-out`): CA3 según la decisión: `CastSystem` bloquea por silencio o `locked_out` cualquier habilidad salvo las que llegan por `UseItem` (`viaItem`), y el silencio interrumpe cualquier casteo que no sea de un objeto (`CastSystemTests.Silence_BlocksEveryAbility_ButNotPotionsNorTheWeapon`, `InterruptLockout_BlocksAbilities_ButNotPotions`). Sigue faltando CA6 en el HUD (estético).
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA6: los iconos de aura de los marcos muestran a la vez las cargas (arriba a la derecha) y el tiempo que queda (abajo); antes, con más de una carga, solo "xN" (`combat_hud.gd`, `test_world_scene.gd`).
 
 ---
 ### HU-036 · IA de monstruos: aggro, persecución, amenaza, evadir
@@ -171,7 +173,7 @@
 ---
 ### HU-038 · HUD de combate
 **Como** jugador **quiero** ver mi vida, recurso, objetivo, casteos y daño **para** tomar decisiones en combate.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-033, HU-035
 - Skills: `godot-client`, `pixel-art-assets`
 
@@ -188,6 +190,7 @@
 - `client/scripts/ui/combat_hud.gd` (construido por código, sin arte): marco propio (nombre, nivel, vida roja, recurso con color por tipo), marco de objetivo con vida y auras, barra de casteo que sigue llenándose en movimiento y termina en "Interrumpido" (rojo) / "Fuera de alcance" (gris) / nada al cancelar, barra 4+4 según `rules.loadout` con tecla, barrido de CD/GCD y oscurecido sin recurso o fuera de alcance (visual), error del servidor en rojo 2 s, auras en gris si no mandan e "Inmune" como texto flotante. `FloatingText`: reserva de 48, 40 visibles, > 6 por entidad y segundo → uno sumado; `AoeReticle`: hasta 24 marcas, las enemigas nunca se ocultan.
 - **Parcial:** sin iconos ni retratos (texto), sin reservas de proyectiles/impactos (no hay VFX todavía); todo pendiente de comprobar en el editor y de los assets (luego llegaron los íconos y marcos de `2fa0192` y los VFX de HU-091).
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): Falta CA4b (gris de los modificadores de daño, hoy solo en ralentizaciones) y CA6 (reservas de VFX separadas y agrupar ticks): estético.
+- 2026-10-04 (rama `feat/duel-zone-and-polish`): CA4b: en gris también los modificadores de daño hecho y recibido que no mandan, con el mismo criterio que `AuraSet.IsDominant` (`CombatHud._dominant_ids`, `test_aura_dominance.gd`). CA6: `VfxLayer` tiene una reserva por tipo (proyectiles 64 con 48 visibles, impactos 32 y brillos de casteo 32), así una lluvia de impactos no recicla proyectiles en vuelo, y los ticks de una misma aura sobre la misma entidad que llegan a menos de 0,3 s salen en un solo número sumado (`FloatingText`, `test_combat_animations.gd`). `/fxbench` mide el FPS con los topes llenos (HU-089 CA3).
 
 ---
 ### HU-039 · Recursos: maná, ira, energía y regeneración
