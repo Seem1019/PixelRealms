@@ -3,6 +3,17 @@ extends GutTest
 ## CanvasLayer), tooltips de tamaño contenido, todo el texto en español y nombres que no se cortan a media palabra.
 
 
+## HU-082 CA2: un ícono que no existe se ve como "?" (y avisa en el log), no como una casilla vacía; sin referencia, nada.
+func test_missing_icon_shows_a_question_mark() -> void:
+	var missing := UiTheme.icon("items/this_icon_does_not_exist")
+	assert_not_null(missing)
+	assert_eq(missing, UiTheme.missing_icon())
+	assert_eq(missing.get_size(), Vector2(16, 16))
+	assert_eq(missing.get_image().get_pixel(7, 3), UiTheme.ACCENT, "arriba del signo")
+	assert_null(UiTheme.icon(""))
+	assert_ne(UiTheme.icon("items/bread"), UiTheme.missing_icon(), "los que existen salen tal cual")
+
+
 func test_theme_reaches_controls_inside_a_canvas_layer() -> void:
 	var layer := CanvasLayer.new()
 	add_child_autofree(layer)

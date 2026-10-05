@@ -46,6 +46,21 @@ static var _font: FontFile
 static var _font_bold: FontFile
 static var _font_title: FontFile
 static var _textures: Dictionary = {}
+static var _missing_icon: Texture2D
+static var _warned_icons: Dictionary = {}
+## Signo "?" del ícono que falta (HU-082 CA2): 8×10, "#" = acento.
+const MISSING_GLYPH: Array[String] = [
+	"..####..",
+	".##..##.",
+	".##..##.",
+	".....##.",
+	"....##..",
+	"...##...",
+	"...##...",
+	"........",
+	"...##...",
+	"...##...",
+]
 
 
 ## Tamaño lógico de la pantalla (project.godot: 480×270), en el que se colocan todos los paneles.
@@ -128,11 +143,34 @@ static func texture(rel: String) -> Texture2D:
 	return _textures[rel]
 
 
-## Ícono de 16×16 de content/ ("items/sword_worn", "spells/fireball"); null si no existe (la casilla queda vacía).
+## Ícono de 16×16 de content/ ("items/sword_worn", "spells/fireball"); null sin referencia. Si la referencia no tiene PNG, un
+## "?" y un aviso en el log, una vez por referencia (HU-082 CA2): nunca una casilla vacía que parezca otra cosa.
 static func icon(ref: String) -> Texture2D:
 	if ref.is_empty():
 		return null
-	return texture("res://assets/icons/%s.png" % ref)
+	var tex := texture("res://assets/icons/%s.png" % ref)
+	if tex != null:
+		return tex
+	if not _warned_icons.has(ref):
+		_warned_icons[ref] = true
+		push_warning("Falta el ícono '%s' (assets/icons/%s.png): se muestra '?'" % [ref, ref])
+	return missing_icon()
+
+
+## "?" de 16×16 dibujado aquí, sin archivo: fondo y marco de panel con el signo en el color de acento.
+static func missing_icon() -> Texture2D:
+	if _missing_icon == null:
+		var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+		img.fill(PANEL_BG)
+		for i: int in 16:
+			for p: Vector2i in [Vector2i(i, 0), Vector2i(i, 15), Vector2i(0, i), Vector2i(15, i)]:
+				img.set_pixelv(p, PANEL_BORDER)
+		for y: int in MISSING_GLYPH.size():
+			for x: int in MISSING_GLYPH[y].length():
+				if MISSING_GLYPH[y][x] == "#":
+					img.set_pixel(4 + x, 3 + y, ACCENT)
+		_missing_icon = ImageTexture.create_from_image(img)
+	return _missing_icon
 
 
 ## StyleBox 9-slice desde assets/ui/<name>.png; si falta la textura, un StyleBoxFlat equivalente (sin degradados).
