@@ -50,7 +50,7 @@
 
 ### HU-083 · Mina Abandonada y jefe Capataz Grask
 **Como** grupo de nivel 4–6 **queremos** una cueva con jefe **para** tener el objetivo final del Tier 1 y botín raro.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-027, HU-036, HU-062, HU-080, HU-086
 - Skills: `world-maps`, `combat-system`, `game-content`
 
@@ -70,12 +70,13 @@
 - 2026-10-04 (rama `feat/duel-zone-and-polish`): palancas y puerta con sprites (`sprites/objects/lever.png` y `door.png`, `tools/art/gen_objects.py`) en lugar del dibujo provisional; `MapObjectsLayer` lo conserva solo si faltan las hojas (`test_map_objects.gd`).
 - 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): en la prueba, la puerta se abría lejos y sin avisar, y la abierta apenas se ve: parecía que las palancas no hacían nada. Ahora la primera palanca dice "Palanca activada (1/2): falta otra para abrir la puerta", al abrirse se oye "Se oye un mecanismo: se ha abierto una puerta" (con polvo en la puerta si se ve) y al cerrarse "Una puerta se ha cerrado"; el estado al entrar en el mapa no se anuncia (`GameState.map_object_toggled`, `test_world_scene.gd`, `test_map_objects.gd`). `TiledMapLoaderTests.Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss` comprueba que la puerta cerrada tapa el único camino al jefe.
 - 2026-10-05 (prueba local): las palancas estaban en la fila 22 y la puerta en la 38, a más de una pantalla: nadie las relacionaba. Ahora la puerta está en la boca del pasillo (fila 36) y las palancas a cada lado, en (51.5, 32.5) y (62.5, 32.5), visibles a la vez (`gen_tier1_maps.py`; `Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss` sigue en verde).
+- 2026-10-06: cerrada con la partida de prueba con amigos (Diego): el jefe y el puzle de la Mina (CA3), OK jugando; no se apuntaron tiempos ni cifras (`docs/design/playtest-notes.md`).
 
 ---
 
 ### HU-084 · Pasada de balance
 **Como** diseñador **quiero** revisar números con datos **para** que ninguna clase sea inútil o rota.
-- Prioridad: Must · Estimación: M · Estado: Parcial
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-041, HU-052, HU-062
 - Skills: `game-content`, `combat-system`
 
@@ -92,6 +93,7 @@
    - Confirmar que el **ciclo real por monstruo** es de ~36 s (`killCycleSecTarget`); si no, se cambia ese valor y la curva de XP se recalcula sola (ADR-017).
 - 2026-10-03 (rama `feat/phase1-close-out`): CA1 y CA2 hechos por `content-designer`: `balance-report.md` (pasada de HU-084) con afinidad, XP por hora, pentagrama, economía y el triángulo PvP simulado (1 000 duelos por pareja a nivel 6 con equipo verde). Con `classAdvantage` todo en 1.0 los duelos salían 0–100 %; la matriz nueva (`content/rules.json`) deja a cada favorito en 63–68 %. Depende de supuestos (kiteo, ejecución): confirmarlo jugando. Commit propuesto: `content(balance): tune PvP classAdvantage so duel favourites win 60-75% (HU-084)`. **Faltan** CA3 y CA4 (partida con amigos).
 - 2026-10-04 (rama `feat/duel-zone-and-polish`): plantilla de la sesión con amigos en `docs/design/playtest-notes.md` (CA3 y CA4, con HU-083 CA3 y HU-089 CA3).
+- 2026-10-06: cerrada con la partida de prueba con amigos (Diego): el primer contacto, las sensaciones y los pendientes del modelo (CA3 y CA4), OK jugando; no se apuntaron tiempos ni cifras (`docs/design/playtest-notes.md`).
 
 ---
 ### HU-090 · Animaciones de combate del cuerpo

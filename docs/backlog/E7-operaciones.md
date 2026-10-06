@@ -117,7 +117,7 @@
 
 ### HU-089 · Prueba de carga del combate ("Mina llena")
 **Como** anfitrión **quiero** una prueba de carga del combate repetible **para** detectar lag, fugas de memoria y exceso de tráfico antes de que lo noten mis amigos.
-- Prioridad: Must · Estimación: M · Estado: Parcial
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-023, HU-088
 - Skills: `dotnet-server`, `combat-system`
 
@@ -147,3 +147,4 @@
   runner compartido los falsea.
 - 2026-10-04 (rama `feat/duel-zone-and-polish`): CA3 preparado: `/fxbench` en el chat mantiene 24 marcas de área y 40 números durante 20 s y avisa del FPS p5, solo en el propio cliente (`FxBench`, `test_fx_bench.gd`). Falta medirlo en el navegador del equipo de referencia (apartado 5 de `docs/design/playtest-notes.md`).
 - 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): `/fxbench` en el cliente de escritorio del PC de Diego: FPS p5 60,0 en 1 170 cuadros (topado por la sincronía vertical). Sigue faltando la medida en el navegador.
+- 2026-10-06: cerrada con la partida de prueba con amigos (Diego): `/fxbench` y el rendimiento del cliente (CA3), OK jugando; no se apuntaron tiempos ni cifras (`docs/design/playtest-notes.md`).

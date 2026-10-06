@@ -19,6 +19,10 @@
 > Tras la rama `feat/duel-zone-and-polish` (2026-10-04): 71 hechas (con la nueva HU-101, zona del duelo), 6 parciales y HU-100
 > pendiente. Las parciales esperan la partida con amigos o una prueba fuera del repo (HU-074, 075, 083 CA3, 084 CA3/CA4, 089 CA3,
 > con la plantilla `docs/design/playtest-notes.md`) y HU-081 CA3, la licencia de las hojas de referencia (compañero de arte).
+>
+> **Fase 1 cerrada (2026-10-06):** la partida de prueba con amigos salió OK y cierra HU-083, HU-084 y HU-089 (74 hechas). Quedan
+> parciales HU-074 (Firefox y build de Windows en itch.io), HU-075 (restauración en el VPS y copia fuera del VPS) y HU-081 CA3
+> (licencia de las referencias), que no bloquean la Fase 2: las llevan operaciones y el compañero de arte.
 
 ## Entorno de la sesión (2026-10-01)
 - Compilación y tests: SDK .NET 10 (10.0.112) en un sandbox Linux **sin acceso a NuGet**. El repo referencia los paquetes

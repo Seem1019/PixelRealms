@@ -78,13 +78,13 @@
 | HU-080 | Mapa "meadow" completo (Tier 1) | E8 | Must | L | Hecha |
 | HU-081 | Arte de clases y monstruos | E8 | Must | L | Parcial |
 | HU-082 | Íconos de items y hechizos | E8 | Must | M | Hecha |
-| HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Parcial |
-| HU-084 | Pasada de balance | E8 | Must | M | Parcial |
+| HU-083 | Mina Abandonada y jefe Capataz Grask | E8 | Must | L | Hecha |
+| HU-084 | Pasada de balance | E8 | Must | M | Hecha |
 | HU-085 | Hechizo de área del Sacerdote (`ground_aoe_all`) | E3 | Must | M | Hecha |
 | HU-086 | Hechizos de área apuntados (combate híbrido) | E3 | Must | L | Hecha |
 | HU-087 | Saltos a un punto (`leap`) | E3 | Must | M | Hecha |
 | HU-088 | Rendimiento del combate | E3 | Must | L | Hecha |
-| HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Parcial |
+| HU-089 | Prueba de carga del combate ("Mina llena") | E7 | Must | M | Hecha |
 | HU-090 | Animaciones de combate del cuerpo | E8 | Should | L | Hecha |
 | HU-091 | Efectos visuales de hechizos | E8 | Should | M | Hecha |
 | HU-092 | Fuente HD para la interfaz | E8 | Should | S | Hecha |
