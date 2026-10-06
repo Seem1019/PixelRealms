@@ -54,7 +54,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             CharacterSaveDto plain => (plain, 0L),
             _ => (null, 0L),
         };
-        if (dto is null) { ctx.SendError(ErrorCodes.BadTicket); ctx.Close("bad_ticket"); return; }
+        if (dto is null) { ctx.SendError(ErrorCodes.BadTicket); ctx.CloseAfterFlush("bad_ticket"); return; }
 
         var previous = players.ByAccount(dto.AccountId);
         if (previous is not null && previous.CharacterId == dto.Id)
@@ -97,7 +97,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
 
         var mapId = world.Maps.ContainsKey(dto.MapId) ? dto.MapId : content.Current.Rules.World.StartMapId;
         var instance = world.InstanceOf(mapId);
-        if (instance is null) { ctx.SendError(ErrorCodes.NotFound, message: "Mapa no disponible"); ctx.Close("no_map"); return; }
+        if (instance is null) { ctx.SendError(ErrorCodes.NotFound, message: "Mapa no disponible"); ctx.CloseAfterFlush("no_map"); return; }
 
         var player = mapper.ToPlayer(dto, world.EntityIds.Next());
         if (mapId != dto.MapId || player.Position == Vec2.Zero) player.Position = instance.Data.DefaultGraveyard.Position;
