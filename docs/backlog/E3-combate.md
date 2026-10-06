@@ -406,7 +406,7 @@
 3. **Dado** un cono o una línea con casteo **entonces** el origen y la dirección se fijan en `CastStarted` (como el punto del círculo) y todos ven la marca; moverse durante el casteo no la gira. Sin casteo, se resuelve en el mismo tick.
 4. **Dado** el cliente **cuando** mantengo la tecla del hechizo (HU-096) **entonces** veo el cono o la línea orientados hacia el ratón, y al lanzarlo la marca y el efecto visual tienen la forma real.
 5. **Dado** un monstruo con un hechizo en cono o en línea **entonces** apunta a su objetivo actual con la misma regla (ADR-015).
-6. **Dado** el validador **entonces** `EngineCapabilities.Shapes` incluye `cone` y `line`, Tajo amplio, Cuchillas arrojadizas y Sendero de luz dejan de salir como no disponibles (ADR-023) y un área de daño sin casteo solo se avisa si incumple la decisión D4 (`README.md` §Pendiente de diseño).
+6. **Dado** el validador **entonces** `EngineCapabilities.Shapes` incluye `cone` y `line`, Tajo amplio, Cuchillas arrojadizas y Sendero de luz dejan de salir como no disponibles (ADR-023) y un área de daño sin casteo solo se avisa si incumple ADR-027 (D4).
 7. **Dado** un cliente tramposo **cuando** manda un `targetPos` fuera de alcance (más `castRangeToleranceTiles`) **entonces** se rechaza como en HU-086; el cliente nunca manda ángulos: la dirección la calcula el servidor.
 
 **Notas técnicas**

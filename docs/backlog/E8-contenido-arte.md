@@ -196,8 +196,8 @@
 **Criterios de aceptación**
 1. **Dado** el modelo de `tools/balance/` ampliado al nivel 10 **entonces** las 15 combinaciones de 4 de los 6 hechizos de cada clase cumplen la regla 40/75 y ninguna supera el valor de la clase en una punta (ADR-020).
 2. **Dado** Eviscerar, Cuchillas arrojadizas, Campo ardiente, Parpadeo, Bloqueo con escudo, Tajo amplio, Renovar y Sendero de luz **entonces** pasan a `"provisional": false` con su medida en `docs/design/balance-report.md`.
-3. **Dado** el segundo rango (nivel 8) **entonces** el modelo lo aplica según la decisión D3 y el informe dice si el rango se sigue notando con el equipo de nivel 9; si no, propone otro `spellRankBonusPct`.
-4. **Dado** las áreas de daño sin casteo **entonces** Tajo amplio y Cuchillas arrojadizas cumplen la decisión D4 y el validador deja de avisar de ellas.
+3. **Dado** el segundo rango (nivel 8) **entonces** el modelo lo aplica según ADR-027 (D3) y el informe dice si el rango se sigue notando con el equipo de nivel 9; si no, propone otro `spellRankBonusPct`.
+4. **Dado** las áreas de daño sin casteo **entonces** Tajo amplio y Cuchillas arrojadizas cumplen ADR-027 (D4) y el validador deja de avisar de ellas.
 5. **Dado** el Mago **entonces** su área llega al objetivo de su pentagrama con Campo ardiente ("su área madura en la Fase 2", `class-kits.md` §Riesgos).
 
 **Notas técnicas**

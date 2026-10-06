@@ -126,20 +126,20 @@
   Los 16 de la Fase 1 ya están medidos (`"provisional": false`, `docs/design/balance-report.md`); los 8 de la Fase 2 van en
   HU-106 y los 8 de la Fase 3 siguen escalados a la misma escala con `"provisional": true`.
 
-**Decisiones de la Fase 2 (propuestas el 2026-10-06, sin confirmar).** Las HU de M6 están escritas con la propuesta; al
-confirmarlas se registran en un ADR y se corrigen las HU si alguna cambia.
-- **D1 · Mejoras 1-de-2** (HU-104, HU-105, HU-107). *Propuesta:* por hechizo. Cada hechizo de clase tiene 2 mejoras en
+**Decisiones de la Fase 2 (confirmadas el 2026-10-06, ADR-027).** Son provisionales hasta probarlas en local antes de
+desplegar la Fase 2: si la sensación no convence, se cambian en ADR-027 y en sus HU.
+- **D1 · Mejoras 1-de-2** (HU-104, HU-105, HU-107). *Decidido:* por hechizo. Cada hechizo de clase tiene 2 mejoras en
   `content/spells.json` y se elige una al llegar al nivel 8 (segundo rango); el +15 % del rango sigue siendo automático. La
   elección se cambia gratis fuera de combate desde el libro, con la misma regla que los hechizos equipados: ese es el reinicio
   que pide ADR-014. *Alternativas:* una sola mejora por rango para toda la clase (menos contenido, builds más pobres) o
   reiniciar en un NPC con coste (la elección pesa más, pero es tedioso y el NPC de la Aldea desaparece en la Fase 3).
-- **D2 · Cambiar los hechizos equipados** (HU-103). *Propuesta:* fuera de combate, en cualquier sitio y sin coste; es lo que
+- **D2 · Cambiar los hechizos equipados** (HU-103). *Decidido:* fuera de combate, en cualquier sitio y sin coste; es lo que
   ya hace `SetHotbar` (HU-043: en combate no se cambia una casilla ocupada). *Alternativa:* solo en puntos seguros (más peso,
   más viajes).
-- **D3 · Escalado de los rangos** (HU-106, ADR-024). *Propuesta:* lineal (+15 / +30 / +45 %) y solo sobre el `base`, como ya
+- **D3 · Escalado de los rangos** (HU-106, ADR-024). *Decidido:* lineal (+15 / +30 / +45 %) y solo sobre el `base`, como ya
   calcula `SpellRanks`; si el rango se queda corto frente al equipo, se sube `spellRankBonusPct` en vez de escalar los
   coeficientes. *Alternativa:* compuesto o escalando también los coeficientes (los tooltips dejan de ser "+30 %").
-- **D4 · Áreas de daño sin casteo** (HU-102, HU-106; ADR-015). *Propuesta:* un cono de alcance cuerpo a cuerpo (radio ≤ 3
+- **D4 · Áreas de daño sin casteo** (HU-102, HU-106; ADR-015). *Decidido:* un cono de alcance cuerpo a cuerpo (radio ≤ 3
   tiles, constante nueva en `rules.combat`) queda exento: se esquiva saliendo del frente del lanzador, como un golpe. Tajo
   amplio (2,5) entra; Cuchillas arrojadizas (4) baja a 3 o lleva casteo, según su pasada de números; Cono de frío (5, Fase 3)
   lleva casteo. *Alternativa:* casteo corto (0,3–0,5 s) en todas, que hace más lentos al Guerrero y al Pícaro.

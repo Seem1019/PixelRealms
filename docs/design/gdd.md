@@ -111,7 +111,8 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
 - **Áreas = se apuntan libremente.** Un hechizo de área se lanza sobre el punto del suelo que marca el cursor, dentro de
   su alcance (`ground`), o alrededor del lanzador (`self`), sin necesidad de objetivo seleccionado. Formas: círculo, cono y
   línea (`shape`, ya en el schema); el cono y la línea salen del lanzador hacia el punto apuntado. El círculo se implementa
-  en la Fase 1 y el cono y la línea cuando un hechizo los necesite.
+  en la Fase 1 y el cono y la línea cuando un hechizo los necesite. Las áreas de daño llevan casteo para poder esquivarlas,
+  salvo los conos cuerpo a cuerpo (radio ≤ 3 tiles), que se esquivan saliendo del frente del lanzador (ADR-027).
 - **Saltos y embestidas.** Carga (embestida a un objetivo) es tab-target; los saltos a un punto (`leap`) se apuntan como
   las áreas. El servidor mueve al personaje (valida alcance, casilla libre y línea de visión) y el cliente no lo predice:
   solo suaviza el desplazamiento al dibujarlo.
@@ -140,17 +141,18 @@ Mezcla de tab-target y combate de acción, al estilo de Albion Online:
   utilizables** (poción de vida y otros consumibles). Teclas: **1–4** hechizos, **5–8** utilizables
   (`rules.loadout`).
 - Los hechizos **mejoran por rangos** al subir de nivel, en lugar de aprender uno nuevo cada pocos niveles.
-  **Fase 1:** los rangos suben solos. **Fase 2:** al subir un rango se elige **1 de 2 mejoras**; las builds salen de qué
-  4 hechizos llevas equipados y qué mejoras eliges. Antes de cerrar el MVP (Fase 2 o 3) debe existir una forma de
-  **reiniciar las mejoras**.
+  **Fase 1:** los rangos suben solos. **Desde la Fase 2:** en el nivel 8 (segundo rango) cada hechizo elige **1 de 2
+  mejoras**, y el +15 % del rango sigue siendo automático; las builds salen de qué 4 hechizos llevas equipados y qué mejoras
+  eliges. La mejora se cambia gratis fuera de combate desde el libro de hechizos, y esa es la forma de **reiniciarla** (ADR-027).
 - **Rangos (ADR-024, confirmado):** los hechizos suben de rango en los niveles **4, 8 y 12** (`rules.progression.spellRankLevels`)
-  con **+15 %** sobre el valor base por rango (`spellRankBonusPct`). En la Fase 1 (tope 6) solo se alcanza la subida del nivel 4.
+  con **+15 %** sobre el valor base por rango (`spellRankBonusPct`), lineal (+15 / +30 / +45 %) y sin escalar los coeficientes
+  (ADR-027). En la Fase 1 (tope 6) solo se alcanza la subida del nivel 4.
 - **Controles y acumulación (ADR-022):** tras un aturdimiento, raíz o silencio, 1,5 s de inmunidad a los tres; efectos del
   mismo tipo no se suman (manda el más fuerte) y la ralentización máxima es del 40 % (`combat.md` §Auras).
 - **Balance por pentagrama y grupos de hechizos:** `docs/design/class-kits.md` (ADR-020). Cada clase tiene 8 hechizos que
   se desbloquean en los niveles 1, 2, 3, 5, 7, 9, 11 y 13 (`rules.progression.spellUnlockLevels`): en la Fase 1 tiene 4
   (todos equipados) y la elección libre empieza en el nivel 7. Pulso sagrado (nv 5) reemplaza a Rezo de sanación.
-  Cuándo se pueden cambiar los hechizos equipados se decide en la Fase 2; en la Fase 1 la barra (HU-043) solo ordena los 4.
+  Los hechizos equipados se cambian fuera de combate, en cualquier sitio y sin coste (ADR-027).
 
 ### Ataque básico (todas las clases)
 - **El ataque básico lo da el arma equipada, no la clase, y no ocupa ninguna de las 4 casillas de hechizo.** Cada tipo de

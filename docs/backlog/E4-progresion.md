@@ -109,7 +109,7 @@
 1. **Dado** las 4 casillas de hechizo ocupadas **cuando** aprendo un hechizo **entonces** el aviso dice que está en el libro (P) y no se coloca solo; el libro lo marca como nuevo hasta que lo abro.
 2. **Dado** el libro de hechizos **entonces** distingue los equipados, los aprendidos sin equipar y los no aprendidos, y muestra cuántos llevo ("Equipados 4/5").
 3. **Dado** que estoy en combate **cuando** arrastro un hechizo a una casilla ocupada **entonces** el cliente avisa de que no se cambian hechizos en combate y la barra no cambia (el servidor ya lo rechaza con `in_combat`, HU-043).
-4. **Dado** que estoy fuera de combate **entonces** cambio los equipados en cualquier sitio y sin coste (decisión D2).
+4. **Dado** que estoy fuera de combate **entonces** cambio los equipados en cualquier sitio y sin coste (ADR-027, D2).
 
 **Notas técnicas**
 - El servidor ya lo cumple (`SetHotbarHandler`): es trabajo de cliente (`spellbook_window.gd`, `game_state.gd::_on_level_up`). Tests GUT del modelo del libro.
@@ -125,7 +125,7 @@
 **Criterios de aceptación**
 1. **Dado** un hechizo de clase en `content/spells.json` **entonces** puede declarar `upgrades`: exactamente 2, cada una con `id`, `name`, `description` y una lista de modificadores genéricos (recarga, casteo, coste, alcance, tamaño del área, objetivos máximos, multiplicador del `base` de un efecto, duración de un aura y efectos añadidos del catálogo existente). El schema y el validador comprueban ids únicos y campos que existan en el hechizo.
 2. **Dado** un personaje que llega al nivel `rules.progression.spellUpgradeLevel` (8, el segundo rango) **entonces** cada hechizo aprendido con `upgrades` queda con la mejora por elegir y `LevelUp` lo informa; los que aprende después (nivel 9) se pueden mejorar desde que los aprende.
-3. **Dado** `ChooseSpellUpgrade{spellId, upgradeId}` fuera de combate **entonces** el servidor comprueba que el hechizo es suyo, que tiene el nivel y que la mejora existe, la guarda y lo confirma. Cambiarla o quitarla (`upgradeId: null`) es gratis: es el reinicio que pide ADR-014 (decisión D1). En combate responde `in_combat`.
+3. **Dado** `ChooseSpellUpgrade{spellId, upgradeId}` fuera de combate **entonces** el servidor comprueba que el hechizo es suyo, que tiene el nivel y que la mejora existe, la guarda y lo confirma. Cambiarla o quitarla (`upgradeId: null`) es gratis: es el reinicio que pide ADR-014 (ADR-027, D1). En combate responde `in_combat`.
 4. **Dado** una mejora elegida **entonces** el servidor la aplica al validar y resolver el hechizo (coste, recarga, casteo, alcance, área y efectos) y los demás ven el resultado (un área más grande, un aura más larga) sin que el cliente mande números.
 5. **Dado** el `Welcome` **entonces** lleva las mejoras elegidas, que se guardan con el personaje (tabla `character_spell_upgrades`, migración EF) y sobreviven a la reconexión, al cambio de mapa y al reinicio del servidor.
 6. **Dado** un cambio de clase (HU-044) o un `/level` por debajo de 8 **entonces** se borran las mejoras de los hechizos que ya no cumple y el `Welcome` renovado lo refleja.
@@ -133,7 +133,7 @@
 
 **Notas técnicas**
 - Cada pareja (hechizo, mejora) se resuelve a un `SpellDef` efectivo al cargar el contenido: el tick no combina modificadores en cada casteo (presupuesto de HU-088).
-- El rango (ADR-024, decisión D3) se sigue aplicando: rango y mejora multiplican el mismo `base`.
+- El rango (ADR-024; ADR-027, D3) se sigue aplicando: rango y mejora multiplican el mismo `base`.
 - Protocolo: mensaje nuevo cliente→servidor y campos nuevos en `Welcome` y `LevelUp`; cambios aditivos (`docs/protocol.md`, skill `net-protocol`). BD: `docs/database.md`.
 - En la Fase 3 se decide si el rango del nivel 12 da otra elección; aquí no se generaliza (pilar 6).
 
@@ -149,7 +149,7 @@
 1. **Dado** un personaje de nivel 8 o más **cuando** abro el libro **entonces** cada hechizo con mejoras muestra las dos con nombre, descripción, los números que cambian (antes → después) y cuál está elegida.
 2. **Dado** un hechizo con la mejora por elegir **entonces** el libro y su casilla de la barra lo señalan hasta que elijo, y al llegar al nivel 8 un aviso dice que ya se pueden elegir (P).
 3. **Cuando** elijo una mejora fuera de combate **entonces** el cliente manda `ChooseSpellUpgrade` y los tooltips del hechizo (barra y libro) pasan a mostrar los valores con la mejora; en combate el botón está desactivado y dice por qué.
-4. **Dado** una mejora elegida **cuando** pulso la otra **entonces** cambia sin coste (decisión D1).
+4. **Dado** una mejora elegida **cuando** pulso la otra **entonces** cambia sin coste (ADR-027, D1).
 
 **Notas técnicas**
 - Los valores del tooltip salen del mismo cálculo que el servidor: casos en `shared/test-vectors/spell_upgrades.json` que pasan en xUnit y en GUT, como el movimiento (regla 6). El cliente solo muestra; resuelve el servidor.

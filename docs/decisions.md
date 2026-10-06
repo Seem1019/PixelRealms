@@ -101,6 +101,7 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - **Alternativas descartadas:** hechizo canalizado de maná (ocupa uno de los 4 huecos); solo pociones (una por combate de jefe);
   maná solo con varita o bastón (castigaba el equipo libre).
 - **Consecuencias:** `SetHotbar` pasa a slots 0–7, `character_hotbar.slot` a 0..7, `LevelUp` gana `rankUps` (opcional).
+- *Nota 2026-10-06: las mejoras 1-de-2 y su reinicio se concretan en ADR-027 (D1).*
 
 ## ADR-015 · Combate híbrido: tab-target para un objetivo, áreas apuntadas
 - **Contexto:** se quiere posicionamiento y esquiva, al estilo de Albion Online, sin perder la robustez del tab-target en servidor.
@@ -113,6 +114,7 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   (áreas sin esquiva ni posicionamiento).
 - **Consecuencias:** `target_aoe_enemies` desaparece (HU-086); `CastSpell` y `CastStarted` ganan campos opcionales; los kits se
   rediseñan (daño en área para Guerrero y Pícaro). Un área apuntada con `castMs = 0` no se puede esquivar: las de daño llevan casteo.
+- *Nota 2026-10-06: los conos cuerpo a cuerpo (radio ≤ 3 tiles) quedan exentos de llevar casteo (ADR-027, D4).*
 
 ## ADR-016 · Habilidades por clase; de Albion solo el combate híbrido
 - **Contexto:** se evaluó Albion Online como referencia (habilidades por arma y por pieza de armadura, energía común,
@@ -249,6 +251,7 @@ antiguas, se marcan como "Reemplazada por ADR-N".
   cooldowns y duraciones no cambian. Como en la Fase 1 solo existe un rango, queda para antes de la Fase 2 decidir si escala
   también los coeficientes y si los rangos se acumulan de forma lineal (+15 / +30 / +45 %) o compuesta; el modelo de
   `tools/balance/` lo incorporará entonces.
+- *Nota 2026-10-06: lineales y solo sobre el `base` (ADR-027, D3).*
 
 ## ADR-025 · Escala de la interfaz con `stretch mode = canvas_items`
 - **Contexto:** con `stretch mode = viewport` todo, texto incluido, se dibujaba a 480×270 y luego se ampliaba la imagen. La
@@ -294,3 +297,26 @@ antiguas, se marcan como "Reemplazada por ADR-N".
 - *Nota 2026-10-02: la fuente pasó a Alegreya Sans / Alegreya SC con suavizado gris (HU-092, `UiTheme`), y el guerrero y el
   mago usan hojas importadas con `tools/art/import_heroes.py`, fuera de la paleta Resurrect 64 (HU-093).*
 
+
+## ADR-027 · Builds de la Fase 2: mejoras por hechizo, cambios fuera de combate, rangos lineales y conos cuerpo a cuerpo
+- **Contexto:** la Fase 2 trae el nivel 7 (más hechizos que casillas) y el segundo rango (nivel 8). ADR-014 y ADR-024 dejaron
+  para entonces cómo son las mejoras 1-de-2 y su reinicio, cuándo se cambian los hechizos equipados y cómo escalan los rangos;
+  y Tajo amplio, Cuchillas arrojadizas y Cono de frío son áreas de daño sin casteo, contra la regla de ADR-015.
+- **Decisión:**
+  - **D1 · Mejoras 1-de-2 por hechizo.** Cada hechizo de clase tiene 2 mejoras en `content/spells.json`; se elige una al llegar
+    al nivel 8 (`rules.progression.spellUpgradeLevel`) y los aprendidos después, desde que se aprenden. El +15 % del rango sigue
+    siendo automático. La mejora se cambia o se quita gratis fuera de combate desde el libro de hechizos: ese es el reinicio
+    que pide ADR-014.
+  - **D2 · Hechizos equipados:** se cambian fuera de combate, en cualquier sitio y sin coste (lo que ya hace `SetHotbar`, HU-043).
+  - **D3 · Rangos lineales sobre el `base`:** +15 / +30 / +45 % sobre el `base` de los efectos numéricos, sin escalar los
+    coeficientes (lo que ya calcula `SpellRanks`). Si el rango se queda corto frente al equipo, se sube `spellRankBonusPct`.
+  - **D4 · Conos cuerpo a cuerpo sin casteo:** un cono de radio ≤ 3 tiles (constante nueva en `rules.combat`, HU-102) puede ser
+    instantáneo: se esquiva saliendo del frente del lanzador, como un golpe. Tajo amplio (2,5) entra; Cuchillas arrojadizas
+    (4) baja a 3 o lleva casteo según su pasada de números (HU-106); Cono de frío (5, Fase 3) lleva casteo.
+- **Alternativas descartadas:** una sola mejora por rango para toda la clase (menos contenido, builds más pobres); reiniciar
+  las mejoras en un NPC con coste (tedioso, y el NPC de la Aldea desaparece en la Fase 3); cambiar los hechizos solo en puntos
+  seguros; rangos compuestos o que escalan los coeficientes (los tooltips dejan de ser "+30 %"); casteo corto en todas las
+  áreas de daño (más lentos el Guerrero y el Pícaro).
+- **Consecuencias:** las HU de M6 (HU-102 a HU-107) se escriben con estas reglas. Son provisionales hasta probarlas en local
+  antes de desplegar la Fase 2: si la sensación no convence, se cambian aquí y en sus HU. En la Fase 3 se decide si el rango
+  del nivel 12 da otra elección.
