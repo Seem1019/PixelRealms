@@ -50,7 +50,7 @@
 
 ### HU-083 · Mina Abandonada y jefe Capataz Grask
 **Como** grupo de nivel 4–6 **queremos** una cueva con jefe **para** tener el objetivo final del Tier 1 y botín raro.
-- Prioridad: Must · Estimación: L · Estado: Parcial
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-027, HU-036, HU-062, HU-080, HU-086
 - Skills: `world-maps`, `combat-system`, `game-content`
 
@@ -70,12 +70,13 @@
 - 2026-10-04 (rama `feat/duel-zone-and-polish`): palancas y puerta con sprites (`sprites/objects/lever.png` y `door.png`, `tools/art/gen_objects.py`) en lugar del dibujo provisional; `MapObjectsLayer` lo conserva solo si faltan las hojas (`test_map_objects.gd`).
 - 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): en la prueba, la puerta se abría lejos y sin avisar, y la abierta apenas se ve: parecía que las palancas no hacían nada. Ahora la primera palanca dice "Palanca activada (1/2): falta otra para abrir la puerta", al abrirse se oye "Se oye un mecanismo: se ha abierto una puerta" (con polvo en la puerta si se ve) y al cerrarse "Una puerta se ha cerrado"; el estado al entrar en el mapa no se anuncia (`GameState.map_object_toggled`, `test_world_scene.gd`, `test_map_objects.gd`). `TiledMapLoaderTests.Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss` comprueba que la puerta cerrada tapa el único camino al jefe.
 - 2026-10-05 (prueba local): las palancas estaban en la fila 22 y la puerta en la 38, a más de una pantalla: nadie las relacionaba. Ahora la puerta está en la boca del pasillo (fila 36) y las palancas a cada lado, en (51.5, 32.5) y (62.5, 32.5), visibles a la vez (`gen_tier1_maps.py`; `Mine_ClosedBossDoor_IsTheOnlyWayToTheBoss` sigue en verde).
+- 2026-10-06: cerrada con la partida de prueba con amigos (Diego): el jefe y el puzle de la Mina (CA3), OK jugando; no se apuntaron tiempos ni cifras (`docs/design/playtest-notes.md`).
 
 ---
 
 ### HU-084 · Pasada de balance
 **Como** diseñador **quiero** revisar números con datos **para** que ninguna clase sea inútil o rota.
-- Prioridad: Must · Estimación: M · Estado: Parcial
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-041, HU-052, HU-062
 - Skills: `game-content`, `combat-system`
 
@@ -92,6 +93,7 @@
    - Confirmar que el **ciclo real por monstruo** es de ~36 s (`killCycleSecTarget`); si no, se cambia ese valor y la curva de XP se recalcula sola (ADR-017).
 - 2026-10-03 (rama `feat/phase1-close-out`): CA1 y CA2 hechos por `content-designer`: `balance-report.md` (pasada de HU-084) con afinidad, XP por hora, pentagrama, economía y el triángulo PvP simulado (1 000 duelos por pareja a nivel 6 con equipo verde). Con `classAdvantage` todo en 1.0 los duelos salían 0–100 %; la matriz nueva (`content/rules.json`) deja a cada favorito en 63–68 %. Depende de supuestos (kiteo, ejecución): confirmarlo jugando. Commit propuesto: `content(balance): tune PvP classAdvantage so duel favourites win 60-75% (HU-084)`. **Faltan** CA3 y CA4 (partida con amigos).
 - 2026-10-04 (rama `feat/duel-zone-and-polish`): plantilla de la sesión con amigos en `docs/design/playtest-notes.md` (CA3 y CA4, con HU-083 CA3 y HU-089 CA3).
+- 2026-10-06: cerrada con la partida de prueba con amigos (Diego): el primer contacto, las sensaciones y los pendientes del modelo (CA3 y CA4), OK jugando; no se apuntaron tiempos ni cifras (`docs/design/playtest-notes.md`).
 
 ---
 ### HU-090 · Animaciones de combate del cuerpo
@@ -182,3 +184,172 @@
 - El pícaro usa un umbral de fondo más bajo (`BG_LEVEL_BY_CLASS`): su ropa casi negra se borraba con el fondo.
 - La fila norte del sacerdote sale de PixelLab (`refs/priest_pixellab/`, cuadros `pl:` en `FRAMES`), escalada por su propio reposo.
 - El ataque y el casteo de espaldas del guerrero y el mago salen de PixelLab animando desde un cuadro de espaldas de su propia hoja (`custom_start_frame`), así conservan capa y sombrero; ya están a escala de la hoja HD.
+
+---
+
+### HU-106 · Números de los hechizos de nivel 7 y 9
+**Como** diseñador **quiero** fijar los números de los 8 hechizos nuevos de la Fase 2 **para** que entren medidos y no provisionales.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-102
+- Skills: `game-content`, `combat-system` (subagente `content-designer`)
+
+**Criterios de aceptación**
+1. **Dado** el modelo de `tools/balance/` ampliado al nivel 10 **entonces** las 15 combinaciones de 4 de los 6 hechizos de cada clase cumplen la regla 40/75 y ninguna supera el valor de la clase en una punta (ADR-020).
+2. **Dado** Eviscerar, Cuchillas arrojadizas, Campo ardiente, Parpadeo, Bloqueo con escudo, Tajo amplio, Renovar y Sendero de luz **entonces** pasan a `"provisional": false` con su medida en `docs/design/balance-report.md`.
+3. **Dado** el segundo rango (nivel 8) **entonces** el modelo lo aplica según ADR-027 (D3) y el informe dice si el rango se sigue notando con el equipo de nivel 9; si no, propone otro `spellRankBonusPct`.
+4. **Dado** las áreas de daño sin casteo **entonces** Tajo amplio y Cuchillas arrojadizas cumplen ADR-027 (D4) y el validador deja de avisar de ellas.
+5. **Dado** el Mago **entonces** su área llega al objetivo de su pentagrama con Campo ardiente ("su área madura en la Fase 2", `class-kits.md` §Riesgos).
+
+**Notas técnicas**
+- Los íconos de los 8 ya existen (HU-082). Campo ardiente es instantáneo: no necesita áreas duraderas (HU-100).
+
+---
+
+### HU-107 · Mejoras de los hechizos
+**Como** jugador **quiero** que cada hechizo tenga dos mejoras con sentido **para** elegir entre estilos (más daño o más control, más alcance o menos recarga).
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-104, HU-106
+- Skills: `game-content` (subagente `content-designer`)
+
+**Criterios de aceptación**
+1. **Dado** los 6 hechizos de cada clase de los niveles 1 a 9 (24 en total) **entonces** cada uno tiene 2 mejoras en `content/spells.json`, con una descripción en español que dice el número.
+2. **Dado** las dos mejoras de un hechizo **entonces** cambian cosas distintas (no "+10 % de daño" contra "+12 % de daño") y ninguna es estrictamente mejor: el modelo mide las dos sobre el pentagrama.
+3. **Dado** el modelo con mejoras **entonces** ninguna combinación de 4 hechizos con sus mejoras rompe la regla 40/75 ni supera el valor de la clase en una punta, y el informe muestra la build más fuerte y la más débil de cada clase.
+4. **Dado** una idea de mejora que necesita un modificador que HU-104 no tiene **entonces** se anota en `class-kits.md` y no entra (pilar 6).
+
+**Notas técnicas**
+- Ejemplos orientativos: Bola de fuego (−0,5 s de casteo / +20 % de daño); Provocar (+1 s / +3 tiles de alcance); Renovar (+2 s / cura al instante un 30 % del total).
+- Los hechizos de los niveles 11 y 13 reciben sus mejoras en la Fase 3.
+
+---
+
+### HU-108 · Tileset del Bosque y paleta de la Cripta
+**Como** jugador **quiero** que el Bosque se vea distinto de la Pradera y la Cripta distinta de la Mina **para** notar que cambié de tier.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-080, HU-083
+- Skills: `pixel-art-assets`, `world-maps`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** `tools/art/gen_tiles.py` **entonces** genera también el atlas del Bosque con la misma disposición de piezas que `terrain.png` (hierba oscura y musgo, tierra húmeda, agua de pantano, copas oscuras, raíces), en Resurrect 64 y de forma determinista.
+2. **Dado** un mapa con la propiedad `biome` (`meadow` o `forest`) **entonces** `TerrainBaker` usa su atlas; sin la propiedad usa el de la Pradera, así que los mapas actuales no cambian.
+3. **Dado** las cuevas **entonces** comparten las piezas de interior con una paleta por mapa (`palette`: Mina marrón, Cripta verde) y la Mina se ve igual que hoy.
+4. **Dado** el cambio de mapa al Bosque **entonces** no tarda más que entrar a la Pradera.
+
+**Notas técnicas**
+- Un tileset por tier (GDD §Mundo). La paleta se aplica al generar el atlas (un PNG por paleta), sin shader.
+
+---
+
+### HU-109 · Monstruos del Bosque y de la Cripta
+**Como** jugador de nivel 6 a 10 **quiero** monstruos nuevos con mecánicas reconocibles **para** que subir en el Bosque no sea pegar a lobos más grandes.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-036, HU-084
+- Skills: `game-content`, `combat-system` (subagente `content-designer`)
+
+**Criterios de aceptación**
+1. **Dado** `content/monsters.json` **entonces** el Linde (6–8) y el Pantano (8–10) tienen 3 monstruos de campamento cada uno, con al menos uno `hard` (a distancia o con mecánica), y 1 élite cada uno (nivel 8 y nivel 10); la Cripta tiene 2 monstruos de nivel 10, 1 élite de nivel 11 y las plantas trampa (inmóviles, enraízan en un área marcada a quien pasa).
+2. **Dado** sus hechizos **entonces** usan solo efectos y auras que ya existen (raíz, ralentización, veneno, área marcada) y cada mecánica se ve antes de doler (casteo o marca).
+3. **Dado** el modelo de `tools/balance/` **entonces** cualquier clase mata en solitario a un monstruo normal de su nivel dentro de `killCycleSecTarget`, la XP por hora entre clases queda en ±15 % y los élites piden un grupo de 2–3 (nadie los mata solo a nivel equivalente).
+4. **Dado** las tablas de XP **entonces** salen de la fórmula de `rules.progression` (nivel y tipo), sin números a mano.
+
+**Notas técnicas**
+- Propuesta de nombres para el `content-designer`: Linde (lobo del bosque, araña tejedora, leñador bandido; élite: oso viejo), Pantano (hombre lagarto, fuego fatuo, sapo gigante; élite: bruja del pantano), Cripta (esqueleto de raíces, espíritu del musgo; élite: guardián de la cripta).
+- `skeleton_warrior` y `lesser_lich_king` (niveles 13 y 15) siguen esperando a la Fase 3.
+
+---
+
+### HU-110 · Equipo, botín y vendedor de los niveles 6 a 10
+**Como** jugador **quiero** equipo nuevo que se note y un sitio donde comprar pociones en el Bosque **para** que avanzar compense y no tenga que volver a la Aldea.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-050, HU-055, HU-109
+- Skills: `inventory-items`, `game-content` (subagente `content-designer`)
+
+**Criterios de aceptación**
+1. **Dado** `content/items.json` **entonces** hay equipo de nivel 7 y de nivel 9 para cada casilla y cada tipo de arma y armadura que ya existe, común y poco común, y el comparador del tooltip (HU-053) lo muestra mejor que el de nivel 4–6.
+2. **Dado** las tablas de botín **entonces** los normales sueltan cobre, chatarra y a veces un verde, y los élites garantizan un verde y a veces un raro (`rules.loot`).
+3. **Dado** el punto seguro del Linde **entonces** un vendedor vende los consumibles del tier (poción de vida mayor y comida) y compra cualquier cosa; Marta no cambia.
+4. **Dado** el modelo **entonces** el oro que se gana del nivel 6 al 10 alcanza para las pociones sin farmear aparte.
+
+**Notas técnicas**
+- El botín del Árbol Podrido va en HU-117. Los objetos de nivel 13 y 15 que ya existen siguen para la Fase 3.
+
+---
+
+### HU-111 · Mapa del Bosque: Linde y Pantano
+**Como** jugador **quiero** un Bosque con dos zonas para subir del 6 al 10 **para** tener un sitio nuevo que explorar después de la Mina.
+- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Dependencias: HU-108, HU-109, HU-110
+- Skills: `world-maps`
+
+**Criterios de aceptación**
+1. **Dado** `maps/forest.tmj` (generado con `tools/maps/`, `biome: forest`) **entonces** tiene dos zonas abiertas en un solo mapa, Linde del Bosque (6–8) y Pantano (8–10), separadas por un cuello de botella; cruzar cada una lleva 25–40 s (`rules.world.zoneCrossTimeSecTarget`).
+2. **Dado** cada zona **entonces** tiene un punto de referencia visible (Linde: un árbol enorme; Pantano: una torre hundida), un sendero principal obvio, 2–3 campamentos con subniveles (los bajos en la entrada, los altos hacia la salida) y una rama lateral con su élite.
+3. **Dado** cada zona **entonces** tiene su punto seguro, y morir en el Bosque te devuelve al de la zona, no a la Aldea.
+4. **Dado** el mapa **entonces** desde la Mina se llega al Linde, al fondo del Pantano está la entrada de la Cripta (HU-115) y en el Linde está el lado alto del puente (HU-113).
+5. **Dado** `TiledMapLoaderTests` **entonces** todos los spawns son alcanzables desde la entrada, no quedan islas y los bordes son sólidos.
+
+**Notas técnicas**
+- Generador determinista como `gen_tier1_maps.py`. Regenerar el Tier 1 deja `meadow.tmj` con cambios de fin de línea: se restaura con `git checkout`.
+- Densidad: un spawn cada ~8×8 tiles en las zonas de farmeo (skill `world-maps`).
+
+---
+
+### HU-114 · Arte del Tier 2: monstruos, jefe e íconos
+**Como** jugador **quiero** que los monstruos y el equipo nuevos tengan su propio dibujo **para** reconocerlos de un vistazo.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-090, HU-109, HU-110
+- Skills: `pixel-art-assets`
+
+**Criterios de aceptación**
+1. **Dado** cada monstruo nuevo **entonces** tiene su hoja con las animaciones de HU-090 (reposo, andar, atacar, recibir golpe y morir) y se distingue a distancia de combate.
+2. **Dado** el Árbol Podrido **entonces** tiene una hoja a escala de jefe, como el Capataz.
+3. **Dado** los objetos nuevos **entonces** tienen su ícono, del mismo estilo que los de HU-082.
+4. **Dado** las hojas generadas **entonces** salen de `tools/art/` de forma determinista y lo que venga de fuera queda en `client/assets/CREDITS.md`.
+
+---
+
+### HU-115 · Cripta de Raíces
+**Como** grupo de nivel 9–10 **queremos** una cueva con trampa, élite y jefe **para** cerrar el Tier 2.
+- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Dependencias: HU-108, HU-109, HU-111
+- Skills: `world-maps`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** `maps/crypt.tmj` (mapa aparte con `palette: crypt`, ADR-007) **entonces** se entra por un portal al fondo del Pantano y tiene 3–5 salas para 5–10 minutos: entrada con punto seguro → salas de monstruos → sala de la trampa → rama lateral con la sala del jefe, y la sala del élite antes de la salida al Tier 3.
+2. **Dado** la sala de la trampa **entonces** las plantas trampa (HU-109) obligan a cruzar con cuidado o a limpiarlas, y se ven antes de activarse.
+3. **Dado** la salida al Tier 3 **entonces** está cerrada en la Fase 2 (`minPhase: 3`, HU-112).
+4. **Dado** `TiledMapLoaderTests` **entonces** todas las salas son alcanzables desde la entrada y morir dentro te deja en la entrada.
+
+**Notas técnicas**
+- Una sola copia compartida, como la Mina (ADR-007). El puzle de palancas ya está en la Mina: aquí la variedad es la trampa.
+
+---
+
+### HU-117 · Jefe Árbol Podrido
+**Como** grupo **queremos** un jefe que obligue a moverse y a reorganizarse **para** tener el objetivo final del Tier 2 y botín raro.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-100, HU-115, HU-116
+- Skills: `combat-system`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** la sala del jefe **entonces** el Árbol Podrido (nivel 11, `boss`, inmóvil) usa Raíces (área marcada sobre un jugador que lo enraíza, esquivable), Esporas (área duradera que daña en el tiempo y obliga a moverse, HU-100) y, bajo el 50 % de vida, invoca retoños que van a por quien menos amenaza tiene (HU-116).
+2. **Dado** `rules.boss` con nivel B = 11 y el tope 10 de la Fase 2 **entonces** 3 jugadores de nivel 9 con equipo de su nivel lo matan en 60–100 s; los casos de 2 de nivel 11 y de 12 + 10 se validan al abrir la Fase 3, y nadie lo mata solo.
+3. **Dado** su muerte **entonces** suelta exactamente un raro de su `groups` (una pieza por rol), asignado al azar a un miembro, y se anuncia en el chat global.
+4. **Dado** el jefe **entonces** es inmune a aturdir, enraizar y ralentizar (`rules.combat.bossImmuneToAuraKinds`).
+
+**Notas técnicas**
+- Inmóvil (`speed: 0`): quedarse lejos no es seguro porque Raíces y Esporas apuntan a jugadores a distancia.
+
+---
+
+### HU-119 · Pasada de balance y partida de prueba de la Fase 2
+**Como** diseñador **quiero** medir la Fase 2 entera y jugarla con amigos **para** cerrarla con datos, como la Fase 1.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-106, HU-107, HU-109, HU-110, HU-117, HU-118
+- Skills: `game-content`, `combat-system` (subagente `content-designer`)
+
+**Criterios de aceptación**
+1. **Dado** el modelo de `tools/balance/` **entonces** subir del 6 al 10 lleva unas 7,2 h (GDD §Progresión) y la XP por hora entre clases queda en ±15 %.
+2. **Dado** el Capataz **entonces** se valida el caso de 1 jugador de nivel 7 con 1 de nivel 5 que la Fase 1 no podía probar (GDD §Jefes).
+3. **Dado** los duelos con las builds nuevas **entonces** el favorito de cada pareja de clases gana entre el 60 % y el 75 % con nivel y equipo iguales (pilar 7).
+4. **Dado** la partida de prueba con amigos **entonces** sus notas quedan en `docs/design/playtest-notes.md` (Bosque, Cripta, jefe, mejoras y rendimiento) y lo que salga se convierte en HU.

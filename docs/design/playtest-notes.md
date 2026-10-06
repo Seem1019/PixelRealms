@@ -8,8 +8,8 @@ aquí. Los números de diseño no se tocan antes de jugar: se comparan con lo qu
 
 | Campo | Valor |
 |---|---|
-| Fecha | |
-| Versión (commit de `main`) | |
+| Fecha | 2026-10-05/06 (primera sesión: Fase 1 completa, resultado OK; sin tiempos apuntados) |
+| Versión (commit de `main`) | `cdd1688` (PR #18) |
 | Servidor | producción (`/play`) o local |
 | Jugadores (nombre · clase · navegador o escritorio) | |
 | Quién cronometra | |

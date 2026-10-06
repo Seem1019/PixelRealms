@@ -174,3 +174,36 @@
 - Pendiente en su día: CA5 (`say` por mapa, `party`/`global` y nombre del mapa en los marcos de grupo), con las HUs de chat y grupo (HU-060/HU-061). *(cerrado el 2026-10-02: ver la última nota)*
 - 2026-10-02 (rama `fix/phase1-audit-blockers`): CA5: el marco de grupo nombra el mapa del compañero (`UiText.map_name`) solo si no es el mío (`test_party_frames.gd`); `say` no cruza mapas y `party`/`global` sí (`SocialTests.Chat_AcrossMaps_SayStaysInTheMap_PartyAndGlobalArrive`).
 - 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): al cambiar de mapa, el cliente borra las entidades del mapa anterior al recibir `ChangeMap`, antes del fundido de 0,25 s; antes lo hacía al terminarlo y perdía las que el servidor manda en el mismo tick (NPC y jugadores junto al destino), que no volvían porque el servidor ya las daba por enviadas (`test_world_scene.gd::test_spawns_that_arrive_during_the_map_fade_are_kept`).
+
+---
+
+### HU-112 · Salida de la Mina al Bosque
+**Como** jugador de nivel 6 **quiero** salir de la Mina por el otro lado **para** llegar al Bosque (la cueva es el camino de ida).
+- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Dependencias: HU-027, HU-111
+- Skills: `world-maps`
+
+**Criterios de aceptación**
+1. **Dado** la Sala 3 de la Mina **entonces** la hornacina tapiada pasa a ser un portal al Linde del Bosque, y el portal de vuelta del Linde lleva a la Sala 3.
+2. **Dado** `rules.world.currentPhase` = 1 **cuando** piso la salida **entonces** no pasa nada y un aviso dice que el derrumbe aún bloquea el paso: los portales ganan `minPhase` (propiedad de Tiled) y el servidor lo valida.
+3. **Dado** la salida **entonces** sigue detrás del gólem élite de la Sala 3.
+
+**Notas técnicas**
+- `minPhase` deja fusionar el Bosque en `main` y desplegar arreglos de la Fase 1 antes de abrir la Fase 2 (HU-118). La salida de la Cripta al Tier 3 usa lo mismo (HU-115).
+
+---
+
+### HU-113 · Atajo del puente roto
+**Como** jugador que ya llegó al Bosque **quiero** volver a las Colinas sin cruzar la Mina **para** ir y venir de la Aldea sin perder tiempo.
+- Prioridad: Should · Estimación: M · Estado: Pendiente
+- Dependencias: HU-026, HU-111, HU-112
+- Skills: `world-maps`, `dotnet-server`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** el borde del Linde que da a las Colinas **cuando** uso la manivela del puente roto desde el Bosque (`Interact`, como las palancas de la Mina) **entonces** el puente queda bajado para siempre para ese personaje.
+2. **Dado** un personaje que lo bajó **cuando** pisa el puente por cualquiera de los dos lados **entonces** cruza entre el Linde y las Colinas.
+3. **Dado** un personaje que no lo bajó **cuando** llega desde las Colinas **entonces** lo ve levantado, un aviso dice que hay que bajarlo desde el otro lado y no cruza.
+4. **Dado** el desbloqueo **entonces** lo decide el servidor, se guarda con el personaje (migración EF) y sobrevive a la reconexión y al reinicio; el `Welcome` lo lleva para que el cliente dibuje el puente bajado o levantado.
+
+**Notas técnicas**
+- Es por personaje porque el atajo se gana llegando al otro lado (GDD §Zonas abiertas: "la cueva es el camino de ida, volver es gratis").
