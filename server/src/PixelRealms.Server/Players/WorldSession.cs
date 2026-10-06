@@ -87,7 +87,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
             if (previous.IsInCombat(ctx.Tick.NowMs, content.Current.Rules.Combat.InCombatWindowSec))
             {
                 ctx.SendError(ErrorCodes.InCombat, message: $"{previous.Name} sigue en combate");
-                ctx.Close(ErrorCodes.InCombat);
+                ctx.CloseAfterFlush(ErrorCodes.InCombat); // con Close, el cierre podía salir antes que el Error
                 return;
             }
             var prevConn = previous.ConnectionId;
