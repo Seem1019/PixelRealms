@@ -148,3 +148,17 @@
 - 2026-10-04 (rama `feat/duel-zone-and-polish`): CA3 preparado: `/fxbench` en el chat mantiene 24 marcas de área y 40 números durante 20 s y avisa del FPS p5, solo en el propio cliente (`FxBench`, `test_fx_bench.gd`). Falta medirlo en el navegador del equipo de referencia (apartado 5 de `docs/design/playtest-notes.md`).
 - 2026-10-05 (prueba local, rama `feat/duel-zone-and-polish`): `/fxbench` en el cliente de escritorio del PC de Diego: FPS p5 60,0 en 1 170 cuadros (topado por la sincronía vertical). Sigue faltando la medida en el navegador.
 - 2026-10-06: cerrada con la partida de prueba con amigos (Diego): `/fxbench` y el rendimiento del cliente (CA3), OK jugando; no se apuntaron tiempos ni cifras (`docs/design/playtest-notes.md`).
+
+---
+
+### HU-118 · Abrir la Fase 2
+**Como** administrador **quiero** subir la fase activa a 2 en el servidor **para** que los amigos jueguen el Tier 2.
+- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Dependencias: HU-104, HU-105, HU-111, HU-112, HU-115, HU-117
+- Skills: `dotnet-server`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** `rules.world.currentPhase` = 2 **entonces** el tope efectivo es 10 (`levelCapByPhase`) y un personaje que estaba en el tope 6 empieza el nivel 7 desde 0 (en el tope no se gana XP).
+2. **Dado** la Fase 2 **entonces** la salida de la Mina se abre (HU-112), la del Tier 3 sigue cerrada y el NPC de cambio de clase sigue en la Aldea (`classChange.npcUntilPhase` = 2).
+3. **Dado** los textos y la interfaz **entonces** nada da por hecho el tope 6 (barra de XP, `/level`, avisos) y `/level 10` funciona.
+4. **Dado** el despliegue **entonces** `docs/deploy.md` dice qué migraciones trae la Fase 2 (HU-104 y HU-113) y en qué orden se aplican, y se hace con copia de la BD antes (HU-075).

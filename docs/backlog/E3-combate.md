@@ -377,7 +377,7 @@
 
 ### HU-100 · Áreas duraderas (Fase 2)
 **Como** jugador **quiero** hechizos que dejan un área en el suelo durante un rato **para** controlar zonas en las peleas de grupo.
-- Prioridad: Should · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Pendiente
 - Dependencias: HU-086, HU-088
 - Skills: `combat-system`, `game-content`
 
@@ -389,3 +389,45 @@
 **Notas técnicas**
 - Sale de HU-088 CA2/CA3 el 2026-10-03: en la Fase 1 ningún hechizo deja un área persistente, así que no hay nada que probar
   hasta que el contenido de la Fase 2 traiga el primero.
+- 2026-10-06 (backlog de la Fase 2): el primero son las Esporas del Árbol Podrido (HU-117); por eso pasa a Must. Ningún hechizo
+  de clase de la Fase 2 la usa (Campo ardiente es instantáneo).
+
+---
+
+### HU-102 · Formas de área: cono y línea
+**Como** jugador **quiero** hechizos de área en cono delante de mí y en línea hacia donde apunto **para** usar Tajo amplio, Cuchillas arrojadizas y Sendero de luz.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-086, HU-096
+- Skills: `combat-system`, `net-protocol`, `godot-client`
+
+**Criterios de aceptación**
+1. **Dado** un hechizo con `shape: cone` **cuando** lo lanzo con `CastSpell{targetPos}` **entonces** el vértice es el lanzador, la dirección va hacia `targetPos` y alcanza a quien esté a ≤ `aoeRadius` y dentro de ±`aoeAngleDeg`/2, con el mismo criterio de pertenencia y de línea de visión que el círculo (HU-086).
+2. **Dado** un hechizo con `shape: line` **entonces** es un rectángulo de `aoeLength` × `aoeWidth` que sale del lanzador hacia `targetPos` y se corta en la primera pared que bloquea la vista (no atraviesa muros).
+3. **Dado** un cono o una línea con casteo **entonces** el origen y la dirección se fijan en `CastStarted` (como el punto del círculo) y todos ven la marca; moverse durante el casteo no la gira. Sin casteo, se resuelve en el mismo tick.
+4. **Dado** el cliente **cuando** mantengo la tecla del hechizo (HU-096) **entonces** veo el cono o la línea orientados hacia el ratón, y al lanzarlo la marca y el efecto visual tienen la forma real.
+5. **Dado** un monstruo con un hechizo en cono o en línea **entonces** apunta a su objetivo actual con la misma regla (ADR-015).
+6. **Dado** el validador **entonces** `EngineCapabilities.Shapes` incluye `cone` y `line`, Tajo amplio, Cuchillas arrojadizas y Sendero de luz dejan de salir como no disponibles (ADR-023) y un área de daño sin casteo solo se avisa si incumple la decisión D4 (`README.md` §Pendiente de diseño).
+7. **Dado** un cliente tramposo **cuando** manda un `targetPos` fuera de alcance (más `castRangeToleranceTiles`) **entonces** se rechaza como en HU-086; el cliente nunca manda ángulos: la dirección la calcula el servidor.
+
+**Notas técnicas**
+- Geometría pura en `PixelRealms.Game` con tests de bordes: el objetivo justo en el límite del ángulo, detrás del lanzador, pegado a él y tras una esquina.
+- `CastStarted` ya lleva `targetPos`; si el cliente no puede deducir el origen con precisión (el lanzador se mueve), gana un `origin` opcional (cambio aditivo, sin subir `ProtocolVersion`).
+- Cono de frío (nivel 11) queda disponible para la Fase 3 sin más trabajo.
+
+---
+
+### HU-116 · Invocaciones de monstruos
+**Como** grupo **queremos** jefes que llamen refuerzos **para** que el combate cambie a mitad y haya que reorganizarse.
+- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Dependencias: HU-036, HU-088
+- Skills: `combat-system`, `game-content`
+
+**Criterios de aceptación**
+1. **Dado** un hechizo de monstruo con el efecto `summon{monsterId, count}` **entonces** las invocaciones aparecen en casillas libres junto al lanzador, entran en combate con la tabla de amenaza del invocador y no reaparecen solas.
+2. **Dado** que el invocador muere, se reinicia o evade (HU-036) **entonces** sus invocaciones desaparecen.
+3. **Dado** las invocaciones **entonces** respetan un tope por invocador y por instancia (`rules.limits`) y salen de una reserva fija, sin romper el presupuesto de asignaciones de HU-088.
+4. **Dado** una invocación muerta **entonces** da 0 XP y no suelta botín: al jefe no se le puede farmear.
+5. **Dado** el validador **entonces** `summon` solo es válido en hechizos de monstruo (en uno de clase es un error) y su `monsterId` existe.
+
+**Notas técnicas**
+- La usa el Árbol Podrido (HU-117). Una feature entra en una fase solo si se usa en ella (pilar 6): no se generaliza a hechizos de jugador.
