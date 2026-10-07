@@ -16,12 +16,12 @@ public sealed class ContentLoaderTests
         result.Report.Errors.ShouldBeEmpty();
         var db = result.ContentOrThrow;
         db.Classes.Count.ShouldBe(4);
-        db.Spells.Count.ShouldBe(57); // + los 16 hechizos de los monstruos del Tier 2 (HU-109)
-        db.Auras.Count.ShouldBe(37);
-        db.Items.Count.ShouldBe(37);
+        db.Spells.Count.ShouldBe(59); // + los 16 hechizos de los monstruos del Tier 2 (HU-109) y 2 de consumibles (HU-110)
+        db.Auras.Count.ShouldBe(38);
+        db.Items.Count.ShouldBe(170); // + el equipo de nivel 7 y 9, raros, chatarra y consumibles del Tier 2 (HU-110)
         db.Monsters.Count.ShouldBe(24); // + los élites de las ramas de la pradera (HU-080) y los 12 del Tier 2 (HU-109)
         db.LootTables.Count.ShouldBe(24);
-        db.Vendors.Count.ShouldBe(1);
+        db.Vendors.Count.ShouldBe(2); // + Brena, en el campamento del Linde (HU-110)
         db.Rules.Hash.Length.ShouldBe(16);
     }
 
@@ -169,9 +169,9 @@ public sealed class ContentLoaderTests
     [InlineData("spells.json", "/spells/3/areaDurationMs", "200", "menos que un pulso")]                                    // HU-100
     [InlineData("spells.json", "/spells/10/areaDurationMs", "3000", "un salto, una carga o una invocación no dejan un área duradera")]                  // HU-100
     [InlineData("spells.json", "/spells/0/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":2}", "solo los hechizos de monstruo invocan")] // HU-116
-    [InlineData("spells.json", "/spells/36/effects/0", "{\"type\":\"summon\",\"monsterId\":\"nope\",\"count\":2}", "monsterId 'nope' no existe")] // HU-116
-    [InlineData("spells.json", "/spells/36/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":6}", "más que rules.limits.maxSummonsPerCaster")] // HU-116
-    [InlineData("spells.json", "/spells/35/areaDurationMs", "3000", "con proyectil no deja un área duradera")] // HU-100 (goblin_shoot tiene proyectil)
+    [InlineData("spells.json", "/spells/38/effects/0", "{\"type\":\"summon\",\"monsterId\":\"nope\",\"count\":2}", "monsterId 'nope' no existe")] // HU-116
+    [InlineData("spells.json", "/spells/38/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":6}", "más que rules.limits.maxSummonsPerCaster")] // HU-116
+    [InlineData("spells.json", "/spells/37/areaDurationMs", "3000", "con proyectil no deja un área duradera")] // HU-100 (goblin_shoot tiene proyectil)
     public void CrossReferenceRules_Fail(string file, string pointer, string valueJson, string expectedFragment)
     {
         using var dir = new TempContent();

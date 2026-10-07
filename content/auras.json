@@ -28,6 +28,7 @@
     {"id": "priest_hymn_hot", "name": "Himno", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 10000, "tickMs": 2000, "base": 1.5, "spCoef": 0.04, "icon": "spells/hymn", "provisional": true},
 
     {"id": "bread_hot", "name": "Comiendo", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 15000, "tickMs": 3000, "base": 10, "breaksOnDamage": true, "icon": "items/bread"},
+    {"id": "smoked_venison_hot", "name": "Comiendo", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 15000, "tickMs": 3000, "base": 24, "breaksOnDamage": true, "icon": "items/bread"},
 
     {"id": "foreman_whip_bleed", "name": "Latigazo", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 9000, "tickMs": 3000, "base": 8, "icon": "spells/whip"},
     {"id": "foreman_rally_aura", "name": "Enfurecido", "kind": "stat_mod", "isDebuff": false, "durationMs": 10000, "mods": {"damageDonePct": 0.25}, "icon": "spells/rally"},
