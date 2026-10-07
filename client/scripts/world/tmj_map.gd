@@ -8,6 +8,10 @@ const TILE_LAYERS := ["ground", "detail", "walls", "above"]
 
 var map_id: String = ""
 var display_name: String = ""
+## HU-108: con qué atlas se hornea (TerrainBaker.atlas_path_for). `biome` para exteriores (meadow, forest) y `palette`
+## para cuevas (mine, crypt); vacías, las de la Pradera y la Mina.
+var biome: String = ""
+var palette: String = ""
 var width: int = 0
 var height: int = 0
 var tile_size: int = 16
@@ -61,6 +65,8 @@ func _parse(path: String) -> bool:
 	var props := _props(root)
 	map_id = str(props.get("mapId", path.get_file().get_basename()))
 	display_name = str(props.get("displayName", map_id))
+	biome = str(props.get("biome", ""))
+	palette = str(props.get("palette", ""))
 	collision = CollisionGrid.new(width, height)
 	_load_tile_props(root, path.get_base_dir())
 	for layer: Variant in root.get("layers", []):

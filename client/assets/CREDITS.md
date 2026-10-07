@@ -18,6 +18,7 @@ el resto del repositorio. Se generó así porque desde el entorno de trabajo no 
 | Carpeta | Generador | Contenido |
 |---|---|---|
 | `tiles/terrain.png`, `tiles/placeholder.png`, `tiles/collision.png` | `tools/art/gen_tiles.py` | pasto, tierra, camino, agua con orilla de piedras, rocas, bosque, arbustos, copas, cercas, casas, objetos (autotile dual-grid) |
+| `tiles/terrain_forest.png`, `tiles/terrain_crypt.png` | `tools/art/gen_tiles.py` | Bosque (hierba oscura con musgo, tierra húmeda, pantano, copas oscuras, raíces) y Cripta (interior de cueva en verde), misma disposición que `terrain.png` (HU-108) |
 | `sprites/characters/`, `sprites/npcs/`, `sprites/monsters/`, `sprites/shadow*.png` | `tools/art/gen_chars.py` | 4 clases, 2 NPC, 8 monstruos y 2 élites (jabalí de guerra y huargo, variantes de su especie) de 32×32 y 2 jefes de 64×64; 3 direcciones (w = e espejado), reposo, caminar, ataque o casteo, golpe y muerte (HU-090) |
 | `icons/items/`, `icons/spells/`, `icons/slots/`, `icons/classes/` | `tools/art/gen_icons.py` | 37 items, 38 hechizos, 9 siluetas de equipo, 4 clases (16×16) |
 | `sprites/vfx/` | `tools/art/gen_vfx.py` | efectos de hechizo (HU-091): brillos de casteo, proyectiles en 8 direcciones, impactos, cura y estallidos de área |
