@@ -101,6 +101,18 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
     head_top = torso_top - head_h + 1 * s
     skin, top, pants, boots = spec["skin"], spec["top"], spec["pants"], spec["boots"]
     robe = spec.get("robe", False)
+    extras = spec.get("extras")
+    ctx = {"cx": cx, "feet": feet, "s": s, "lean": (lx, ly), "walk": walk, "bob": bob,
+           "torso": (cx - torso_w // 2 + lx, torso_top + ly, torso_w, torso_h),
+           "head": (cx - head_w // 2 + (1 if direction == "e" else 0) + lx, head_top + ly, head_w, head_h),
+           "arms_up": bool(spec.get("_arms_up")), "eyes_closed": bool(spec.get("_eyes_closed"))}
+
+    def hook(stage: str) -> None:
+        """Rasgos propios de un monstruo (cola, hocico, costillas...; monstruos del Tier 2, gen_monsters_t2.py) en tres
+        momentos: `under` (detrás del cuerpo), `torso` (sobre el torso, bajo brazos y cabeza) y `over` (encima de todo,
+        antes del contorno). Sin `extras` no dibuja nada: las hojas que no lo usan no cambian."""
+        if extras:
+            extras(img, stage, direction, ctx)
 
     def legs():
         if direction == "e":
@@ -139,6 +151,7 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
                     put(img, cx + lx, torso_top + ly + torso_h - 2 * s, "gold")
             if spec.get("trim") and direction == "s":
                 vline(img, cx - 1 + lx, torso_top + ly + 1, torso_top + ly + torso_h - 3 * s, spec["trim"])
+        hook("torso")
 
     def arm(side: int, front: bool):
         swing = {0: 1, 1: 0, 2: -1, 3: 0}.get(walk, 0) * side
@@ -298,6 +311,26 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         elif w == "book":
             rect(img, hx - 2, hy - 2, 5, 4, "wine")
             hline(img, hx - 2, hx + 2, hy - 2, "gold")
+        elif w == "axe":
+            # Hacha de leñador: mango largo y hoja ancha hacia fuera.
+            vline(img, hx, hy - 10 * s, hy + 2 * s, "rust")
+            vline(img, hx + 1, hy - 9 * s, hy + 2 * s, "wine")
+            rect(img, hx + 2, hy - 11 * s, 3 * s, 4 * s, "silver")
+            vline(img, hx + 2 + 3 * s, hy - 12 * s, hy - 7 * s, "mist")
+            put(img, hx - 1, hy - 10 * s, "lavgray")
+        elif w == "spear":
+            vline(img, hx, hy - 13 * s, hy + 3 * s, "rust")
+            put(img, hx, hy - 12 * s, "clay")
+            rect(img, hx - 1, hy - 15 * s, 3, 2 * s, "silver")
+            put(img, hx, hy - 16 * s, "mist")
+            put(img, hx, hy - 17 * s, "white")
+        elif w == "thorn":
+            # Rama espinosa a modo de espada.
+            line(img, hx, hy, hx + (3 if direction == "e" else 0), hy - 9 * s, "clay")
+            line(img, hx + 1, hy, hx + (4 if direction == "e" else 1), hy - 8 * s, "rust")
+            for k, o in ((3, -1), (5, 2), (7, -1)):
+                put(img, hx + o + (k // 3 if direction == "e" else 0), hy - k * s, "leaf")
+            hline(img, hx - 2, hx + 2, hy - 1, "olive")
 
     def shield(at):
         if not spec.get("shield") or direction == "n":
@@ -328,6 +361,7 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         weapon_at(img, pose.get("kind", spec.get("weapon")), hx, hy, pose["angle"], s, spec, pose)
 
     # Orden de dibujo según la dirección.
+    hook("under")
     if direction == "n":
         weapon_hand = arm(1, False) if not robe else (cx + torso_w // 2 + 1, torso_top + torso_h)
         weapon(weapon_hand)
@@ -354,6 +388,7 @@ def humanoid(spec: dict, direction: str, frame: str, size: int = 32) -> np.ndarr
         weapon(right)
         posed_weapon()
         shield(left)
+    hook("over")
     img = outline(img)
     for fx in spec.get("_fx", []):
         fx(img)
@@ -433,6 +468,28 @@ def weapon_at(img, kind, hx, hy, ang, s, spec, pose) -> None:
     elif kind == "book":
         rect(img, hx - 2, hy - 2, 5, 4, "wine")
         hline(img, hx - 2, hx + 2, hy - 2, "gold")
+    elif kind == "axe":
+        line(img, *at(-3), *at(8 * s), "rust")
+        line(img, *at(-2, 1), *at(7 * s, 1), "wine")
+        for k in range(10 * s, 17 * s + 1):  # hoja maciza del lado que corta (a medio píxel, sin huecos al girar)
+            for j in range(2, 9):
+                put(img, *at(k / 2, j / 2), "silver")
+        line(img, *at(4.5 * s, 4.5), *at(9 * s, 4.5), "mist")
+        put(img, *at(7 * s, -1), "lavgray")
+    elif kind == "spear":
+        line(img, *at(-9), *at(6), "rust")
+        put(img, *at(5), "clay")
+        line(img, *at(7), *at(9), "mist")
+        put(img, *at(8, -1), "silver")
+        put(img, *at(8, 1), "silver")
+        put(img, *at(10), "white")
+    elif kind == "thorn":
+        line(img, *at(1), *at(10 * s), "clay")
+        line(img, *at(1, 1), *at(9 * s, 1), "rust")
+        for k, o in ((3, -1), (5, 2), (7, -1), (9, 2)):
+            put(img, *at(k * s, o), "leaf")
+        put(img, *at(10 * s), "pale")
+        line(img, *at(0, -2), *at(0, 2), "olive")
 
 
 def fx_trail(hx, hy, a0, a1, radius, colors):
@@ -486,11 +543,12 @@ def fx_dust(cx, feet, direction):
 
 
 GLOWS = {"mage": ("ice", "sky"), "priest": ("cream", "gold"), "lich": ("pink_p", "lilac"), "trainer": ("lilac", "violet"),
-         "warrior": ("gold", "amber"), "rogue": ("leaf", "jade"), "default": ("gold", "amber")}
+         "warrior": ("gold", "amber"), "rogue": ("leaf", "jade"), "default": ("gold", "amber"),
+         "woodcutter": ("cream", "sand"), "poison": ("lime", "leaf"), "roots": ("leaf", "jade")}
 
 # Ataque por clase o monstruo (si no se indica, sale del arma).
 ATTACK_BY_WEAPON = {"sword": "slash", "dagger": "slash", "staff": "staff", "mace": "mace", "bow": "bow", "pick": "pick",
-                    "whip": "whip", "book": "punch", None: "punch"}
+                    "whip": "whip", "book": "punch", None: "punch", "axe": "chop", "spear": "spear", "thorn": "slash"}
 
 # Tablas de ataque mirando al este: (alcance de la mano, altura de la mano, ángulo del arma, inclinación del cuerpo).
 ATTACK_POSES = {
@@ -502,6 +560,10 @@ ATTACK_POSES = {
     "whip": [(-2, -3, -150, 0), (0, -4, -95, 0), (3, 0, 0, 1), (1, 0, 30, 0)],
     "bow": [(2, -1, 0, 0), (2, -1, 0, 0), (2, -1, 0, -1), (2, -1, 0, 0)],
     "punch": [(-1, 0, 0, 0), (2, 0, 0, 1), (4, 0, 0, 1), (1, 0, 0, 0)],
+    # Hachazo: como el pico, pero acaba más arriba para que la hoja se vea en el suelo también de frente.
+    "chop": [(-1, -5, -120, 0), (1, -3, -55, 1), (3, -1, 20, 1), (2, 0, 45, 0)],
+    # Lanza: la mano avanza menos que en la estocada para que la punta no se salga del cuadro.
+    "spear": [(-4, 0, -8, -1), (0, 0, 0, 0), (2, 0, 0, 1), (0, 1, 10, 0)],
 }
 
 
@@ -538,7 +600,7 @@ def humanoid_combat(spec: dict, direction: str, kind: str, i: int, size: int) ->
             if i == 2:
                 tip = (int(hand[0] + math.cos(math.radians(a)) * 13), int(hand[1] + math.sin(math.radians(a)) * 13))
                 fx.append(fx_sparkle(tip[0], tip[1], 2, "cream", "gold"))
-        if style in ("slash", "mace", "pick") and i in (1, 2):
+        if style in ("slash", "mace", "pick", "chop") and i in (1, 2):
             prev = dir_angle(direction, ATTACK_POSES[style][i - 1][2])
             colors = ("cream", "gold") if style == "mace" and spec.get("glow") == "priest" else ("mist", "white")
             fx.append(fx_trail(hand[0], hand[1], prev, a, 10 * s if style == "slash" else 9 * s, colors))
@@ -547,13 +609,19 @@ def humanoid_combat(spec: dict, direction: str, kind: str, i: int, size: int) ->
                 fx.append(fx_speedlines(cx, torso_top, direction))
             if i == 2:
                 fx.append(fx_sparkle(hand[0] + fx_ * 7, hand[1] + fy_ * 7, 2, "mist", "white"))
+        if style == "spear":
+            if i in (1, 2):
+                fx.append(fx_speedlines(cx, torso_top, direction))
+            if i == 2:
+                tip = (int(round(hand[0] + math.cos(math.radians(a)) * 11)), int(round(hand[1] + math.sin(math.radians(a)) * 11)))
+                fx.append(fx_sparkle(tip[0], tip[1], 2, glow[1], glow[0]))
         if style == "staff" and i in (1, 2):
             tip = (int(round(hand[0] + math.cos(math.radians(a)) * 13 * s)), int(round(hand[1] + math.sin(math.radians(a)) * 13 * s)))
             fx.append(fx_sparkle(tip[0], tip[1], 2 if i == 1 else 4, glow[1], glow[0]))
         if style == "mace" and i == 2 and spec.get("glow") == "priest":
             mt = (int(round(hand[0] + math.cos(math.radians(a)) * 8 * s)), int(round(hand[1] + math.sin(math.radians(a)) * 8 * s)))
             fx.append(fx_sparkle(mt[0], mt[1], 4, "gold", "cream"))
-        if style == "pick" and i == 2:
+        if style in ("pick", "chop") and i == 2:
             fx.append(fx_dust(cx, feet, direction))
         if style == "punch" and i == 2:
             fx.append(fx_sparkle(hand[0] + fx_ * 3, hand[1] + fy_ * 3, 2, glow[1], glow[0]))
