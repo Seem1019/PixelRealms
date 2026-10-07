@@ -191,12 +191,14 @@ def cc_value2(ch,s,AU):
     return val*(1+0.5*(n-1))
 def mob_value(ch,s,AU,base_speed=4.0):
     uses=60/max(s['cooldownMs']/1000,1.0); per=0
+    # el lanzador también recibe lo beneficioso de un área a su alrededor o de una línea que sale de él (HU-102)
+    own=s['targeting'] in('self','ally','self_aoe_allies') or (s['targeting'] in('ground_aoe_allies','ground_aoe_all') and s.get('shape')=='line')
     for e in s['effects']:
         if e['type']=='leap': per+=e['maxRange']
         if e['type']=='dash': per+=5.0
         if e['type']=='apply_aura':
             a=AU[e['auraId']]
-            if a['kind']=='stat_mod' and a.get('mods',{}).get('speedPct',0)>0 and (e.get('applyTo')=='self' or s['targeting'] in('self','ally')):
+            if a['kind']=='stat_mod' and a.get('mods',{}).get('speedPct',0)>0 and not a.get('isDebuff') and (e.get('applyTo')=='self' or own):
                 per+=a['mods']['speedPct']*base_speed*a['durationMs']/1000
             if a.get('removesKinds') and 'root' in a['removesKinds']: per+=2*base_speed  # ~2 s de control quitado
     return per*uses

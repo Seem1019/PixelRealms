@@ -1,7 +1,7 @@
 {
   "$schema": "./schemas/auras.schema.json",
   "auras": [
-    {"id": "warrior_shield_block_aura", "name": "Bloqueo con escudo", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"damageTakenPct": -0.5}, "icon": "spells/shield_block", "provisional": true},
+    {"id": "warrior_shield_block_aura", "name": "Bloqueo con escudo", "kind": "stat_mod", "isDebuff": false, "durationMs": 5000, "mods": {"damageTakenPct": -0.5}, "icon": "spells/shield_block", "provisional": false},
     {"id": "warrior_charge_stun", "name": "Cargado", "kind": "stun", "isDebuff": true, "durationMs": 1500, "icon": "spells/charge"},
     {"id": "warrior_hamstring_slow", "name": "Tendón cortado", "kind": "slow", "isDebuff": true, "durationMs": 6000, "pct": 0.4, "icon": "spells/hamstring", "provisional": true},
     {"id": "warrior_mighty_blow_stun", "name": "Aturdido", "kind": "stun", "isDebuff": true, "durationMs": 1000, "icon": "spells/mighty_blow", "provisional": true},
@@ -11,7 +11,7 @@
     {"id": "rogue_sprint_aura", "name": "Carrera", "kind": "stat_mod", "isDebuff": false, "durationMs": 6000, "mods": {"speedPct": 0.5}, "removesKinds": ["root", "slow"], "immuneKinds": ["root", "slow"], "icon": "spells/sprint"},
     {"id": "rogue_shadowstep_empower", "name": "Paso sombrío", "kind": "stat_mod", "isDebuff": false, "durationMs": 3000, "mods": {"damageDonePct": 0.6}, "icon": "spells/shadowstep", "provisional": false},
     {"id": "rogue_shadowstep_slow", "name": "Desorientado", "kind": "slow", "isDebuff": true, "durationMs": 500, "pct": 0.4, "icon": "spells/shadowstep", "provisional": false},
-    {"id": "rogue_blades_speed", "name": "Impulso", "kind": "stat_mod", "isDebuff": false, "durationMs": 3000, "mods": {"speedPct": 0.3}, "icon": "spells/throwing_blades", "provisional": true},
+    {"id": "rogue_blades_speed", "name": "Impulso", "kind": "stat_mod", "isDebuff": false, "durationMs": 3000, "mods": {"speedPct": 0.25}, "icon": "spells/throwing_blades", "provisional": false},
     {"id": "rogue_mortal_root", "name": "Clavado", "kind": "root", "isDebuff": true, "durationMs": 1000, "icon": "spells/mortal_slash", "provisional": true},
     {"id": "rogue_crippling_slow", "name": "Debilitado", "kind": "slow", "isDebuff": true, "durationMs": 4000, "pct": 0.3, "icon": "spells/crippling_poison", "provisional": true},
 
@@ -19,12 +19,12 @@
     {"id": "mage_frost_nova_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova", "provisional": false},
     {"id": "mage_meteor_stun", "name": "Aturdido", "kind": "stun", "isDebuff": true, "durationMs": 1000, "icon": "spells/meteor", "provisional": true},
 
-    {"id": "priest_renew_hot", "name": "Renovar", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 12000, "tickMs": 3000, "base": 2.4, "spCoef": 0.07, "icon": "spells/renew"},
+    {"id": "priest_renew_hot", "name": "Renovar", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 12000, "tickMs": 3000, "base": 13, "spCoef": 0.22, "icon": "spells/renew", "provisional": false},
     {"id": "priest_power_shield_aura", "name": "Escudo sagrado", "kind": "shield", "isDebuff": false, "durationMs": 15000, "base": 50, "spCoef": 0.8, "icon": "spells/power_shield"},
     {"id": "priest_power_shield_speed", "name": "Paso ligero", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"speedPct": 0.2}, "icon": "spells/power_shield", "provisional": false},
     {"id": "priest_pulse_slow", "name": "Deslumbrado", "kind": "slow", "isDebuff": true, "durationMs": 1500, "pct": 0.3, "icon": "spells/holy_pulse", "provisional": false},
-    {"id": "priest_path_speed", "name": "Sendero de luz", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"speedPct": 0.3}, "icon": "spells/path_of_light", "provisional": true},
-    {"id": "priest_path_slow", "name": "Cegado", "kind": "slow", "isDebuff": true, "durationMs": 3000, "pct": 0.3, "icon": "spells/path_of_light", "provisional": true},
+    {"id": "priest_path_speed", "name": "Sendero de luz", "kind": "stat_mod", "isDebuff": false, "durationMs": 4000, "mods": {"speedPct": 0.25}, "icon": "spells/path_of_light", "provisional": false},
+    {"id": "priest_path_slow", "name": "Cegado", "kind": "slow", "isDebuff": true, "durationMs": 2000, "pct": 0.3, "icon": "spells/path_of_light", "provisional": false},
     {"id": "priest_hymn_hot", "name": "Himno", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 10000, "tickMs": 2000, "base": 1.5, "spCoef": 0.04, "icon": "spells/hymn", "provisional": true},
 
     {"id": "bread_hot", "name": "Comiendo", "kind": "hot", "isDebuff": false, "school": "magic", "durationMs": 15000, "tickMs": 3000, "base": 10, "breaksOnDamage": true, "icon": "items/bread"},

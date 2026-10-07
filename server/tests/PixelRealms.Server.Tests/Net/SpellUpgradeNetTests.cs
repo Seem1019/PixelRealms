@@ -19,8 +19,6 @@ public sealed class SpellUpgradeNetTests
     private static PatchedContent Content() => PatchedContent.WithRules(r => r["world"]!["currentPhase"] = 2)
         .PatchContent("spells.json", root =>
         {
-            // Fase 2 abierta: el validador no deja las Cuchillas (área de daño sin casteo de 4 casillas) hasta HU-106.
-            root["spells"]!.AsArray().First(s => s!["id"]!.GetValue<string>() == "rogue_throwing_blades")!["aoeRadius"] = 3;
             var fireball = root["spells"]!.AsArray().First(s => s!["id"]!.GetValue<string>() == "mage_fireball")!;
             fireball["upgrades"] = JsonNode.Parse("""
                 [{ "id": "fireball_quick", "name": "Llama rápida", "description": "Casteo 0,5 s más corto.", "mods": [{ "stat": "castMs", "add": -500 }] },

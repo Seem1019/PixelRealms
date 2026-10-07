@@ -47,9 +47,6 @@ public sealed class SpellUpgradeTests
                 _ => null,
             };
             if (ups is not null) s["upgrades"] = ups;
-            // Con la Fase 2 abierta, el validador no deja un área de daño sin casteo de más de 3 casillas (ADR-027 D4): hasta
-            // la pasada de números de HU-106, las Cuchillas de prueba se quedan en 3.
-            if (id == "rogue_throwing_blades") s["aoeRadius"] = 3;
         }
     }
 

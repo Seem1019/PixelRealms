@@ -88,8 +88,9 @@ public sealed class ContentLoaderTests
     {
         var warnings = ContentLoader.Load(TestContent.ContentDir).Report.Warnings;
         warnings.ShouldNotContain(w => w.Contains("warrior_cleave", StringComparison.Ordinal));        // radio 2,5
-        warnings.ShouldContain(w => w.Contains("rogue_throwing_blades", StringComparison.Ordinal)
-            && w.Contains("ADR-015", StringComparison.Ordinal));                                       // radio 4, sin casteo (HU-106)
+        warnings.ShouldNotContain(w => w.Contains("rogue_throwing_blades", StringComparison.Ordinal)); // radio 3 desde HU-106
+        warnings.ShouldContain(w => w.Contains("mage_cone_of_cold", StringComparison.Ordinal)
+            && w.Contains("ADR-015", StringComparison.Ordinal));                                       // radio 5, sin casteo (Fase 3)
     }
 
     [Fact]
@@ -97,6 +98,8 @@ public sealed class ContentLoaderTests
     {
         using var dir = new TempContent();
         dir.PatchPointer("rules.json", "/world/currentPhase", "2"); // tope 10: las Cuchillas (nivel 9) ya se alcanzan
+        dir.Patch("spells.json", root =>
+            root["spells"]!.AsArray().First(s => s!["id"]!.GetValue<string>() == "rogue_throwing_blades")!["aoeRadius"] = 4); // como antes de HU-106
         var result = ContentLoader.Load(dir.Path);
         result.Content.ShouldBeNull();
         result.Report.Errors.ShouldContain(e => e.Contains("rogue_throwing_blades", StringComparison.Ordinal) && e.Contains("ya se alcanza", StringComparison.Ordinal));

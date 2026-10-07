@@ -9,7 +9,7 @@ Supuestos (docs/design/balance-report.md §Fase 2):
   lo numérico (stats, armadura, daño del arma, poder de hechizo) × gear_factor(nivel) = 1 + 0,2 · (nivel − 6). Es el
   presupuesto lineal por nivel de la skill game-content, con el equipo de nivel N − 1 de media al nivel N.
 - Rangos de hechizo como el servidor (+spellRankBonusPct del `base` por rango, rules.progression.spellRankLevels).
-- Hechizos: los 16 medidos de la Fase 1. Los de nivel 7 y 9 siguen provisionales (HU-106) y no se cuentan.
+- Hechizos: los 16 de la Fase 1. Los de nivel 7 y 9 (HU-106) no entran aquí: el solitario con ellos lo mide phase2.py.
 - El monstruo pega con su básico y sus hechizos (cooldown, casteo que pausa su básico, hpBelowPct). Las áreas marcadas no se
   esquivan (peor caso) y el modelo no ve el kiteo, las interrupciones ni los controles del jugador sobre el monstruo.
 - El cuerpo a cuerpo tarda (attackRange − alcance del arma) / velocidad en llegar a un monstruo a distancia.
