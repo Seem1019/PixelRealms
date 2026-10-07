@@ -31,6 +31,12 @@ public sealed class MapInstance(int id, MapData data)
     /// <summary>Puertas abiertas y cuándo vuelven a cerrarse (ms de juego).</summary>
     public Dictionary<string, long> DoorsOpenUntil { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>Áreas duraderas de la instancia, de la más antigua a la más nueva (HU-100); las gestiona CastSystem.</summary>
+    public List<Combat.PersistentArea> PersistentAreas { get; } = new();
+
+    /// <summary>Id de la próxima área duradera (`AreaSpawn.areaId`).</summary>
+    public int NextPersistentAreaId { get; set; } = 1;
+
     public EntityTable<Player> Players => new(_players);
 
     public EntityTable<Monster> Monsters => new(_monsters);

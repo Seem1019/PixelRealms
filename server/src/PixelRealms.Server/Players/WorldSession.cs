@@ -115,6 +115,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         ctx.Send(mapper.ToStatsUpdate(player));
         foreach (var cd in mapper.ToCooldowns(player)) ctx.Send(cd); // recargas que siguieron corriendo fuera (HU-015)
         if (EventDispatcher.ToMapObjects(instance) is { } objects) ctx.Send(objects); // palancas y puertas (HU-083)
+        foreach (var area in EventDispatcher.ToAreaSpawns(instance, ctx.Tick.NowMs)) ctx.Send(area); // áreas duraderas (HU-100)
     }
 
     /// <summary>HU-025 CA2: la conexión nueva toma el personaje que seguía en el mundo; se reenvía Welcome y la AOI completa.</summary>
@@ -131,6 +132,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         // Las auras propias siguieron corriendo mientras estaba linkdead: el cliente nuevo no las conoce (HU-098 CA2).
         foreach (var aura in player.Auras.All) ctx.Send(EventDispatcher.ToAuraApplied(player, aura, ctx.Tick.NowMs));
         if (instance is not null && EventDispatcher.ToMapObjects(instance) is { } objects) ctx.Send(objects);
+        if (instance is not null) foreach (var area in EventDispatcher.ToAreaSpawns(instance, ctx.Tick.NowMs)) ctx.Send(area);
         logger.LogInformation("{Name} reconectó (conexión {Conn})", player.Name, connectionId);
     }
 

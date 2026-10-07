@@ -47,12 +47,12 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     public int PendingImpacts(MapInstance map) => _impacts.TryGetValue(map.Id, out var l) ? l.Count : 0;
 
     /// <summary>
-    /// Áreas apuntadas en curso en la instancia: casteos `ground_*` con su marca en el suelo (los saltos no cuentan). Son las
-    /// "áreas" de `rules.limits.maxAreasPerInstance` y de `/admin/stats` (HU-072 CA3); en la Fase 1 no hay áreas duraderas.
+    /// Áreas de la instancia: casteos `ground_*` con su marca en el suelo (los saltos no cuentan) y áreas duraderas (HU-100). Son
+    /// las "áreas" de `rules.limits.maxAreasPerInstance` y de `/admin/stats` (HU-072 CA3).
     /// </summary>
     public int ActiveAreas(MapInstance map)
     {
-        var n = 0;
+        var n = map.PersistentAreas.Count;
         foreach (var a in map.Actors.Values)
             if (a.Combat.Cast is { } c && c.Spell.Targeting.IsGround() && !HasLeap(c.Spell)) n++;
         return n;
@@ -64,7 +64,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         return false;
     }
 
-    /// <summary>Descarta los impactos en vuelo de quien sale del mundo (HU-015): no resuelven a nombre de un ausente.</summary>
+    /// <summary>Descarta los impactos en vuelo de quien sale del mundo (HU-015): no resuelven a nombre de un ausente. Sus áreas
+    /// duraderas se van en el siguiente pulso (ya no está en el mapa).</summary>
     public void ForgetCaster(Actor caster, MapInstance map)
     {
         if (!_impacts.TryGetValue(map.Id, out var list)) return;
@@ -149,8 +150,9 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                 {
                     if (!ValidPoint(targetPos, map)) return CastErrors.InvalidPayload;
                     if (hasLeap) break;
-                    // HU-033 CA4 / HU-086 CA7b: tope de marcas en el suelo por instancia (rendimiento del cliente y del servidor).
-                    if (!spell.IsInstant && ActiveAreas(map) >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
+                    // HU-033 CA4 / HU-086 CA7b: tope de marcas en el suelo por instancia (rendimiento del cliente y del servidor). Las
+                    // áreas duraderas lo comprueban abajo, contando la que sustituyen (HU-100).
+                    if (!spell.IsInstant && spell.AreaDurationMs == 0 && ActiveAreas(map) >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
                     if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
                     // HU-102: en el cono y la línea el punto solo da la dirección (la línea se corta en la primera pared).
                     if (spell.Shape != Shape.Circle) break;
@@ -168,6 +170,16 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         // usa el punto: no se reenvía.
         if (spell.Targeting.IsArea() && spell.Shape != Shape.Circle) targetPos = AimPoint(caster, spell, targetPos);
         else if (spell.Targeting is Targeting.SelfAoeEnemies or Targeting.SelfAoeAllies) targetPos = null;
+        // Un área no tiene objetivo: el `targetId` del cliente no elige nada (p. ej. el camino del proyectil en vez del área).
+        if (spell.Targeting.IsArea()) targetId = null;
+
+        // HU-100: un área duradera también ocupa sitio en la instancia, aunque sea instantánea o alrededor del lanzador; si el
+        // lanzador ya tiene las suyas al tope, la nueva sustituye a una y no suma.
+        if (spell.AreaDurationMs > 0)
+        {
+            var replaces = AreasOf(caster, map) >= ctx.Rules.Limits.MaxPersistentAreasPerCaster ? 1 : 0;
+            if (ActiveAreas(map) - replaces >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
+        }
 
         // Otro hechizo durante un casteo lo cancela sin coste (ADR-019); los usables (pociones) no.
         if (cancelCurrent && combat.Cast is { } current) EndCast(caster, current, CastResults.Cancelled, null, map, ctx);
@@ -241,6 +253,7 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
     public void Tick(MapInstance map, TickContext ctx)
     {
         ResolveImpacts(map, ctx);
+        if (map.PersistentAreas.Count > 0) PulseAreas(map, ctx);
         _casting.Clear();
         _flying.Clear();
         foreach (var a in map.Actors.Values)
@@ -314,7 +327,86 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
             caster.Combat.AbilityLockEndsAtMs = Math.Max(caster.Combat.AbilityLockEndsAtMs, end); // en el aire ni se castea ni se pega
             return;
         }
+        if (spell.AreaDurationMs > 0 && spell.Targeting.IsArea())
+        {
+            effects.ApplyCastOnly(caster, spell, map, ctx); // lo del lanzamiento, una vez; los pulsos solo tocan a los objetivos
+            SpawnArea(caster, spell, targetPos ?? origin, origin, map, ctx);
+            return;
+        }
         effects.Apply(caster, spell, targetId, targetPos, origin, map, ctx);
+    }
+
+    /// <summary>
+    /// HU-100: deja el área en el suelo. Cada lanzador tiene como mucho `maxPersistentAreasPerCaster` (la nueva quita la más
+    /// antigua) y la instancia como mucho `maxAreasPerInstance` (al tope no se crea: lo normal es que el casteo ya lo rechazara).
+    /// El primer pulso llega un intervalo después, para que dé tiempo a salir.
+    /// </summary>
+    private static void SpawnArea(Actor caster, SpellDef spell, Vec2 pos, Vec2 origin, MapInstance map, TickContext ctx)
+    {
+        var limits = ctx.Rules.Limits;
+        var areas = map.PersistentAreas;
+        if (areas.Capacity < limits.MaxAreasPerInstance) areas.Capacity = limits.MaxAreasPerInstance; // reserva fija (HU-088)
+        var own = 0;
+        foreach (var a in areas) if (ReferenceEquals(a.Caster, caster)) own++;
+        for (var i = 0; i < areas.Count && own >= limits.MaxPersistentAreasPerCaster; i++)
+        {
+            if (!ReferenceEquals(areas[i].Caster, caster)) continue;
+            ctx.Emit(new PersistentAreaDespawnedEvent(map.Id, areas[i].Id));
+            areas.RemoveAt(i--);
+            own--;
+        }
+        if (own >= limits.MaxPersistentAreasPerCaster || areas.Count >= limits.MaxAreasPerInstance) return;
+        var area = new PersistentArea(map.NextPersistentAreaId++, caster, spell, pos, origin, ctx.NowMs + spell.AreaDurationMs,
+            ctx.NowMs + limits.PersistentAreaTickMs);
+        areas.Add(area);
+        ctx.Emit(new PersistentAreaSpawnedEvent(map.Id, area));
+    }
+
+    private static int AreasOf(Actor caster, MapInstance map)
+    {
+        var n = 0;
+        foreach (var a in map.PersistentAreas) if (ReferenceEquals(a.Caster, caster)) n++;
+        return n;
+    }
+
+    /// <summary>Revisión de autoridad (HU-100): al morir, sus áreas se van ya (si reapareciera antes del pulso, seguirían).</summary>
+    public void DropAreasOf(Actor caster, MapInstance map, TickContext ctx)
+    {
+        var areas = map.PersistentAreas;
+        for (var i = 0; i < areas.Count; i++)
+        {
+            if (!ReferenceEquals(areas[i].Caster, caster)) continue;
+            ctx.Emit(new PersistentAreaDespawnedEvent(map.Id, areas[i].Id));
+            areas.RemoveAt(i--);
+        }
+    }
+
+    /// <summary>
+    /// Pulsos de las áreas duraderas: cada `persistentAreaTickMs` aplica los efectos del hechizo sobre los objetivos con la forma
+    /// fijada (cada área a su ritmo, desde que apareció: quedan repartidas entre ticks). Se van al caducar o si su lanzador muere,
+    /// evade, se reinicia (un monstruo sin amenaza) o deja el mapa.
+    /// </summary>
+    private void PulseAreas(MapInstance map, TickContext ctx)
+    {
+        var areas = map.PersistentAreas;
+        var tickMs = ctx.Rules.Limits.PersistentAreaTickMs;
+        for (var i = 0; i < areas.Count; i++)
+        {
+            var a = areas[i];
+            var casterGone = a.Caster.IsDead || a.Caster.Combat.Evading || a.Caster is Monster { Threat.Count: 0 }
+                || !ReferenceEquals(map.Find(a.Caster.Id), a.Caster);
+            if (!casterGone && ctx.NowMs >= a.NextPulseAtMs && a.NextPulseAtMs <= a.ExpiresAtMs)
+            {
+                effects.Apply(a.Caster, a.Spell, null, a.Pos, a.Origin, map, ctx, pulse: true);
+                a = a with { NextPulseAtMs = a.NextPulseAtMs + tickMs };
+                areas[i] = a;
+            }
+            if (casterGone || ctx.NowMs >= a.ExpiresAtMs)
+            {
+                ctx.Emit(new PersistentAreaDespawnedEvent(map.Id, a.Id));
+                areas.RemoveAt(i--);
+            }
+        }
     }
 
     private static EffectDef? LeapOf(SpellDef spell)

@@ -140,6 +140,8 @@ public sealed record SpellDef
     public required Targeting Targeting { get; init; }
     public double AoeRadius { get; init; }
     public int MaxTargets { get; init; } = 10;
+    /// <summary>HU-100: área duradera (0 = se resuelve una vez). Pulsa cada `rules.limits.persistentAreaTickMs`.</summary>
+    public int AreaDurationMs { get; init; }
     public ProjectileDef? Projectile { get; init; }
     public required IReadOnlyList<EffectDef> Effects { get; init; }
     public required string Icon { get; init; }

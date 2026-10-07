@@ -194,6 +194,11 @@
           "minimum": 1,
           "default": 10
         },
+        "areaDurationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "HU-100: el área se queda en el suelo este tiempo y aplica sus efectos cada rules.limits.persistentAreaTickMs (el primero, un intervalo después de aparecer). Solo hechizos de área; como mucho rules.limits.maxPersistentAreasPerCaster por lanzador."
+        },
         "projectile": {
           "type": "object",
           "additionalProperties": false,

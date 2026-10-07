@@ -96,6 +96,19 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     foreach (var p in objMap.Players.Values) if (p.ConnectionId >= 0) connections.Send(p.ConnectionId, msg);
                     break;
                 }
+                case PersistentAreaSpawnedEvent ps when world.GetInstance(ps.MapInstanceId) is { } areaMap:
+                {
+                    // HU-100: como las palancas, a todos los de la instancia (las áreas son pocas y duran segundos).
+                    var msg = ToAreaSpawn(ps.Area, ctx.NowMs);
+                    foreach (var p in areaMap.Players.Values) if (p.ConnectionId >= 0) connections.Send(p.ConnectionId, msg);
+                    break;
+                }
+                case PersistentAreaDespawnedEvent pd when world.GetInstance(pd.MapInstanceId) is { } goneMap:
+                {
+                    var msg = new AreaDespawn(pd.AreaId);
+                    foreach (var p in goneMap.Players.Values) if (p.ConnectionId >= 0) connections.Send(p.ConnectionId, msg);
+                    break;
+                }
                 case AuraRemovedEvent ar:
                     Broadcast(ar.MapInstanceId, ar.Target, new AuraRemoved(ar.Target.Id.Value, ar.AuraId, ar.CasterId?.Value));
                     break;
@@ -208,6 +221,17 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
         foreach (var cd in mapper.ToCooldowns(player)) connections.Send(player.ConnectionId, cd);
         if (world.GetInstance(mapInstanceId) is { } map && ToMapObjects(map) is { } objects) connections.Send(player.ConnectionId, objects);
         Broadcast(mapInstanceId, player, SnapshotBuilder.ToSpawn(player));
+    }
+
+    /// <summary>HU-100: AreaSpawn de un área duradera (al aparecer o para quien entra en el mapa).</summary>
+    public static AreaSpawn ToAreaSpawn(PersistentArea area, long nowMs) =>
+        new(area.Id, area.Caster.Id.Value, area.Spell.Id, ToPx(area.Pos)!.Value, area.Spell.Shape == Content.Defs.Shape.Circle ? null : ToPx(area.Origin),
+            (int)Math.Max(0, area.ExpiresAtMs - nowMs), area.Spell.AppliedUpgradeId);
+
+    /// <summary>Las áreas duraderas que ya están en el mapa, para quien entra (como `MapObjects`).</summary>
+    public static IEnumerable<AreaSpawn> ToAreaSpawns(Game.Map.MapInstance map, long nowMs)
+    {
+        foreach (var a in map.PersistentAreas) yield return ToAreaSpawn(a, nowMs);
     }
 
     private static DuelZoneDto ToDuelZone(DuelSession duel) =>

@@ -63,7 +63,7 @@ public sealed class EnvelopeTests
         MessageRegistry.ServerMessageNames.ShouldContain("CombatEvents");
         MessageRegistry.ServerMessageNames.ShouldNotContain("CombatEvent");
         MessageRegistry.ClientMessageNames.Count.ShouldBe(38); // + OnlineListRequest (HU-063), Interact (HU-083), ChooseSpellUpgrade (HU-104)
-        MessageRegistry.ServerMessageNames.Count.ShouldBe(28); // + OnlineList (HU-063), MapObjects (HU-083), SpellUpgradesUpdate (HU-104)
+        MessageRegistry.ServerMessageNames.Count.ShouldBe(30); // + OnlineList (HU-063), MapObjects (HU-083), SpellUpgradesUpdate (HU-104), AreaSpawn/AreaDespawn (HU-100)
     }
 
     [Fact]
@@ -111,5 +111,15 @@ public sealed class EnvelopeTests
             .ShouldBe("""{"t":"SpellUpgradesUpdate","d":{"upgrades":{"mage_fireball":"fireball_quick"},"reqId":2}}""");
         MessageRegistry.EncodeToString(new LevelUp(8, [], null, ["mage_fireball"]))
             .ShouldBe("""{"t":"LevelUp","d":{"level":8,"newSpells":[],"upgradesUnlocked":["mage_fireball"]}}""");
+    }
+
+    [Fact]
+    public void AreaSpawn_AndAreaDespawn_EncodeExactJson() // HU-100
+    {
+        MessageRegistry.EncodeToString(new AreaSpawn(3, 12, "boss_spores", new Vec2Dto(160, 96), null, 5500))
+            .ShouldBe("""{"t":"AreaSpawn","d":{"areaId":3,"casterId":12,"spellId":"boss_spores","pos":{"x":160,"y":96},"expiresInMs":5500}}""");
+        MessageRegistry.EncodeToString(new AreaDespawn(3)).ShouldBe("""{"t":"AreaDespawn","d":{"areaId":3}}""");
+        MessageRegistry.EncodeToString(new CastStarted(1, "warrior_cleave", null, new Vec2Dto(40, 16), new Vec2Dto(0, 16), null, 0, "cleave_wide"))
+            .ShouldBe("""{"t":"CastStarted","d":{"casterId":1,"spellId":"warrior_cleave","targetPos":{"x":40,"y":16},"origin":{"x":0,"y":16},"durationMs":0,"upgradeId":"cleave_wide"}}""");
     }
 }

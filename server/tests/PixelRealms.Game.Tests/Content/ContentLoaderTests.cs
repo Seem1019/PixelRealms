@@ -162,6 +162,10 @@ public sealed class ContentLoaderTests
     [InlineData("spells.json", "/spells/2/effects/1/auraId", "\"nope\"", "auraId 'nope' no existe")]
     [InlineData("rules.json", "/ai/wanderPauseMinMs", "7000", "mayor que wanderPauseMaxMs")]
     [InlineData("rules.json", "/loadout/usableSlots", "5", "más que las 8 teclas")]
+    [InlineData("spells.json", "/spells/0/areaDurationMs", "3000", "solo un hechizo de área puede dejar un área duradera")] // HU-100
+    [InlineData("spells.json", "/spells/3/areaDurationMs", "200", "menos que un pulso")]                                    // HU-100
+    [InlineData("spells.json", "/spells/10/areaDurationMs", "3000", "un salto o una carga no dejan un área duradera")]                                  // HU-100
+    [InlineData("spells.json", "/spells/35/areaDurationMs", "3000", "con proyectil no deja un área duradera")] // HU-100 (goblin_shoot tiene proyectil)
     public void CrossReferenceRules_Fail(string file, string pointer, string valueJson, string expectedFragment)
     {
         using var dir = new TempContent();

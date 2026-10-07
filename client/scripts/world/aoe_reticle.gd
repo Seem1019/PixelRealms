@@ -56,6 +56,16 @@ func clear_mark(caster_id: int) -> void:
 		queue_redraw()
 
 
+## HU-100: área duradera (AreaSpawn), hasta AreaDespawn o su caducidad. Va con las marcas de casteo, con clave negativa para
+## no chocar con los ids de lanzador.
+func set_lasting_mark(area_id: int, area: Dictionary, enemy: bool, expires_in_ms: int) -> void:
+	set_area_mark(-area_id, area, enemy, expires_in_ms)
+
+
+func clear_lasting_mark(area_id: int) -> void:
+	clear_mark(-area_id)
+
+
 ## Quita las marcas cuyo casteo ya debería haber terminado (CastEnded perdido).
 func prune(now_ms: int) -> void:
 	for caster_id: Variant in _marks.keys():

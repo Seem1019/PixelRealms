@@ -67,6 +67,8 @@ namespace PixelRealms.Protocol;
 [JsonSerializable(typeof(StatsUpdate))]
 [JsonSerializable(typeof(XpGain))]
 [JsonSerializable(typeof(LevelUp))]
+[JsonSerializable(typeof(AreaSpawn))]
+[JsonSerializable(typeof(AreaDespawn))]
 [JsonSerializable(typeof(SpellUpgradesUpdate))]
 [JsonSerializable(typeof(InventoryUpdate))]
 [JsonSerializable(typeof(LootWindow))]

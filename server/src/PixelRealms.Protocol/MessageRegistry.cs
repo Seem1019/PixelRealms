@@ -67,6 +67,8 @@ public static class MessageRegistry
         RegisterServer<EntityDespawn>("EntityDespawn");
         RegisterServer<CastStarted>("CastStarted");
         RegisterServer<CastEnded>("CastEnded");
+        RegisterServer<AreaSpawn>("AreaSpawn");
+        RegisterServer<AreaDespawn>("AreaDespawn");
         RegisterServer<CombatEvents>("CombatEvents");
         RegisterServer<AuraApplied>("AuraApplied");
         RegisterServer<AuraRemoved>("AuraRemoved");

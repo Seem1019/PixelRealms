@@ -31,6 +31,12 @@ public sealed record CastStarted(int CasterId, string SpellId, int? TargetId, Ve
 
 public sealed record CastEnded(int CasterId, string SpellId, string Result, string? Reason) : IServerMessage;
 
+/// <summary>HU-100 (ADR-018): aparece un área duradera; `pos` es el centro (o el punto canónico de un cono o una línea, con
+/// `origin`). Se va con `AreaDespawn` o al pasar `expiresInMs`. Nada por tick.</summary>
+public sealed record AreaSpawn(int AreaId, int CasterId, string SpellId, Vec2Dto Pos, Vec2Dto? Origin, int ExpiresInMs, string? UpgradeId = null) : IServerMessage;
+
+public sealed record AreaDespawn(int AreaId) : IServerMessage;
+
 public sealed record CombatEventDto(int Src, int Dst, string? SpellId, string Kind, int Amount, bool Crit, string School);
 
 public sealed record CombatEvents(long Tick, IReadOnlyList<CombatEventDto> E) : IServerMessage;

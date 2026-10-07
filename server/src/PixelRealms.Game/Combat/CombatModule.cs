@@ -47,6 +47,7 @@ public sealed class CombatModule
         Death.OnMonsterKilled = Spawns.ScheduleRespawn;
         Death.IsLooted = Loot.IsLooted;
         Death.OnCorpseRemoved = (m, map) => Loot.Forget(map, m.Id);
+        Death.OnActorKilled = Casts.DropAreasOf;
         Services.PvpCanAttack = (a, b) => Pvp.CanAttack(a, b, Services.Content.Rules) is not null;
         Services.InDuel = Pvp.InActiveDuel;
         Damage.DuelClamp = Pvp.ClampDamage;

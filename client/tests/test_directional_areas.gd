@@ -69,3 +69,16 @@ func test_a_remote_line_cast_draws_a_line_mark_from_its_origin() -> void:
 	assert_eq(AoeReticle.shape_points(area).size(), 4)
 	_dispatch("CastEnded", {"casterId": 8, "spellId": "priest_path_of_light", "result": "done"})
 	assert_false((reticle.get("_marks") as Dictionary).has(8))
+
+
+func test_a_lasting_area_is_drawn_until_it_goes() -> void: # HU-100
+	var w := await _world()
+	var reticle: AoeReticle = w.get("_reticle")
+	_dispatch("AreaSpawn", {"areaId": 5, "casterId": 77, "spellId": "mage_flame_burst", "pos": {"x": 320.0, "y": 800.0}, "expiresInMs": 3000})
+	var marks: Dictionary = reticle.get("_marks")
+	assert_true(marks.has(-5), "un área duradera se dibuja aunque su lanzador no esté en la AOI")
+	var mark: Dictionary = marks[-5]
+	assert_true(bool(mark["enemy"]), "de alguien que no se ve: roja")
+	assert_eq(str((mark["area"] as Dictionary)["shape"]), "circle")
+	_dispatch("AreaDespawn", {"areaId": 5})
+	assert_false((reticle.get("_marks") as Dictionary).has(-5))

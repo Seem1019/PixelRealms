@@ -832,6 +832,20 @@ func _cast_ground(spell: Dictionary, world_pos: Vector2) -> void:
 			_forced_move_until_ms = Time.get_ticks_msec() + 500
 
 
+## HU-100: área duradera en el suelo con la forma del hechizo; roja si es de alguien hostil (o de quien no está en la AOI).
+func _on_area_spawn(d: Dictionary) -> void:
+	var spell := SpellUpgrades.of_message(d)
+	var caster := int(d.get("casterId", -1))
+	var p: Dictionary = d.get("pos", {})
+	var pos := Vector2(float(p.get("x", 0)), float(p.get("y", 0)))
+	var area := AoeReticle.circle_area(pos, float(spell.get("aoeRadius", 1.0)) * 16.0)
+	if d.get("origin") is Dictionary and _is_directional(spell):
+		var o: Dictionary = d["origin"]
+		area = _directional_area(spell, Vector2(float(o.get("x", 0)), float(o.get("y", 0))), pos)
+	var enemy := caster != GameState.self_id and (not _remotes.has(caster) or (_remotes[caster] as RemoteEntity).hostile)
+	_reticle.set_lasting_mark(int(d.get("areaId", 0)), area, enemy, int(d.get("expiresInMs", 0)))
+
+
 ## Alcance solo visual para oscurecer la casilla (HU-038 CA3).
 func _spell_in_range(spell: Dictionary) -> bool:
 	var targeting := str(spell.get("targeting", "enemy"))
@@ -865,6 +879,10 @@ func _on_message(type: String, d: Dictionary) -> void:
 				else:
 					_reticle.set_mark(caster, aim, radius * 16.0, enemy, int(d.get("durationMs", 0)))
 			_presenter.cast_started(d)
+		"AreaSpawn":
+			_on_area_spawn(d)
+		"AreaDespawn":
+			_reticle.clear_lasting_mark(int(d.get("areaId", 0)))
 		"CastEnded":
 			var caster := int(d.get("casterId", -1))
 			_reticle.clear_mark(caster)

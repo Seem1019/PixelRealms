@@ -48,6 +48,7 @@ public static class CrossRefValidator
         var combat = rules.GetProperty("combat");
         var minInstantCd = combat.GetProperty("minInstantSpellCooldownMs").GetInt32();
         var instantConeMaxRadius = combat.GetProperty("instantConeMaxRadiusTiles").GetDouble();
+        var areaTickMs = rules.GetProperty("limits").GetProperty("persistentAreaTickMs").GetInt32();
         // Tope de nivel de la fase activa: lo que ya se alcanza no puede quedarse en aviso.
         var phaseCaps = progression.GetProperty("levelCapByPhase").EnumerateArray().Select(e => e.GetInt32()).ToList();
         var phase = rules.GetProperty("world").GetProperty("currentPhase").GetInt32();
@@ -80,6 +81,20 @@ public static class CrossRefValidator
                 }
                 if (!ImplementedEffects.Contains(type))
                     report.Warn("spells.json", $"{p}/effects/{k}/type", $"{id}: efecto '{type}' aún no implementado → hechizo no disponible (ADR-023)");
+            }
+
+            // HU-100: un área duradera es un área que dura al menos un pulso; sin desplazamientos ni proyectil (los
+            // pulsos solo tocan a los objetivos y un proyectil no deja área).
+            if (sp.TryGetProperty("areaDurationMs", out var durEl))
+            {
+                if (!targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && !targeting.StartsWith("self_aoe", StringComparison.Ordinal))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: solo un hechizo de área puede dejar un área duradera");
+                else if (effects.Any(e => Str(e, "type") is "leap" or "dash"))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un salto o una carga no dejan un área duradera");
+                if (sp.TryGetProperty("projectile", out _))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un hechizo con proyectil no deja un área duradera");
+                if (durEl.GetInt32() < areaTickMs)
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: dura {durEl.GetInt32()} ms, menos que un pulso (rules.limits.persistentAreaTickMs = {areaTickMs})");
             }
 
             if (sp.TryGetProperty("upgrades", out var upgradesEl))
@@ -429,6 +444,9 @@ public static class CrossRefValidator
                 }
                 if (m.TryGetProperty("addEffect", out var added))
                 {
+                    // Las mismas reglas que los efectos del hechizo (revisión de autoridad de HU-100).
+                    if (sp.TryGetProperty("areaDurationMs", out _) && Str(added, "type") is "leap" or "dash")
+                        report.Error("spells.json", $"{mp}/addEffect", $"{id}/{upId}: un salto o una carga no van en un área duradera");
                     if (added.TryGetProperty("auraId", out var addedAura)) referencedAuras.Add(addedAura.GetString()!);
                     if (added.TryGetProperty("auraId", out addedAura) && !auraIds.Contains(addedAura.GetString()!))
                         report.Error("spells.json", $"{mp}/addEffect/auraId", $"{id}/{upId}: auraId '{addedAura.GetString()}' no existe en auras.json");

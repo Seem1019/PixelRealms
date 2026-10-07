@@ -70,6 +70,7 @@ public sealed class MapTransferService(World world, InterestSystem interest, Con
         {
             connections.Send(player.ConnectionId, new ChangeMap(to.MapId, SnapshotBuilder.Px(position.X), SnapshotBuilder.Px(position.Y)));
             if (EventDispatcher.ToMapObjects(to) is { } objects) connections.Send(player.ConnectionId, objects); // HU-083
+            foreach (var area in EventDispatcher.ToAreaSpawns(to, ctx.NowMs)) connections.Send(player.ConnectionId, area); // HU-100
         }
         session.Save(player, ctx.NowMs, "change_map");
         logger.LogInformation("{Name}: {From} → {To} ({Reason})", player.Name, from.MapId, to.MapId, reason);
