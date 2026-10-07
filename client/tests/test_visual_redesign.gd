@@ -100,7 +100,7 @@ func test_spellbook_rows_show_full_names_and_the_detail_goes_beside_the_list() -
 	var base := UiTheme.base_size()
 	assert_true(book.get_global_rect().end.y <= base.y - CombatHud.HOTBAR_HEIGHT - UiTheme.SCREEN_MARGIN, "no tapa la barra rápida")
 	var entry := list.get_child(2) as SpellbookWindow.SpellEntry
-	book.call("_show_tip", entry)
+	book.call("_show_tip", entry, entry.tooltip_bbcode)
 	await get_tree().process_frame
 	var tip: Control = book.get("_tip")
 	assert_true(tip.visible)

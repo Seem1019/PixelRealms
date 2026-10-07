@@ -39,7 +39,7 @@ func _visual(id: int) -> EntityVisual:
 
 func cast_started(d: Dictionary) -> void:
 	var caster := int(d.get("casterId", -1))
-	var spell := Content.spell(str(d.get("spellId", "")))
+	var spell := SpellUpgrades.of_message(d)
 	var target_id := int(d.get("targetId", -1)) if d.get("targetId") != null else -1
 	var target_pos := Vector2.INF
 	if d.get("targetPos") is Dictionary:

@@ -24,6 +24,7 @@ signal online_list_received(players: Array)  ## HU-063: respuesta a OnlineListRe
 signal map_objects_changed  ## HU-083: palancas o puertas del mapa actual
 signal map_object_toggled(id: String, state: String)  ## HU-083: una palanca o una puerta cambió (no el estado al entrar)
 signal hotbar_changed  ## HU-103: la barra cambió (Welcome, hechizo nuevo colocado o casilla asignada desde la interfaz)
+signal spell_upgrades_changed  ## HU-105: las mejoras elegidas cambiaron (Welcome, SpellUpgradesUpdate) o se desbloquearon
 signal duel_zone_changed  ## HU-101: zona del duelo o aviso de estar fuera de ella
 
 var self_id: int = -1
@@ -38,6 +39,8 @@ var hotbar: Array = []
 var known_spells: Array[String] = []
 ## HU-103: hechizos aprendidos que no cupieron en la barra; el libro los marca como nuevos hasta que se cierra.
 var unseen_spells: Array[String] = []
+## HU-105: mejora elegida por hechizo (spellId → upgradeId), tal como la confirma el servidor.
+var spell_upgrades: Dictionary = {}
 var target_id: int = -1
 var party: Dictionary = {}  # {leader, members: [{name, entityId, classId, level, hpPct, online, mapId}]}
 var map_objects: Dictionary = {}  # HU-083: id → estado ("on"/"off", "open"/"closed") de los objetos del mapa actual
@@ -87,6 +90,7 @@ func _ready() -> void:
 	Net.register_handler("Died", _on_died)
 	Net.register_handler("XpGain", _on_xp_gain)
 	Net.register_handler("LevelUp", _on_level_up)
+	Net.register_handler("SpellUpgradesUpdate", _on_spell_upgrades)
 	Net.register_handler("ChatMessage", _on_chat_message)
 	Net.register_handler("PartyUpdate", _on_party_update)
 	Net.register_handler("DuelUpdate", _on_duel_update)
@@ -157,7 +161,9 @@ func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	for s: Variant in d.get("knownSpells", []):
 		known_spells.append(str(s))
 	unseen_spells = unseen_spells.filter(func(id: String) -> bool: return known_spells.has(id))
+	spell_upgrades = (d["spellUpgrades"] as Dictionary).duplicate() if d.get("spellUpgrades") is Dictionary else {}
 	hotbar_changed.emit()
+	spell_upgrades_changed.emit()
 	rules_hash = str(d.get("rulesHash", ""))
 	stats_changed.emit()
 	inventory_changed.emit()
@@ -408,10 +414,51 @@ func _on_level_up(d: Dictionary) -> void:
 			notice.emit("Nuevo hechizo: %s (en el libro, P)" % spell_name)
 	if not rank_ups.is_empty():
 		notice.emit("Tus hechizos suben de rango (+%d %%)" % roundi(float(Content.rule("progression", "spellRankBonusPct", 0.15)) * 100.0))
+	var unlocked: Array = d.get("upgradesUnlocked", []) if d.get("upgradesUnlocked") != null else []
+	if not unlocked.is_empty():
+		notice.emit("Ya puedes elegir las mejoras de tus hechizos (P)")  # HU-105 CA2
+		spell_upgrades_changed.emit()
 	stats_changed.emit()
 	if placed:
 		hotbar_changed.emit()
 	leveled_up.emit(level, new_spells, rank_ups)
+
+
+## HU-105: lo que confirma el servidor tras un ChooseSpellUpgrade.
+func _on_spell_upgrades(d: Dictionary) -> void:
+	spell_upgrades = (d["upgrades"] as Dictionary).duplicate() if d.get("upgrades") is Dictionary else {}
+	spell_upgrades_changed.emit()
+
+
+## HU-105: nivel desde el que se eligen mejoras (`rules.progression.spellUpgradeLevel`).
+func spell_upgrade_level() -> int:
+	return int(Content.rule("progression", "spellUpgradeLevel", 8))
+
+
+## El hechizo como lo lanza el personaje: con su mejora si la eligió y le toca por nivel (el servidor hace lo mismo).
+func effective_spell(spell_id: String) -> Dictionary:
+	var spell := Content.spell(spell_id)
+	if level < spell_upgrade_level() or not spell_upgrades.has(spell_id):
+		return spell
+	return SpellUpgrades.apply(spell, str(spell_upgrades[spell_id]))
+
+
+## Hechizo aprendido con mejoras que aún no tiene ninguna elegida (el libro y la barra lo señalan, HU-105 CA2).
+func upgrade_pending(spell_id: String) -> bool:
+	return level >= spell_upgrade_level() and known_spells.has(spell_id) and not spell_upgrades.has(spell_id) \
+		and not (Content.spell(spell_id).get("upgrades", []) as Array).is_empty()
+
+
+## Pide elegir (o quitar, con "") la mejora; la copia local cambia con SpellUpgradesUpdate. En combate no se pide: se avisa.
+func choose_upgrade(spell_id: String, upgrade_id: String) -> bool:
+	if is_in_combat():
+		notice.emit("No puedes cambiar mejoras en combate")
+		return false
+	var payload := {"spellId": spell_id, "reqId": Net.next_req_id()}
+	if not upgrade_id.is_empty():
+		payload["upgradeId"] = upgrade_id
+	Net.send("ChooseSpellUpgrade", payload)
+	return true
 
 
 ## HU-103: casilla de la barra (0–3) donde está equipado el hechizo, o -1.

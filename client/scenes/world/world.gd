@@ -637,7 +637,7 @@ func _use_slot(slot: int) -> void:
 		if not payload.is_empty():
 			_send("UseItem", payload)  # HU-055
 		return
-	var spell := Content.spell(str(entry.get("ref", "")))
+	var spell := GameState.effective_spell(str(entry.get("ref", "")))  # HU-105: con su mejora (alcance, área)
 	if spell.is_empty():
 		return
 	var targeting := str(spell.get("targeting", "enemy"))
@@ -730,7 +730,7 @@ func _update_range_ring() -> void:
 		else:
 			for i: int in 4:
 				if Input.is_action_pressed("spell_%d" % (i + 1)):
-					var spell := Content.spell(str(_slot_entry(i).get("ref", "")))
+					var spell := GameState.effective_spell(str(_slot_entry(i).get("ref", "")))
 					reach = _spell_reach_px(spell)
 					enemy_only = str(spell.get("targeting", "enemy")) == "enemy"
 					break
@@ -845,7 +845,7 @@ func _on_message(type: String, d: Dictionary) -> void:
 	match type:
 		"CastStarted":
 			var caster := int(d.get("casterId", -1))
-			var spell := Content.spell(str(d.get("spellId", "")))
+			var spell := SpellUpgrades.of_message(d)  # HU-105: la marca con la forma de la mejora del lanzador
 			if caster == GameState.self_id:
 				for e: Variant in spell.get("effects", []):
 					if str((e as Dictionary).get("type", "")) in ["leap", "dash"]:

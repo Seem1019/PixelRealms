@@ -80,6 +80,7 @@ func _ready() -> void:
 	GameState.xp_changed.connect(_refresh_xp)
 	GameState.notice.connect(show_notice)
 	GameState.leveled_up.connect(func(_l: int, _n: Array, _r: Array) -> void: _refresh_hotbar())
+	GameState.spell_upgrades_changed.connect(_refresh_hotbar)
 	EventBus.ui_error.connect(_on_ui_error)
 	_refresh_self()
 	_refresh_hotbar()
@@ -433,8 +434,9 @@ func _refresh_hotbar() -> void:
 		b.disabled = false
 		var ref := str(entry.get("ref", ""))
 		if str(entry.get("kind", "spell")) == "spell":
-			var spell := Content.spell(ref)
+			var spell := GameState.effective_spell(ref)  # HU-105: números con la mejora elegida
 			b.show_entry(UiTheme.icon(str(spell.get("icon", ""))), str(spell.get("name", ref)), -1, TooltipBuilder.build_spell(spell))
+			b.show_badge("!" if GameState.upgrade_pending(ref) else "")  # HU-105 CA2: mejora por elegir
 			var cost: Dictionary = spell.get("cost", {}) if spell.get("cost") != null else {}
 			var lacks := not cost.is_empty() and int(cost.get("amount", 0)) > GameState.resource
 			var out_of_range := in_range_check.is_valid() and not bool(in_range_check.call(spell))
@@ -483,7 +485,7 @@ func _refresh_sweeps() -> void:
 		if not entry.is_empty() and str(entry.get("kind", "spell")) == "spell":
 			var spell_id := str(entry.get("ref", ""))
 			var cd := GameState.cooldown_remaining_ms(spell_id)
-			var spell := Content.spell(spell_id)
+			var spell := GameState.effective_spell(spell_id)
 			var total := int(spell.get("cooldownMs", 0))
 			if cd > 0 and total > 0:
 				frac = float(cd) / float(total)
@@ -732,6 +734,11 @@ class HotSlot extends Button:
 			_count.text = str(count) if count >= 0 else ""
 		tooltip_bbcode = bbcode
 		tooltip_text = name_text  # Godot solo pide el tooltip propio si hay texto
+
+	## Marca en la esquina de la casilla (la de la cantidad, que en un hechizo está libre): "!" = mejora por elegir.
+	func show_badge(text: String) -> void:
+		if _count != null:
+			_count.text = text
 
 	func icon_texture() -> Texture2D:
 		return _icon.texture if _icon != null else null

@@ -6,6 +6,9 @@ extends PanelContainer
 ## La lista tiene alto máximo (no tapa la barra rápida) y el detalle del hechizo sale al lado de la ventana, no encima.
 ## HU-103: con más hechizos que casillas, la cabecera cuenta los equipados, los equipados llevan su tecla sobre el ícono,
 ## los aprendidos sin equipar van en gris claro y los que no cupieron al aprenderlos salen en dorado hasta cerrar el libro.
+## HU-105: desde `spellUpgradeLevel`, bajo cada hechizo aprendido con mejoras van sus dos mejoras (la elegida marcada; su detalle
+## dice qué números cambian); pulsar la otra la cambia gratis (ChooseSpellUpgrade). En combate están desactivadas. Un "!" sobre el
+## ícono señala los que aún no tienen mejora elegida, y el detalle del hechizo enseña sus números con la mejora.
 
 const WIDTH := 168
 const ROW_H := 18
@@ -46,6 +49,7 @@ func _ready() -> void:
 	GameState.stats_changed.connect(refresh)
 	GameState.leveled_up.connect(func(_l: int, _n: Array, _r: Array) -> void: refresh())
 	GameState.hotbar_changed.connect(_on_hotbar_changed)
+	GameState.spell_upgrades_changed.connect(_on_hotbar_changed)
 	visibility_changed.connect(_on_visibility_changed)
 
 
@@ -86,6 +90,9 @@ func refresh() -> void:
 	spells.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("levelReq", 1)) < int(b.get("levelReq", 1)))
 	var known := 0
 	var equipped := 0
+	var rows := 0
+	var can_upgrade := GameState.level >= GameState.spell_upgrade_level()
+	var in_combat := GameState.is_in_combat()
 	for s: Variant in spells:
 		var sd: Dictionary = s
 		var id := str(sd.get("id", ""))
@@ -94,25 +101,76 @@ func refresh() -> void:
 		entry.known = GameState.known_spells.has(id)
 		entry.slot = GameState.spell_slot_of(id) if entry.known else -1
 		entry.is_new = entry.known and GameState.unseen_spells.has(id)
-		entry.setup(sd)
+		entry.pending = GameState.upgrade_pending(id)
+		entry.setup(GameState.effective_spell(id) if entry.known else sd)
 		if entry.known:
 			known += 1
 			if entry.slot >= 0:
 				equipped += 1
-		entry.hovered.connect(_show_tip)
+		entry.hovered.connect(func(e: SpellEntry) -> void: _show_tip(e, e.tooltip_bbcode))
 		entry.unhovered.connect(func() -> void: _tip.visible = false)
 		_list.add_child(entry)
+		rows += 1
+		var upgrades: Array = sd.get("upgrades", [])
+		if entry.known and can_upgrade and not upgrades.is_empty():
+			_list.add_child(_upgrade_row(sd, in_combat))
+			rows += 1
 	_count.text = "Equipados %d/%d · arrastra a 1–%d" % [equipped, known, int(Content.rule("loadout", "spellSlots", 4))]
 	# Alto en filas enteras: nunca se ve media fila cortada abajo.
-	var rows := mini(spells.size(), floori((_max_list_height() + 1.0) / (ROW_H + 1)))
+	rows = mini(rows, floori((_max_list_height() + 1.0) / (ROW_H + 1)))
 	_scroll.custom_minimum_size = Vector2(WIDTH - 12, rows * (ROW_H + 1) - 1)
 	UiTheme.dock(self, Control.PRESET_TOP_LEFT, UiTheme.SCREEN_MARGIN, InventoryWindow.WINDOW_TOP - UiTheme.SCREEN_MARGIN)
 	reset_size()
 
 
+## HU-105: las dos mejoras de un hechizo; la elegida va pulsada. Su detalle: nombre, descripción y "antes → después".
+func _upgrade_row(sd: Dictionary, in_combat: bool) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	row.custom_minimum_size = Vector2(0, ROW_H)
+	var spell_id := str(sd.get("id", ""))
+	var chosen := str(GameState.spell_upgrades.get(spell_id, ""))
+	for u: Variant in sd.get("upgrades", []):
+		var ud: Dictionary = u
+		var up_id := str(ud.get("id", ""))
+		var b := UpgradeButton.new()
+		b.spell_id = spell_id
+		b.upgrade_id = up_id
+		b.text = str(ud.get("name", up_id))
+		b.toggle_mode = true
+		b.button_pressed = up_id == chosen
+		b.disabled = in_combat
+		b.focus_mode = Control.FOCUS_NONE
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.theme_type_variation = "SmallButton"
+		var lines: Array[String] = ["[color=#ffdb6b][b]%s[/b][/color]" % b.text, str(ud.get("description", ""))]
+		for line: String in SpellUpgrades.diff_lines(sd, SpellUpgrades.apply(sd, up_id)):
+			lines.append("[color=#44dd44]%s[/color]" % line)
+		if up_id == chosen:
+			lines.append("[color=%s]Elegida[/color]" % TooltipBuilder.MUTED)
+		if in_combat:
+			lines.append("[color=#ff5555]No puedes cambiar mejoras en combate[/color]")
+		b.tooltip_bbcode = "\n".join(lines)
+		b.mouse_entered.connect(func() -> void: _show_tip(b, b.tooltip_bbcode))
+		b.mouse_exited.connect(func() -> void: _tip.visible = false)
+		b.pressed.connect(func() -> void: _on_upgrade_pressed(b))
+		row.add_child(b)
+	return row
+
+
+## Pulsar la elegida no hace nada; la otra la cambia (gratis, fuera de combate). La marca la pone el SpellUpgradesUpdate.
+func _on_upgrade_pressed(b: UpgradeButton) -> void:
+	b.set_pressed_no_signal(str(GameState.spell_upgrades.get(b.spell_id, "")) == b.upgrade_id)
+	if b.button_pressed:
+		return
+	GameState.choose_upgrade(b.spell_id, b.upgrade_id)
+
+
 ## Detalle a la derecha de la ventana (o a la izquierda si no cabe), a la altura de la fila y dentro de la pantalla.
-func _show_tip(entry: SpellEntry) -> void:
-	_tip_label.text = entry.tooltip_bbcode
+func _show_tip(anchor: Control, bbcode: String) -> void:
+	_tip_label.text = bbcode
 	_tip_label.custom_minimum_size.x = UiTheme.TOOLTIP_MAX_WIDTH
 	_tip.visible = true
 	_tip.reset_size()
@@ -122,8 +180,15 @@ func _show_tip(entry: SpellEntry) -> void:
 	var x := rect.end.x + 2.0
 	if x + size.x > base.x - UiTheme.SCREEN_MARGIN:
 		x = rect.position.x - size.x - 2.0
-	var y := clampf(entry.get_global_rect().position.y, UiTheme.SCREEN_MARGIN, base.y - UiTheme.SCREEN_MARGIN - size.y)
+	var y := clampf(anchor.get_global_rect().position.y, UiTheme.SCREEN_MARGIN, base.y - UiTheme.SCREEN_MARGIN - size.y)
 	_tip.global_position = Vector2(x, y).round()
+
+
+## Botón de una mejora (HU-105).
+class UpgradeButton extends Button:
+	var spell_id: String = ""
+	var upgrade_id: String = ""
+	var tooltip_bbcode: String = ""
 
 
 ## Entrada arrastrable del libro: ícono, nombre completo y "Nv X" alineado a la derecha; dato {"kind": "spell", "ref": id}.
@@ -135,6 +200,7 @@ class SpellEntry extends Button:
 	var known: bool = false
 	var slot: int = -1  ## casilla de la barra (0–3) si está equipado
 	var is_new: bool = false  ## aprendido sin sitio en la barra y aún sin ver (HU-103)
+	var pending: bool = false  ## con mejoras y ninguna elegida (HU-105)
 	var tooltip_bbcode: String = ""
 	var icon_tex: Texture2D
 	var _name: Label
@@ -175,6 +241,16 @@ class SpellEntry extends Button:
 			_name.add_theme_color_override("font_color", UiTheme.ACCENT)
 		elif slot < 0:
 			_name.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+		if pending:
+			var mark := Label.new()
+			mark.text = "!"
+			mark.theme_type_variation = "SmallLabel"
+			mark.add_theme_color_override("font_color", UiTheme.ACCENT)
+			mark.add_theme_color_override("font_outline_color", UiTheme.OUTLINE)
+			mark.add_theme_constant_override("outline_size", 2)
+			mark.position = Vector2(0, -2)
+			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(mark)
 		if slot >= 0:
 			var key := Label.new()
 			key.text = str(slot + 1)
