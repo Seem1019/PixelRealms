@@ -10,6 +10,7 @@ signal menu_requested  ## engranaje de arriba a la derecha (HU-015)
 
 const ERROR_SECONDS := 2.0
 const ERROR_FADE := 0.4
+const NOTICE_MAX_LINES := 3
 const FRAME_WIDTH := 132
 ## Marco propio: retrato de 22×22 y barras a su derecha; la XP va debajo de todo el marco.
 const PORTRAIT := 22
@@ -346,8 +347,15 @@ func _refresh_xp() -> void:
 		_xp_frame.tooltip_text = "XP %d / %d" % [GameState.xp, GameState.xp_next]
 
 
+## Los avisos que llegan juntos (subir de nivel: nivel, hechizo nuevo, rangos) se apilan: se ven las últimas 3 líneas.
 func show_notice(text: String) -> void:
-	_notice_label.text = text
+	var lines: PackedStringArray = []
+	if _notice_until > 0.0 and not _notice_label.text.is_empty():
+		lines = _notice_label.text.split("\n")
+	lines.append(text)
+	if lines.size() > NOTICE_MAX_LINES:
+		lines = lines.slice(lines.size() - NOTICE_MAX_LINES)
+	_notice_label.text = "\n".join(lines)
 	_notice_until = Time.get_ticks_msec() / 1000.0 + 3.0
 
 
@@ -442,7 +450,7 @@ func _refresh_hotbar() -> void:
 ## En combate, una casilla de hechizo ocupada no se toca: el servidor lo rechazaría (`in_combat`) y la copia local quedaría mal.
 func _assign_slot(slot: int, kind: String, ref: String) -> void:
 	if slot < int(Content.rule("loadout", "spellSlots", 4)) and not _slot_entry(slot).is_empty() and GameState.is_in_combat():
-		show_error(ApiMessages.text_for("in_combat"))
+		show_error("No puedes cambiar hechizos en combate")  # HU-103 CA3
 		return
 	for i: int in range(GameState.hotbar.size() - 1, -1, -1):
 		var hd: Dictionary = GameState.hotbar[i]
@@ -454,6 +462,7 @@ func _assign_slot(slot: int, kind: String, ref: String) -> void:
 		GameState.hotbar.append({"slot": slot, "kind": kind, "ref": ref})
 		Net.send("SetHotbar", {"slot": slot, "kind": kind, "ref": ref})
 	_refresh_hotbar()
+	GameState.hotbar_changed.emit()
 
 
 func _slot_entry(slot: int) -> Dictionary:

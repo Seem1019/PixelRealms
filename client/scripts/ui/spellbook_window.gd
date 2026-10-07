@@ -4,11 +4,14 @@ extends PanelContainer
 ## requerido (los no aprendidos atenuados); arrastrar a una casilla de hechizo (1–4) → SetHotbar; Shift+arrastrar fuera de
 ## la barra quita. Los consumibles se arrastran desde la bolsa a las casillas 5–8 (la casilla muestra la cantidad en bolsa).
 ## La lista tiene alto máximo (no tapa la barra rápida) y el detalle del hechizo sale al lado de la ventana, no encima.
+## HU-103: con más hechizos que casillas, la cabecera cuenta los equipados, los equipados llevan su tecla sobre el ícono,
+## los aprendidos sin equipar van en gris claro y los que no cupieron al aprenderlos salen en dorado hasta cerrar el libro.
 
 const WIDTH := 168
 const ROW_H := 18
 
 var _list: VBoxContainer
+var _count: Label
 var _scroll: ScrollContainer
 var _tip: PanelContainer
 var _tip_label: RichTextLabel
@@ -21,10 +24,9 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", 3)
 	add_child(v)
 	v.add_child(InventoryWindow.title_row("Hechizos", "P"))
-	var hint := Label.new()
-	hint.text = "Arrastra a las casillas 1–4"
-	hint.theme_type_variation = "SmallLabel"
-	v.add_child(hint)
+	_count = Label.new()
+	_count.theme_type_variation = "SmallLabel"
+	v.add_child(_count)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(_scroll)
@@ -43,7 +45,20 @@ func _ready() -> void:
 	_tip.add_child(_tip_label)
 	GameState.stats_changed.connect(refresh)
 	GameState.leveled_up.connect(func(_l: int, _n: Array, _r: Array) -> void: refresh())
-	visibility_changed.connect(func() -> void: _tip.visible = false)
+	GameState.hotbar_changed.connect(_on_hotbar_changed)
+	visibility_changed.connect(_on_visibility_changed)
+
+
+func _on_hotbar_changed() -> void:
+	if visible:
+		refresh()
+
+
+## Al cerrar se dan por vistos los hechizos nuevos (HU-103 CA1).
+func _on_visibility_changed() -> void:
+	_tip.visible = false
+	if not visible:
+		GameState.unseen_spells.clear()
 
 
 func toggle() -> void:
@@ -69,16 +84,25 @@ func refresh() -> void:
 		if str(sd.get("classId", "")) == GameState.class_id:
 			spells.append(sd)
 	spells.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("levelReq", 1)) < int(b.get("levelReq", 1)))
+	var known := 0
+	var equipped := 0
 	for s: Variant in spells:
 		var sd: Dictionary = s
 		var id := str(sd.get("id", ""))
 		var entry := SpellEntry.new()
 		entry.spell_id = id
 		entry.known = GameState.known_spells.has(id)
+		entry.slot = GameState.spell_slot_of(id) if entry.known else -1
+		entry.is_new = entry.known and GameState.unseen_spells.has(id)
 		entry.setup(sd)
+		if entry.known:
+			known += 1
+			if entry.slot >= 0:
+				equipped += 1
 		entry.hovered.connect(_show_tip)
 		entry.unhovered.connect(func() -> void: _tip.visible = false)
 		_list.add_child(entry)
+	_count.text = "Equipados %d/%d · arrastra a 1–%d" % [equipped, known, int(Content.rule("loadout", "spellSlots", 4))]
 	# Alto en filas enteras: nunca se ve media fila cortada abajo.
 	var rows := mini(spells.size(), floori((_max_list_height() + 1.0) / (ROW_H + 1)))
 	_scroll.custom_minimum_size = Vector2(WIDTH - 12, rows * (ROW_H + 1) - 1)
@@ -109,6 +133,8 @@ class SpellEntry extends Button:
 
 	var spell_id: String = ""
 	var known: bool = false
+	var slot: int = -1  ## casilla de la barra (0–3) si está equipado
+	var is_new: bool = false  ## aprendido sin sitio en la barra y aún sin ver (HU-103)
 	var tooltip_bbcode: String = ""
 	var icon_tex: Texture2D
 	var _name: Label
@@ -145,12 +171,30 @@ class SpellEntry extends Button:
 			pic.modulate = Color(0.45, 0.42, 0.5)
 			_name.add_theme_color_override("font_color", UiTheme.TEXT_DISABLED)
 			_level.add_theme_color_override("font_color", UiTheme.ERROR)
+		elif is_new:
+			_name.add_theme_color_override("font_color", UiTheme.ACCENT)
+		elif slot < 0:
+			_name.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+		if slot >= 0:
+			var key := Label.new()
+			key.text = str(slot + 1)
+			key.theme_type_variation = "SmallLabel"
+			key.add_theme_color_override("font_color", UiTheme.ACCENT)
+			key.add_theme_color_override("font_outline_color", UiTheme.OUTLINE)
+			key.add_theme_constant_override("outline_size", 2)
+			key.position = Vector2(12, 7)
+			key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(key)
 		mouse_entered.connect(func() -> void: hovered.emit(self))
 		mouse_exited.connect(func() -> void: unhovered.emit())
 
 	## Texto visible de la fila (nombre completo y nivel), para los tests.
 	func row_text() -> String:
 		return "%s %s" % [_name.text, _level.text]
+
+	## Color del nombre: dice si está equipado, aprendido sin equipar, nuevo o sin aprender (para los tests).
+	func name_color() -> Color:
+		return _name.get_theme_color("font_color")
 
 	func _get_drag_data(_at: Vector2) -> Variant:
 		if not known:
