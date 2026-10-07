@@ -49,6 +49,7 @@ public static class CrossRefValidator
         var minInstantCd = combat.GetProperty("minInstantSpellCooldownMs").GetInt32();
         var instantConeMaxRadius = combat.GetProperty("instantConeMaxRadiusTiles").GetDouble();
         var areaTickMs = rules.GetProperty("limits").GetProperty("persistentAreaTickMs").GetInt32();
+        var maxSummonsPerCaster = rules.GetProperty("limits").GetProperty("maxSummonsPerCaster").GetInt32();
         // Tope de nivel de la fase activa: lo que ya se alcanza no puede quedarse en aviso.
         var phaseCaps = progression.GetProperty("levelCapByPhase").EnumerateArray().Select(e => e.GetInt32()).ToList();
         var phase = rules.GetProperty("world").GetProperty("currentPhase").GetInt32();
@@ -81,16 +82,27 @@ public static class CrossRefValidator
                 }
                 if (!ImplementedEffects.Contains(type))
                     report.Warn("spells.json", $"{p}/effects/{k}/type", $"{id}: efecto '{type}' aún no implementado → hechizo no disponible (ADR-023)");
+                if (type == "summon")
+                {
+                    // HU-116: solo monstruos invocan, una plantilla que exista y dentro del tope por invocador.
+                    if (source != "monster")
+                        report.Error("spells.json", $"{p}/effects/{k}", $"{id}: solo los hechizos de monstruo invocan (HU-116)");
+                    var summoned = Str(eff, "monsterId");
+                    if (!monsterIds.Contains(summoned))
+                        report.Error("spells.json", $"{p}/effects/{k}/monsterId", $"{id}: monsterId '{summoned}' no existe en monsters.json");
+                    if (eff.TryGetProperty("count", out var cnt) && cnt.GetInt32() > maxSummonsPerCaster)
+                        report.Error("spells.json", $"{p}/effects/{k}/count", $"{id}: invoca {cnt.GetInt32()}, más que rules.limits.maxSummonsPerCaster ({maxSummonsPerCaster})");
+                }
             }
 
-            // HU-100: un área duradera es un área que dura al menos un pulso; sin desplazamientos ni proyectil (los
+            // HU-100: un área duradera es un área que dura al menos un pulso; sin desplazamientos, invocaciones ni proyectil (los
             // pulsos solo tocan a los objetivos y un proyectil no deja área).
             if (sp.TryGetProperty("areaDurationMs", out var durEl))
             {
                 if (!targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && !targeting.StartsWith("self_aoe", StringComparison.Ordinal))
                     report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: solo un hechizo de área puede dejar un área duradera");
-                else if (effects.Any(e => Str(e, "type") is "leap" or "dash"))
-                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un salto o una carga no dejan un área duradera");
+                else if (effects.Any(e => Str(e, "type") is "leap" or "dash" or "summon"))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un salto, una carga o una invocación no dejan un área duradera");
                 if (sp.TryGetProperty("projectile", out _))
                     report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un hechizo con proyectil no deja un área duradera");
                 if (durEl.GetInt32() < areaTickMs)
@@ -444,7 +456,9 @@ public static class CrossRefValidator
                 }
                 if (m.TryGetProperty("addEffect", out var added))
                 {
-                    // Las mismas reglas que los efectos del hechizo (revisión de autoridad de HU-100).
+                    // Las mismas reglas que los efectos del hechizo (revisión de autoridad de HU-100/HU-116).
+                    if (Str(added, "type") == "summon")
+                        report.Error("spells.json", $"{mp}/addEffect", $"{id}/{upId}: solo los hechizos de monstruo invocan (HU-116)");
                     if (sp.TryGetProperty("areaDurationMs", out _) && Str(added, "type") is "leap" or "dash")
                         report.Error("spells.json", $"{mp}/addEffect", $"{id}/{upId}: un salto o una carga no van en un área duradera");
                     if (added.TryGetProperty("auraId", out var addedAura)) referencedAuras.Add(addedAura.GetString()!);

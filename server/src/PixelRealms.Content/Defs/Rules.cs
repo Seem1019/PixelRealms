@@ -302,6 +302,9 @@ public sealed record LimitRules
     public required int PersistentAreaTickMs { get; init; }
     public required int MaxBuffsPerEntity { get; init; }
     public required int MaxDebuffsPerEntity { get; init; }
+    /// <summary>HU-116: invocaciones vivas por invocador y por instancia.</summary>
+    public required int MaxSummonsPerCaster { get; init; }
+    public required int MaxSummonsPerInstance { get; init; }
 }
 
 public sealed record PentagramReferences

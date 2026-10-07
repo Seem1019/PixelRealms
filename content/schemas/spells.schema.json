@@ -581,6 +581,28 @@
             "type"
           ],
           "description": "Corta el casteo del objetivo y aplica rules.combat.interruptLockoutMs (ADR-019)."
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "summon"
+            },
+            "monsterId": {
+              "$ref": "common.schema.json#/$defs/id"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "type",
+            "monsterId",
+            "count"
+          ],
+          "description": "HU-116: invoca `count` monstruos junto al lanzador, una vez por lanzamiento. Solo hechizos de monstruo; topes en rules.limits (maxSummonsPerCaster, maxSummonsPerInstance). No dan XP ni botín y se van si el invocador muere o evade."
         }
       ]
     }

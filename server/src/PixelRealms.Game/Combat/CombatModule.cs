@@ -25,6 +25,7 @@ public sealed class CombatModule
         Resources = new ResourceSystem(Services, Damage);
         Death = new DeathSystem(Services, Auras, interest);
         Spawns = new SpawnSystem(content, world);
+        Summons = new SummonSystem(content, world, interest);
         Ai = new MonsterAiSystem(Services, Casts, Auras, movement);
         Progression = new Progression.ProgressionSystem(Services);
         Loot = new Items.LootSystem(Services);
@@ -44,10 +45,12 @@ public sealed class CombatModule
         Damage.Death = Death;
         Auras.Interrupter = Casts;
         Effects.Casts = Casts;
+        Effects.Summons = Summons;
         Death.OnMonsterKilled = Spawns.ScheduleRespawn;
         Death.IsLooted = Loot.IsLooted;
         Death.OnCorpseRemoved = (m, map) => Loot.Forget(map, m.Id);
         Death.OnActorKilled = Casts.DropAreasOf;
+        Summons.OnRemoving = (m, map, ctx) => { Casts.ForgetCaster(m, map); Auras.ClearAll(m, map, ctx); };
         Services.PvpCanAttack = (a, b) => Pvp.CanAttack(a, b, Services.Content.Rules) is not null;
         Services.InDuel = Pvp.InActiveDuel;
         Damage.DuelClamp = Pvp.ClampDamage;
@@ -72,6 +75,7 @@ public sealed class CombatModule
     public ResourceSystem Resources { get; }
     public DeathSystem Death { get; }
     public SpawnSystem Spawns { get; }
+    public SummonSystem Summons { get; }
     public MonsterAiSystem Ai { get; }
     public Progression.ProgressionSystem Progression { get; }
     public Items.LootSystem Loot { get; }
@@ -123,7 +127,7 @@ public sealed class CombatModule
     /// <summary>Registra los sistemas en orden; `extraBeforeInterest` permite insertar portales u otros antes de la AOI.</summary>
     public Simulation Register(Simulation sim, params IMapSystem[] extraBeforeInterest)
     {
-        sim.AddSystem(Movement).AddSystem(Objects).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Loot).AddSystem(Spawns).AddSystem(Social);
+        sim.AddSystem(Movement).AddSystem(Objects).AddSystem(Casts).AddSystem(Auras).AddSystem(Ai).AddSystem(AutoAttack).AddSystem(Resources).AddSystem(Death).AddSystem(Progression).AddSystem(Loot).AddSystem(Spawns).AddSystem(Summons).AddSystem(Social);
         foreach (var s in extraBeforeInterest) sim.AddSystem(s);
         return sim.AddSystem(Interest);
     }

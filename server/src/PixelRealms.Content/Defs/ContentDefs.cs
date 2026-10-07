@@ -93,6 +93,9 @@ public sealed record EffectDef
     public ApplyTo ApplyTo { get; init; } = ApplyTo.Targets;
     public double BonusBelowHpPct { get; init; }
     public double BonusMult { get; init; } = 1.0;
+    /// <summary>`summon` (HU-116): plantilla y cuántos.</summary>
+    public string? MonsterId { get; init; }
+    public int Count { get; init; }
     /// <summary>`apply_aura` de un hechizo mejorado (HU-104): copia del aura con los campos que cambia la mejora, mismo id. No
     /// viene del JSON: la pone <see cref="SpellUpgrades.Apply"/>.</summary>
     [JsonIgnore] public AuraDef? AuraOverride { get; init; }

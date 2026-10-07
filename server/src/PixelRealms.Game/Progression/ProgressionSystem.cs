@@ -41,6 +41,7 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
         for (var i = 0; i < count; i++)
         {
             if (ctx.Events[i] is not ActorDiedEvent { Victim: Monster monster } died || died.MapInstanceId != map.Id) continue;
+            if (monster.SummonedBy is not null) continue; // HU-116 CA4: las invocaciones dan 0 XP (al jefe no se le farmea)
             var taggerId = monster.TaggedBy ?? died.Killer?.Id;
             if (taggerId is null || map.Find(taggerId.Value) is not Player tagger) continue;
             foreach (var (player, xp) in XpRecipients(tagger, monster, map, ctx.Rules))

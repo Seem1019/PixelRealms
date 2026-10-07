@@ -15,7 +15,7 @@ public static class EngineCapabilities
         { "self", "enemy", "ally", "self_aoe_enemies", "self_aoe_allies", "ground_aoe_enemies", "ground_aoe_allies", "ground_aoe_all" };
 
     public static readonly HashSet<string> Effects = new(StringComparer.Ordinal)
-        { "damage", "heal", "restore_resource", "apply_aura", "taunt", "dash", "interrupt", "leap" };
+        { "damage", "heal", "restore_resource", "apply_aura", "taunt", "dash", "interrupt", "leap", "summon" };
 
     /// <summary>Motivo por el que el hechizo no está disponible, o null si lo está.</summary>
     public static string? UnavailableReason(SpellDef spell)

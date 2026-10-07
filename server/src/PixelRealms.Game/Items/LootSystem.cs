@@ -122,6 +122,7 @@ public sealed class LootSystem(CombatServices services) : IMapSystem
         for (var i = 0; i < count; i++)
         {
             if (ctx.Events[i] is not ActorDiedEvent { Victim: Monster monster } died || died.MapInstanceId != map.Id) continue;
+            if (monster.SummonedBy is not null) continue; // HU-116: las invocaciones no sueltan botín
             var taggerId = monster.TaggedBy ?? died.Killer?.Id;
             if (taggerId is null || map.Find(taggerId.Value) is not Player tagger) continue;
             CreateBag(monster, tagger, map, ctx);

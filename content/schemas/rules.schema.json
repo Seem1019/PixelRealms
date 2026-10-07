@@ -184,7 +184,7 @@
 
     "limits": {
       "type": "object", "additionalProperties": false,
-      "required": ["maxPersistentAreasPerCaster", "maxAreasPerInstance", "maxPendingImpactsPerInstance", "aoeMaxTargetsCap", "persistentAreaTickMs", "maxBuffsPerEntity", "maxDebuffsPerEntity"],
+      "required": ["maxPersistentAreasPerCaster", "maxAreasPerInstance", "maxPendingImpactsPerInstance", "aoeMaxTargetsCap", "persistentAreaTickMs", "maxBuffsPerEntity", "maxDebuffsPerEntity", "maxSummonsPerCaster", "maxSummonsPerInstance"],
       "description": "Topes de rendimiento del combate (ADR-018).",
       "properties": {
         "maxPersistentAreasPerCaster": { "type": "integer", "minimum": 0, "description": "Áreas duraderas por lanzador; una nueva por encima del tope reemplaza a la más antigua." },
@@ -193,6 +193,8 @@
         "aoeMaxTargetsCap": { "type": "integer", "minimum": 1, "description": "Tope global de objetivos por área, por encima del maxTargets de cada hechizo." },
         "persistentAreaTickMs": { "type": "integer", "minimum": 50, "description": "Cada cuánto se evalúa un área que dura en el tiempo (repartidas entre ticks)." },
         "maxBuffsPerEntity": { "type": "integer", "minimum": 1, "description": "Tope de auras beneficiosas por entidad (ADR-021). Un aura nueva siempre se aplica: si el grupo está lleno, sale la beneficiosa con menos tiempo restante." },
+        "maxSummonsPerCaster": { "type": "integer", "minimum": 0, "description": "HU-116: invocaciones vivas por invocador; por encima, el efecto `summon` crea menos." },
+        "maxSummonsPerInstance": { "type": "integer", "minimum": 0, "description": "HU-116: invocaciones vivas por MapInstance." },
         "maxDebuffsPerEntity": { "type": "integer", "minimum": 1, "description": "Tope de auras perjudiciales por entidad, sin contar controles (ADR-021). Si está lleno, sale la perjudicial con menos tiempo restante." }
       }
     },

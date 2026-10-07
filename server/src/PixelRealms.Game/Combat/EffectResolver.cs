@@ -18,8 +18,11 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
     /// <summary>Lo fija la composición: el efecto `interrupt` corta casteos.</summary>
     public CastSystem? Casts { get; set; }
 
+    /// <summary>Lo fija la composición: el efecto `summon` (HU-116).</summary>
+    public Ai.SummonSystem? Summons { get; set; }
+
     /// <param name="pulse">Pulso de un área duradera (HU-100): solo los efectos sobre los objetivos; los del lanzamiento (sobre uno
-    /// mismo, desplazamientos) ya se aplicaron una vez con <see cref="ApplyCastOnly"/>.</param>
+    /// mismo, invocaciones, desplazamientos) ya se aplicaron una vez con <see cref="ApplyCastOnly"/>.</param>
     public void Apply(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, Vec2 origin, MapInstance map, TickContext ctx, bool pulse = false)
     {
         var rules = ctx.Rules.Combat;
@@ -57,7 +60,7 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
             if (IsNegative(e)) hasNegative = true;
         }
 
-        if (!pulse) ApplySelfEffects(caster, spell, casterStats, map, ctx);
+        if (!pulse) ApplySelfAndSummons(caster, spell, casterStats, map, ctx);
 
         var hitAny = false;
         foreach (var target in list)
@@ -78,7 +81,7 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
             {
                 var e = spell.Effects[k];
                 if (e.ApplyTo == ApplyTo.Self) continue;
-                if (e.Type is EffectType.Leap or EffectType.Dash) continue;
+                if (e.Type is EffectType.Leap or EffectType.Dash or EffectType.Summon) continue;
                 // ground_aoe_all: positivos a aliados, negativos a enemigos; nadie recibe ambos.
                 if (spell.Targeting == Targeting.GroundAoeAll && IsNegative(e) != isEnemy) continue;
                 if (target.IsDead) break;
@@ -93,17 +96,18 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
         if (hitAny && !hasDamage) damage.GrantRage(caster, rules.RagePerHitDealt, ctx);
     }
 
-    /// <summary>HU-100: lo que un área duradera hace una sola vez al lanzarse (efectos sobre uno mismo).</summary>
+    /// <summary>HU-100: lo que un área duradera hace una sola vez al lanzarse (efectos sobre uno mismo e invocaciones).</summary>
     public void ApplyCastOnly(Actor caster, SpellDef spell, MapInstance map, TickContext ctx) =>
-        ApplySelfEffects(caster, spell, services.StatsOf(caster), map, ctx);
+        ApplySelfAndSummons(caster, spell, services.StatsOf(caster), map, ctx);
 
-    /// <summary>Efectos sobre uno mismo: una vez por lanzamiento, sin tirada.</summary>
-    private void ApplySelfEffects(Actor caster, SpellDef spell, Progression.DerivedStats casterStats, MapInstance map, TickContext ctx)
+    /// <summary>Efectos sobre uno mismo e invocaciones (HU-116): una vez por lanzamiento, sin tirada.</summary>
+    private void ApplySelfAndSummons(Actor caster, SpellDef spell, Progression.DerivedStats casterStats, MapInstance map, TickContext ctx)
     {
         for (var k = 0; k < spell.Effects.Count; k++)
         {
             var e = spell.Effects[k];
-            if (e.ApplyTo == ApplyTo.Self) ApplyEffect(e, caster, caster, spell, casterStats, crit: false, map, ctx);
+            if (e.Type == EffectType.Summon) { if (caster is Monster invoker) Summons?.Summon(invoker, e, map, ctx); }
+            else if (e.ApplyTo == ApplyTo.Self) ApplyEffect(e, caster, caster, spell, casterStats, crit: false, map, ctx);
         }
     }
 

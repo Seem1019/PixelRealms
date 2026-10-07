@@ -164,7 +164,10 @@ public sealed class ContentLoaderTests
     [InlineData("rules.json", "/loadout/usableSlots", "5", "más que las 8 teclas")]
     [InlineData("spells.json", "/spells/0/areaDurationMs", "3000", "solo un hechizo de área puede dejar un área duradera")] // HU-100
     [InlineData("spells.json", "/spells/3/areaDurationMs", "200", "menos que un pulso")]                                    // HU-100
-    [InlineData("spells.json", "/spells/10/areaDurationMs", "3000", "un salto o una carga no dejan un área duradera")]                                  // HU-100
+    [InlineData("spells.json", "/spells/10/areaDurationMs", "3000", "un salto, una carga o una invocación no dejan un área duradera")]                  // HU-100
+    [InlineData("spells.json", "/spells/0/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":2}", "solo los hechizos de monstruo invocan")] // HU-116
+    [InlineData("spells.json", "/spells/36/effects/0", "{\"type\":\"summon\",\"monsterId\":\"nope\",\"count\":2}", "monsterId 'nope' no existe")] // HU-116
+    [InlineData("spells.json", "/spells/36/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":6}", "más que rules.limits.maxSummonsPerCaster")] // HU-116
     [InlineData("spells.json", "/spells/35/areaDurationMs", "3000", "con proyectil no deja un área duradera")] // HU-100 (goblin_shoot tiene proyectil)
     public void CrossReferenceRules_Fail(string file, string pointer, string valueJson, string expectedFragment)
     {

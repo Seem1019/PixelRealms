@@ -174,7 +174,9 @@
     "aoeMaxTargetsCap": 10,
     "persistentAreaTickMs": 500,
     "maxBuffsPerEntity": 16,
-    "maxDebuffsPerEntity": 16
+    "maxDebuffsPerEntity": 16,
+    "maxSummonsPerCaster": 4,
+    "maxSummonsPerInstance": 32
   },
 
   "balanceTargets": {
