@@ -36,6 +36,7 @@ Tipos compartidos (ids, enums, stats): `schemas/common.schema.json`.
 | `interrupt` | — | corta el casteo del objetivo; aplica `rules.combat.interruptLockoutMs` (ADR-019) |
 | `dash` | `minRange?` | el lanzador se coloca adyacente al objetivo (Carga); exige LOS |
 | `leap` | `maxRange`, `travelMs?` | salto a `targetPos` (0 ms = teletransporte); lo mueve el servidor; los efectos siguientes se aplican al caer (HU-087) |
+| `summon` | `monsterId`, `count` | solo monstruos: invoca junto al lanzador, una vez por lanzamiento, con su amenaza; sin XP ni botín y se van si el invocador muere, evade o se reinicia; topes `rules.limits.maxSummonsPerCaster`/`maxSummonsPerInstance` (HU-116) |
 Campos comunes: `applyTo: "self"` aplica el efecto al lanzador aunque el hechizo sea de área o de salto; `heal` admite
 `bonusBelowHpPct` + `bonusMult` (cura más si el objetivo está por debajo de ese % de vida).
 Tipos de aura: `dot`, `hot`, `stat_mod` (`mods.stats`, `damageTakenPct`, `damageDonePct`, `speedPct`), `stun`, `root`, `silence`, `shield`, `slow`.
@@ -44,9 +45,19 @@ Escuelas: solo `physical` y `magic` (ADR-010).
 Targeting (combate híbrido, ADR-015): un objetivo (tab-target) `self`, `enemy`, `ally`; área `self_aoe_enemies`,
 `self_aoe_allies` y, desde HU-086, `ground_aoe_enemies`, `ground_aoe_allies`, `ground_aoe_all` (punto apuntado; `ground_aoe_all`
 cura aliados y daña enemigos). `target_aoe_enemies` ya no existe. Campos `aoeRadius`, `maxTargets`. Las áreas
-apuntadas de daño llevan `castMs > 0` para que se puedan esquivar.
+apuntadas de daño llevan `castMs > 0` para que se puedan esquivar, salvo los conos de radio ≤ `rules.combat.instantConeMaxRadiusTiles`
+(3), que se esquivan saliendo del frente del lanzador (ADR-027 D4).
 Formas (`shape`, ADR-016): `circle` (`aoeRadius`), `cone` (`aoeRadius`, `aoeAngleDeg`), `line` (`aoeLength`, `aoeWidth`); cono y
-línea salen del lanzador hacia `targetPos`. Solo `circle` está implementado; los hechizos que usan algo del motor aún no implementado quedan no disponibles (ADR-023).
+línea salen del lanzador hacia `targetPos` y la línea se corta en la primera pared (HU-102). Las tres están implementadas; los
+hechizos que usan algo del motor aún no implementado quedan no disponibles (ADR-023).
+
+**Mejoras 1-de-2 (HU-104, ADR-027 D1):** un hechizo de clase puede llevar `upgrades` con exactamente 2 mejoras
+`{id, name, description, mods}`; se eligen desde `rules.progression.spellUpgradeLevel` (8). Cada modificador es de un tipo
+(valor final = valor · `mult` + `add`): `{"stat": "cooldownMs|castMs|cost|range|aoeRadius|aoeAngleDeg|aoeLength|aoeWidth|maxTargets", ...}`,
+`{"effect": "damage|heal|restore_resource", "mult": 1.2}` (escala base y coeficientes), `{"aura": "<id que aplica>", "stat":
+"durationMs|pct|amount", ...}` o `{"addEffect": {<efecto>}}`. La descripción dice el número. El validador rechaza ids repetidos,
+modificadores que apuntan a algo que el hechizo no tiene y mejoras que dejan valores fuera de rango, un instantáneo con
+cooldown corto o un área de daño sin casteo que no se puede esquivar.
 
 **Si una idea no cabe en estos efectos**, no la fuerces con hacks: propone al usuario un nuevo tipo de efecto
 (requiere código en `EffectResolver`, schema, tests y esta tabla) y crea una HU para ello.

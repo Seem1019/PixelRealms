@@ -141,8 +141,9 @@ sequenceDiagram
   9-slice (`StyleBoxTexture`) y arte en la paleta Resurrect 64 generado por `tools/art/` (salvo guerrero y mago: hojas
   importadas con `tools/art/import_heroes.py`, HU-093). El mapa se dibuja con `TerrainBaker`/`TerrainRenderer`: al
   cargar, hornea el `.tmj` (los mismos GIDs que lee la colisión) con autotile dual-grid en texturas por trozos, una capa
-  bajo las entidades y otra (copas, aleros) encima. Las entidades son `EntityVisual` (sprite de 32×32 animado, sombra y
-  placa de nombre); `NameplateLayout` separa las placas que se pisan.
+  bajo las entidades y otra (copas, aleros) encima, con el atlas de su tier (propiedades de mapa `biome` y `palette`,
+  HU-108). Las entidades son `EntityVisual` (sprite de 32×32 animado, sombra y placa de nombre); `NameplateLayout`
+  separa las placas que se pisan.
 
 ## 7. Despliegue (amigos)
 - VPS Linux (2 vCPU / 2–4 GB). `docker compose`: `server`, `postgres`, `caddy` (TLS automático → `wss://`).

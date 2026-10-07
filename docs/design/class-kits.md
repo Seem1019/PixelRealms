@@ -1,9 +1,9 @@
 # Clases: pentagrama, armas de referencia y grupos de hechizos
 
 > Estructura aprobada el 2026-09-30 (ADR-020). `content/spells.json` y `content/auras.json` tienen estos 32 hechizos y sus
-> auras. Los 16 de la Fase 1 (niveles 1–5) tienen **números medidos** (`"provisional": false`, ver
-> [balance-report.md](balance-report.md)); los 16 de las Fases 2 y 3 están escalados a la misma escala pero siguen
-> **provisionales** (`"provisional": true`) hasta su pasada de balance.
+> auras. Los 16 de la Fase 1 (niveles 1–5) y los 8 de la Fase 2 (niveles 7 y 9, HU-106) tienen **números medidos**
+> (`"provisional": false`, ver [balance-report.md](balance-report.md)); los 8 de la Fase 3 están escalados a la misma escala
+> pero siguen **provisionales** (`"provisional": true`) hasta su pasada de balance.
 
 ## Pentagrama
 Cada clase se define por 5 puntas, iguales para todas. En el Sacerdote, sus curas ocupan mono-objetivo y área; un hechizo
@@ -129,6 +129,12 @@ Formas: [obj] a un objetivo · [propio] sobre uno mismo · [suelo] área apuntad
 34 / 45 / 0 / 23 · Guerrero 35 / 21 / 29 / 16 / 70 · Sacerdote 51 / 29 / 10 / 11 / 29. Los números de cada hechizo y cómo
 se midieron están en [balance-report.md](balance-report.md).
 
+**Perfil en la Fase 2, medido al nivel 10** con los 6 hechizos (HU-106, `tools/balance/phase2.py`): Pícaro 65 / 10 / 20 / 65 / 27 ·
+Mago 38 / 56 / 45 / 20 / 19 · Guerrero 34 / 33 / 29 / 16 / 88 · Sacerdote 64 / 40 / 19 / 24 / 25. Se aparta de los aportes de
+arriba en dos hechizos: **Eviscerar** aporta mono 11 (no 20) porque más daño dispara la XP por hora del Pícaro, y **Campo
+ardiente** aporta área 26 (no 20) para compensar que el Estallido pierde área al nivel 10. **Cuchillas arrojadizas** es un cono de
+radio 3 sin casteo (ADR-027 D4).
+
 **Sale del kit anterior:** Desgarrar, Escudo de maná, Rezo de sanación (lo reemplaza Pulso sagrado) y Hoja envenenada
 (pasa a ser Veneno debilitante).
 
@@ -149,7 +155,9 @@ se midieron están en [balance-report.md](balance-report.md).
   varita (sin maná y recuperando maná), descansa menos porque se cura, y suma Castigo (nv 2) y Pulso sagrado (nv 5).
 - El modelo suma aportes y no ve las parejas que se potencian (ralentizar + área, aturdir + golpe fuerte).
 - La identidad del Pícaro en la Fase 1 depende del salto (HU-087).
-- En la Fase 1 el Mago tiene mono y control igual de altos (objetivo 45 / 45, medido 41 / 45) y menos área (objetivo 35, medido 34); su área madura en la Fase 2.
+- En la Fase 1 el Mago tiene mono y control igual de altos (objetivo 45 / 45, medido 41 / 45) y menos área (objetivo 35, medido 34); su área madura en la Fase 2 (al nivel 10, con Campo ardiente: 56, objetivo 55).
+- Al subir solo el `base`, los rangos se notan poco con el equipo del nivel 9 (+4 % de mediana con el segundo rango): ver la
+  propuesta de `spellRankBonusPct` en [balance-report.md](balance-report.md) §Rangos.
 - 16 hechizos nuevos necesitan íconos, efectos visuales y marcas de área (3 de ellos en la Fase 1).
 - Los valores de referencia se calibran una sola vez: cambiarlos después reescala todas las clases.
 - Castear moviéndose da a los casteos largos un valor (alejarse, esquivar) que el pentagrama no mide; primera palanca si

@@ -353,3 +353,610 @@ Sacerdote de su nivel y al 54 % de un Guerrero; en pareja cae en 24–37 s.
 ## Sin medir
 - **Triángulo con duelos reales** (HU-084 CA3): el simulador es de una dimensión, sin obstáculos ni latencia.
 - **Pentagrama al nivel 15** (Fases 2 y 3).
+
+# Fase 2 · Monstruos del Tier 2 (HU-109, 2026-10-06)
+
+Los 12 monstruos del Bosque y de la Cripta: 3 de campamento y un élite en el Linde y en el Pantano, y en la Cripta 2 de nivel
+10, las plantas trampa y un élite de nivel 11. Medidos con `python tools/balance/tier2.py` (nuevo; `--tier1` repite el
+solitario sin equipo nuevo y `--quick` se salta los élites). Valores esperados, sin azar ni movimiento.
+
+**Supuestos** (los de la Fase 1 salvo donde se dice):
+- **Equipo aproximado** (no hay equipo de nivel 7 a 9 hasta HU-110): el verde de referencia del Tier 1 (`REF_GEAR`) con todo lo
+  numérico (stats, armadura, daño del arma, poder de hechizo) × `1 + 0,2 · (nivel − 6)`: ×1,0 al 6, ×1,4 al 8, ×1,8 al 10. Es
+  el presupuesto lineal por nivel de la skill `game-content`, con el equipo de nivel N − 1 de media al nivel N.
+- **Rangos de hechizo** como el servidor: +15 % del `base` del nivel 4 al 7 y +30 % del 8 al 11 (`check.py` no los cuenta).
+- **Hechizos:** los 16 medidos de la Fase 1. Los de nivel 7 y 9 siguen provisionales (HU-106) y no se cuentan: los tiempos
+  para matar son conservadores.
+- **Misma escala que la Fase 1:** rotación con los hechizos de daño, maná gastado y descanso como `check.py`. Con esos supuestos
+  (y sin rangos) el modelo nuevo repite el Kóbold minero de la Fase 1: ciclos de 33 / 37 / 34 / 36 s y 11 % de diferencia de
+  XP por hora (`check.py`: 33,3 / 37,1 / 34,8 / 36,0 s y 10 %).
+- **El monstruo** pega con su básico y sus hechizos (cooldown, casteo que pausa su básico, `hpBelowPct`, DoT, aturdir y
+  silenciar). Las áreas marcadas no se esquivan (peor caso), salvo en la columna de los élites que lo dice; esquivar le cuesta
+  al cuerpo a cuerpo el casteo + 0,5 s sin pegar. El cuerpo a cuerpo tarda en llegar a un monstruo a distancia.
+- **Élites:** pociones menores de vida (60, cada 60 s, bajo el 40 %); el Sacerdote cura (Escudo + Sanar, su capacidad medida en
+  60 s) a quien baje del 50 % solo y del 60 % en grupo, sin pegar mientras cura, y sus curas gastan maná.
+
+### Bestiario
+XP calculada con `rules.progression` (`round((5 · nivel + 1) · tipo)`). Cada mecánica se ve antes de doler: casteo (barra sobre
+el monstruo) o área marcada en el suelo. Solo efectos, formas (círculo) y auras que ya existen.
+
+| Zona | Monstruo (`id`) | Nv | Tipo | Vida | Armadura | Daño | Alcance · velocidad | Mecánica | XP |
+|---|---|---|---|---|---|---|---|---|---|
+| Linde | Lobo del bosque (`forest_wolf`) | 6 | normal | 175 | 28 | 4–7 cada 1,7 s | 1,2 · **5** | Aullido bajo el 50 % (casteo 1 s): +25 % de daño 8 s. Más rápido que el jugador: no se le huye | 31 |
+| Linde | Leñador bandido (`bandit_woodcutter`) | 7 | normal | 190 | 40 | 6–10 cada 2,8 s | 1,5 · 3,8 | Hachazo: área marcada (radio 1,25) en su objetivo, casteo 1,5 s, 12 de daño, cada 10 s | 36 |
+| Linde | Araña tejedora (`weaver_spider`) | 8 | hard | 220 | 25 | 7–11 cada 2,2 s | **5** · 3,8 | Telaraña: área marcada (1,5), casteo 1,2 s, 6 de daño y raíz 2,5 s, cada 12 s | 49 |
+| Linde | **Oso viejo** (`old_bear`) | 8 | élite | 950 | 60 | 36–48 cada 2,5 s | 1,5 · 4,5 | Zarpazo: área marcada (1,5), casteo 1,2 s, 30, cada 10 s. Rugido: a su objetivo, casteo 1 s, 10 y aturde 2 s, cada 12 s | 123 |
+| Pantano | Sapo gigante (`giant_toad`) | 8 | normal | 230 | 15 | 6–10 cada 2,6 s | 1,5 · 3 | Salpicón de lodo: área marcada (2), casteo 1,5 s, 8 y ralentiza 40 % 4 s, cada 12 s | 41 |
+| Pantano | Hombre lagarto (`lizardman`) | 9 | normal | 230 | 40 | 6–9 cada 2,4 s | 1,8 · 4,2 | Lanza envenenada: a su objetivo, casteo 1 s, 8 y veneno de 3 cada 3 s durante 9 s, cada 10 s | 46 |
+| Pantano | Fuego fatuo (`will_o_wisp`) | 10 | hard | 240 | 10 | 8–11 **mágico** cada 2,4 s | **6** · 4,5 | Destello: área marcada (1,5), casteo 1,5 s, 12 mágico y silencio 2,5 s, cada 12 s | 61 |
+| Pantano | **Bruja del pantano** (`swamp_witch`) | 10 | élite | 1 050 | 30 | 30–40 **mágico** cada 2,4 s | **6** · 4 | Ciénaga: área marcada (2,5), casteo 2 s, 20 y raíz 3 s, cada 14 s. Maldición: a quien no es el tanque, casteo 1,5 s, 8 cada 3 s durante 12 s. Brebaje bajo el 50 %: casteo 2,5 s, se cura 150, cada 25 s | 153 |
+| Cripta | Esqueleto de raíces (`root_skeleton`) | 10 | normal | 235 | **90** | 6–10 cada 2,4 s | 1,5 · 3,8 | Tajo de espinas: área marcada (1,25), casteo 1,2 s, 8 y sangrado físico de 5 cada 3 s durante 9 s, cada 10 s | 51 |
+| Cripta | Espíritu del musgo (`moss_spirit`) | 10 | hard | 230 | 20 | 8–12 **mágico** cada 2,4 s | **5** · 3,5 | Savia: casteo 2 s, cura 40 a sí mismo y a los monstruos a 5 casillas, cada 12 s (interrúmpelo o mátalo primero) | 61 |
+| Cripta | Planta trampa (`trap_plant`) | 10 | hard | 200 | 40 | 8–11 cada 2,4 s | **8** · **0** | Inmóvil; despierta a 4 casillas. Raíces trampa: área marcada (2) en quien pasa, casteo 1,2 s, 8 y raíz 3 s, cada 8 s | 61 |
+| Cripta | **Guardián de la cripta** (`crypt_guardian`) | 11 | élite | 1 150 | **110** | 40–56 cada 2,6 s | 1,5 · 4 | Golpe de losa: área marcada (1,5), casteo 1,8 s, 40, cada 10 s. Coraza de raíces: casteo 1,5 s, escudo de 160 durante 10 s, cada 18 s | 168 |
+
+- **Un normal por nivel, sin huecos:** lobo (6), leñador (7), sapo (8), lagarto (9) y esqueleto (10); el 10 del Pantano es el
+  Fuego fatuo (`hard`).
+- **Élites:** `aggroRange` 4, menor que el de los monstruos de campamento de su zona (5–7; las plantas trampa, también 4, tienen
+  su propia sala), y correa 12, como los de la pradera. Pegan, en proporción a la vida del tanque, casi lo que el Capataz a su grupo de referencia (el Guerrero de su nivel
+  pierde ~2–2,6 % de vida por segundo; con el Capataz, 2,6 %), pero mueren antes: el combate en trío dura 20–34 s (el Capataz,
+  81–86 s).
+- **Botín:** tablas mínimas (cobre y la chatarra que ya existe); HU-110 añade el equipo y el verde garantizado de los élites.
+
+### 1. Stats por clase y nivel (equipo aproximado y rangos)
+| Nv | Equipo × | Pícaro: vida · AP/SP · armadura | Mago | Guerrero | Sacerdote |
+|---|---|---|---|---|---|
+| 6 | 1,0 | 200 · 76/20 · 45 | 170 · 46/48 · 14 | 408 · 66/20 · 78 | 215 · 42/37 · 18 |
+| 7 | 1,2 | 212 · 84/22 · 52 | 180 · 51/53 · 16 | 449 · 73/22 · 92 | 231 · 46/41 · 21 |
+| 8 | 1,4 | 224 · 92/24 · 58 | 190 · 56/58 · 17 | 490 · 81/24 · 106 | 247 · 51/45 · 24 |
+| 9 | 1,6 | 236 · 101/26 · 65 | 200 · 60/63 · 19 | 530 · 88/26 · 121 | 263 · 55/50 · 27 |
+| 10 | 1,8 | 248 · 109/28 · 71 | 210 · 65/69 · 21 | 571 · 96/28 · 135 | 279 · 59/54 · 30 |
+| 11 | 2,0 | 260 · 117/30 · 78 | 220 · 69/74 · 22 | 612 · 103/30 · 149 | 295 · 63/58 · 33 |
+
+Cura del Sacerdote (Escudo + Sanar, 60 s): 16,8 por segundo al 8, 18,4 al 10 y 19,2 al 11.
+
+### 2. Solitario contra cada monstruo de campamento de su nivel
+Rotación / solo básicos: tiempo en matarlo · vida perdida. En negrita, por encima del piso del 50 %.
+
+| Monstruo | Nv | Tipo | Pícaro | Mago | Guerrero | Sacerdote |
+|---|---|---|---|---|---|---|
+| *Kóbold minero (Fase 1, referencia)* | 5 | normal | 12 s · 15 % / 21 s · 28 % | 11 s · 22 % / 33 s · **65 %** | 15 s · 8 % / 26 s · 17 % | 16 s · 23 % / 33 s · **50 %** |
+| Lobo del bosque | 6 | normal | 12 s · 14 % / 22 s · 27 % | 11 s · 15 % / 33 s · **57 %** | 15 s · 8 % / 26 s · 14 % | 15 s · 17 % / 36 s · 47 % |
+| Leñador bandido | 7 | normal | 12 s · 12 % / 21 s · 25 % | 11 s · 17 % / 33 s · **56 %** | 15 s · 8 % / 26 s · 14 % | 16 s · 21 % / 33 s · 43 % |
+| Araña tejedora | 8 | hard | 13 s · 16 % / 22 s · 27 % | 11 s · 19 % / 33 s · **61 %** | 15 s · 8 % / 25 s · 13 % | 16 s · 23 % / 33 s · 47 % |
+| Sapo gigante | 8 | normal | 12 s · 13 % / 21 s · 20 % | 13 s · 18 % / 37 s · **55 %** | 14 s · 5 % / 24 s · 11 % | 16 s · 17 % / 36 s · 39 % |
+| Hombre lagarto | 9 | normal | 11 s · 15 % / 20 s · 27 % | 11 s · 20 % / 30 s · **58 %** | 15 s · 9 % / 24 s · 15 % | 16 s · 24 % / 31 s · 44 % |
+| Fuego fatuo | 10 | hard | 11 s · 16 % / 18 s · 32 % | 11 s · 19 % / 30 s · **61 %** | 13 s · 9 % / 23 s · 17 % | 16 s · 25 % / 29 s · 46 % |
+| Esqueleto de raíces | 10 | normal | 12 s · 15 % / 21 s · 28 % | 11 s · 22 % / 30 s · **60 %** | 15 s · 9 % / 24 s · 14 % | 15 s · 24 % / 29 s · 45 % |
+| Espíritu del musgo | 10 | hard | 12 s · 16 % / 20 s · 24 % | 13 s · 19 % / 37 s · **56 %** | 13 s · 7 % / 25 s · 14 % | 18 s · 18 % / 38 s · 46 % |
+| Planta trampa | 10 | hard | 11 s · 12 % / 17 s · 20 % | 11 s · 18 % / 27 s · 45 % | 13 s · 6 % / 21 s · 10 % | 13 s · 16 % / 24 s · 31 % |
+
+- **Con la rotación** nadie pasa del 25 % de vida perdida y todos los matan en 11–18 s (Fase 1: 10–16 s).
+- **Solo con básicos:** el Pícaro, el Guerrero y el Sacerdote quedan bajo el 50 %; el **Mago, en 55–61 %**: por encima del piso
+  pero por debajo del 65 % del Kóbold que la Fase 1 dejó pendiente (ver §Desviaciones).
+
+### 2c. Ciclo por monstruo y XP por hora en solitario
+Ciclo = pelea + descanso + 10 s de caminata · XP por hora.
+
+| Monstruo | Nv | Pícaro | Mago | Guerrero | Sacerdote | Diferencia | Ciclo máx. |
+|---|---|---|---|---|---|---|---|
+| Lobo del bosque | 6 | 32 s · 3 500 | 36 s · 3 124 | 34 s · 3 287 | 32 s · 3 519 | 11 % | 36 s |
+| Leñador bandido | 7 | 32 s · 4 113 | 35 s · 3 751 | 34 s · 3 820 | 33 s · 3 900 | 9 % | 35 s |
+| Araña tejedora | 8 | 33 s · 5 305 | 34 s · 5 260 | 34 s · 5 148 | 32 s · 5 472 | 6 % | 34 s |
+| Sapo gigante | 8 | 32 s · 4 682 | 35 s · 4 180 | 32 s · 4 542 | 31 s · 4 718 | 11 % | 35 s |
+| Hombre lagarto | 9 | 31 s · 5 371 | 33 s · 5 071 | 34 s · 4 848 | 32 s · 5 167 | 10 % | 34 s |
+| Fuego fatuo | 10 | 31 s · 7 139 | 32 s · 6 886 | 32 s · 6 762 | 32 s · 6 949 | 5 % | 32 s |
+| Esqueleto de raíces | 10 | 32 s · 5 741 | 32 s · 5 757 | 34 s · 5 361 | 31 s · 6 020 | 11 % | 34 s |
+| Espíritu del musgo | 10 | 32 s · 6 892 | 34 s · 6 545 | 32 s · 6 956 | 32 s · 6 841 | 6 % | 34 s |
+| Planta trampa | 10 | 30 s · 7 355 | 32 s · 6 886 | 32 s · 6 961 | 27 s · 8 000 | 14 % | 32 s |
+
+- **Cualquier clase mata a cualquier monstruo de campamento de su nivel con un ciclo de 27–36 s**, dentro de
+  `killCycleSecTarget` (36 s).
+- **XP por hora:** diferencia máxima entre clases del 14 % (Planta trampa); en los normales, 9–11 %. Dentro del ±15 %.
+- **Horas del 6 al 10** contra el normal de cada nivel: Pícaro 6,2 h, Mago 6,9 h, Guerrero 6,7 h, Sacerdote 6,4 h (la curva da
+  7,2 h a 36 s). Los hechizos de nivel 7 y 9 (HU-106) las acortarán más: lo mide HU-119.
+- Los `hard` dan un 20 % más de XP con tiempos parecidos; su riesgo (pegan a distancia, enraízan, silencian, se curan) es lo que
+  el modelo no ve.
+
+### Élites: solo y en grupo de su nivel
+Columnas del solitario: como en la Fase 1 (rotación, sin curas ni pociones); con pociones y, el Sacerdote, curándose; y lo mismo
+esquivando todas las áreas marcadas (el mejor caso para quien juega solo). En los grupos, lo más bajo que llega la vida de cada uno.
+
+#### Oso viejo (nv 8, 950 de vida, armadura 60)
+| Solo a nivel 8 | Como la Fase 1 | Con pociones y curas | Esquivando las áreas |
+|---|---|---|---|
+| Pícaro | 20 s · **106 %** | muere a los 24 s (le queda el 70 %) | muere a los 29 s (68 %) |
+| Mago | 14 s · **108 %** | muere a los 17 s (73 %) | muere a los 22 s (64 %) |
+| Guerrero | 46 s · **103 %** | muere a los 50 s (30 %) | muere a los 63 s (29 %) |
+| Sacerdote | 17 s · **101 %** | sin maná para curarse a los 156 s, muere a los 175 s (81 %) | sin maná a los 217 s, muere a los 240 s (42 %) |
+
+| Grupo | Duración | Vida perdida (lo más bajo) | Resultado |
+|---|---|---|---|
+| Guerrero + Pícaro | 34 s | Guerrero 60 % | lo matan |
+| Guerrero + Mago | 31 s | Guerrero 60 % | lo matan |
+| Guerrero + Sacerdote | 46 s | Guerrero 44 % | lo matan |
+| Pícaro + Mago | 40 s | Pícaro muere, Mago 82 % | lo matan con una baja |
+| Pícaro + Sacerdote | 52 s | Pícaro 53 % | lo matan |
+| Mago + Sacerdote | 50 s | Mago 56 % | lo matan |
+| Tríos de nivel 8 (los 4) | 21–27 s | tanque 44–53 % | lo matan |
+| Tríos con Sacerdote de nivel 7 | 27–28 s | Guerrero 44 % | lo matan |
+
+#### Bruja del pantano (nv 10, 1 050 de vida, armadura 30)
+| Solo a nivel 10 | Como la Fase 1 | Con pociones y curas | Esquivando las áreas |
+|---|---|---|---|
+| Pícaro | 20 s · **101 %** | muere a los 24 s (le queda el 51 %) | muere a los 26 s (55 %) |
+| Mago | 19 s · **115 %** | muere a los 22 s (58 %) | muere a los 24 s (55 %) |
+| Guerrero | 46 s · **105 %** | muere a los 49 s (23 %) | muere a los 53 s (32 %) |
+| Sacerdote | 22 s · **102 %** | sin maná a los 280 s, muere a los 317 s (62 %) | sin maná a los 396 s, muere a los 456 s (59 %) |
+
+| Grupo | Duración | Vida perdida (lo más bajo) | Resultado |
+|---|---|---|---|
+| Guerrero + Pícaro | 29 s | Guerrero 55 %, Pícaro 22 % | lo matan |
+| Guerrero + Mago | 30 s | Guerrero 55 %, Mago 29 % | lo matan |
+| Guerrero + Sacerdote | 42 s | Guerrero 43 %, Sacerdote 30 % | lo matan |
+| Pícaro + Mago | 29 s | Pícaro muere, Mago 26 % | lo matan con una baja |
+| Pícaro + Sacerdote | 41 s | Pícaro 50 %, Sacerdote 30 % | lo matan |
+| Mago + Sacerdote | 43 s | Mago 53 %, Sacerdote 33 % | lo matan |
+| Tríos de nivel 10 (los 4) | 20–23 s | tanque 31–50 % | lo matan |
+| Tríos con Sacerdote de nivel 9 | 24 s | Guerrero 40 % | lo matan |
+
+#### Guardián de la cripta (nv 11, 1 150 de vida, armadura 110)
+| Solo a nivel 11 | Como la Fase 1 | Con pociones y curas | Esquivando las áreas |
+|---|---|---|---|
+| Pícaro | 25 s · **108 %** | muere a los 29 s (le queda el 74 %) | muere a los 35 s (79 %) |
+| Mago | 16 s · **106 %** | muere a los 21 s (73 %) | muere a los 27 s (71 %) |
+| Guerrero | 58 s · **102 %** | muere a los 64 s (46 %) | muere a los 79 s (48 %) |
+| Sacerdote | 21 s · **106 %** | sin maná a los 278 s, muere a los 323 s (79 %) | no lo mata en 600 s (le queda el 19 %) |
+
+| Grupo | Duración | Vida perdida (lo más bajo) | Resultado |
+|---|---|---|---|
+| Guerrero + Pícaro | 39 s | Guerrero 60 % | lo matan |
+| Guerrero + Mago | 38 s | Guerrero 60 % | lo matan |
+| Guerrero + Sacerdote | 57 s | Guerrero 43 % | lo matan |
+| Pícaro + Mago | 42 s | Pícaro muere, Mago 72 % | lo matan con una baja |
+| Pícaro + Sacerdote | 58 s | Pícaro 49 % | lo matan |
+| Mago + Sacerdote | 69 s | Mago 60 % | lo matan |
+| Tríos de nivel 11 (los 4) | 22–30 s | tanque 37–49 % | lo matan |
+| Tríos con Sacerdote de nivel 10 (el tope de la Fase 2) | 31–34 s | Guerrero 41 % | lo matan |
+
+- **Nadie los mata solo a nivel equivalente**, ni con pociones, ni esquivando todas las áreas. El que más se acerca es el
+  Guerrero (deja al élite con el 23–48 %). El Sacerdote se cura más de lo que le pegan durante minutos, pero no le hace daño
+  suficiente y se queda sin maná; contra el Guardián, esquivándolo todo, sigue vivo a los 10 minutos con el élite al 19 %.
+- **Piden un grupo de 2–3:** las parejas con Guerrero o Sacerdote los matan en 29–69 s; Pícaro + Mago (sin tanque ni sanador)
+  pierde a uno. Los tríos, en 20–34 s, también con un nivel menos.
+- **Rugido del Oso** (aturde 2 s a su objetivo, con casteo: no se esquiva andando, sí se interrumpe) es lo que impide que el
+  Sacerdote y el Guerrero lo maten solos esquivando: con un área alrededor del oso en su lugar, los dos lo mataban.
+
+### Sensibilidad: sin equipo nuevo (`tier2.py --tier1`)
+Con solo el verde del Tier 1 (sin HU-110), el ciclo sube a 29–40 s, la diferencia de XP por hora llega al 19 % (Planta trampa;
+16 % el Hombre lagarto) y el Mago solo con básicos pierde hasta el 89 % (Espíritu del musgo). Del nivel 6 al 10: 6,5–7,2 h.
+**HU-110 tiene que hacer crecer los números del equipo ~20 % por nivel de item** (lo que supone `gear_factor`); si se queda corto,
+la palanca es la vida de los normales de nivel 9 y 10, no la de los del Linde.
+
+### Desviaciones y propuestas
+1. **Mago solo con básicos, 55–61 % de vida perdida** (piso 50 %). Es el pendiente de la Fase 1 (65 % contra el Kóbold), que
+   aquí no empeora. Propuesta, **no aplicada** (cambia los duelos del Mago y su punta de armadura, que hay que volver a medir):
+   ```json
+   "classScaling": { "mage": { "hpPerSta": 12 } }
+   ```
+   Deja al Mago en 47–53 % contra los monstruos del Tier 2 y en 57 % contra el Kóbold. Con `hpPerSta` 11: 51–57 %.
+2. **La Fase 2 sale algo más corta que la curva** (6,2–6,9 h frente a 7,2 h) y se acortará con los hechizos de nivel 7 y 9. No se
+   toca aquí: HU-119 mide con el equipo y los hechizos reales y decide entre subir la vida de los monstruos o `minutesPerLevel`.
+3. **Maná del Mago:** con la aproximación de `check.py` (alterna básicos), su ciclo contra el Kóbold es 37 s; con el maná exacto
+   de la rotación más codiciosa sería 49 s. Se mantiene la escala de la Fase 1; HU-119 debería cronometrar cómo descansa un Mago
+   de verdad.
+
+### Lo que el modelo no ve
+- **Kiteo:** el Mago, con Nova (raíz 3 s) y Descarga (−40 %), puede alejarse del Oso (velocidad 4,5) y del Guardián (4); el
+  Lobo (5) no se deja kitear sin raíz. Las cifras de los élites son, por eso, pesimistas para un Mago que juegue bien.
+- **Interrupciones y controles del jugador:** Gubia corta Brebaje, Savia, Coraza de raíces y Rugido; la Carga aturde 1,5 s. No
+  están en el modelo, así que los grupos con Pícaro o Guerrero matan a los élites algo antes.
+- **Parejas que se potencian contra estos monstruos:** Nova de escarcha + Estallido de llamas contra un campamento de lobos
+  (la raíz es lo único que frena su velocidad 5); Gubia + Paso sombrío contra el Espíritu del musgo (cortar Savia y rematarlo).
+
+### Cliente y motor
+- **Sprites:** los 12 usan `monsters/<id>` y no hay hoja todavía (HU-114). El cliente dibuja el rectángulo de color con la
+  inicial (`PlaceholderSprite`, `client/scripts/world/entity_visual.gd`), sin errores. Dos tests GUT que exigen hoja y
+  animaciones a todo monstruo de `monsters.json` fallan hasta HU-114 (`test_visual_redesign.gd`,
+  `test_combat_animations.gd`).
+- **Íconos y efectos:** los hechizos y auras nuevos reutilizan íconos existentes; los mágicos sin proyectil se dibujan en arcano y
+  los físicos en acero (`VfxCatalog`), hasta que HU-114 les dé elemento (veneno, naturaleza).
+- **Planta inmóvil (`speed: 0`):** el schema lo permite desde esta HU (antes el mínimo era 0,5) y la IA lo soporta sin código
+  (`docs/design/combat.md` §Monstruos). Su spawn en la Cripta debe ir con `wanderRadius` 0 (HU-115).
+
+# Fase 2 · Hechizos de nivel 7 y 9 (HU-106, 2026-10-07)
+
+Los 8 hechizos nuevos de la Fase 2 pasan a `"provisional": false`. Medidos con `python tools/balance/phase2.py` (nuevo;
+`--rank 0.2` repite todo con otro `spellRankBonusPct` en memoria, sin tocar `rules.json`). Valores esperados, sin azar.
+
+**Decisiones de medición nuevas:**
+1. **Nivel 10** (tope de la Fase 2) con el equipo aproximado de `tier2.py` (×1,8; no hay equipo de nivel 7 a 9 cerrado: HU-110 está
+   en curso) y el **segundo rango**: +30 % del `base` de los efectos y de las auras numéricas, sin escalar los coeficientes (ADR-027
+   D3), lo mismo que hace el servidor.
+2. **Referencias del nivel 10 con la misma definición que las fijas del nivel 6**: mono = básico del Pícaro / 0,30 (43,0), área =
+   4 × 0,6 × mono (103,1), control 40, movilidad 120, armadura = aguante del Guerrero / 0,70 (133,7 s). Con las fijas del nivel 6, el
+   equipo del 10 subía todas las puntas a la vez (el básico del Pícaro valdría 49) y la regla 40/75 dejaba de medir el kit.
+   Objetivo de referencia de nivel 10 con la misma mitigación que el del 6 (armadura 48).
+3. **Valor de la clase en una punta** = el del pentagrama completo (`rules.balanceTargets.pentagram.classes`); con 6 hechizos,
+   "base + 4 mejores" ya no limita a ninguna combinación. **Objetivo de la Fase 2** = base + los 4 mejores aportes objetivo de
+   [class-kits.md](class-kits.md) entre los hechizos hasta el nivel 10.
+4. **Una línea que sale del lanzador también le da lo beneficioso** (HU-102: el Sacerdote está en el origen de Sendero de luz), así
+   que su velocidad cuenta en su movilidad (`model.mob_value`).
+
+### Números
+| Clase | Hechizo | Antes (provisional) | Ahora |
+|---|---|---|---|
+| Pícaro | Eviscerar | 10,5 + 0,42 AP, recarga 20 s | **8 + 0,4 AP, recarga 14 s**, 35 de energía |
+| | Cuchillas arrojadizas | cono 4 · 50°, 2,1 + 0,12 AP, +30 % de velocidad 3 s | **cono 3 · 50° sin casteo**, alcance 3, **4 + 0,23 AP**, **+25 %** de velocidad 3 s, recarga 10 s, 25 de energía |
+| Mago | Campo ardiente | 2,8 + 0,1 SP, 6 de maná | **9 + 0,23 SP**, **8 de maná**, casteo 0,5 s, recarga 4 s, radio 1,5 |
+| | Parpadeo | — | sin cambios: 6 casillas, recarga 15 s, 8 de maná |
+| Guerrero | Bloqueo con escudo | −50 % 4 s, recarga 20 s | −50 % **5 s**, recarga **12 s**, 10 de ira |
+| | Tajo amplio | 1,75 + 0,1 AP + 0,21 arma | **4 + 0,17 AP + 0,35 arma**; cono 2,5 · 90°, recarga 6 s, 15 de ira |
+| Sacerdote | Renovar | 2,4 + 0,07 SP por tick, 8 de maná | **13 + 0,22 SP** por tick (4 en 12 s), **15 de maná**, recarga 3 s |
+| | Sendero de luz | cura 1,8 + 0,06 SP, +30 % 4 s, −30 % 3 s, 10 de maná | cura **20 + 0,5 SP**, **+25 %** de velocidad 4 s, −30 % **2 s**, **15 de maná**; línea 8 × 1,5, recarga 15 s |
+
+- **Renovar** cura en un objetivo lo que dan sus ticks (uno cada 3 s): su recarga de 3 s sirve para mantenerlo en varios aliados.
+  Con 15 de maná cura ~6,4 por punto de maná al nivel 7 (Escudo 4,5; Sanar 2,5).
+- **Campo ardiente** cuesta 8 de maná para que no rinda más por maná que la Bola de fuego sobre un solo objetivo (3,6 frente a 3,9
+  de daño por maná al nivel 10).
+
+### Pentagrama al nivel 10
+Aporte de cada hechizo (puntos; entre paréntesis, el objetivo de class-kits.md). Las áreas cuentan enteras en área (decisión 1).
+
+| Clase | Hechizo | Mono | Área | Control | Movilidad | Armadura | Suma |
+|---|---|---|---|---|---|---|---|
+| Pícaro (base 29 / — / — / — / 27) | Golpe siniestro | 18 (20) | | | | | 18 |
+| | Gubia | 2 (5) | | 15 (15) | | | 17 |
+| | Paso sombrío | 5 (5) | | 4 (5) | 25 (25) | | 35 |
+| | Carrera | | | | 25 (25) | | 25 |
+| | **Eviscerar** | **11 (20)** | | | | | 11 |
+| | **Cuchillas arrojadizas** | | **10 (10)** | | **15 (15)** | | 25 |
+| Mago (base 18 / — / — / — / 19) | Bola de fuego | 16 (20) | | | | | 16 |
+| | Descarga de escarcha | 4 (5) | | 15 (15) | | | 19 |
+| | Nova de escarcha | | 4 (5) | 30 (30) | | | 34 |
+| | Estallido de llamas | −2 (5) | 26 (30) | | | | 24 |
+| | **Campo ardiente** | −2 | **26 (20)** | | | | 24 |
+| | **Parpadeo** | | | | **20 (20)** | | 20 |
+| Guerrero (base 25 / — / — / — / 70) | Golpe heroico | 9 (15) | | | | | 9 |
+| | Provocar | | | 15 (15) | | | 15 |
+| | Carga | | | 14 (15) | 16 (15) | | 30 |
+| | Torbellino | (5) | 19 (20) | | | | 19 |
+| | **Bloqueo con escudo** | | | | | **18 (20)** | 18 |
+| | **Tajo amplio** | (5) | **15 (15)** | | | | 15 |
+| Sacerdote (base — / — / — / — / 25) | Sanar | 27 (30) | | | | | 27 |
+| | Castigo | | | | | | 0 |
+| | Palabra de poder: Escudo | 17 (20) | | | 11 (10) | (5) | 27 |
+| | Pulso sagrado | | 26 (30) | 10 (10) | | | 36 |
+| | **Renovar** | **20 (20)** | | | | | 20 |
+| | **Sendero de luz** | | **15 (15)** | **9 (10)** | **13 (15)** | | 37 |
+
+Valor de cada clase (base + 4 mejores aportes por punta) frente al objetivo de la Fase 2 y al pentagrama completo:
+
+| Clase | Mono | Área | Control | Movilidad | Armadura | Total |
+|---|---|---|---|---|---|---|
+| Pícaro | 65 (80 · 85) | 10 (10 · 15) | 20 (20 · 35) | 65 (65 · 85) | 27 (30 · 30) | 187 (205) |
+| Mago | 38 (45 · 45) | **56 (55 · 90)** | 45 (45 · 70) | 20 (20 · 20) | 19 (25 · 25) | 178 (190) |
+| Guerrero | 34 (40 · 45) | 33 (35 · 45) | 29 (30 · 50) | 16 (15 · 20) | 88 (90 · 90) | 200 (210) |
+| Sacerdote | 64 (70 · 85) | 40 (45 · 85) | 19 (20 · 25) | 24 (25 · 25) | 25 (30 · 30) | 173 (190) |
+
+- **Regla 40/75 (HU-106 CA1): se cumple.** En las 15 combinaciones de 4 de cada clase ninguna pasa de 187,5 (las más cargadas:
+  Guerrero 177 con Provocar + Carga + Torbellino + Bloqueo; Pícaro 159; Sacerdote 153; Mago 138) ni supera el valor de la clase en
+  una punta. La habilidad que más suma sigue siendo Pulso sagrado (36 al 10; 39 al 7 y al 8). También se cumple del nivel 7 al 10 con
+  los hechizos aprendidos en cada nivel; la única punta por encima es la base del Pícaro en armadura al 7 (30,2 de 30), sin hechizos.
+- **Área del Mago (CA5): 56, objetivo 55.** Campo ardiente aporta 26 (objetivo 20) porque al nivel 10 Estallido baja de 30 a 26: el
+  rango solo sube el `base` y el equipo sube el básico del Pícaro, que es la referencia (ver §Rangos). Con Campo ardiente el área
+  pasa a ser la punta más alta del Mago, como pide class-kits.md §Riesgos.
+- **Todo lo de la Fase 1 pierde 1–4 puntos del nivel 6 al 10** (Bola de fuego 20 → 16, Sanar 31 → 27, Estallido 30 → 26) por la
+  misma razón. Los perfiles quedan por debajo del objetivo de la Fase 2 en mono y armadura (Pícaro, Mago, Sacerdote).
+- **Eviscerar se queda en 11 de 20** por la XP por hora (ver §Solitario).
+- **Movilidad del Sacerdote:** Escudo (11) + Sendero (13) = 24 de 25. Con +30 % de velocidad (16) la combinación pasaba de 25: por
+  eso Sendero da +25 %.
+
+**Parejas que se potencian (el modelo suma y no las ve):**
+- **Paso sombrío + Eviscerar:** el +60 % de daño de 3 s sobre el golpe grande (59 en vez de 37 al nivel 7). Es la apertura del
+  Pícaro en solitario y en duelo.
+- **Nova de escarcha + Campo ardiente:** 3 s de raíz dentro de un área de radio 1,5 que se repite cada 4 s; sin raíz, salir de 1,5
+  casillas es fácil.
+- **Carga + Tajo amplio:** el aturdimiento de 1,5 s deja a los objetivos quietos dentro del cono.
+- **Sendero de luz + Pulso sagrado:** la línea ralentiza a los enemigos que luego caen en el Pulso; en grupo, la velocidad de la
+  línea junta a los aliados para el Pulso.
+- **Escudo + Renovar sobre el tanque:** se suman (al 10, un escudo de ~110 y 29 de cura cada 3 s durante 12 s). Lo vigila HU-117
+  con el jefe.
+- **Al revés, Cuchillas + Carrera:** las velocidades no se suman (ADR-022, manda la más fuerte): el modelo suma 40 de movilidad y
+  mientras dura Carrera (+50 %) el +25 % de las Cuchillas no aporta.
+
+### Áreas sin casteo (ADR-027 D4, CA4)
+**Cuchillas arrojadizas baja a radio 3 y sigue sin casteo.** Contra el grupo de referencia (3 secundarios en un radio de 2 alrededor
+del principal) un Pícaro pegado al objetivo toca lo mismo con radio 3 que con 4: lo que limita es la apertura de 50°, no el radio.
+Solo ganaría el radio 4 apartándose 2 casillas (2,5 de 3 frente a 2,2), y un casteo le costaba al Pícaro su básico y moverse a la
+mitad justo cuando la habilidad le da velocidad. El alcance baja a 3 (en un cono el punto solo da la dirección, como en Tajo amplio).
+
+| Área | Lanzador a | Secundarios tocados |
+|---|---|---|
+| Tajo amplio, cono 2,5 · 90° | 1,5 | 2,4 de 3 |
+| Torbellino, alrededor 2 | 1,5 | 2,2 de 3 |
+| Cuchillas, cono 3 · 50° (elegido) / 4 · 50° (antes) | 1,25 | 2,0 / 2,0 de 3 |
+| Cuchillas, cono 3 · 50° / 4 · 50° | 2 | 2,2 / 2,5 de 3 |
+| Campo ardiente, suelo 1,5 | — | 2,8 de 3 |
+| Sendero de luz, línea 8 × 1,5 | 4 | 2,2 de 3 |
+
+El validador ya no avisa de Tajo amplio (2,5) ni de las Cuchillas (3); queda el aviso de Cono de frío (nivel 11, Fase 3). Con
+`world.currentPhase` en 2 (copia temporal del contenido) no hay errores.
+
+### Rangos (ADR-027 D3, CA3)
+Lo que sube un lanzamiento con el rango, con el equipo aproximado (y, como contraste, con el verde de nivel 9 que hay hoy en
+`items.json` por HU-110, en curso, en su estado del 2026-10-07: da un 12–24 % más de AP y SP que la aproximación).
+
+| Clase | Hechizo | Rango 0 → 1 (equipo del 4) | Rango 1 → 2 (equipo del 8) | Rango 1 → 2 (equipo del 9) | Ídem, verde de nivel 9 de items.json | Equipo del 8 → 9 |
+|---|---|---|---|---|---|---|
+| Pícaro | Golpe siniestro | 2,6 % | 2,0 % | 1,8 % | 1,5 % | 7,9 % |
+| | Gubia | 15 % | 13 % | 13 % | 13 % | 0,2 % |
+| | Eviscerar | — | 2,6 % | 2,4 % | 2,0 % | 7,2 % |
+| | Cuchillas arrojadizas | — | 2,3 % | 2,2 % | 1,8 % | 7,4 % |
+| Mago | Bola de fuego | 5,4 % | 4,1 % | 3,9 % | 3,6 % | 6,4 % |
+| | Descarga de escarcha | 4,3 % | 3,2 % | 3,0 % | 2,8 % | 7,1 % |
+| | Nova de escarcha | 5,9 % | 4,5 % | 4,3 % | 3,9 % | 6,2 % |
+| | Estallido de llamas | 7,0 % | 5,5 % | 5,2 % | 4,8 % | 5,5 % |
+| | Campo ardiente | — | 5,7 % | 5,4 % | 5,0 % | 5,3 % |
+| Guerrero | Golpe heroico | 3,9 % | 2,6 % | 2,4 % | 2,1 % | 7,7 % |
+| | Torbellino | 3,7 % | 2,5 % | 2,3 % | 2,0 % | 8,0 % |
+| | Tajo amplio | — | 2,7 % | 2,5 % | 2,2 % | 8,0 % |
+| Sacerdote | Sanar | 6,6 % | 5,1 % | 4,8 % | 4,3 % | 5,9 % |
+| | Castigo | 6,4 % | 4,9 % | 4,6 % | 4,1 % | 6,0 % |
+| | Palabra de poder: Escudo | 10 % | 8,0 % | 7,7 % | 7,2 % | 3,4 % |
+| | Pulso sagrado | 7,3 % | 5,6 % | 5,4 % | 4,9 % | 5,4 % |
+| | Renovar | — | 7,8 % | 7,5 % | 7,0 % | 3,5 % |
+| | Sendero de luz | — | 6,6 % | 6,3 % | 5,8 % | 4,8 % |
+
+**Con el equipo del nivel 9, el segundo rango no se nota:** mediana 4,4 % (4,0 % con el verde de `items.json`), menos que el primer
+rango en la Fase 1 (6,1 %), menos que un solo nivel de equipo (6,1 %) y por debajo de la variación de una tirada (10,5 %,
+`varianceMax / varianceMin − 1`) en 17 de 18 hechizos (solo Gubia, que no tiene coeficiente). Al subir el `base` y no los
+coeficientes, el rango pesa menos cuanto mejor es el equipo.
+
+| `spellRankBonusPct` | Rango 0 → 1 al 4 | Rango 1 → 2 al 9 | Superan la variación al 9 | Rango 3 (nv 12) | Hechizo que más suma (nv 7–10) |
+|---|---|---|---|---|---|
+| 0,15 (actual) | 6,1 % | 4,4 % | 1 de 18 | +45 % | Pulso sagrado 39,0 |
+| **0,20** | 8,2 % | 5,8 % | 1 de 18 | +60 % | Pulso sagrado 39,7 |
+| 0,25 | 10,2 % | 7,2 % | 3 de 18 | +75 % | Pulso sagrado **40,7** |
+| 0,30 | 12,2 % | 8,5 % | 4 de 18 | +90 % | Pulso sagrado **41,7** |
+| 0,40 | 16,3 % | 11,0 % | 10 de 18 | +120 % | Pulso sagrado **43,8** |
+
+**Propuesta (no aplicada):** `spellRankBonusPct` 0,15 → **0,20** (+20 / +40 / +60 %). El segundo rango sube un 5,8 % con el equipo del
+9, lo mismo que el primero en la Fase 1 y que un nivel de equipo; es el valor más alto que deja a Pulso sagrado en 40 o menos (con
+0,25 llega a 40,7 y habría que bajarlo). Con 0,20 se cumple la regla 40/75 en los niveles 7 a 10 (`phase2.py --rank 0.2`).
+```json
+"progression": { "spellRankBonusPct": 0.2 }
+```
+Que se note como una tirada distinta pide ~0,40 y rompe la regla 40/75 por Pulso sagrado. Los hechizos que viven del coeficiente
+(Golpe siniestro, Torbellino, Golpe heroico: 2–3 %) no lo notan con ningún valor razonable; eso solo lo arreglaría escalar también
+los coeficientes, la alternativa que ADR-027 D3 descartó. Antes de aplicarlo hay que repetir con +20 % lo que en la Fase 1 ya
+cuenta el rango del nivel 4: el Capataz (79 s con +15 %) y los duelos.
+
+### Solitario y XP por hora con los hechizos nuevos
+`phase2.py` repite el solitario de `tier2.py` contra el normal de cada nivel con varios equipos de 4 para farmear y se queda con el
+mejor de cada clase. Bloqueo con escudo baja el daño recibido en su fracción de tiempo activo; Renovar va sobre el propio Sacerdote
+(cura mientras pelea, le cuesta un GCD y maná). "Suavizado" = media con la vida del monstruo ×0,9–1,1: el modelo no tiene azar y el
+tiempo para matar va a saltos (en el Sapo, el Mago lo mata a 13,2 s porque le faltan 3 de vida a los 13 s).
+
+| Monstruo | Nv | Pícaro | Mago | Guerrero | Sacerdote | Diferencia | Con los de la Fase 1 |
+|---|---|---|---|---|---|---|---|
+| Leñador bandido | 7 | 4 491 (Eviscerar) | 3 713 | 3 815 (Bloqueo) | 3 975 | **17 %** | 11 % |
+| Sapo gigante | 8 | 5 247 | 4 268 | 4 517 | 4 680 | **19 %** | 12 % |
+| Hombre lagarto | 9 | 5 971 (+ Cuchillas) | 4 970 | 5 231 (Tajo) | 5 224 | **17 %** | 8 % |
+| Esqueleto de raíces | 10 | 6 485 | 5 681 | 5 734 | 5 903 | 12 % | 11 % |
+
+Sin suavizar (como `tier2.py`): 15 / 20 / 16 / 11 %.
+
+- **Solo el Pícaro farmea más rápido con lo nuevo** (Eviscerar desde el 7 y Cuchillas, que también pega a un solo objetivo, desde el
+  9): mata en 10 s en lugar de 12. El Mago y el Sacerdote farmean mejor con su equipo de la Fase 1: Campo ardiente y Renovar gastan
+  maná y su descanso ya depende del maná. El Guerrero gana un 2–9 % (Bloqueo al 7, Tajo al 9).
+- **Eviscerar es el que decide** (suavizado):
+
+  | Eviscerar | Golpe al 7 | Mono al 10 | Dif. nv 7 | nv 8 | nv 9 | nv 10 |
+  |---|---|---|---|---|---|---|
+  | 6 + 0,3 AP, 14 s | 27 | 8 | 15 % | 18 % | 15 % | 10 % |
+  | **8 + 0,4 AP, 14 s (elegido)** | 37 | 11 | 17 % | 19 % | 17 % | 12 % |
+  | 10 + 0,5 AP, 14 s | 46 | 14 | 20 % | 21 % | 19 % | 13 % |
+  | 14 + 0,7 AP, 14 s (mono 20) | 64 | 19 | 25 % | 25 % | 23 % | 18 % |
+  | 10,5 + 0,42 AP, 20 s (provisional) | 41 | 8 | 18 % | 21 % | 18 % | 13 % |
+
+  Ningún Eviscerar deja la diferencia en el 15 % al nivel 8 (el Mago contra el Sapo ya estaba en el 12 %). Elegí el menor que
+  sigue siendo un golpe fuerte (el doble que Golpe siniestro al 7, 1,05 de daño por energía frente a 0,6); con 6 + 0,3 (27) apenas
+  supera a Golpe siniestro (18) y gasta más energía. La recarga de 14 s le da 3 golpes en los 30 s del pentagrama y uno por pelea en
+  solitario (las peleas duran menos de 14 s): es la que más mono da por cada punto de XP por hora.
+- **Palancas de `rules.json` probadas, ninguna lo cierra** (suavizado): `classScaling.rogue.haste` 1,10 (−0/−1 punto),
+  `classScaling.mage.sp.int` 1,6 (−1), `classScaling.warrior.ap.str` 2,1 con `mage.sp.int` 1,65 (−1/−2) y, sin suavizar,
+  `combat.manaRegenPerSpiPer5s` 1,2 (−0/−3). El Pícaro descansa por vida y el Mago por maná: subir el daño del Mago no le acorta
+  el descanso.
+- **Para HU-119 (no aplicado):** medir con el equipo real de HU-110 (el verde de nivel 9 de `items.json` da al Pícaro un 24 % más de
+  AP que la aproximación). Si la diferencia se confirma, la primera palanca es Eviscerar a 6 + 0,3 AP (−2 puntos); la segunda sale de
+  cronometrar el descanso real del Mago (§Fase 2, Desviaciones 3), el más lento de los niveles 7 a 9: si el modelo lo exagera, la
+  diferencia baja sin tocar nada.
+
+### Lo que no se midió
+- **Duelos con los kits nuevos** (HU-119 CA3): el simulador de HU-084 no está en el repo. Riesgo principal: Bloqueo con escudo (−50 %
+  el 42 % del tiempo) contra Mago > Guerrero (68 % al nivel 6) y Eviscerar con Paso sombrío en Pícaro > Mago (67 %).
+- **El jefe y los élites con Renovar y Sendero de luz** (el modelo cura con Escudo + Sanar): HU-117.
+- **El equipo real** (HU-110 en curso): todo usa `gear_factor`; el verde de nivel 9 de `items.json` solo entra en la tabla de rangos.
+
+# Fase 2 · Equipo, botín y vendedor (HU-110, 2026-10-07)
+
+Medido con `python tools/balance/gear.py` (nuevo): el comparador del tooltip, `tier2.py` con el equipo real de `items.json` en lugar
+de `gear_factor`, la economía del 6 al 10 y los élites. `--elite-dmg 1.3` y `--regen-delay 5` prueban las propuestas en memoria.
+Mismos supuestos que §Fase 2 (HU-109): hechizos de la Fase 1, rangos del servidor, sin azar; los de HU-106 no entran.
+
+### Equipo nuevo
+120 objetos de nivel 7 (Linde) y de nivel 9 (Pantano y Cripta), un blanco y un verde por nivel para cada casilla y cada tipo que ya
+existe: las 6 armas, el escudo, cabeza, pecho, manos, piernas y pies en tela, cuero, malla y placas, y cuello y anillo (el verde, en
+dos versiones: física y de lanzador). Además, un raro por élite y 8 chatarras.
+
+| Arma | Blanco nv 7 | Verde nv 7 | Blanco nv 9 | Verde nv 9 |
+|---|---|---|---|---|
+| Espada | 7–13 c/2,4 s (DPS 4,2) · Fue 2 | 8–15 (4,8) · Fue 3 Agu 2 | 9–17 (5,4) · Fue 2 Agu 1 | 11–20 (6,5) · Fue 4 Agu 3 |
+| Daga | 5–8 c/1,6 s (4,1) · Agi 2 | 6–9 (4,7) · Agi 4 Agu 1 | 7–10 (5,3) · Agi 2 Agu 1 | 8–12 (6,2) · Agi 5 Agu 2 |
+| Hacha | 10–17 c/3,2 s (4,2) · Fue 2 | 12–19 (4,8) · Fue 3 Agu 2 | 14–21 (5,5) · Fue 2 Agu 1 | 16–25 (6,4) · Fue 4 Agu 3 |
+| Maza | 6–11 c/2,6 s (3,3) · PH 2 · Esp 2 | 7–13 (3,8) · PH 4 · Esp 3 Int 2 | 8–14 (4,2) · PH 3 · Esp 2 Int 1 | 9–16 (4,8) · PH 5 · Esp 4 Int 2 Agu 1 |
+| Bastón | 5–10 c/3,0 s (2,5) · PH 3 · Int 2 | 6–11 (2,8) · PH 6 · Int 4 Esp 1 | 6–12 (3,0) · PH 4 · Int 2 Esp 1 | 7–14 (3,5) · PH 7 · Int 5 Esp 2 |
+| Varita | 5–8 c/2,0 s (3,2) · PH 2 · Int 2 | 6–9 (3,8) · PH 4 · Int 4 Esp 1 | 6–11 (4,2) · PH 3 · Int 2 Esp 1 | 7–13 (5,0) · PH 5 · Int 5 Esp 2 |
+
+| Armadura (blanco 7 · verde 7 · blanco 9 · verde 9) | Cabeza | Pecho | Manos | Piernas | Pies | Stats del verde 7 · verde 9 (blanco: 2 · 3) |
+|---|---|---|---|---|---|---|
+| Tela | 3 · 3 · 4 · 4 | 4 · 4 · 5 · 5 | 2 · 2 · 3 · 3 | 3 · 4 · 4 · 5 | 2 · 3 · 3 · 4 | Int 3 Esp 2 Agu 1 · Int 4 Esp 2 Agu 2 |
+| Cuero | 8 · 9 · 10 · 12 | 10 · 11 · 13 · 14 | 6 · 6 · 7 · 8 | 9 · 10 · 11 · 12 | 7 · 7 · 8 · 9 | Agi 3 Agu 2 Fue 1 · Agi 4 Agu 2 Fue 2 |
+| Malla | 14 · 16 · 18 · 20 | 18 · 20 · 23 · 25 | 10 · 11 · 12 · 14 | 15 · 17 · 19 · 21 | 11 · 13 · 15 · 16 | Agu 3 Fue 2 Esp 1 · Agu 4 Fue 2 Esp 2 |
+| Placas | 22 · 25 · 29 · 32 | 28 · 31 · 36 · 40 | 15 · 17 · 20 · 22 | 24 · 26 · 30 · 34 | 18 · 20 · 23 · 26 | Agu 3 Fue 3 · Agu 4 Fue 4 |
+| Escudo | | | | | | 25 · 28 · 32 · 36 de armadura; Agu 3 Fue 3 · Agu 4 Fue 4 |
+| Joyería (verde) | | | | | | Cuello: Agi 3 Fue 2 Agu 1 o Int 3 Esp 2 Agu 1 · Agi 4 Fue 2 Agu 2 o Int 4 Esp 2 Agu 2; anillo: Agu 3 + 3 (físico o lanzador) · Agu 4 + 4 |
+
+- **Reglas:** el daño de las armas verdes es el del verde del Tier 1 ×1,4 (nivel 7) y ×1,8 (nivel 9), la misma velocidad; el hacha
+  sigue el presupuesto de la espada a 3,2 s; los blancos, ~0,87 del verde de su nivel. La armadura es la del pecho blanco del Tier 1
+  por tipo (tela 3, cuero 8, malla 14, placas 22) × casilla (pecho 1, piernas 0,85, cabeza 0,8, pies 0,65, manos 0,55) × nivel / 5,
+  y el blanco ×0,9; el escudo, 20 × nivel / 5. Stats por tipo: tela Int > Esp > Agu; cuero Agi > Agu > Fue; malla Agu > Fue > Esp
+  (sirve al Guerrero y al Sacerdote); placas Agu = Fue.
+- **Por debajo de la guía de la skill** (`nivel × {0,5; 1}`): verdes de armadura y joyería con 6 y 8 puntos (no 7 y 9), armas con 5
+  y 7, y blancos con 2 y 3 (no 3–4 y 4–5). Ahora hay pieza para las 9 casillas (el Tier 1 daba 3–6 por clase): con la guía, el
+  equipo esperado queda muy por encima de `gear_factor` y el Guerrero mata solo a los élites (ver §Élites).
+- **Raros de élite** (10 %): Collar de garras de oso (nv 8, cuello, Agi 5 Fue 4 Agu 3), Varita de la bruja (nv 10, 8–14, PH 7,
+  Int 6 Esp 5 Agu 4) y Escudo de losa (nv 10, 48 de armadura, Agu 7 Fue 5 Agi 3). Precio de venta 30 · 50 · 35 (blancos 7), 130 ·
+  210 · 140 (verdes 7), 40 · 65 · 45 y 165 · 270 · 180 (armadura · arma · joya, nivel 9); raros 450–500.
+- **Comparador del tooltip (CA1):** las 94 comparaciones de cada objeto nuevo con los del Tier 1 de su casilla, tipo y rareza (y del
+  nivel 9 con el 7) salen «mejor», sin ninguna flecha roja. Un blanco contra el verde del Tier 1 de su casilla cambia stats por
+  armadura o DPS (7 de 28 sin flechas rojas). Contra los raros del Capataz (nivel 6) los verdes ganan en DPS o armadura y pierden 1–3
+  puntos de algún stat: el Pico sigue siendo competitivo en stats hasta el Hacha de raíz negra (Fue −1, Agu −1, DPS +2,4).
+
+### Botín (CA2)
+- **Normales:** el cobre de HU-109, su chatarra (60–65 %, de 16 a 22 cobres: seda, glándula, escama, polvo de fuego fatuo, musgo,
+  semilla; piel, bolsa y hueso del Tier 1), una poción un 6–8 % de las veces, 9–10 blancos al 1,2 % (~11 % por kill) y 10–11 verdes
+  al 0,7 % (**~7 % por kill**; el Tier 1 daba 4–13 %). La probabilidad por objeto queda por debajo del 3–5 % de la guía porque cada
+  tramo tiene 31 verdes: lo que se iguala con el Tier 1 es la de sacar un verde por kill.
+- **Reparto:** el Linde suelta el nivel 7 y el Pantano y la Cripta el 9. En cada zona, cada objeto de su tramo está en exactamente un
+  monstruo y cada monstruo lleva algo de cada clase (el Leñador, más armas y placas; la Araña y el Espíritu del musgo, más tela).
+- **Élites:** un verde garantizado (`groups`, 1 de los 31 de su tramo con el mismo peso), su raro al 10 %, chatarra segura y poción
+  un 20–25 %. Por kill, a repartir: 142–150 cobres en oro y chatarra, 1 verde y 0,1 raros.
+- **Lo que le llega a una clase:** unos 300 kills por tramo dan ~21 verdes, ~5 de su afinidad alta, más los élites y lo que le pasan
+  los amigos: a final de tramo, la mitad de las casillas en verde es lo razonable (el equipo «esperado» del modelo).
+
+### Vendedor y consumibles (CA3)
+- `forest_camp`, **Brena la trampera** (`npcs/shopkeeper`; la coloca HU-111 en el punto seguro del Linde). Compra cualquier cosa: el
+  servidor compra todo lo que tiene `sellPrice > 0`. Marta no cambia.
+- Hoy vende la poción menor de vida, la de maná y el pan. **Falta** la poción mayor de vida (100 de vida, recarga 60 s, 60 cobres) y
+  el Venado ahumado (120 de vida en 15 s, solo fuera de combate y se corta con daño, 12 cobres): necesitan `item_greater_heal` y
+  `item_eat_smoked_venison` en `spells.json` y `smoked_venison_hot` en `auras.json`, fuera del alcance de esta HU. Con ellos, el
+  vendedor pasa a vender poción mayor, venado y poción menor de maná, y las tablas del Tier 2 sueltan poción mayor y venado.
+- **Poción de 100, no de 150:** con 150, el Sacerdote mata solo al Oso viejo incluso con `gear_factor` (215 s esquivando).
+
+### Modelo con el equipo real
+Equipo de todas las casillas de afinidad alta de cada clase (el Guerrero, placas y escudo). **Esperado:** arma, pecho, piernas y
+cuello en verde y el resto en blanco del tramo (nivel 7 a los niveles 7 y 8; nivel 9 del 9 al 11). **Recién llegado:** el esperado
+del tramo anterior (Tier 1 al 7; nivel 7 al 8 y al 9; nivel 9 al 10). **Completo:** todo en verde, la cota superior.
+
+| Clase: puntos de stats · armadura · PH · DPS del arma | Tier 1 (nv 6) | `gear_factor` ×1,4 (nv 8) | Nv 7 en las casillas de `REF_GEAR` | Nv 7 completo | ×1,8 (nv 10) | Nv 9 en las casillas de `REF_GEAR` | Nv 9 completo |
+|---|---|---|---|---|---|---|---|
+| Pícaro | 10 · 18 · 0 · 3,4 | 14 · 25 · 0 · 4,8 | 25 · 23 · 0 · 4,7 | 47 · 43 · 0 · 4,7 | 18 · 32 · 0 · 6,2 | 34 · 30 · 0 · 6,2 | 63 · 55 · 0 · 6,2 |
+| Mago | 6 · 5 · 4 · 2,0 | 8 · 7 · 6 · 2,8 | 13 · 7 · 6 · 2,8 | 47 · 16 · 6 · 2,8 | 11 · 9 · 7 · 3,6 | 18 · 9 · 7 · 3,5 | 63 · 21 · 7 · 3,5 |
+| Guerrero | 16 · 64 · 0 · 3,5 | 22 · 90 · 0 · 5,0 | 27 · 104 · 0 · 4,8 | 53 · 147 · 0 · 4,8 | 29 · 115 · 0 · 6,4 | 37 · 134 · 0 · 6,5 | 71 · 190 · 0 · 6,5 |
+| Sacerdote | 10 · 17 · 3 · 2,8 | 14 · 24 · 4 · 3,8 | 19 · 24 · 4 · 3,8 | 47 · 29 · 4 · 3,8 | 18 · 31 · 5 · 5,0 | 26 · 30 · 5 · 5,0 | 63 · 37 · 5 · 5,0 |
+
+El daño y la armadura de las armas siguen a `gear_factor`; los stats, no: `REF_GEAR` tenía piezas de nivel 1 a 5 y la aproximación
+las trataba como de nivel 5. Vida · AP/SP · armadura al nivel 8, `gear_factor` frente a esperado: Pícaro 224 · 92/24 · 58 → 310 ·
+106/28 · 79; Mago 190 · 56/58 · 17 → 230 · 68/72 · 23; Guerrero 490 · 81/24 · 106 → 540 · 91/26 · 154; Sacerdote 247 · 51/45 · 24 →
+265 · 60/55 · 28 (al 10: 350, 310, 684 y 345 de vida).
+
+| Equipo | Pícaro: rotación / básicos | Mago | Guerrero | Sacerdote | Ciclo máx. | Dif. XP/h máx. |
+|---|---|---|---|---|---|---|
+| `gear_factor` (HU-109) | 11–13 s · ≤ 16 % / ≤ 32 % | 11–13 s · ≤ 22 % / ≤ **61 %** | 13–15 s · ≤ 9 % / ≤ 17 % | 13–18 s · ≤ 25 % / ≤ 47 % | 35,7 s | 13,9 % |
+| Recién llegado | 10–13 s · ≤ 14 % / ≤ 28 % | 10–11 s · ≤ 17 % / ≤ **62 %** | 11–17 s · ≤ 9 % / ≤ 16 % | 12–16 s · ≤ 23 % / ≤ 47 % | **36,3 s** | 14,3 % |
+| Esperado | 9–12 s · ≤ 14 % / ≤ 27 % | 10–11 s · ≤ 15 % / ≤ **57 %** | 11–15 s · ≤ 8 % / ≤ 14 % | 12–15 s · ≤ 19 % / ≤ 47 % | 35,7 s | **15,4 %** |
+| Completo | 8–12 s · ≤ 14 % / ≤ 27 % | 8–11 s · ≤ 15 % / ≤ **57 %** | 10–15 s · ≤ 8 % / ≤ 14 % | 10–15 s · ≤ 17 % / ≤ 47 % | 35,7 s | **19,1 %** |
+
+Ciclo y XP por hora con el equipo esperado (pelea + descanso + 10 s):
+
+| Monstruo | Nv | Pícaro | Mago | Guerrero | Sacerdote | Diferencia |
+|---|---|---|---|---|---|---|
+| Lobo del bosque | 6 | 32 s · 3 500 | 36 s · 3 124 | 34 s · 3 287 | 32 s · 3 519 | 11 % |
+| Leñador bandido | 7 | 28 s · 4 696 | 31 s · 4 210 | 30 s · 4 381 | 26 s · 4 980 | **15,4 %** |
+| Araña tejedora | 8 | 29 s · 6 046 | 30 s · 5 797 | 34 s · 5 237 | 29 s · 6 083 | 14 % |
+| Sapo gigante | 8 | 28 s · 5 321 | 30 s · 4 851 | 32 s · 4 600 | 28 s · 5 367 | 14 % |
+| Hombre lagarto | 9 | 28 s · 6 013 | 29 s · 5 617 | 31 s · 5 412 | 27 s · 6 033 | 10 % |
+| Fuego fatuo | 10 | 29 s · 7 453 | 29 s · 7 518 | 32 s · 6 943 | 29 s · 7 572 | 8 % |
+| Esqueleto de raíces | 10 | 30 s · 6 130 | 29 s · 6 258 | 33 s · 5 585 | 29 s · 6 342 | 12 % |
+| Espíritu del musgo | 10 | 29 s · 7 580 | 29 s · 7 518 | 31 s · 7 127 | 28 s · 7 985 | 11 % |
+| Planta trampa | 10 | 28 s · 7 884 | 28 s · 7 837 | 29 s · 7 653 | 25 s · 8 819 | 13 % |
+
+- **Ciclo:** ≤ `killCycleSecTarget` (36 s) con el equipo esperado y el completo; recién llegado al 7 con el equipo del Tier 1, el
+  Guerrero tarda 36,3 s contra el Leñador (HU-109 ya medía hasta 40 s sin equipo nuevo).
+- **XP por hora:** 15,4 % con el esperado (Leñador: el Sacerdote se cura en un lanzamiento y el Mago espera su maná) y 19,1 % con el
+  completo (Araña: el Guerrero, 31 s frente a 25 s del Sacerdote). Ver §Desviaciones 1.
+- **Mago solo con básicos:** 57 % (era 55–61 %); sigue la propuesta `hpPerSta` 12 de HU-109.
+- **Horas del 6 al 10** (la curva da 7,2 h): `gear_factor` 6,2–6,9 h; esperado Pícaro 5,7, Mago 6,2, Guerrero 6,3 y Sacerdote 5,6 h;
+  completo 5,3–5,9 h. El equipo acorta la Fase 2 otro 6–13 %: lo decide HU-119 (vida de los normales o `killCycleSecTarget`).
+
+### Economía del 6 al 10 (CA4)
+Contra el normal de cada nivel con el equipo esperado; ingresos = cobre + chatarra + blancos vendidos (los verdes no se cuentan).
+
+| Nv | Monstruo | Cobres por kill (oro + chatarra + blancos) | Verdes por 100 kills | Platas por hora (Pícaro · Mago · Guerrero · Sacerdote) |
+|---|---|---|---|---|
+| 6 | Lobo del bosque | 33,6 (22 + 7,8 + 3,8) | 7,0 | 37,9 · 33,8 · 35,6 · 38,1 |
+| 7 | Leñador bandido | 33,6 (24 + 5,0 + 4,1) | 7,7 | 43,8 · 39,3 · 40,9 · 46,4 |
+| 8 | Sapo gigante | 42,1 (27 + 9,6 + 5,5) | 7,0 | 54,6 · 49,8 · 47,2 · 55,1 |
+| 9 | Hombre lagarto | 53,5 (30 + 18,0 + 5,5) | 7,7 | 69,9 · 65,3 · 62,9 · 70,1 |
+| 10 | Esqueleto de raíces | 52,3 (33 + 13,5 + 5,8) | 7,0 | 62,8 · 64,1 · 57,2 · 65,0 |
+
+| Del 6 al 10 (717 kills) | Ingresos | Poción mayor 1 cada 10 kills | Poción mayor en cada recarga mientras pelea (peor caso) | Venado en cada kill | Sobra en el peor caso |
+|---|---|---|---|---|---|
+| Pícaro (5,7 h) | 300 platas | 43 (14 %) | 73 (24 %) | 86 (29 %) | 141 platas |
+| Mago (6,2 h) | 300 platas | 43 (14 %) | 80 (27 %) | 86 (29 %) | 134 platas |
+| Guerrero (6,3 h) | 300 platas | 43 (14 %) | 95 (32 %) | 86 (29 %) | 119 platas |
+| Sacerdote (5,6 h) | 300 platas | 43 (14 %) | 98 (33 %) | 86 (29 %) | 116 platas |
+
+**Alcanza sin farmear aparte:** aun bebiendo una poción mayor en cada recarga mientras pelea y comiendo después de cada kill, sobra
+más de un tercio de lo ganado, sin contar élites ni verdes vendidos (130–270 cobres cada uno).
+
+### Élites con el equipo real
+Solo, a su nivel, con pociones mayores (100) bajo el 40 % y el Sacerdote curándose: sin esquivar / esquivando todas las áreas.
+
+| Élite | Equipo | Pícaro | Mago | Guerrero | Sacerdote | Parejas · tríos de su nivel |
+|---|---|---|---|---|---|---|
+| Oso viejo (8) | `gear_factor` | muere (59 %) / muere (62 %) | muere (64 %) / muere (58 %) | muere (27 %) / muere (26 %) | muere (66 %) / muere (29 %) | 30–52 s (Pícaro + Mago, una baja) · 21–27 s |
+| Oso viejo (8) | esperado | muere (39 %) / muere (48 %) | muere (55 %) / muere (48 %) | muere (**3 %**) / muere (**2 %**) | muere (21 %) / **lo mata** (170 s) | 28–40 s · 18–21 s |
+| Oso viejo (8) | completo | muere (25 %) / muere (24 %) | muere (43 %) / muere (27 %) | **lo mata** (61 s) / **lo mata** (75 s) | **lo mata** (313 s) / **lo mata** (171 s) | 25–36 s · 17–19 s |
+| Bruja del pantano (10) | `gear_factor` | muere (52 %) / muere (56 %) | muere (55 %) / muere (52 %) | muere (15 %) / muere (28 %) | muere (53 %) / **lo mata** (451 s) | 29–43 s · 20–23 s |
+| Bruja del pantano (10) | esperado | muere (27 %) / muere (40 %) | muere (39 %) / muere (32 %) | muere (**3 %**) / muere (9 %) | **lo mata** (257 s) / **lo mata** (219 s) | 25–35 s · 18–19 s |
+| Bruja del pantano (10) | completo | muere (8 %) / muere (10 %) | muere (21 %) / muere (4 %) | **lo mata** (48 s) / **lo mata** (58 s) | **lo mata** (150 s) / **lo mata** (120 s) | 22–30 s · 16–18 s |
+| Guardián de la cripta (11) | `gear_factor` | muere (71 %) / muere (76 %) | muere (71 %) / muere (71 %) | muere (46 %) / muere (43 %) | muere (58 %) / **lo mata** (494 s) | 38–69 s (Pícaro + Mago, una baja) · 22–30 s |
+| Guardián de la cripta (11) | esperado | muere (50 %) / muere (68 %) | muere (64 %) / muere (48 %) | muere (25 %) / muere (28 %) | no lo mata (60 %) / **lo mata** (316 s) | 32–52 s · 21–22 s |
+| Guardián de la cripta (11) | completo | muere (35 %) / muere (43 %) | muere (44 %) / muere (25 %) | **lo mata** (91 s) / **lo mata** (118 s) | no lo mata (14 %) / **lo mata** (190 s) | 29–38 s · 18–19 s |
+
+- Con el equipo esperado, el Guerrero deja al Oso y a la Bruja al 2–9 %: el margen de HU-109 (15–46 %) desaparece. El Sacerdote los
+  mata solo en 170–316 s curándose sin parar; con 3 normales por cada élite en ese tiempo, no le compensa en XP.
+- Con todo en verde, el Guerrero mata al Oso en 61 s, a la Bruja en 48 s y al Guardián en 91 s: mejor XP por hora que los normales.
+- Las parejas y los tríos los matan antes que con `gear_factor` y sin bajas (Pícaro + Mago ya no pierde a nadie).
+
+### Desviaciones y propuestas (no aplicadas)
+1. **XP por hora 15,4 % con el equipo esperado y 19,1 % con el completo** (objetivo ≤ 15 %). Con menos daño recibido, el descanso de
+   los demás se queda en los 6 s de `hpRegenDelaySec` mientras el Sacerdote se cura en un lanzamiento; el equipo no tiene palanca
+   propia del Mago (tela, bastón y varita son también del Sacerdote). Propuesta en `rules.json`:
+   ```json
+   "combat": { "hpRegenDelaySec": 5 }
+   ```
+   Con 5 s: esperado 14,0 %, recién llegado 14,0 %, `gear_factor` 11,1 %, completo 16,4 %; Kóbold de la Fase 1 11,7 % (hoy 11,4 %);
+   ciclos ≤ 35,3 s y 5,5–6,1 h del 6 al 10. Con 4 s el completo baja a 13,5 %, pero el Kóbold sube a 14,1 %. Los hechizos de HU-106
+   cambian quién va primero (el Pícaro con Eviscerar): decidirlo en HU-119 con los dos.
+2. **Élites con el equipo real.** Propuesta en `monsters.json`, básico de los tres élites ×1,3:
+   ```json
+   { "id": "old_bear", "damageMin": 47, "damageMax": 62 },
+   { "id": "swamp_witch", "damageMin": 39, "damageMax": 52 },
+   { "id": "crypt_guardian", "damageMin": 52, "damageMax": 73 }
+   ```
+   Con el equipo esperado nadie los mata solo salvo el Sacerdote esquivándolo todo (Bruja en 433 s, Guardián en 219 s), el Guerrero
+   se queda en el 16–44 % y las parejas (25–56 s) y los tríos (18–23 s) los siguen matando sin bajas (el tanque, hasta el 95 % en
+   pareja). Con todo en verde, el Guerrero aún mata al Oso (61 s) y a la Bruja (48 s), como el Gólem en la Fase 1: o se acepta, o
+   HU-119 les da una mecánica que el tanque solo no aguante.
+3. **La Fase 2 sale más corta** (5,6–6,3 h frente a 7,2 h): HU-119.
+
+### Íconos
+Los 131 objetos nuevos usan íconos que ya existen y piden uno propio en HU-114: las 24 armas (`sword_*`, `dagger_*`, `axe_*`,
+`mace_*`, `staff_*`, `wand_*` del Tier 1), las 80 piezas de armadura (capucha, túnica, guantes, calzas y botas de cada tipo, con
+`hood_apprentice`, `robe_novice`, `vest_leather`, `mail_recruit`, `plate_foreman`, `helm_iron`, `gloves_bandit`, `legs_miner`,
+`boots_boar` y `boots_shadowstep`), los 4 escudos (`shield_wood`), las 12 joyas (`necklace_wolf`, `amulet_lantern`, `ring_bone`), los
+3 raros y las 8 chatarras (`goo`, `tusk`, `bone`). La poción mayor y el venado usarán `potion_red` y `bread`.

@@ -101,7 +101,7 @@
 
 ### HU-103 · Más hechizos que casillas
 **Como** jugador de nivel 7 o más **quiero** saber que aprendí un hechizo que no cabe en la barra y elegir cuáles llevo **para** armar mi build.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-043
 - Skills: `godot-client`
 
@@ -114,11 +114,18 @@
 **Notas técnicas**
 - El servidor ya lo cumple (`SetHotbarHandler`): es trabajo de cliente (`spellbook_window.gd`, `game_state.gd::_on_level_up`). Tests GUT del modelo del libro.
 
+**Notas de implementación**
+- El servidor ya lo cumplía (HU-043: `SetHotbar` acepta cualquier hechizo conocido y en combate no cambia una casilla ocupada); todo es cliente.
+- `GameState._on_level_up`: con la barra llena el hechizo va a `unseen_spells` y el aviso dice "(en el libro, P)"; nueva señal `hotbar_changed` (Welcome, hechizo colocado, casilla asignada) y `spell_slot_of`.
+- `CombatHud.show_notice` apila los avisos que llegan juntos (últimas 3 líneas): antes "¡Nivel N!" tapaba al de "Nuevo hechizo". En combate, cambiar una casilla ocupada dice "No puedes cambiar hechizos en combate".
+- `SpellbookWindow`: cabecera "Equipados N/M · arrastra a 1–4", la tecla sobre el ícono de los equipados, nombre gris claro para los aprendidos sin equipar y dorado para los nuevos, que se dan por vistos al cerrar el libro.
+- Tests: `test_spellbook_choice.gd` (2). GUT completo 164/164.
+
 ---
 
 ### HU-104 · Mejoras de hechizo 1-de-2
 **Como** jugador de nivel 8 o más **quiero** elegir una de dos mejoras para cada hechizo **para** que mi personaje no sea igual al de otro de mi clase.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-041, HU-043
 - Skills: `combat-system`, `net-protocol`, `game-content`, `dotnet-server`
 
@@ -137,11 +144,19 @@
 - Protocolo: mensaje nuevo cliente→servidor y campos nuevos en `Welcome` y `LevelUp`; cambios aditivos (`docs/protocol.md`, skill `net-protocol`). BD: `docs/database.md`.
 - En la Fase 3 se decide si el rango del nivel 12 da otra elección; aquí no se generaliza (pilar 6).
 
+**Notas de implementación**
+- Contenido: `SpellDef.Upgrades` (2 por hechizo de clase) con modificadores de cuatro tipos (`SpellModDef`: campo del hechizo, potencia de un tipo de efecto, campo de un aura aplicada con `EffectDef.AuraOverride` y mismo id, efecto añadido); `SpellUpgrades.Apply` los resuelve y `ContentDb.Upgraded(spell, upgrade)` guarda el hechizo efectivo de cada pareja al cargar, así el tick no combina nada. Regla `rules.progression.spellUpgradeLevel` (8, tiene que ser un nivel de rango).
+- Validación: schema (`upgrades`, `upgrade`, `mod`), `CrossRefValidator.CheckUpgrades` (solo clase, ids únicos, un tipo por modificador y que apunte a algo del hechizo) y `ContentLoader.CheckUpgradedSpells` (valores en rango, instantáneo con cooldown mínimo y sin áreas de daño imposibles de esquivar).
+- Dominio: `Player.SpellUpgrades`, `SpellUpgradeRules` (`Choose`, `Effective`, `UnlockedAt`, `Prune`); `CastSystem.TryBeginCast` cambia el hechizo por el mejorado para todo lo demás; `LevelUpEvent.UpgradesUnlocked`; `/level` hacia abajo y el cambio de clase podan las mejoras.
+- Red y BD: `ChooseSpellUpgrade` → `SpellUpgradesUpdate` (`ChooseSpellUpgradeHandler`), `Welcome.spellUpgrades`, `LevelUp.upgradesUnlocked`; tabla `character_spell_upgrades` (migración `CharacterSpellUpgrades`, escrita a mano porque `dotnet ef` no está instalado; `MigrationRoundTripTests.Model_HasNoChangesWithoutAMigration` comprueba que el modelo y la instantánea cuadran). La carga del personaje usa ahora consultas separadas (`AsSplitQuery`) por la cuarta colección.
+- Tests: `SpellUpgradeTests` (11, con mejoras de prueba en una copia del contenido), `SpellUpgradeContentTests` (15), `SpellUpgradeNetTests` (2), `EnvelopeTests` y la migración de ida y vuelta. El contenido real aún no tiene mejoras (HU-107) y el cliente no las muestra (HU-105).
+- 2026-10-06 (revisión de autoridad): la recarga guardada se restaura con la más larga entre el hechizo y sus mejoras (`ContentDb.LongestCooldownMs`; antes se recortaba con la del base y salir y entrar la acortaba); `CastStarted` y `AreaSpawn` llevan `upgradeId` (`SpellDef.AppliedUpgradeId`) para que los demás dibujen la forma mejorada (el cliente lo usa en HU-105); renovar un aura con la definición de otra mejora la sustituye; la clave de los hechizos mejorados es una tupla (`Effective` no asigna); `/reload rules` revalida los hechizos mejorados; una mejora no puede añadir un aura beneficiosa que dure más que la recarga. Tests: `SpellUpgradeTests` (+4), `SpellUpgradeContentTests` (+1), `CharacterRepositoryTests.SpellUpgrades_RoundTrip_…` (Postgres). Queda fuera: aplicar escudos o beneficios a un aliado que pelea no mete en combate al lanzador (ya pasaba; afecta igual a `SetHotbar`).
+
 ---
 
 ### HU-105 · Elegir mejoras en el libro de hechizos
 **Como** jugador **quiero** ver las dos mejoras de cada hechizo con sus números y elegir una **para** decidir con datos, no a ciegas.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-103, HU-104
 - Skills: `godot-client`
 
@@ -153,3 +168,11 @@
 
 **Notas técnicas**
 - Los valores del tooltip salen del mismo cálculo que el servidor: casos en `shared/test-vectors/spell_upgrades.json` que pasan en xUnit y en GUT, como el movimiento (regla 6). El cliente solo muestra; resuelve el servidor.
+
+**Notas de implementación**
+- `SpellUpgrades` (cliente) traduce `SpellUpgrades.Apply` y da las líneas "antes → después" (`diff_lines`); `shared/test-vectors/spell_upgrades.json` (7 casos con hechizos y auras copiados del contenido, generados con su resultado esperado) pasa en xUnit (`SpellUpgradeVectorTests`) y en GUT (`test_spell_upgrade_vectors.gd`).
+- `GameState`: `spell_upgrades` (del `Welcome` y de `SpellUpgradesUpdate`), `effective_spell`, `upgrade_pending`, `choose_upgrade` (en combate no se pide: avisa) y el aviso al llegar al nivel 8 con `upgradesUnlocked`.
+- Libro: bajo cada hechizo aprendido con mejoras, desde `spellUpgradeLevel`, una fila con las dos (la elegida pulsada, desactivadas en combate con el motivo, detalle con descripción y lo que cambia); "!" sobre el ícono si falta elegir y detalle del hechizo con los números mejorados. Barra: "!" en la casilla y tooltip, coste y recarga con la mejora.
+- Mundo: el apuntado y el alcance usan el hechizo efectivo; las marcas y efectos de casteos y áreas ajenos se dibujan con su `upgradeId` (`SpellUpgrades.of_message`).
+- Tests: `test_spell_upgrade_book.gd` (6) con mejoras puestas en el contenido durante el test (el real las recibe en HU-107). GUT completo 184/184.
+

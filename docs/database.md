@@ -2,7 +2,7 @@
 
 Convenciones: tablas y columnas en `snake_case` (`EFCore.NamingConventions` → `UseSnakeCaseNamingConvention()`),
 PK `uuid` (UUID v7 generado en .NET: `Guid.CreateVersion7()`) en `accounts`, `characters` y `character_items`;
-`item_audit_log` usa `bigint` identity y `character_hotbar`/`character_cooldowns` una PK compuesta; timestamps `timestamptz` en UTC,
+`item_audit_log` usa `bigint` identity y `character_hotbar`/`character_cooldowns`/`character_spell_upgrades` una PK compuesta; timestamps `timestamptz` en UTC,
 nombres únicos case-insensitive mediante la collation ICU no determinista `case_insensitive` (ver *Nombres únicos* abajo).
 
 ```mermaid
@@ -11,6 +11,7 @@ erDiagram
   characters ||--o{ character_items : posee
   characters ||--o{ character_hotbar : configura
   characters ||--o{ character_cooldowns : recarga
+  characters ||--o{ character_spell_upgrades : elige
   accounts {
     uuid id PK
     varchar20 username "único, collation case_insensitive"
@@ -55,6 +56,11 @@ erDiagram
     smallint kind PK "0=spell 1=item (plantilla de consumible)"
     varchar48 ref PK
     timestamptz ends_at "fin en reloj real: sigue corriendo desconectado (HU-015)"
+  }
+  character_spell_upgrades {
+    uuid character_id PK,FK
+    varchar48 spell_id PK
+    varchar48 upgrade_id "mejora 1-de-2 elegida (HU-104, ADR-027 D1); al cargar se descarta si ya no vale"
   }
   item_audit_log {
     bigint id PK "identity"

@@ -100,23 +100,23 @@
 | HU-097 | Historial del chat | E6 | Should | S | Hecha |
 | HU-098 | Estados (buffos, perjuicios y control) legibles | E3 | Must | M | Hecha |
 | HU-099 | Héroes en alta resolución | E8 | Should | M | Hecha |
-| HU-100 | Áreas duraderas (Fase 2) | E3 | Must | M | Pendiente |
+| HU-100 | Áreas duraderas (Fase 2) | E3 | Must | M | Hecha |
 | HU-101 | Zona del duelo | E6 | Must | M | Hecha |
-| HU-102 | Formas de área: cono y línea | E3 | Must | M | Pendiente |
-| HU-103 | Más hechizos que casillas | E4 | Must | S | Pendiente |
-| HU-104 | Mejoras de hechizo 1-de-2 | E4 | Must | L | Pendiente |
-| HU-105 | Elegir mejoras en el libro de hechizos | E4 | Must | M | Pendiente |
-| HU-106 | Números de los hechizos de nivel 7 y 9 | E8 | Must | M | Pendiente |
+| HU-102 | Formas de área: cono y línea | E3 | Must | M | Hecha |
+| HU-103 | Más hechizos que casillas | E4 | Must | S | Hecha |
+| HU-104 | Mejoras de hechizo 1-de-2 | E4 | Must | L | Hecha |
+| HU-105 | Elegir mejoras en el libro de hechizos | E4 | Must | M | Hecha |
+| HU-106 | Números de los hechizos de nivel 7 y 9 | E8 | Must | M | Hecha |
 | HU-107 | Mejoras de los hechizos | E8 | Must | M | Pendiente |
-| HU-108 | Tileset del Bosque y paleta de la Cripta | E8 | Must | M | Pendiente |
-| HU-109 | Monstruos del Bosque y de la Cripta | E8 | Must | M | Pendiente |
-| HU-110 | Equipo, botín y vendedor de los niveles 6 a 10 | E8 | Must | M | Pendiente |
+| HU-108 | Tileset del Bosque y paleta de la Cripta | E8 | Must | M | Hecha |
+| HU-109 | Monstruos del Bosque y de la Cripta | E8 | Must | M | Hecha |
+| HU-110 | Equipo, botín y vendedor de los niveles 6 a 10 | E8 | Must | M | Hecha |
 | HU-111 | Mapa del Bosque: Linde y Pantano | E8 | Must | L | Pendiente |
 | HU-112 | Salida de la Mina al Bosque | E2 | Must | S | Pendiente |
 | HU-113 | Atajo del puente roto | E2 | Should | M | Pendiente |
-| HU-114 | Arte del Tier 2: monstruos, jefe e íconos | E8 | Must | M | Pendiente |
+| HU-114 | Arte del Tier 2: monstruos, jefe e íconos | E8 | Must | M | Parcial |
 | HU-115 | Cripta de Raíces | E8 | Must | L | Pendiente |
-| HU-116 | Invocaciones de monstruos | E3 | Must | M | Pendiente |
+| HU-116 | Invocaciones de monstruos | E3 | Must | M | Hecha |
 | HU-117 | Jefe Árbol Podrido | E8 | Must | M | Pendiente |
 | HU-118 | Abrir la Fase 2 | E7 | Must | S | Pendiente |
 | HU-119 | Pasada de balance y partida de prueba de la Fase 2 | E8 | Must | M | Pendiente |

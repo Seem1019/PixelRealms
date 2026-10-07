@@ -32,7 +32,10 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 - Objeto en `zones`: `name: string`, `safe: bool`, `minLevel`, `maxLevel`, `landmark: string` (punto de referencia visible).
 - Objeto en `portals`: `portalId`, `targetMapId`, `targetX`, `targetY` (tiles), `minLevel?`. Rectángulo = se activa al pisarlo.
 - Objeto en `graveyards`: uno **por zona** (punto seguro: fogata/santuario); `defaultGraveyard` del mapa es el de la aldea.
-- Mapa: `mapId: string`, `displayName: string`, `defaultGraveyard: string`.
+- Mapa: `mapId: string`, `displayName: string`, `defaultGraveyard: string`; y para el dibujo (HU-108, solo cliente)
+  `biome: string` en exteriores (`meadow`, `forest`) o `palette: string` en cuevas (`mine`, `crypt`). Eligen el atlas de
+  `TerrainBaker` (`terrain.png`, `terrain_forest.png`, `terrain_crypt.png`); sin ellas, el de la Pradera y la Mina. El
+  servidor las ignora.
 
 ## Servidor: `TiledMapLoader` (PixelRealms.Game/Map)
 1. Lee `.tmj` con System.Text.Json (solo los campos necesarios; ignorar el resto).
@@ -60,7 +63,9 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 - Zonas abiertas: 25–40 s de caminata para cruzarlas (~100×100 tiles útiles a 4 tiles/s), un punto de referencia visible,
   sendero principal obvio, 2–3 campamentos con subniveles (bajos en la entrada, altos en la salida), ramas laterales con recompensa.
 - Cuevas (mapas aparte): 3–5 salas, 5–10 min; sala del jefe en rama lateral; sala élite antes de la salida al tier siguiente.
-  Todas comparten el tileset `interior` cambiando paleta (mina marrón, cripta verde, fortaleza gris).
+  Todas comparten las piezas de interior y cambian de paleta con la propiedad `palette` (mina marrón, cripta verde;
+  fortaleza gris en la Fase 3): una paleta nueva es una entrada de `CAVE_PALETTES` en `tools/art/gen_tiles.py`, su PNG y
+  su fila en `TerrainBaker.PALETTE_ATLASES`.
 - El pueblo (`safe=true`) debe estar a < 40 tiles de las zonas 1–3.
 - Tras editar: `dotnet test --filter Map`, copiar los mapas al cliente (`godot --path client --headless -s ../tools/sync_content.gd`)
   y abrirlo para revisar capas `above`.

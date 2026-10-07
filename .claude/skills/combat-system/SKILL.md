@@ -24,10 +24,11 @@ está construido y cómo extenderlo sin romperlo.
 
 ## Pipeline de un hechizo
 ```
-CastSpell(msg) ─► CastSystem.TryBeginCast
+CastSpell(msg) ─► CastSystem.TryBeginCast  (jugador: el hechizo pasa a su versión con la mejora elegida, HU-104)
    ├─ validar: conoce, equipado en la barra (handler: `not_equipped`), levelReq, !dead, !stunned, !silenced y !locked_out (salvo objetos: pociones sí), CD, GCD, (si ya castea: cancelar el casteo actual, ADR-019)
    │           recurso ≥ coste, objetivo válido para targeting (jugador enemigo solo si PvpService.CanAttack), rango, LOS
-   │           `ground_*`, cono, línea y `leap`: targetPos obligatorio, rango y LOS al punto; queda fijo en CastState (ADR-015/016)
+   │           `ground_*`, cono, línea y `leap`: targetPos obligatorio, rango y LOS al punto (en cono y línea solo rango: el punto
+   │           da la dirección y la línea se corta en la primera pared, HU-102); queda fijo en CastState (ADR-015/016)
    ├─ castMs == 0 ─► Resolve inmediato
    └─ castMs > 0  ─► CastState{spell, target, endsAtMs} + evento CastStarted; GCD arranca YA
 tick: si now ≥ endsAtMs ─► revalidar (rango + `castRangeToleranceTiles` (1.5), LOS, objetivo vivo, recurso) ─► Resolve
@@ -71,7 +72,7 @@ entrada en `Evade`. Detalles en `docs/design/combat.md` §Monstruos.
 - Auras: íconos sobre el marco de unidad con barrido de duración.
 - Saltos (`leap`) y Carga: el cliente no los predice; suaviza la posición del servidor en ~100 ms.
 - Áreas apuntadas: al pulsar la tecla se muestra el círculo de `aoeRadius` bajo el cursor y el clic envía `targetPos`;
-  `CastStarted{targetPos}` (y `dir` en cono/línea) dibuja la marca en el suelo para todos hasta que el casteo termina; la forma y el
+  `CastStarted{targetPos}` (y `origin` en cono/línea) dibuja la marca en el suelo para todos hasta que el casteo termina; la forma y el
   tamaño salen del contenido del cliente y `radius` solo viaja si algo lo modifica (ADR-018).
 
 ## Rendimiento (ADR-018)
