@@ -12,6 +12,18 @@
     {"id": "lt_skeleton", "gold": {"min": 20, "max": 45}, "entries": [{"itemId": "bone_fragment", "chance": 0.7, "min": 1, "max": 3}, {"itemId": "ruin_greataxe", "chance": 0.01}]},
     {"id": "lt_lich_king", "gold": {"min": 300, "max": 600}, "maxItems": 3, "groups": [{"rolls": 1, "entries": [{"itemId": "lich_kings_scepter", "weight": 1}, {"itemId": "cryptguard_breastplate", "weight": 1}, {"itemId": "shadowstep_boots", "weight": 1}]}], "entries": [{"itemId": "bone_ring", "chance": 0.5}]},
     {"id": "lt_boar_alpha", "gold": {"min": 15, "max": 35}, "groups": [{"rolls": 1, "entries": [{"itemId": "boar_hide_boots", "weight": 2}, {"itemId": "bandit_gloves", "weight": 1}, {"itemId": "apprentice_hood", "weight": 1}]}], "entries": [{"itemId": "boar_tusk", "chance": 1.0, "min": 1, "max": 2}, {"itemId": "bandit_coin_purse", "chance": 0.5}, {"itemId": "bread", "chance": 0.3, "min": 1, "max": 2}, {"itemId": "minor_healing_potion", "chance": 0.2}]},
-    {"id": "lt_wolf_alpha", "gold": {"min": 30, "max": 70}, "groups": [{"rolls": 1, "entries": [{"itemId": "wolf_fang_dagger", "weight": 1}, {"itemId": "wolf_tooth_necklace", "weight": 1}, {"itemId": "iron_sword", "weight": 1}, {"itemId": "willow_wand", "weight": 1}]}], "entries": [{"itemId": "wolf_pelt", "chance": 1.0, "min": 2, "max": 3}, {"itemId": "minor_healing_potion", "chance": 0.2}, {"itemId": "minor_mana_potion", "chance": 0.2}, {"itemId": "bone_ring", "chance": 0.05}]}
+    {"id": "lt_wolf_alpha", "gold": {"min": 30, "max": 70}, "groups": [{"rolls": 1, "entries": [{"itemId": "wolf_fang_dagger", "weight": 1}, {"itemId": "wolf_tooth_necklace", "weight": 1}, {"itemId": "iron_sword", "weight": 1}, {"itemId": "willow_wand", "weight": 1}]}], "entries": [{"itemId": "wolf_pelt", "chance": 1.0, "min": 2, "max": 3}, {"itemId": "minor_healing_potion", "chance": 0.2}, {"itemId": "minor_mana_potion", "chance": 0.2}, {"itemId": "bone_ring", "chance": 0.05}]},
+    {"id": "lt_forest_wolf", "gold": {"min": 14, "max": 30}, "entries": [{"itemId": "wolf_pelt", "chance": 0.65}]},
+    {"id": "lt_bandit_woodcutter", "gold": {"min": 16, "max": 33}, "entries": [{"itemId": "bandit_coin_purse", "chance": 0.5}]},
+    {"id": "lt_weaver_spider", "gold": {"min": 18, "max": 36}, "entries": []},
+    {"id": "lt_old_bear", "gold": {"min": 55, "max": 110}, "entries": []},
+    {"id": "lt_giant_toad", "gold": {"min": 18, "max": 36}, "entries": []},
+    {"id": "lt_lizardman", "gold": {"min": 20, "max": 40}, "entries": []},
+    {"id": "lt_will_o_wisp", "gold": {"min": 22, "max": 44}, "entries": []},
+    {"id": "lt_swamp_witch", "gold": {"min": 65, "max": 130}, "entries": []},
+    {"id": "lt_root_skeleton", "gold": {"min": 22, "max": 44}, "entries": [{"itemId": "bone_fragment", "chance": 0.6, "min": 1, "max": 2}]},
+    {"id": "lt_moss_spirit", "gold": {"min": 22, "max": 44}, "entries": []},
+    {"id": "lt_trap_plant", "gold": {"min": 22, "max": 44}, "entries": []},
+    {"id": "lt_crypt_guardian", "gold": {"min": 70, "max": 140}, "entries": [{"itemId": "bone_fragment", "chance": 1.0, "min": 2, "max": 4}]}
   ]
 }

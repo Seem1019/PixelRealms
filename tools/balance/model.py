@@ -65,8 +65,9 @@ def aura_total(ch,a,target=TARGET):
     return None
 AOE_N=3
 PHYS_SHARE=1.0  # los monstruos del Tier 1 pegan físico  # objetivos secundarios agrupados
-def simulate(ch,loadout,SP,AU,T=30.0,dt=0.05,count_basic=True,heal_mode=False):
-    """Devuelve (main, secondary) daño o cura total en T s. loadout: ids por prioridad."""
+def simulate(ch,loadout,SP,AU,T=30.0,dt=0.05,count_basic=True,heal_mode=False,trace=None):
+    """Devuelve (main, secondary) daño o cura total en T s. loadout: ids por prioridad.
+    trace (lista, opcional): recibe (t, main+secondary acumulado, maná) en cada paso; lo usa tier2.py."""
     t=0; swing_t=0; cast=None; gcd=0; lock=0; cds={i:0 for i in loadout}
     energy=100.0; rage=0.0; mana=ch.maxMana; last_spend=-99
     main=0; sec=0; dots={}; buff=[0.0,0.0]  # [hasta, pct]  # (auraId,target)->[expiry,nexttick,per,tick,stacks]
@@ -153,6 +154,7 @@ def simulate(ch,loadout,SP,AU,T=30.0,dt=0.05,count_basic=True,heal_mode=False):
                 if ch.resource=='rage': rage=min(CB['resourceCap'],rage+CB['ragePerHitDealt'])
                 if ch.resource=='mana': mana=min(ch.maxMana,mana+ch.maxMana*CB['manaPerBasicHitPctPerSec']*ch.swing)
         t+=dt
+        if trace is not None: trace.append((t,main+sec,mana))
     return main,sec
 # ---- control y movilidad (analítico, por minuto)
 def cc_value(ch,s,AU):

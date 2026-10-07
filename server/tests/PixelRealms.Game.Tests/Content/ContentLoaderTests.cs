@@ -16,11 +16,11 @@ public sealed class ContentLoaderTests
         result.Report.Errors.ShouldBeEmpty();
         var db = result.ContentOrThrow;
         db.Classes.Count.ShouldBe(4);
-        db.Spells.Count.ShouldBe(41);
-        db.Auras.Count.ShouldBe(26);
+        db.Spells.Count.ShouldBe(57); // + los 16 hechizos de los monstruos del Tier 2 (HU-109)
+        db.Auras.Count.ShouldBe(37);
         db.Items.Count.ShouldBe(37);
-        db.Monsters.Count.ShouldBe(12); // + los élites de las ramas de la pradera (HU-080)
-        db.LootTables.Count.ShouldBe(12);
+        db.Monsters.Count.ShouldBe(24); // + los élites de las ramas de la pradera (HU-080) y los 12 del Tier 2 (HU-109)
+        db.LootTables.Count.ShouldBe(24);
         db.Vendors.Count.ShouldBe(1);
         db.Rules.Hash.Length.ShouldBe(16);
     }

@@ -31,6 +31,18 @@
 
     {"id": "foreman_whip_bleed", "name": "Latigazo", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 9000, "tickMs": 3000, "base": 8, "icon": "spells/whip"},
     {"id": "foreman_rally_aura", "name": "Enfurecido", "kind": "stat_mod", "isDebuff": false, "durationMs": 10000, "mods": {"damageDonePct": 0.25}, "icon": "spells/rally"},
+
+    {"id": "forest_wolf_howl_frenzy", "name": "Furia de la manada", "kind": "stat_mod", "isDebuff": false, "durationMs": 8000, "mods": {"damageDonePct": 0.25}, "icon": "spells/rally"},
+    {"id": "weaver_spider_web_root", "name": "Atrapado en la red", "kind": "root", "isDebuff": true, "durationMs": 2500, "icon": "spells/crippling_poison"},
+    {"id": "old_bear_roar_stun", "name": "Aturdido", "kind": "stun", "isDebuff": true, "durationMs": 2000, "icon": "spells/taunt"},
+    {"id": "giant_toad_mud_slow", "name": "Embarrado", "kind": "slow", "isDebuff": true, "durationMs": 4000, "pct": 0.4, "icon": "spells/hamstring"},
+    {"id": "lizardman_poison_spear_poison", "name": "Veneno de lagarto", "kind": "dot", "isDebuff": true, "school": "magic", "durationMs": 9000, "tickMs": 3000, "base": 3, "icon": "spells/poison_blade"},
+    {"id": "will_o_wisp_flash_silence", "name": "Deslumbrado", "kind": "silence", "isDebuff": true, "durationMs": 2500, "icon": "spells/smite"},
+    {"id": "swamp_witch_mire_root", "name": "Atascado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"},
+    {"id": "swamp_witch_curse_dot", "name": "Maldición", "kind": "dot", "isDebuff": true, "school": "magic", "durationMs": 12000, "tickMs": 3000, "base": 8, "icon": "spells/shadow_bolt"},
+    {"id": "root_skeleton_thorn_slash_bleed", "name": "Espinas", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 9000, "tickMs": 3000, "base": 5, "icon": "spells/whip"},
+    {"id": "crypt_guardian_bark_shield", "name": "Coraza de raíces", "kind": "shield", "isDebuff": false, "durationMs": 10000, "base": 160, "icon": "spells/shield_block"},
+    {"id": "trap_plant_snare_root", "name": "Enraizado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"},
     {"id": "lich_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"}
   ]
 }
