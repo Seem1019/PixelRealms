@@ -12,7 +12,7 @@
 
     "progression": {
       "type": "object", "additionalProperties": false,
-      "required": ["maxLevel", "levelCapByPhase", "minutesPerLevel", "killCycleSecTarget", "xpRate", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "spellRankLevels", "spellRankBonusPct", "classChange", "altCatchUp"],
+      "required": ["maxLevel", "levelCapByPhase", "minutesPerLevel", "killCycleSecTarget", "xpRate", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "spellRankLevels", "spellRankBonusPct", "spellUpgradeLevel", "classChange", "altCatchUp"],
       "properties": {
         "maxLevel": { "type": "integer", "minimum": 2, "maximum": 60, "description": "Nivel máximo absoluto del MVP. xpParaSubir se define para L = 1..maxLevel-1." },
         "levelCapByPhase": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Tope de nivel efectivo por fase del MVP (índice = fase − 1). El tope activo es levelCapByPhase[world.currentPhase − 1]; el último valor debe ser igual a maxLevel." },
@@ -31,6 +31,7 @@
         "levelDiffClamp": { "type": "integer", "minimum": 0 },
         "spellUnlockLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Niveles en que cada clase desbloquea su hechizo n.º i (ordenados). Informativo: el valor real es spells[].levelReq." },
         "spellRankLevels": { "type": "array", "items": { "type": "integer", "minimum": 2 }, "minItems": 1, "description": "Niveles en que todos los hechizos de clase suben un rango (ADR-024). En la Fase 1 solo se alcanza el primero." },
+        "spellUpgradeLevel": { "type": "integer", "minimum": 2, "description": "Nivel desde el que cada hechizo de clase elige 1 de sus 2 mejoras (HU-104, ADR-027 D1); es uno de spellRankLevels." },
         "spellRankBonusPct": { "type": "number", "exclusiveMinimum": 0, "description": "Fracción del valor base que añade cada rango (0.15 = +15 % por rango, ADR-024)." },
         "classChange": { "type": "object", "additionalProperties": false, "required": ["npcUntilPhase"],
           "properties": { "npcUntilPhase": { "type": "integer", "minimum": 0, "description": "Última fase en la que el NPC de la Aldea cambia la clase conservando nivel, items y oro (0 = nunca)." } } },
@@ -59,7 +60,7 @@
 
     "combat": {
       "type": "object", "additionalProperties": false,
-      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "bodyHalfWidthTiles", "bodyHeightAboveFeetTiles", "bodyDepthBelowFeetTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaRegenPenaltyDurationSec", "manaPerBasicHitPctPerSec", "castMoveSpeedMult", "interruptLockoutMs", "abilityLockMs", "minInstantSpellCooldownMs", "linkdeadSec", "linkdeadInCombatMaxSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "evadeSpeedMult", "bossImmuneToAuraKinds", "controlAuraKinds", "hardControlKinds", "hardControlImmunitySec", "maxSlowPct"],
+      "required": ["gcdMs", "critMultiplier", "varianceMin", "varianceMax", "physicalMissBase", "physicalMissPerTargetLevel", "magicMissBase", "critBase", "critPerAgi", "critPerInt", "critCap", "dodgeBase", "dodgePerAgi", "dodgeCap", "armorPerAgi", "mitigationPerLevel", "mitigationConstant", "mitigationCap", "basicAttackPowerDivisor", "castRangeToleranceTiles", "bodyHalfWidthTiles", "bodyHeightAboveFeetTiles", "bodyDepthBelowFeetTiles", "inCombatWindowSec", "hpRegenDelaySec", "hpRegenPerSpi", "hpRegenPerSta", "manaRegenPerSpiPer5s", "manaRegenPerIntPer5s", "manaRegenCastingPenalty", "manaRegenPenaltyDurationSec", "manaPerBasicHitPctPerSec", "castMoveSpeedMult", "interruptLockoutMs", "abilityLockMs", "minInstantSpellCooldownMs", "instantConeMaxRadiusTiles", "linkdeadSec", "linkdeadInCombatMaxSec", "ragePerHitDealt", "ragePerHitTaken", "rageDecayPerSecOutOfCombat", "energyPerSec", "resourceCap", "threatPerDamage", "threatPerHeal", "threatSwitchMelee", "threatSwitchRanged", "tauntThreatBonus", "respawnHpPct", "respawnResourcePct", "corpseLifetimeSec", "evadeSpeedMult", "bossImmuneToAuraKinds", "controlAuraKinds", "hardControlKinds", "hardControlImmunitySec", "maxSlowPct"],
       "properties": {
         "gcdMs": { "type": "integer", "minimum": 0, "description": "Cooldown global tras cualquier hechizo con triggersGcd." },
         "critMultiplier": { "type": "number", "minimum": 1 },
@@ -83,6 +84,7 @@
         "castMoveSpeedMult": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Multiplicador de velocidad de movimiento mientras se castea (ADR-019). 1 = sin penalización." },
         "interruptLockoutMs": { "type": "integer", "minimum": 0, "description": "Tiempo sin poder castear tras un corte por control o por el efecto interrupt." },
         "abilityLockMs": { "type": "integer", "minimum": 0, "description": "Bloqueo de animación tras un hechizo instantáneo: no sale el básico ni otro hechizo; el básico pendiente sale al terminar." },
+        "instantConeMaxRadiusTiles": { "type": "number", "minimum": 0, "description": "Radio máximo de un cono de daño sin casteo: a esa distancia se esquiva saliendo del frente del lanzador, como un golpe (ADR-027 D4; lo comprueba el validador)." },
         "minInstantSpellCooldownMs": { "type": "integer", "minimum": 0, "description": "Cooldown mínimo de un hechizo de clase instantáneo (lo comprueba el validador)." },
         "linkdeadSec": { "type": "number", "minimum": 0, "description": "Tiempo que un personaje desconectado fuera de combate sigue en el mundo antes de guardarse y salir (HU-025)." },
         "linkdeadInCombatMaxSec": { "type": "number", "minimum": 0, "description": "Tiempo máximo que un personaje desconectado en combate sigue en el mundo (fuera de combate: linkdeadSec)." },
@@ -182,7 +184,7 @@
 
     "limits": {
       "type": "object", "additionalProperties": false,
-      "required": ["maxPersistentAreasPerCaster", "maxAreasPerInstance", "maxPendingImpactsPerInstance", "aoeMaxTargetsCap", "persistentAreaTickMs", "maxBuffsPerEntity", "maxDebuffsPerEntity"],
+      "required": ["maxPersistentAreasPerCaster", "maxAreasPerInstance", "maxPendingImpactsPerInstance", "aoeMaxTargetsCap", "persistentAreaTickMs", "maxBuffsPerEntity", "maxDebuffsPerEntity", "maxSummonsPerCaster", "maxSummonsPerInstance"],
       "description": "Topes de rendimiento del combate (ADR-018).",
       "properties": {
         "maxPersistentAreasPerCaster": { "type": "integer", "minimum": 0, "description": "Áreas duraderas por lanzador; una nueva por encima del tope reemplaza a la más antigua." },
@@ -191,6 +193,8 @@
         "aoeMaxTargetsCap": { "type": "integer", "minimum": 1, "description": "Tope global de objetivos por área, por encima del maxTargets de cada hechizo." },
         "persistentAreaTickMs": { "type": "integer", "minimum": 50, "description": "Cada cuánto se evalúa un área que dura en el tiempo (repartidas entre ticks)." },
         "maxBuffsPerEntity": { "type": "integer", "minimum": 1, "description": "Tope de auras beneficiosas por entidad (ADR-021). Un aura nueva siempre se aplica: si el grupo está lleno, sale la beneficiosa con menos tiempo restante." },
+        "maxSummonsPerCaster": { "type": "integer", "minimum": 0, "description": "HU-116: invocaciones vivas por invocador; por encima, el efecto `summon` crea menos." },
+        "maxSummonsPerInstance": { "type": "integer", "minimum": 0, "description": "HU-116: invocaciones vivas por MapInstance." },
         "maxDebuffsPerEntity": { "type": "integer", "minimum": 1, "description": "Tope de auras perjudiciales por entidad, sin contar controles (ADR-021). Si está lleno, sale la perjudicial con menos tiempo restante." }
       }
     },

@@ -1,4 +1,9 @@
-"""Tileset del mundo: client/assets/tiles/terrain.png (16 columnas × 16 px).
+"""Tilesets del mundo en client/assets/tiles/: atlas de 16 columnas × 16 px con la misma disposición de piezas, uno por
+tier y paleta de cueva (HU-108). `TerrainBaker` lo elige con la propiedad de mapa `palette` (cuevas) o `biome` (exteriores):
+  terrain.png         Pradera (Tier 1) e interior de la Mina: mapas sin propiedad, `biome: meadow` o `palette: mine`
+  terrain_forest.png  Bosque (Tier 2): `biome: forest`
+  terrain_crypt.png   el del Bosque con el interior en la paleta de la Cripta: `palette: crypt`
+Las piezas de interior (INTERIOR_CELLS) se dibujan una vez y CAVE_PALETTES las recolorea al generar cada atlas (sin shader).
 
 Filas (ver client/scripts/world/terrain_baker.gd, que debe coincidir):
   0  pasto: 8 variantes base + 8 decoraciones (matas, flores, piedrita, seta…)
@@ -20,7 +25,7 @@ import zlib
 
 import numpy as np
 
-from pix import (P, PeriodicNoise, canvas, ellipse, hash01, hline, line, outline, put, rect, rgba, save, vline)
+from pix import (P, PeriodicNoise, canvas, ellipse, hash01, hline, line, outline, put, recolor, rect, rgba, save, vline)
 
 T = 16
 COLS = 16
@@ -725,6 +730,337 @@ def big_well() -> np.ndarray:
     return outline(t)
 
 
+# --- Bosque (Tier 2, HU-108) -----------------------------------------------------------------------------------------
+# Las mismas piezas en el mismo sitio que la Pradera, más oscuras: hierba con musgo, tierra húmeda, agua de pantano con
+# orilla de barro y juncos, peñascos con musgo, copas verde azulado y raíces. Lo que no cambia (piezas de interior,
+# cartel, farol, pozo, fogata y escalera) se copia del atlas de la Pradera.
+
+def forest_grass(seed: int, tone: str = "normal") -> np.ndarray:
+    """Hierba oscura: base verde gris con briznas y motas de musgo. `tone` como en `grass_base`: light son manchas de
+    musgo y dark, sotobosque más cerrado."""
+    rnd = random.Random(seed)
+    base, light, dark = "sage_d", "sage", "coal"
+    blades = {"normal": 8, "light": 5, "dark": 14}[tone]
+    t = tile()
+    t[:, :] = rgba(base)
+    if tone == "light":
+        for _ in range(4):
+            x, y = rnd.randrange(T), rnd.randrange(T)
+            for dx, dy in [(0, 0), (1, 0), (0, 1), (1, 1), (2, 1)]:
+                put(t, (x + dx) % T, (y + dy) % T, "olive")
+            put(t, x, y, "moss")
+    for _ in range(blades):
+        x, y = rnd.randrange(T), rnd.randrange(1, T - 1)
+        put(t, x, y, dark)
+        put(t, (x + 1) % T, y, dark)
+        put(t, x, y - 1, light)
+    for _ in range(3):
+        put(t, rnd.randrange(T), rnd.randrange(T), "olive")
+    return t
+
+
+def drop_shadow(t: np.ndarray, color: str) -> None:
+    """Sombra de 1 px bajo lo dibujado (objetos planos sobre el suelo)."""
+    m = t[:, :, 3] > 0
+    for y in range(T - 1):
+        for x in range(T):
+            if m[y, x] and not m[y + 1, x]:
+                put(t, x, y + 1, color)
+
+
+def fern(seed: int, big: bool) -> np.ndarray:
+    """Helecho: frondas en abanico desde la base, con la punta más clara."""
+    rnd = random.Random(seed)
+    t = tile()
+    cx, cy = 8, 12
+    fronds = 5 if big else 3
+    for i in range(fronds):
+        a = math.pi * (0.15 + 0.7 * i / (fronds - 1))
+        n = rnd.randint(4, 6) if big else rnd.randint(3, 4)
+        x1, y1 = round(cx - math.cos(a) * n), round(cy - math.sin(a) * n * 0.8)
+        line(t, cx, cy, x1, y1, "green")
+        put(t, x1, y1, "jade")
+    drop_shadow(t, "pine")
+    return t
+
+
+def fallen_leaves(seed: int) -> np.ndarray:
+    rnd = random.Random(seed)
+    t = tile()
+    for _ in range(5):
+        x, y = rnd.randint(2, 12), rnd.randint(3, 12)
+        c, d = rnd.choice([("rust", "wine"), ("clay", "rust"), ("olive", "mud"), ("moss", "olive")])
+        put(t, x, y, c)
+        put(t, x + 1, y, c)
+        put(t, x + 1, y + 1, d)
+    return t
+
+
+def roots(seed: int) -> np.ndarray:
+    """Raíces que asoman del suelo, del color del tronco: una principal y una rama, con luz arriba y sombra abajo."""
+    rnd = random.Random(seed)
+    t = tile()
+    y0 = rnd.randint(8, 10)
+    main = [(2, y0 + 1), (5, y0 - 1), (8, y0), (11, y0 - 2), (13, y0 - 1)]
+    branch = [(8, y0), (10, y0 + 2), (12, y0 + 3)]
+    for pts in (main, branch):
+        for a, b in zip(pts, pts[1:]):
+            line(t, a[0], a[1], b[0], b[1], "wine")
+    m = t[:, :, 3] > 0
+    for y in range(1, T):
+        for x in range(T):
+            if m[y, x] and not m[y - 1, x]:
+                put(t, x, y - 1, "rust")
+    drop_shadow(t, "coal")
+    return t
+
+
+def forest_mushrooms() -> np.ndarray:
+    """Setas de sombrero pardo en grupo (las rojas son de la Pradera)."""
+    t = tile()
+    for (x, y, r) in [(5, 8, 2), (9, 11, 1), (11, 8, 1)]:
+        vline(t, x, y + 1, y + 2 + r, "sage_p")
+        hline(t, x - r - 1, x + r + 1, y, "clay")
+        hline(t, x - r, x + r, y - 1, "tan")
+        put(t, x - r, y - 1, "sand")
+        hline(t, x - 1, x + 1, y + 3 + r, "coal")
+    return t
+
+
+def moss_clump(seed: int) -> np.ndarray:
+    rnd = random.Random(seed)
+    t = tile()
+    for _ in range(3):
+        x, y = rnd.randint(4, 11), rnd.randint(5, 11)
+        ellipse(t, x, y, 2.5, 1.6, "olive")
+        put(t, x - 1, y - 1, "moss")
+        put(t, x, y - 1, "moss")
+    drop_shadow(t, "coal")
+    return t
+
+
+def twigs(seed: int) -> np.ndarray:
+    rnd = random.Random(seed)
+    t = tile()
+    y = rnd.randint(8, 11)
+    line(t, 3, y + 2, 12, y, "mud")
+    line(t, 7, y + 1, 8, y - 2, "mud")
+    put(t, 8, y - 3, "olive")
+    put(t, 12, y - 1, "olive")
+    put(t, 4, y + 1, "taupe")
+    return t
+
+
+WET_BASE, WET_LIGHT, WET_DARK = "dusty", "taupe", "mud"
+PATH_BASE, PATH_LIGHT, PATH_DARK = "taupe", "sage_p", "dusty"
+
+
+def wet_dirt_base(seed: int) -> np.ndarray:
+    t = tile()
+    dirt_texture(t, seed, None, WET_BASE, WET_LIGHT, WET_DARK)
+    return t
+
+
+def mud_puddle() -> np.ndarray:
+    t = tile()
+    ellipse(t, 8, 9, 4, 2, "mauve")
+    ellipse(t, 8, 9, 3, 1.4, "ink")
+    hline(t, 6, 7, 8, "lavgray")
+    return t
+
+
+def paint_wet_dirt(t, m, f, cfg):
+    dirt_texture(t, 11, m, WET_BASE, WET_LIGHT, WET_DARK)
+    tl, br = edge_masks(m)
+    t[br] = rgba(WET_DARK)
+    t[tl & (f < 0.56)] = rgba("coal")  # hierba que se mete sobre el borde superior
+
+
+def paint_forest_path(t, m, f, cfg):
+    dirt_texture(t, 23, m, PATH_BASE, PATH_LIGHT, PATH_DARK)
+    tl, br = edge_masks(m)
+    t[br] = rgba(PATH_DARK)
+    t[tl & (f < 0.56)] = rgba("coal")
+
+
+def paint_swamp(t, m, f, cfg):
+    """Agua de pantano: verde turbia con nenúfares, orilla de barro con juncos y una línea de verdín."""
+    shore = m & (f < 0.6)
+    deep = m & (f >= 0.6)
+    rnd = random.Random(cfg * 31 + 9)
+    for y in range(T):
+        for x in range(T):
+            if deep[y, x]:
+                put(t, x, y, "teal_d" if f[y, x] > 0.85 else "pine")
+            elif shore[y, x]:
+                h = hash01(x // 2, y // 2, 11)
+                put(t, x, y, "olive" if h > 0.6 else ("mud" if h > 0.2 else "sage_d"))
+    # Juncos en la orilla: tallos de 3 px con la punta clara.
+    for _ in range(4):
+        x, y = rnd.randint(1, 14), rnd.randint(3, 14)
+        if shore[y, x] and shore[y - 2, x]:
+            vline(t, x, y - 2, y, "olive")
+            put(t, x, y - 3, "moss")
+    # Brillos y nenúfares.
+    for _ in range(2):
+        x, y = rnd.randint(2, 11), rnd.randint(2, 13)
+        if deep[y, x] and deep[y, min(x + 2, 15)]:
+            hline(t, x, x + 2, y, "sage")
+    for _ in range(2):
+        x, y = rnd.randint(3, 12), rnd.randint(3, 12)
+        if deep[y, x] and deep[y + 1, x + 1] and deep[y - 1, x - 1]:
+            hline(t, x - 1, x + 1, y, "green")
+            hline(t, x - 1, x, y - 1, "jade")
+            put(t, x + 1, y + 1, "sage_d")
+    for y in range(T):
+        for x in range(T):
+            if deep[y, x] and ((y > 0 and shore[y - 1, x]) or (x > 0 and shore[y, x - 1])):
+                put(t, x, y, "olive")
+    tl, br = edge_masks(m)
+    t[br & shore] = rgba("coal")
+
+
+def paint_mossy_rock(t, m, f, cfg):
+    """Peñasco del Bosque: la roca de la Pradera con musgo por la cara de arriba."""
+    paint_rock(t, m, f, cfg)
+    noise = PeriodicNoise(cfg + 131, 16, 4)
+    top, rim = near_edge(m, 0, -1, 3), near_edge(m, 0, -1, 1)
+    for y in range(T):
+        for x in range(T):
+            if top[y, x] and noise(x, y) > 0.35:
+                put(t, x, y, "moss" if rim[y, x] else "olive")
+
+
+def paint_dark_forest(t, m, f, cfg):
+    leafy(t, m, f, "teal_d", "sage", "coal", "outline", cfg + 101, "sage_l")
+
+
+def paint_fern_bush(t, m, f, cfg):
+    leafy(t, m, f, "sage", "sage_l", "sage_d", "coal", cfg + 202, "pale")
+    rnd = random.Random(cfg + 9)
+    for _ in range(2):
+        x, y = rnd.randint(2, 13), rnd.randint(2, 13)
+        if m[y, x] and f[y, x] > 0.75:
+            put(t, x, y, "lilac")  # bayas
+
+
+def paint_dark_canopy(t, m, f, cfg):
+    leafy(t, m, f, "pine", "green", "coal", "teal_d", cfg + 303, "jade")
+
+
+def rooted_trunk() -> np.ndarray:
+    """Tronco oscuro con raíces que se abren sobre el suelo (asoma bajo las copas)."""
+    t = tile()
+    rect(t, 6, 0, 4, 12, "wine")
+    vline(t, 6, 0, 11, "rust")
+    vline(t, 9, 0, 11, "grape_d")
+    put(t, 8, 4, "grape_d")
+    for pts in [[(6, 11), (4, 13), (2, 14)], [(9, 11), (11, 13), (13, 14)], [(7, 11), (7, 14)]]:
+        for a, b in zip(pts, pts[1:]):
+            line(t, a[0], a[1], b[0], b[1], "wine")
+    put(t, 4, 12, "rust")
+    put(t, 11, 12, "rust")
+    return outline(t)
+
+
+def moss_on_top(img: np.ndarray, seed: int, amount: float) -> np.ndarray:
+    """Musgo en la cara de arriba de un objeto: píxeles opacos con el de encima vacío o de contorno."""
+    rnd = random.Random(seed)
+    out = img.copy()
+    edge = rgba("outline")
+    h, w = img.shape[:2]
+    solid = (img[:, :, 3] > 0) & ~np.all(img == edge, axis=2)
+    for y in range(1, h - 1):
+        for x in range(w):
+            if solid[y, x] and not solid[y - 1, x] and rnd.random() < amount:
+                out[y, x] = rgba("moss")
+                if solid[y + 1, x]:
+                    out[y + 1, x] = rgba("olive")
+    return out
+
+
+# Madera más oscura (cerca, paredes, tocón) y tejado de tablillas con musgo.
+FOREST_WOOD = {"clay": "rust", "tan": "clay", "rust": "wine", "wine": "grape_d", "sand": "tan"}
+FOREST_ROOF = {"red": "olive", "redl": "moss", "coral": "moss", "blood": "mud", "wine": "sage_d"}
+
+
+def recolor_cells(atlas: np.ndarray, cells: list[tuple[int, int]], mapping: dict[str, str]) -> None:
+    for (row, col) in cells:
+        cell = atlas[row * T:(row + 1) * T, col * T:(col + 1) * T]
+        atlas[row * T:(row + 1) * T, col * T:(col + 1) * T] = recolor(cell, mapping)
+
+
+def forest_atlas(meadow: np.ndarray) -> np.ndarray:
+    """Atlas del Bosque (Tier 2) con la misma disposición que el de la Pradera (`meadow`, del que copia lo que no cambia)."""
+    atlas = meadow.copy()
+    # Fila 0: hierba oscura (8) y decoraciones en el sitio de las de la Pradera: helechos (matas), flores azules, hojas
+    # caídas, raíces (piedrita), setas pardas, musgo (trébol) y ramitas.
+    for i, tone in enumerate(["normal", "normal", "normal", "normal", "light", "light", "dark", "dark"]):
+        blit(atlas, forest_grass(500 + i, tone), i, 0)
+    decos = [fern(21, False), fern(22, True), flowers(23, "sky", "ice"), fallen_leaves(24), roots(25),
+             forest_mushrooms(), moss_clump(26), twigs(27)]
+    for i, d in enumerate(decos):
+        blit(atlas, d, 8 + i, 0)
+    # Fila 1: tierra húmeda (4) y sus decoraciones (piedrita, raíz, charco de barro, ramitas); el suelo de cueva se queda.
+    for i in range(4):
+        blit(atlas, wet_dirt_base(600 + i), i, 1)
+    for i, d in enumerate([pebble(28, "dirt"), roots(29), mud_puddle(), twigs(30)]):
+        blit(atlas, d, 4 + i, 1)
+    rows = [
+        (2, dual_tiles(212, 0.45, paint_wet_dirt)),
+        (3, dual_tiles(313, 0.30, paint_forest_path)),
+        (4, dual_tiles(414, 0.35, paint_swamp)),
+        (5, dual_tiles(515, 0.35, outlined_dual(paint_mossy_rock))),
+        (6, dual_tiles(616, 0.40, outlined_dual(paint_dark_forest))),
+        (7, dual_tiles(717, 0.35, outlined_dual(paint_fern_bush))),
+        (8, dual_tiles(818, 0.40, outlined_dual(paint_dark_canopy))),
+    ]
+    for row, tiles in rows:
+        for cfg, t in enumerate(tiles):
+            blit(atlas, t, cfg, row)
+    # Cerca y casa: madera oscura y tejado con musgo (las ruinas ya lo tienen).
+    recolor_cells(atlas, [(10, c) for c in range(16)] + [(12, c) for c in range(5)], FOREST_WOOD)
+    recolor_cells(atlas, [(11, c) for c in range(12)], FOREST_ROOF)
+    # Fila 13: tronco con raíces, sombra de copa más oscura, tocón y tronco caído con musgo; el resto se queda.
+    shadow = tile()
+    shadow[:, :] = rgba("coal", 120)
+    for i, o in enumerate([rooted_trunk(), shadow, moss_on_top(recolor(stump(), FOREST_WOOD), 31, 0.5),
+                           moss_on_top(recolor(log(), FOREST_WOOD), 32, 0.6)]):
+        blit(atlas, o, i, 13)
+    # Filas 14-15: sendero interior (4 variantes) y copas de 32×32 (2 para arboledas y 2 más oscuras para el borde).
+    for i in range(4):
+        path = tile()
+        dirt_texture(path, 700 + i, None, PATH_BASE, PATH_LIGHT, PATH_DARK)
+        blit(atlas, path, i, 14)
+    crowns = [crown(5, "pine", "green", "coal", "jade"), crown(6, "pine", "green", "coal", "jade"),
+              crown(7, "teal_d", "sage", "coal", "sage_l"), crown(8, "teal_d", "sage", "outline", "sage_l")]
+    for i, c in enumerate(crowns):
+        atlas[14 * T:16 * T, (4 + i * 2) * T:(6 + i * 2) * T] = c
+    return atlas
+
+
+# --- Paletas de cueva (HU-108) ---------------------------------------------------------------------------------------
+# Las cuevas comparten las piezas de interior (suelo y sus decoraciones, roca de cueva y escalera) y cada mapa elige su
+# paleta con la propiedad `palette`. Se dibujan una vez en la de la Mina y se recolorean al generar el atlas.
+
+INTERIOR_CELLS = [(1, c) for c in range(8, 16)] + [(9, c) for c in range(16)] + [(13, 8)]
+
+CAVE_PALETTES: dict[str, dict[str, str]] = {
+    "mine": {},  # marrón: las piezas tal cual
+    "crypt": {
+        "mauve": "sage_d", "plum": "pine", "ink": "coal", "dusty": "sage", "lavgray": "sage", "mud": "coal",
+        "aqua_l": "leaf", "teal": "green", "foam": "pale", "aqua": "jade", "navy": "teal_d", "indigo": "pine",
+    },
+}
+
+
+def cave_palette(atlas: np.ndarray, palette: str) -> np.ndarray:
+    """Copia de `atlas` con las piezas de interior en la paleta de cueva `palette` (las demás no cambian)."""
+    out = atlas.copy()
+    recolor_cells(out, INTERIOR_CELLS, CAVE_PALETTES[palette])
+    return out
+
+
 def base_tiles_png() -> None:
     """Imágenes que referencian maps/tilesets/placeholder.tsj y collision.tsj (para verlas en Tiled)."""
     img = canvas(128, 16)
@@ -743,7 +1079,8 @@ def base_tiles_png() -> None:
     save(col, "tiles/collision.png")
 
 
-def build() -> None:
+def meadow_atlas() -> np.ndarray:
+    """Atlas de la Pradera (Tier 1), con las piezas de interior en la paleta de la Mina."""
     atlas = canvas(COLS * T, ROWS * T)
     # Fila 0: pasto.
     for i, tone in enumerate(["normal", "normal", "normal", "normal", "light", "light", "dark", "dark"]):
@@ -799,7 +1136,15 @@ def build() -> None:
     for i, c in enumerate(crowns):
         atlas[14 * T:16 * T, (4 + i * 2) * T:(6 + i * 2) * T] = c
     atlas[14 * T:16 * T, 12 * T:14 * T] = big_well()
-    save(atlas, "tiles/terrain.png")
+    return atlas
+
+
+def build() -> None:
+    meadow = meadow_atlas()
+    save(cave_palette(meadow, "mine"), "tiles/terrain.png")
+    forest = forest_atlas(meadow)
+    save(forest, "tiles/terrain_forest.png")
+    save(cave_palette(forest, "crypt"), "tiles/terrain_crypt.png")
     base_tiles_png()
 
 

@@ -18,6 +18,9 @@ public sealed class Monster(EntityId id, MonsterTemplate template, Vec2 spawnPos
 
     public bool IsBoss => Template.Boss;
 
+    /// <summary>HU-116: quién lo invocó (null si salió de un spawn). Sin XP ni botín; se va con su invocador.</summary>
+    public EntityId? SummonedBy { get; init; }
+
     /// <summary>Primer jugador que le hizo daño (HU-040 CA3): solo él (o su grupo) recibe XP y botín.</summary>
     public EntityId? TaggedBy { get; set; }
 

@@ -34,6 +34,7 @@ public sealed class Character
     public List<CharacterItem> Items { get; set; } = new();
     public List<CharacterHotbarSlot> Hotbar { get; set; } = new();
     public List<CharacterCooldown> Cooldowns { get; set; } = new();
+    public List<CharacterSpellUpgrade> SpellUpgrades { get; set; } = new();
 }
 
 /// <summary>Instancia de item (id de instancia NUNCA se reutiliza). container: 0 = bolsa, 1 = equipo.</summary>
@@ -54,6 +55,14 @@ public sealed class CharacterHotbarSlot
     public short Slot { get; set; }
     public short Kind { get; set; }
     public string Ref { get; set; } = "";
+}
+
+/// <summary>Mejora elegida para un hechizo (HU-104, ADR-027 D1): una por hechizo.</summary>
+public sealed class CharacterSpellUpgrade
+{
+    public Guid CharacterId { get; set; }
+    public string SpellId { get; set; } = "";
+    public string UpgradeId { get; set; } = "";
 }
 
 /// <summary>Cooldown que sigue corriendo al salir (HU-015). kind 0 = spell, 1 = item (plantilla de consumible).</summary>

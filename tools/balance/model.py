@@ -65,8 +65,9 @@ def aura_total(ch,a,target=TARGET):
     return None
 AOE_N=3
 PHYS_SHARE=1.0  # los monstruos del Tier 1 pegan físico  # objetivos secundarios agrupados
-def simulate(ch,loadout,SP,AU,T=30.0,dt=0.05,count_basic=True,heal_mode=False):
-    """Devuelve (main, secondary) daño o cura total en T s. loadout: ids por prioridad."""
+def simulate(ch,loadout,SP,AU,T=30.0,dt=0.05,count_basic=True,heal_mode=False,trace=None):
+    """Devuelve (main, secondary) daño o cura total en T s. loadout: ids por prioridad.
+    trace (lista, opcional): recibe (t, main+secondary acumulado, maná) en cada paso; lo usa tier2.py."""
     t=0; swing_t=0; cast=None; gcd=0; lock=0; cds={i:0 for i in loadout}
     energy=100.0; rage=0.0; mana=ch.maxMana; last_spend=-99
     main=0; sec=0; dots={}; buff=[0.0,0.0]  # [hasta, pct]  # (auraId,target)->[expiry,nexttick,per,tick,stacks]
@@ -153,6 +154,7 @@ def simulate(ch,loadout,SP,AU,T=30.0,dt=0.05,count_basic=True,heal_mode=False):
                 if ch.resource=='rage': rage=min(CB['resourceCap'],rage+CB['ragePerHitDealt'])
                 if ch.resource=='mana': mana=min(ch.maxMana,mana+ch.maxMana*CB['manaPerBasicHitPctPerSec']*ch.swing)
         t+=dt
+        if trace is not None: trace.append((t,main+sec,mana))
     return main,sec
 # ---- control y movilidad (analítico, por minuto)
 def cc_value(ch,s,AU):
@@ -189,12 +191,14 @@ def cc_value2(ch,s,AU):
     return val*(1+0.5*(n-1))
 def mob_value(ch,s,AU,base_speed=4.0):
     uses=60/max(s['cooldownMs']/1000,1.0); per=0
+    # el lanzador también recibe lo beneficioso de un área a su alrededor o de una línea que sale de él (HU-102)
+    own=s['targeting'] in('self','ally','self_aoe_allies') or (s['targeting'] in('ground_aoe_allies','ground_aoe_all') and s.get('shape')=='line')
     for e in s['effects']:
         if e['type']=='leap': per+=e['maxRange']
         if e['type']=='dash': per+=5.0
         if e['type']=='apply_aura':
             a=AU[e['auraId']]
-            if a['kind']=='stat_mod' and a.get('mods',{}).get('speedPct',0)>0 and (e.get('applyTo')=='self' or s['targeting'] in('self','ally')):
+            if a['kind']=='stat_mod' and a.get('mods',{}).get('speedPct',0)>0 and not a.get('isDebuff') and (e.get('applyTo')=='self' or own):
                 per+=a['mods']['speedPct']*base_speed*a['durationMs']/1000
             if a.get('removesKinds') and 'root' in a['removesKinds']: per+=2*base_speed  # ~2 s de control quitado
     return per*uses

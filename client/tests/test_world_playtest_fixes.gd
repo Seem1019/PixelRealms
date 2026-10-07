@@ -118,7 +118,8 @@ func test_aiming_highlights_who_the_area_would_hit() -> void:
 	_dispatch("EntitySpawn", {"id": 8, "kind": "monster", "templateId": "slime", "name": "Slime", "x": 160.0, "y": 115.2, "dir": "s", "level": 1, "hpPct": 100, "flags": 0})
 	await get_tree().process_frame
 	_world._use_slot(0)
-	_world._update_area_preview(Vector2(160, 160))  # radio 2,5 casillas = 40 px
+	_world._reticle.aim_pos = Vector2(160, 160)
+	_world._update_area_preview()  # radio 2,5 casillas = 40 px
 	assert_true((_world._remotes[7] as RemoteEntity).area_hint, "pies a 41,6 px pero el cuadro entra")
 	assert_false((_world._remotes[8] as RemoteEntity).area_hint)
 	_world._stop_aiming()

@@ -10,6 +10,7 @@ signal menu_requested  ## engranaje de arriba a la derecha (HU-015)
 
 const ERROR_SECONDS := 2.0
 const ERROR_FADE := 0.4
+const NOTICE_MAX_LINES := 3
 const FRAME_WIDTH := 132
 ## Marco propio: retrato de 22×22 y barras a su derecha; la XP va debajo de todo el marco.
 const PORTRAIT := 22
@@ -79,6 +80,7 @@ func _ready() -> void:
 	GameState.xp_changed.connect(_refresh_xp)
 	GameState.notice.connect(show_notice)
 	GameState.leveled_up.connect(func(_l: int, _n: Array, _r: Array) -> void: _refresh_hotbar())
+	GameState.spell_upgrades_changed.connect(_refresh_hotbar)
 	EventBus.ui_error.connect(_on_ui_error)
 	_refresh_self()
 	_refresh_hotbar()
@@ -346,8 +348,15 @@ func _refresh_xp() -> void:
 		_xp_frame.tooltip_text = "XP %d / %d" % [GameState.xp, GameState.xp_next]
 
 
+## Los avisos que llegan juntos (subir de nivel: nivel, hechizo nuevo, rangos) se apilan: se ven las últimas 3 líneas.
 func show_notice(text: String) -> void:
-	_notice_label.text = text
+	var lines: PackedStringArray = []
+	if _notice_until > 0.0 and not _notice_label.text.is_empty():
+		lines = _notice_label.text.split("\n")
+	lines.append(text)
+	if lines.size() > NOTICE_MAX_LINES:
+		lines = lines.slice(lines.size() - NOTICE_MAX_LINES)
+	_notice_label.text = "\n".join(lines)
 	_notice_until = Time.get_ticks_msec() / 1000.0 + 3.0
 
 
@@ -425,8 +434,9 @@ func _refresh_hotbar() -> void:
 		b.disabled = false
 		var ref := str(entry.get("ref", ""))
 		if str(entry.get("kind", "spell")) == "spell":
-			var spell := Content.spell(ref)
+			var spell := GameState.effective_spell(ref)  # HU-105: números con la mejora elegida
 			b.show_entry(UiTheme.icon(str(spell.get("icon", ""))), str(spell.get("name", ref)), -1, TooltipBuilder.build_spell(spell))
+			b.show_badge("!" if GameState.upgrade_pending(ref) else "")  # HU-105 CA2: mejora por elegir
 			var cost: Dictionary = spell.get("cost", {}) if spell.get("cost") != null else {}
 			var lacks := not cost.is_empty() and int(cost.get("amount", 0)) > GameState.resource
 			var out_of_range := in_range_check.is_valid() and not bool(in_range_check.call(spell))
@@ -442,7 +452,7 @@ func _refresh_hotbar() -> void:
 ## En combate, una casilla de hechizo ocupada no se toca: el servidor lo rechazaría (`in_combat`) y la copia local quedaría mal.
 func _assign_slot(slot: int, kind: String, ref: String) -> void:
 	if slot < int(Content.rule("loadout", "spellSlots", 4)) and not _slot_entry(slot).is_empty() and GameState.is_in_combat():
-		show_error(ApiMessages.text_for("in_combat"))
+		show_error("No puedes cambiar hechizos en combate")  # HU-103 CA3
 		return
 	for i: int in range(GameState.hotbar.size() - 1, -1, -1):
 		var hd: Dictionary = GameState.hotbar[i]
@@ -454,6 +464,7 @@ func _assign_slot(slot: int, kind: String, ref: String) -> void:
 		GameState.hotbar.append({"slot": slot, "kind": kind, "ref": ref})
 		Net.send("SetHotbar", {"slot": slot, "kind": kind, "ref": ref})
 	_refresh_hotbar()
+	GameState.hotbar_changed.emit()
 
 
 func _slot_entry(slot: int) -> Dictionary:
@@ -474,7 +485,7 @@ func _refresh_sweeps() -> void:
 		if not entry.is_empty() and str(entry.get("kind", "spell")) == "spell":
 			var spell_id := str(entry.get("ref", ""))
 			var cd := GameState.cooldown_remaining_ms(spell_id)
-			var spell := Content.spell(spell_id)
+			var spell := GameState.effective_spell(spell_id)
 			var total := int(spell.get("cooldownMs", 0))
 			if cd > 0 and total > 0:
 				frac = float(cd) / float(total)
@@ -723,6 +734,11 @@ class HotSlot extends Button:
 			_count.text = str(count) if count >= 0 else ""
 		tooltip_bbcode = bbcode
 		tooltip_text = name_text  # Godot solo pide el tooltip propio si hay texto
+
+	## Marca en la esquina de la casilla (la de la cantidad, que en un hechizo está libre): "!" = mejora por elegir.
+	func show_badge(text: String) -> void:
+		if _count != null:
+			_count.text = text
 
 	func icon_texture() -> Texture2D:
 		return _icon.texture if _icon != null else null

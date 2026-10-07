@@ -42,6 +42,7 @@ public static class MessageRegistry
         Register<PartyLeave>("PartyLeave");
         Register<PartyKick>("PartyKick");
         Register<SetHotbar>("SetHotbar");
+        Register<ChooseSpellUpgrade>("ChooseSpellUpgrade");
         Register<Respawn>("Respawn");
         Register<UsePortal>("UsePortal");
         Register<DuelRequest>("DuelRequest");
@@ -66,6 +67,8 @@ public static class MessageRegistry
         RegisterServer<EntityDespawn>("EntityDespawn");
         RegisterServer<CastStarted>("CastStarted");
         RegisterServer<CastEnded>("CastEnded");
+        RegisterServer<AreaSpawn>("AreaSpawn");
+        RegisterServer<AreaDespawn>("AreaDespawn");
         RegisterServer<CombatEvents>("CombatEvents");
         RegisterServer<AuraApplied>("AuraApplied");
         RegisterServer<AuraRemoved>("AuraRemoved");
@@ -73,6 +76,7 @@ public static class MessageRegistry
         RegisterServer<StatsUpdate>("StatsUpdate");
         RegisterServer<XpGain>("XpGain");
         RegisterServer<LevelUp>("LevelUp");
+        RegisterServer<SpellUpgradesUpdate>("SpellUpgradesUpdate");
         RegisterServer<InventoryUpdate>("InventoryUpdate");
         RegisterServer<LootWindow>("LootWindow");
         RegisterServer<ChangeMap>("ChangeMap");

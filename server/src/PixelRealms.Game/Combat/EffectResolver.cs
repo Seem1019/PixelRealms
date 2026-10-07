@@ -18,14 +18,20 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
     /// <summary>Lo fija la composición: el efecto `interrupt` corta casteos.</summary>
     public CastSystem? Casts { get; set; }
 
-    public void Apply(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, Vec2 origin, MapInstance map, TickContext ctx)
+    /// <summary>Lo fija la composición: el efecto `summon` (HU-116).</summary>
+    public Ai.SummonSystem? Summons { get; set; }
+
+    /// <param name="pulse">Pulso de un área duradera (HU-100): solo los efectos sobre los objetivos; los del lanzamiento (sobre uno
+    /// mismo, invocaciones, desplazamientos) ya se aplicaron una vez con <see cref="ApplyCastOnly"/>.</param>
+    public void Apply(Actor caster, SpellDef spell, EntityId? targetId, Vec2? targetPos, Vec2 origin, MapInstance map, TickContext ctx, bool pulse = false)
     {
         var rules = ctx.Rules.Combat;
         var grid = map.Collision;
 
         // Desplazamientos primero: lo demás se resuelve en el punto de llegada (ADR-016).
-        foreach (var e in spell.Effects)
+        for (var k = 0; k < spell.Effects.Count && !pulse; k++)
         {
+            var e = spell.Effects[k];
             if (e.Type == EffectType.Leap && targetPos is { } tp)
             {
                 var dest = ForcedMovement.LeapDestination(caster.Position, tp, e.MaxRange > 0 ? e.MaxRange : spell.Range, grid);
@@ -46,16 +52,15 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
         var casterStats = services.StatsOf(caster);
         var hasDamage = false;
         var hasNegative = false;
-        foreach (var e in spell.Effects)
+        for (var k = 0; k < spell.Effects.Count; k++)
         {
+            var e = spell.Effects[k];
             if (e.ApplyTo == ApplyTo.Self) continue;
             if (e.Type == EffectType.Damage) hasDamage = true;
             if (IsNegative(e)) hasNegative = true;
         }
 
-        // Efectos sobre uno mismo: una vez por lanzamiento, sin tirada.
-        foreach (var e in spell.Effects)
-            if (e.ApplyTo == ApplyTo.Self) ApplyEffect(e, caster, caster, spell, casterStats, crit: false, map, ctx);
+        if (!pulse) ApplySelfAndSummons(caster, spell, casterStats, map, ctx);
 
         var hitAny = false;
         foreach (var target in list)
@@ -72,10 +77,11 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
                 crit = outcome == HitOutcome.Crit;
                 hitAny = true;
             }
-            foreach (var e in spell.Effects)
+            for (var k = 0; k < spell.Effects.Count; k++)
             {
+                var e = spell.Effects[k];
                 if (e.ApplyTo == ApplyTo.Self) continue;
-                if (e.Type is EffectType.Leap or EffectType.Dash) continue;
+                if (e.Type is EffectType.Leap or EffectType.Dash or EffectType.Summon) continue;
                 // ground_aoe_all: positivos a aliados, negativos a enemigos; nadie recibe ambos.
                 if (spell.Targeting == Targeting.GroundAoeAll && IsNegative(e) != isEnemy) continue;
                 if (target.IsDead) break;
@@ -88,6 +94,21 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
 
         // Una habilidad que impacta sin hacer daño (Provocar, el aturdimiento de Carga) también da ira (HU-039 CA2).
         if (hitAny && !hasDamage) damage.GrantRage(caster, rules.RagePerHitDealt, ctx);
+    }
+
+    /// <summary>HU-100: lo que un área duradera hace una sola vez al lanzarse (efectos sobre uno mismo e invocaciones).</summary>
+    public void ApplyCastOnly(Actor caster, SpellDef spell, MapInstance map, TickContext ctx) =>
+        ApplySelfAndSummons(caster, spell, services.StatsOf(caster), map, ctx);
+
+    /// <summary>Efectos sobre uno mismo e invocaciones (HU-116): una vez por lanzamiento, sin tirada.</summary>
+    private void ApplySelfAndSummons(Actor caster, SpellDef spell, Progression.DerivedStats casterStats, MapInstance map, TickContext ctx)
+    {
+        for (var k = 0; k < spell.Effects.Count; k++)
+        {
+            var e = spell.Effects[k];
+            if (e.Type == EffectType.Summon) { if (caster is Monster invoker) Summons?.Summon(invoker, e, map, ctx); }
+            else if (e.ApplyTo == ApplyTo.Self) ApplyEffect(e, caster, caster, spell, casterStats, crit: false, map, ctx);
+        }
     }
 
     /// <summary>Efecto perjudicial: daño, control/perjuicio, interrupción, provocación. Positivo: cura, recurso, beneficio.</summary>
@@ -137,7 +158,8 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
                 if (target is Player rp && (e.Resource is null || services.ResourceOf(rp) == e.Resource)) damage.AddResource(rp, e.Amount, ctx);
                 break;
             case EffectType.ApplyAura:
-                if (e.AuraId is not null) auras.Apply(target, services.Content.Aura(e.AuraId), caster, map, ctx, spell.Id);
+                // HU-104: una mejora puede traer el aura con otra duración o potencia (mismo id).
+                if (e.AuraId is not null) auras.Apply(target, e.AuraOverride ?? services.Content.Aura(e.AuraId), caster, map, ctx, spell.Id);
                 break;
             case EffectType.Taunt:
                 if (target is Monster m && !m.Combat.Evading) m.Threat.Taunt(caster.Id, ctx.NowMs, e.DurationMs, rules.TauntThreatBonus);

@@ -87,8 +87,8 @@
           },
           "speed": {
             "type": "number",
-            "minimum": 0.5,
-            "description": "tiles/s"
+            "minimum": 0,
+            "description": "tiles/s; 0 = inmóvil (planta trampa): ni patrulla ni persigue, solo ataca a quien entra en su attackRange"
           },
           "lootTableId": {
             "$ref": "common.schema.json#/$defs/id"

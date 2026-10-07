@@ -1,0 +1,691 @@
+{
+  "_doc": "HU-105: casos de SpellUpgrades.Apply (servidor) y spell_upgrades.gd (cliente). Cada caso trae el hechizo (copia del contenido de cuando se generó, con dos mejoras), las auras que usa y lo esperado al aplicar `upgradeId`. Valor final = valor · mult + add; enteros redondeando la mitad hacia arriba. El cliente usa una copia en client/tests/vectors/.",
+  "cases": [
+    {
+      "name": "casteo y coste (redondeo a la mitad hacia arriba)",
+      "spell": {
+        "id": "mage_fireball",
+        "name": "Bola de fuego",
+        "source": "class",
+        "classId": "mage",
+        "levelReq": 1,
+        "school": "magic",
+        "castMs": 2000,
+        "cooldownMs": 0,
+        "cost": {
+          "resource": "mana",
+          "amount": 8
+        },
+        "range": 8,
+        "targeting": "enemy",
+        "projectile": {
+          "sprite": "vfx/fireball",
+          "speed": 12
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "base": 7,
+            "spCoef": 0.3
+          }
+        ],
+        "icon": "spells/fireball",
+        "description": "Lanza una bola de fuego.",
+        "provisional": false,
+        "upgrades": [
+          {
+            "id": "u_quick",
+            "name": "Rápida",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "castMs",
+                "mult": 0.75
+              },
+              {
+                "stat": "cost",
+                "mult": 0.3125
+              }
+            ]
+          },
+          {
+            "id": "u_quick_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_quick",
+      "auras": [],
+      "expected": {
+        "castMs": 1500,
+        "cooldownMs": 0,
+        "range": 8,
+        "aoeRadius": 0,
+        "aoeAngleDeg": 0,
+        "aoeLength": 0,
+        "aoeWidth": 0,
+        "maxTargets": 10,
+        "cost": 3,
+        "effects": [
+          {
+            "type": "damage",
+            "base": 7,
+            "spCoef": 0.3
+          }
+        ],
+        "auras": {}
+      }
+    },
+    {
+      "name": "potencia del daño",
+      "spell": {
+        "id": "mage_fireball",
+        "name": "Bola de fuego",
+        "source": "class",
+        "classId": "mage",
+        "levelReq": 1,
+        "school": "magic",
+        "castMs": 2000,
+        "cooldownMs": 0,
+        "cost": {
+          "resource": "mana",
+          "amount": 8
+        },
+        "range": 8,
+        "targeting": "enemy",
+        "projectile": {
+          "sprite": "vfx/fireball",
+          "speed": 12
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "base": 7,
+            "spCoef": 0.3
+          }
+        ],
+        "icon": "spells/fireball",
+        "description": "Lanza una bola de fuego.",
+        "provisional": false,
+        "upgrades": [
+          {
+            "id": "u_hot",
+            "name": "Intensa",
+            "description": "x",
+            "mods": [
+              {
+                "effect": "damage",
+                "mult": 1.2
+              }
+            ]
+          },
+          {
+            "id": "u_hot_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_hot",
+      "auras": [],
+      "expected": {
+        "castMs": 2000,
+        "cooldownMs": 0,
+        "range": 8,
+        "aoeRadius": 0,
+        "aoeAngleDeg": 0,
+        "aoeLength": 0,
+        "aoeWidth": 0,
+        "maxTargets": 10,
+        "cost": 8,
+        "effects": [
+          {
+            "type": "damage",
+            "base": 8.4,
+            "spCoef": 0.36
+          }
+        ],
+        "auras": {}
+      }
+    },
+    {
+      "name": "duración y porcentaje de un aura",
+      "spell": {
+        "id": "mage_frostbolt",
+        "name": "Descarga de escarcha",
+        "source": "class",
+        "classId": "mage",
+        "levelReq": 2,
+        "school": "magic",
+        "castMs": 1800,
+        "cooldownMs": 12000,
+        "cost": {
+          "resource": "mana",
+          "amount": 8
+        },
+        "range": 8,
+        "targeting": "enemy",
+        "projectile": {
+          "sprite": "vfx/frostbolt",
+          "speed": 10
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "base": 5,
+            "spCoef": 0.3
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "mage_chill"
+          }
+        ],
+        "icon": "spells/frostbolt",
+        "description": "Daño mágico que ralentiza un 40 % durante 4 s.",
+        "provisional": false,
+        "upgrades": [
+          {
+            "id": "u_long",
+            "name": "Larga",
+            "description": "x",
+            "mods": [
+              {
+                "aura": "mage_chill",
+                "stat": "durationMs",
+                "add": 2000
+              },
+              {
+                "aura": "mage_chill",
+                "stat": "pct",
+                "add": -0.1
+              }
+            ]
+          },
+          {
+            "id": "u_long_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_long",
+      "auras": [
+        {
+          "id": "mage_chill",
+          "name": "Helado",
+          "kind": "slow",
+          "isDebuff": true,
+          "durationMs": 4000,
+          "pct": 0.4,
+          "icon": "spells/frostbolt"
+        }
+      ],
+      "expected": {
+        "castMs": 1800,
+        "cooldownMs": 12000,
+        "range": 8,
+        "aoeRadius": 0,
+        "aoeAngleDeg": 0,
+        "aoeLength": 0,
+        "aoeWidth": 0,
+        "maxTargets": 10,
+        "cost": 8,
+        "effects": [
+          {
+            "type": "damage",
+            "base": 5,
+            "spCoef": 0.3
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "mage_chill"
+          }
+        ],
+        "auras": {
+          "mage_chill": {
+            "durationMs": 6000,
+            "pct": 0.30000000000000004,
+            "base": 0.0,
+            "spCoef": 0.0
+          }
+        }
+      }
+    },
+    {
+      "name": "efecto añadido",
+      "spell": {
+        "id": "mage_frostbolt",
+        "name": "Descarga de escarcha",
+        "source": "class",
+        "classId": "mage",
+        "levelReq": 2,
+        "school": "magic",
+        "castMs": 1800,
+        "cooldownMs": 12000,
+        "cost": {
+          "resource": "mana",
+          "amount": 8
+        },
+        "range": 8,
+        "targeting": "enemy",
+        "projectile": {
+          "sprite": "vfx/frostbolt",
+          "speed": 10
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "base": 5,
+            "spCoef": 0.3
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "mage_chill"
+          }
+        ],
+        "icon": "spells/frostbolt",
+        "description": "Daño mágico que ralentiza un 40 % durante 4 s.",
+        "provisional": false,
+        "upgrades": [
+          {
+            "id": "u_root",
+            "name": "Atrapa",
+            "description": "x",
+            "mods": [
+              {
+                "addEffect": {
+                  "type": "apply_aura",
+                  "auraId": "mage_frost_nova_root"
+                }
+              }
+            ]
+          },
+          {
+            "id": "u_root_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_root",
+      "auras": [
+        {
+          "id": "mage_chill",
+          "name": "Helado",
+          "kind": "slow",
+          "isDebuff": true,
+          "durationMs": 4000,
+          "pct": 0.4,
+          "icon": "spells/frostbolt"
+        },
+        {
+          "id": "mage_frost_nova_root",
+          "name": "Congelado",
+          "kind": "root",
+          "isDebuff": true,
+          "durationMs": 3000,
+          "icon": "spells/frost_nova",
+          "provisional": false
+        }
+      ],
+      "expected": {
+        "castMs": 1800,
+        "cooldownMs": 12000,
+        "range": 8,
+        "aoeRadius": 0,
+        "aoeAngleDeg": 0,
+        "aoeLength": 0,
+        "aoeWidth": 0,
+        "maxTargets": 10,
+        "cost": 8,
+        "effects": [
+          {
+            "type": "damage",
+            "base": 5,
+            "spCoef": 0.3
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "mage_chill"
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "mage_frost_nova_root"
+          }
+        ],
+        "auras": {}
+      }
+    },
+    {
+      "name": "apertura del cono y recarga",
+      "spell": {
+        "id": "warrior_cleave",
+        "name": "Tajo amplio",
+        "source": "class",
+        "classId": "warrior",
+        "levelReq": 9,
+        "school": "physical",
+        "castMs": 0,
+        "cooldownMs": 6000,
+        "cost": {
+          "resource": "rage",
+          "amount": 15
+        },
+        "range": 2.5,
+        "targeting": "ground_aoe_enemies",
+        "shape": "cone",
+        "aoeRadius": 2.5,
+        "aoeAngleDeg": 90,
+        "maxTargets": 5,
+        "effects": [
+          {
+            "type": "damage",
+            "base": 1.75,
+            "apCoef": 0.1,
+            "weaponPct": 0.21
+          }
+        ],
+        "icon": "spells/cleave",
+        "description": "Un tajo en cono hacia donde apuntas.",
+        "provisional": true,
+        "upgrades": [
+          {
+            "id": "u_wide",
+            "name": "Abierto",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "aoeAngleDeg",
+                "add": 30
+              },
+              {
+                "stat": "cooldownMs",
+                "mult": 2
+              }
+            ]
+          },
+          {
+            "id": "u_wide_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_wide",
+      "auras": [],
+      "expected": {
+        "castMs": 0,
+        "cooldownMs": 12000,
+        "range": 2.5,
+        "aoeRadius": 2.5,
+        "aoeAngleDeg": 120.0,
+        "aoeLength": 0,
+        "aoeWidth": 0,
+        "maxTargets": 5,
+        "cost": 15,
+        "effects": [
+          {
+            "type": "damage",
+            "base": 1.75,
+            "apCoef": 0.1,
+            "weaponPct": 0.21
+          }
+        ],
+        "auras": {}
+      }
+    },
+    {
+      "name": "línea, objetivos por defecto y alcance",
+      "spell": {
+        "id": "priest_path_of_light",
+        "name": "Sendero de luz",
+        "source": "class",
+        "classId": "priest",
+        "levelReq": 9,
+        "school": "magic",
+        "castMs": 0,
+        "cooldownMs": 15000,
+        "cost": {
+          "resource": "mana",
+          "amount": 10
+        },
+        "range": 8,
+        "targeting": "ground_aoe_all",
+        "shape": "line",
+        "aoeLength": 8,
+        "aoeWidth": 1.5,
+        "maxTargets": 8,
+        "effects": [
+          {
+            "type": "heal",
+            "base": 1.8,
+            "spCoef": 0.06
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "priest_path_speed"
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "priest_path_slow"
+          }
+        ],
+        "icon": "spells/path_of_light",
+        "description": "Una línea de luz: aliados más rápidos y una cura pequeña; enemigos ralentizados.",
+        "provisional": true,
+        "upgrades": [
+          {
+            "id": "u_far",
+            "name": "Lejos",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "aoeLength",
+                "add": 2.5
+              },
+              {
+                "stat": "aoeWidth",
+                "mult": 1.5
+              },
+              {
+                "stat": "maxTargets",
+                "add": 2
+              },
+              {
+                "stat": "range",
+                "add": 1
+              }
+            ]
+          },
+          {
+            "id": "u_far_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_far",
+      "auras": [
+        {
+          "id": "priest_path_slow",
+          "name": "Cegado",
+          "kind": "slow",
+          "isDebuff": true,
+          "durationMs": 3000,
+          "pct": 0.3,
+          "icon": "spells/path_of_light",
+          "provisional": true
+        },
+        {
+          "id": "priest_path_speed",
+          "name": "Sendero de luz",
+          "kind": "stat_mod",
+          "isDebuff": false,
+          "durationMs": 4000,
+          "mods": {
+            "speedPct": 0.3
+          },
+          "icon": "spells/path_of_light",
+          "provisional": true
+        }
+      ],
+      "expected": {
+        "castMs": 0,
+        "cooldownMs": 15000,
+        "range": 9.0,
+        "aoeRadius": 0,
+        "aoeAngleDeg": 0,
+        "aoeLength": 10.5,
+        "aoeWidth": 2.25,
+        "maxTargets": 10,
+        "cost": 10,
+        "effects": [
+          {
+            "type": "heal",
+            "base": 1.8,
+            "spCoef": 0.06
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "priest_path_speed"
+          },
+          {
+            "type": "apply_aura",
+            "auraId": "priest_path_slow"
+          }
+        ],
+        "auras": {}
+      }
+    },
+    {
+      "name": "cantidad de un aura (base y coeficientes)",
+      "spell": {
+        "id": "priest_renew",
+        "name": "Renovar",
+        "source": "class",
+        "classId": "priest",
+        "levelReq": 7,
+        "school": "magic",
+        "castMs": 0,
+        "cooldownMs": 3000,
+        "cost": {
+          "resource": "mana",
+          "amount": 8
+        },
+        "range": 8,
+        "targeting": "ally",
+        "effects": [
+          {
+            "type": "apply_aura",
+            "auraId": "priest_renew_hot"
+          }
+        ],
+        "icon": "spells/renew",
+        "description": "Cura poco a poco durante 12 s.",
+        "provisional": true,
+        "upgrades": [
+          {
+            "id": "u_more",
+            "name": "Más",
+            "description": "x",
+            "mods": [
+              {
+                "aura": "priest_renew_hot",
+                "stat": "amount",
+                "mult": 1.25
+              }
+            ]
+          },
+          {
+            "id": "u_more_other",
+            "name": "Otra",
+            "description": "x",
+            "mods": [
+              {
+                "stat": "range",
+                "add": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "upgradeId": "u_more",
+      "auras": [
+        {
+          "id": "priest_renew_hot",
+          "name": "Renovar",
+          "kind": "hot",
+          "isDebuff": false,
+          "school": "magic",
+          "durationMs": 12000,
+          "tickMs": 3000,
+          "base": 2.4,
+          "spCoef": 0.07,
+          "icon": "spells/renew"
+        }
+      ],
+      "expected": {
+        "castMs": 0,
+        "cooldownMs": 3000,
+        "range": 8,
+        "aoeRadius": 0,
+        "aoeAngleDeg": 0,
+        "aoeLength": 0,
+        "aoeWidth": 0,
+        "maxTargets": 10,
+        "cost": 8,
+        "effects": [
+          {
+            "type": "apply_aura",
+            "auraId": "priest_renew_hot"
+          }
+        ],
+        "auras": {
+          "priest_renew_hot": {
+            "durationMs": 12000,
+            "pct": 0.0,
+            "base": 3.0,
+            "spCoef": 0.08750000000000001
+          }
+        }
+      }
+    }
+  ]
+}

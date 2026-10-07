@@ -25,8 +25,11 @@ aquí se citan los valores por defecto para poder leer las fórmulas. Cambio de 
   él), y un punto apuntado dentro de una casilla que tapa la vista se rechaza con `no_los`.
 - Sin fuego amigo. `maxTargets` elige los más cercanos al centro del área (distancia al cuadro del cuerpo).
 - **Formas** (`shape`): `circle` (`aoeRadius`), `cone` (`aoeRadius` + `aoeAngleDeg`) y `line` (`aoeLength` + `aoeWidth`); el
-  cono y la línea salen del lanzador en la dirección de `targetPos`. Las tres están en el schema; el círculo se implementa en
-  la Fase 1 (HU-086) y el cono y la línea cuando un hechizo los use (hasta entonces, los hechizos que los usan quedan **no disponibles**: ver §Contenido no disponible).
+  cono y la línea salen del lanzador (su posición al empezar el casteo) en la dirección de `targetPos`, que solo da la
+  dirección: no hace falta línea de visión al punto, y sin punto (o con el punto sobre sus pies) usan hacia dónde mira. La
+  línea se corta en la primera casilla que tapa la vista. Alcanzan a quien tenga el cuadro del cuerpo dentro, como el círculo,
+  con LOS del vértice u origen a los pies. Círculo desde HU-086; cono y línea desde HU-102. Las áreas de daño llevan casteo
+  salvo los conos de radio ≤ `instantConeMaxRadiusTiles` (ADR-027 D4).
 - **Salto a un punto** (efecto `leap`: `maxRange`, `travelMs`; `travelMs = 0` = teletransporte; HU-087): el lanzador va hasta
   `targetPos`, recortado a la última casilla libre con LOS dentro de `maxRange`. Lo mueve el servidor; el cliente no lo
   predice y suaviza la posición recibida (~100 ms). `root` y `stun` impiden saltar y cargar (decisión 2026-10-03: enraizado no se mueve, tampoco con Carga). Los efectos del mismo hechizo que van
@@ -153,7 +156,11 @@ Físico: `miss 5 %` (+1 % por nivel del objetivo sobre el atacante) → `dodge` 
 
 ## Rendimiento (ADR-018)
 Áreas: se buscan con la rejilla AOI de la instancia y pruebas de forma sin raíces ni trigonometría; las instantáneas se
-evalúan una vez al resolverse; solo interactúan con entidades. Límites en `rules.limits`; eventos de combate agrupados por
+evalúan una vez al resolverse; solo interactúan con entidades. **Áreas duraderas (HU-100):** un hechizo de área con
+`areaDurationMs` deja el área en el suelo con la forma fijada al resolverse y aplica sus efectos cada
+`rules.limits.persistentAreaTickMs` (500 ms; el primer pulso, un intervalo después de aparecer, para que dé tiempo a salir).
+Como mucho `maxPersistentAreasPerCaster` (2) por lanzador (la tercera quita la más antigua) y cuentan para
+`maxAreasPerInstance`; se van al caducar o si su lanzador muere, evade o deja el mapa. Límites en `rules.limits`; eventos de combate agrupados por
 tick (`CombatEvents`). Detalle y umbrales de verificación en ADR-018.
 
 ## Auras (`content/auras.json`)
@@ -200,6 +207,17 @@ cada 500 ms) → `Attack` (en rango; usa `spells[]` listos según su `cooldownMs
 `Evade` si se aleja > `leashRange`: vuelve inmune, se cura al 100 %, resetea amenaza. Respawn tras `respawnSec`.
 Los duelistas no generan aggro ni amenaza mientras dura el duelo; la zona del duelo (§Muerte y reaparición) impide usarlo para
 cruzar el mapa ignorados por los monstruos.
+- Un monstruo solo lanza sus hechizos en `Attack`, es decir, con el objetivo a ≤ `attackRange`: un hechizo a distancia necesita
+  un monstruo a distancia. Las áreas se lanzan en el punto del objetivo (`target: current`) o en el del propio monstruo
+  (`target: self`, marca centrada en él).
+- **Inmóvil (`speed: 0`, HU-109):** funciona sin código aparte. No patrulla ni persigue (pasa a `Chase`, pero sus pasos son de
+  0 casillas); ataca y lanza hechizos a quien está a ≤ `attackRange`. Como no se aleja del spawn, la correa no lo hace evadir:
+  olvida al objetivo (sin curarse) cuando este pasa de 2 × `leashRange`, y evade al instante, curándose, si el A* hacia él
+  falla. Su `attackRange` debe cubrir el alcance de los jugadores (8) para que no se le mate gratis desde lejos.
+- **Invocaciones (`summon`, HU-116):** solo hechizos de monstruo. Salen en casillas libres a 1,5–2,5 del invocador con su
+  tabla de amenaza (entran persiguiendo) y sin spawn (no reaparecen); topes `rules.limits.maxSummonsPerCaster` (4) y
+  `maxSummonsPerInstance` (32). Se van sin cadáver al morir o evadir, o si su invocador muere, evade, se queda sin amenaza o
+  deja el mapa. No dan XP ni botín.
 
 ## Recursos
 - Ira: `+ragePerHitDealt` por golpe/habilidad propia que impacta, `+ragePerHitTaken` por golpe recibido,

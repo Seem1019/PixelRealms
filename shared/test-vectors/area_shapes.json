@@ -1,0 +1,35 @@
+{
+  "_doc": "HU-102: casos de AreaShape.cs (servidor) y area_geometry.gd (cliente, vista previa al apuntar). Unidades en casillas; 'dir' sin normalizar (los dos lados la normalizan). 'hit': si el área toca el cuadro del cuerpo con los pies en 'feet'. 'clear': LineOfSight.ClearDistance con 'walls' que tapan la vista en un mapa de 30x30. El cliente usa una copia en client/tests/vectors/.",
+  "body": { "halfWidth": 0.375, "above": 0.75, "below": 0.25 },
+  "cases": [
+    { "name": "cono: delante", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [12, 10], "hit": true },
+    { "name": "cono: detrás", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [8, 10], "hit": false },
+    { "name": "cono: al lado, fuera de la apertura", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [10, 12.4], "hit": false },
+    { "name": "cono: pies fuera del ángulo, cuadro dentro", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [11.5, 11.9], "hit": true },
+    { "name": "cono: ni el cuadro entra", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [11.5, 12.6], "hit": false },
+    { "name": "cono: radio al lado más cercano del cuadro", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [12.85, 10], "hit": true },
+    { "name": "cono: justo fuera del radio", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 90, "feet": [12.9, 10], "hit": false },
+    { "name": "cono de 180: al lado por abajo", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 3, "angleDeg": 180, "feet": [10.2, 12], "hit": true },
+    { "name": "cono de 180: detrás", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 3, "angleDeg": 180, "feet": [9, 10], "hit": false },
+    { "name": "cono: el vértice dentro del cuadro", "shape": "cone", "origin": [10, 10], "dir": [1, 0], "radius": 2.5, "angleDeg": 50, "feet": [10.1, 10.5], "hit": true },
+    { "name": "cono en diagonal (cuchillas)", "shape": "cone", "origin": [10, 10], "dir": [-1, -1], "radius": 4, "angleDeg": 50, "feet": [7.6, 7.9], "hit": true },
+    { "name": "cono en diagonal: fuera de la apertura", "shape": "cone", "origin": [10, 10], "dir": [-1, -1], "radius": 4, "angleDeg": 50, "feet": [10, 7], "hit": false },
+    { "name": "línea: dentro", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [17, 10], "hit": true },
+    { "name": "línea: el cuadro entra por el final", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [18.3, 10], "hit": true },
+    { "name": "línea: pasado el final", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [18.6, 10], "hit": false },
+    { "name": "línea: a un lado, el cuadro entra", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [14, 11], "hit": true },
+    { "name": "línea: a un lado, fuera", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [14, 11.6], "hit": false },
+    { "name": "línea: por encima, fuera", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [14, 8.9], "hit": false },
+    { "name": "línea: detrás del origen", "shape": "line", "origin": [10, 10], "dir": [1, 0], "length": 8, "width": 1.5, "feet": [9, 10], "hit": false },
+    { "name": "línea en diagonal: sobre el eje", "shape": "line", "origin": [10, 10], "dir": [1, 1], "length": 8, "width": 1.5, "feet": [13.5, 13.5], "hit": true },
+    { "name": "línea en diagonal: lejos del eje", "shape": "line", "origin": [10, 10], "dir": [1, 1], "length": 8, "width": 1.5, "feet": [15, 12], "hit": false }
+  ],
+  "clear": [
+    { "name": "sin paredes", "walls": [], "from": [10.5, 10.5], "dir": [1, 0], "max": 8, "expected": 8 },
+    { "name": "pared en el camino", "walls": [[14, 10]], "from": [10.5, 10.5], "dir": [1, 0], "max": 8, "expected": 3.5 },
+    { "name": "diagonal: casilla vecina por la que no pasa", "walls": [[12, 11]], "from": [10.5, 10.2], "dir": [1, 0.3], "max": 8, "expected": 8 },
+    { "name": "diagonal: primera casilla que cruza", "walls": [[13, 11]], "from": [10.5, 10.2], "dir": [1, 0.3], "max": 8, "expected": 2.784 },
+    { "name": "hacia el norte", "walls": [[10, 6]], "from": [10.5, 10.5], "dir": [0, -1], "max": 8, "expected": 3.5 },
+    { "name": "borde del mapa", "walls": [], "from": [2.5, 10.5], "dir": [-1, 0], "max": 8, "expected": 2.5 }
+  ]
+}

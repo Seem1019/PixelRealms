@@ -377,7 +377,7 @@
 
 ### HU-100 · Áreas duraderas (Fase 2)
 **Como** jugador **quiero** hechizos que dejan un área en el suelo durante un rato **para** controlar zonas en las peleas de grupo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-086, HU-088
 - Skills: `combat-system`, `game-content`
 
@@ -392,11 +392,19 @@
 - 2026-10-06 (backlog de la Fase 2): el primero son las Esporas del Árbol Podrido (HU-117); por eso pasa a Must. Ningún hechizo
   de clase de la Fase 2 la usa (Campo ardiente es instantáneo).
 
+**Notas de implementación**
+- Contenido: `areaDurationMs` en el hechizo (schema y validador: solo áreas, no saltos, al menos un pulso). Ningún hechizo del contenido la usa aún: la primera serán las Esporas del Árbol Podrido (HU-117).
+- `CastSystem`: al resolver un área con duración crea una `PersistentArea` (record struct) en `MapInstance.PersistentAreas`, lista con la capacidad de `maxAreasPerInstance` reservada una vez; `PulseAreas` aplica los efectos cada `persistentAreaTickMs` con la forma fijada (cada área a su ritmo desde que apareció, así quedan repartidas entre ticks), el primer pulso un intervalo después de aparecer. Tope por lanzador (la tercera quita la más antigua) y por instancia (cuentan en `ActiveAreas` y en `area_limit`, también las instantáneas); se van al caducar o si el lanzador muere, evade o deja el mapa. Las áreas nunca interactúan entre sí.
+- `EffectResolver.Apply` recorre los efectos por índice: el `foreach` sobre `IReadOnlyList` creaba un enumerador por lanzamiento (y por pulso).
+- Red: `AreaSpawn`/`AreaDespawn` a todos los de la instancia y, a quien entra o reconecta, las que ya están (como `MapObjects`); nada por tick. Cliente: marca duradera en `AoeReticle` (clave negativa) con la forma del hechizo, roja si el lanzador es hostil o no se ve.
+- Tests: `PersistentAreaTests` (6: pulsos, salir a tiempo, tope por lanzador e instancia, muerte del lanzador, 0 bytes por tick con un área vacía), `PersistentAreaNetTests`, validador (3 casos), `EnvelopeTests`, GUT `test_directional_areas.gd`.
+- 2026-10-07 (revisión de autoridad, todo latente porque ningún contenido usa aún áreas duraderas): las áreas de un lanzador se quitan en el momento de su muerte (`DeathSystem.OnActorKilled` → `CastSystem.DropAreasOf`; antes, si reaparecía antes del pulso, seguían) y si es un monstruo que se queda sin amenaza; los pulsos solo aplican los efectos sobre los objetivos (`EffectResolver.Apply(pulse: true)`) y lo del lanzamiento (sobre uno mismo, invocaciones) va una vez (`ApplyCastOnly`); el `targetId` del cliente no cuenta en un hechizo de área; `area_limit` no impide sustituir la propia área; el validador prohíbe salto, carga, invocación y proyectil en un área duradera, también por una mejora. Tests: `PersistentAreaTests` (+4), validador (+1).
+
 ---
 
 ### HU-102 · Formas de área: cono y línea
 **Como** jugador **quiero** hechizos de área en cono delante de mí y en línea hacia donde apunto **para** usar Tajo amplio, Cuchillas arrojadizas y Sendero de luz.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-086, HU-096
 - Skills: `combat-system`, `net-protocol`, `godot-client`
 
@@ -414,11 +422,19 @@
 - `CastStarted` ya lleva `targetPos`; si el cliente no puede deducir el origen con precisión (el lanzador se mueve), gana un `origin` opcional (cambio aditivo, sin subir `ProtocolVersion`).
 - Cono de frío (nivel 11) queda disponible para la Fase 3 sin más trabajo.
 
+**Notas de implementación**
+- Servidor: `AreaShape` (struct puro) prueba si el círculo, el cono (cuadro recortado por los dos semiplanos de la cuña, Sutherland-Hodgman en `stackalloc`) o la línea (ejes separadores) tocan el cuadro del cuerpo; `TargetResolver.ShapeOf` la coloca y `LineOfSight.ClearDistance` (Amanatides-Woo) corta la línea en la primera casilla que tapa la vista. LOS del vértice u origen a los pies de cada candidato.
+- `CastSystem`: en cono y línea el punto solo da la dirección (sin LOS al punto); al empezar se fija un punto canónico `origen + dirección · alcance` (hacia donde mira si el punto está a menos de un píxel) que viaja en `CastStarted` junto con `origin` (nuevo, aditivo). Monstruos: apuntan a su objetivo al empezar.
+- Revisión de autoridad: un `self_aoe` con cono aceptaba un punto enorme que convertía el cono en círculo (ahora `invalid_payload` fuera del mapa) y la dirección de un cono con casteo seguía al facing hasta el final (ahora fija). Un `self_aoe` circular ya no reenvía el punto del cliente. El validador da error, no aviso, si un área de daño sin casteo (fuera de los conos ≤ `rules.combat.instantConeMaxRadiusTiles`, ADR-027 D4) ya se alcanza en la fase activa: las Cuchillas arrojadizas bloquearán abrir la Fase 2 hasta HU-106.
+- Cliente: `AreaGeometry` (traducción de `AreaShape` y `ClearDistance`), vista previa del cono y la línea desde el jugador hacia el cursor (`AoeReticle`, `BodyShape.shape_hits`), punto enviado acercado al alcance, marcas ajenas desde `CastStarted.origin` y estallidos con la apertura y el largo reales (`VfxCatalog.area_points`).
+- Tests: `AreaShapeTests` (19), `AreaShapeVectorTests` con `shared/test-vectors/area_shapes.json` (27 casos, también en GUT `test_area_shape_vectors.gd`), `test_directional_areas.gd`, `ContentLoaderTests` (disponibles y guarda de D4).
+- Pendiente fuera de esta HU: `LineOfSight.Has` (Bresenham) se cuela entre dos muros en diagonal (ya existía y afecta igual al círculo); un cono cuyo vértice cae dentro del cuadro de alguien lo alcanza aunque apunte al otro lado (mismo criterio que el círculo).
+
 ---
 
 ### HU-116 · Invocaciones de monstruos
 **Como** grupo **queremos** jefes que llamen refuerzos **para** que el combate cambie a mitad y haya que reorganizarse.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-036, HU-088
 - Skills: `combat-system`, `game-content`
 
@@ -431,3 +447,10 @@
 
 **Notas técnicas**
 - La usa el Árbol Podrido (HU-117). Una feature entra en una fase solo si se usa en ella (pilar 6): no se generaliza a hechizos de jugador.
+
+**Notas de implementación**
+- Contenido: efecto `summon{monsterId, count}` (schema, `EffectType.Summon`, `EffectDef.MonsterId/Count`, `EngineCapabilities`); el validador lo exige en hechizos de monstruo, con una plantilla que exista y `count` ≤ `maxSummonsPerCaster`. Topes nuevos `rules.limits.maxSummonsPerCaster` (4) y `maxSummonsPerInstance` (32).
+- `Ai/SummonSystem` (va detrás de `SpawnSystem` en el tick): `Summon` crea los monstruos en casillas libres con LOS a 1,5–2,5 del invocador (empieza por un lado al azar), con `SummonedBy`, sin spawn y con la amenaza del invocador; `Tick` los quita (EntityDespawn, sin cadáver) si mueren o evaden, o si el invocador muere, evade, se queda sin amenaza o ya no está en el mapa. `EffectResolver` aplica `summon` una vez por lanzamiento, como los efectos sobre uno mismo.
+- `ProgressionSystem` y `LootSystem` ignoran la muerte de una invocación: 0 XP y sin botín.
+- Tests: `SummonTests` (5: aparición con amenaza y persecución, topes, invocador muerto o evadiendo, invocador sin amenaza, sin XP ni botín ni cadáver) y un caso del validador. Ningún monstruo del contenido invoca aún: el primero es el Árbol Podrido (HU-117).
+- 2026-10-07 (revisión de autoridad): una invocación que se quita en vida pierde sus auras y sus proyectiles en vuelo (`SummonSystem.OnRemoving` → `ForgetCaster` + `ClearAll`); `summon` en un `addEffect` de una mejora es un error; `summons` cuenta en el tiempo de combate del tick. Tests: `SummonTests` (+1), validador (+2: plantilla inexistente y `count` por encima del tope).

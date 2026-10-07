@@ -189,7 +189,7 @@
 
 ### HU-106 · Números de los hechizos de nivel 7 y 9
 **Como** diseñador **quiero** fijar los números de los 8 hechizos nuevos de la Fase 2 **para** que entren medidos y no provisionales.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-102
 - Skills: `game-content`, `combat-system` (subagente `content-designer`)
 
@@ -202,6 +202,13 @@
 
 **Notas técnicas**
 - Los íconos de los 8 ya existen (HU-082). Campo ardiente es instantáneo: no necesita áreas duraderas (HU-100).
+
+**Notas de implementación**
+- Modelo nuevo `tools/balance/phase2.py`: pentagrama al nivel 10 con el equipo aproximado de `tier2.py` y el segundo rango (+30 % del `base`, D3), con referencias del nivel 10 definidas como las del 6. Las 15 combinaciones de cada clase cumplen la regla 40/75 (máximo: Guerrero, 177 de 187) y también del nivel 7 al 10. Números y medidas en `docs/design/balance-report.md` §HU-106.
+- CA4: Cuchillas arrojadizas pasa a cono de radio 3 sin casteo (pegado al objetivo toca lo mismo que con radio 4; un casteo frenaba al Pícaro). El validador ya no avisa de ella ni de Tajo amplio, y con la Fase 2 abierta no da errores. CA5: área del Mago 56 (objetivo 55) con Campo ardiente en 26.
+- CA3: con el equipo del nivel 9 el segundo rango sube un 4,4 % de mediana (4,0 % con el verde de nivel 9 que hay en `items.json`): no se nota. Propuesta no aplicada: `spellRankBonusPct` 0,20, el máximo que deja a Pulso sagrado en 40 puntos.
+- Eviscerar se queda en mono 11 (objetivo 20): con más daño el Pícaro farmea mucho más rápido. Aun así, la XP por hora entre clases queda en 17–19 % entre los niveles 7 y 9 (15 % es el tope); queda para HU-119 con el equipo real, con las palancas medidas en el informe.
+- Tests ajustados a las Cuchillas de radio 3: `ContentLoaderTests.InstantDamageCones_WarnOnlyBeyondMeleeRange` ya no espera su aviso (lo da Cono de frío, radio 5, nivel 11) e `InstantDamageArea_ThatTheActivePhaseReaches_IsAnError` las vuelve a poner a 4 en su copia del contenido; `SpellUpgradeTests` y `SpellUpgradeNetTests` ya no las parchean para abrir la Fase 2.
 
 ---
 
@@ -225,7 +232,7 @@
 
 ### HU-108 · Tileset del Bosque y paleta de la Cripta
 **Como** jugador **quiero** que el Bosque se vea distinto de la Pradera y la Cripta distinta de la Mina **para** notar que cambié de tier.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-080, HU-083
 - Skills: `pixel-art-assets`, `world-maps`, `godot-client`
 
@@ -238,11 +245,17 @@
 **Notas técnicas**
 - Un tileset por tier (GDD §Mundo). La paleta se aplica al generar el atlas (un PNG por paleta), sin shader.
 
+**Notas de implementación**
+- `tools/art/gen_tiles.py` genera tres atlas con la disposición de `terrain.png`: `terrain_forest.png` (hierba oscura con musgo, tierra húmeda, sendero, pantano con juncos y nenúfares, peñascos con musgo, copas verde azulado, helechos, raíces y tronco con raíces; copia del de la Pradera lo que no cambia) y `terrain_crypt.png` (el del Bosque con las piezas de interior recoloreadas por `CAVE_PALETTES["crypt"]`). `terrain.png` sale con la paleta `mine` (identidad): mismos píxeles que antes.
+- `TmjMap` lee las propiedades de mapa `biome` y `palette`; `TerrainBaker.atlas_path_for` elige el atlas (`palette` manda; sin propiedad o con un valor desconocido, `terrain.png`) y la caché del horneado va por mapa y atlas. `meadow.tmj` y `mine.tmj` no cambian; el servidor ignora las propiedades nuevas.
+- CA3: la Mina horneada antes y después es idéntica píxel a píxel (suelo y capa `above`), igual que la Pradera. CA4: hornear la Pradera con el atlas del Bosque tarda lo mismo que con el suyo (850–930 ms frío, 3 tandas; cargar un atlas ~2 ms; en caché ~0,05 ms): el coste depende del tamaño del mapa, no del bioma.
+- Tests: `test_terrain_biomes.gd` (lectura de las propiedades, misma disposición de piezas, la Cripta solo recolorea el interior, horneado y caché del Bosque). Capturas en `docs/screenshots/tier2/` (atlas y Pradera/Mina horneadas con los atlas nuevos); `forest.tmj` y `crypt.tmj` llegan con HU-111 y HU-115.
+
 ---
 
 ### HU-109 · Monstruos del Bosque y de la Cripta
 **Como** jugador de nivel 6 a 10 **quiero** monstruos nuevos con mecánicas reconocibles **para** que subir en el Bosque no sea pegar a lobos más grandes.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-036, HU-084
 - Skills: `game-content`, `combat-system` (subagente `content-designer`)
 
@@ -256,11 +269,18 @@
 - Propuesta de nombres para el `content-designer`: Linde (lobo del bosque, araña tejedora, leñador bandido; élite: oso viejo), Pantano (hombre lagarto, fuego fatuo, sapo gigante; élite: bruja del pantano), Cripta (esqueleto de raíces, espíritu del musgo; élite: guardián de la cripta).
 - `skeleton_warrior` y `lesser_lich_king` (niveles 13 y 15) siguen esperando a la Fase 3.
 
+**Notas de implementación**
+- 12 monstruos, 16 hechizos y 11 auras de monstruo con efectos existentes (solo círculo); cada mecánica tiene casteo o área marcada. Bestiario, números y medidas en `docs/design/balance-report.md` §Fase 2.
+- Modelo nuevo `tools/balance/tier2.py`: ciclo de 27–36 s con cualquier clase, XP por hora en ±14 % y ningún élite se mata solo (ni con pociones ni esquivando); las parejas con Guerrero o Sacerdote los matan. El equipo de nivel 7 a 9 es una aproximación (`gear_factor`) hasta HU-110.
+- Planta trampa con `speed: 0`: el schema bajó el mínimo de 0,5 a 0 y la IA lo soporta sin código (`combat.md` §Monstruos); su spawn va con `wanderRadius` 0 (HU-115).
+- Botín mínimo (cobre y chatarra existente) que completa HU-110. Las hojas `monsters/<id>` las dibuja HU-114 (CA1), que entra antes que estos monstruos: sin ellas, el cliente pintaba el marcador de color y los dos tests GUT de hojas y animaciones fallaban.
+- Pendiente de decidir (no aplicado): Mago solo con básicos al 55–61 % (piso 50 %); propuesta `classScaling.mage.hpPerSta` 12 en el informe.
+
 ---
 
 ### HU-110 · Equipo, botín y vendedor de los niveles 6 a 10
 **Como** jugador **quiero** equipo nuevo que se note y un sitio donde comprar pociones en el Bosque **para** que avanzar compense y no tenga que volver a la Aldea.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-050, HU-055, HU-109
 - Skills: `inventory-items`, `game-content` (subagente `content-designer`)
 
@@ -272,6 +292,13 @@
 
 **Notas técnicas**
 - El botín del Árbol Podrido va en HU-117. Los objetos de nivel 13 y 15 que ya existen siguen para la Fase 3.
+
+**Notas de implementación**
+- 120 objetos de nivel 7 y 9 (un blanco y un verde por casilla y tipo; el verde de joyería, físico y de lanzador), 3 raros de élite y 8 chatarras. El comparador los da mejores que los del Tier 1 de su casilla y tipo en las 94 comparaciones; contra los raros del Capataz quedan a la par. Stats un punto por debajo de la guía: con las 9 casillas cubiertas, la guía dejaba a los élites al alcance del Guerrero solo.
+- Botín de los 12 monstruos: los normales sueltan cobre, su chatarra, ~11 % de blancos y ~7 % de verdes (el Linde, nivel 7; el Pantano y la Cripta, nivel 9); los élites, un verde garantizado (`groups`) y su raro al 10 %.
+- Vendedor `forest_camp` (Brena la trampera) que compra de todo; Marta no cambia. **Falta (Parcial):** la poción mayor de vida y el Venado ahumado necesitan 2 hechizos en `spells.json` y 1 aura en `auras.json`, que esta HU no podía tocar; hasta entonces vende las pociones menores y pan.
+- `tools/balance/gear.py`: ciclo ≤ 36 s salvo el Guerrero recién llegado al 7 (36,3 s); oro del 6 al 10 de sobra para pociones y comida; XP por hora 15,4 % con el equipo esperado. Propuestas (no aplicadas) de `hpRegenDelaySec` 5 y élites ×1,3 en `balance-report.md` §HU-110.
+- 2026-10-07: aplicados los consumibles que faltaban (`item_greater_heal`, `item_eat_smoked_venison` y el aura `smoked_venison_hot` en `spells.json`/`auras.json`; Poción mayor de vida y Venado ahumado en `items.json`); Brena vende poción mayor, venado y poción menor de maná y las tablas del Tier 2 sueltan los nuevos. CA3 cumplido: HU hecha. Los íconos propios de los 131 objetos van con HU-114.
 
 ---
 
@@ -296,7 +323,7 @@
 
 ### HU-114 · Arte del Tier 2: monstruos, jefe e íconos
 **Como** jugador **quiero** que los monstruos y el equipo nuevos tengan su propio dibujo **para** reconocerlos de un vistazo.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Parcial
 - Dependencias: HU-090, HU-109, HU-110
 - Skills: `pixel-art-assets`
 
@@ -305,6 +332,10 @@
 2. **Dado** el Árbol Podrido **entonces** tiene una hoja a escala de jefe, como el Capataz.
 3. **Dado** los objetos nuevos **entonces** tienen su ícono, del mismo estilo que los de HU-082.
 4. **Dado** las hojas generadas **entonces** salen de `tools/art/` de forma determinista y lo que venga de fuera queda en `client/assets/CREDITS.md`.
+
+**Notas de implementación**
+- CA1 hecho (2026-10-07): las hojas de los 12 monstruos del Tier 2 (HU-109) las dibuja `tools/art/gen_monsters_t2.py` (`build()`, con `gen_chars.sheet` y `write_meta`; `generate_all.py` lo llama) con las animaciones de HU-090, silueta propia y paleta de su bioma; los élites, más grandes. `gen_chars.py` gana armas y poses aditivas sin cambiar las hojas existentes (comprobado píxel a píxel, y dos ejecuciones dan los mismos bytes). Lámina: `docs/screenshots/tier2/monsters.png`.
+- Falta: CA2, la hoja del Árbol Podrido (llega con HU-117), y CA3, los íconos del equipo de nivel 7 y 9 (HU-110; mientras, esos objetos usan íconos que ya existen).
 
 ---
 

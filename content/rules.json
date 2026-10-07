@@ -17,6 +17,7 @@
     "spellUnlockLevels": [1, 2, 3, 5, 7, 9, 11, 13],
     "spellRankLevels": [4, 8, 12],
     "spellRankBonusPct": 0.15,
+    "spellUpgradeLevel": 8,
     "classChange": { "npcUntilPhase": 2 },
     "altCatchUp": { "fromPhase": 3, "xpMultiplier": 2.0 }
   },
@@ -70,6 +71,7 @@
     "interruptLockoutMs": 1500,
     "abilityLockMs": 250,
     "minInstantSpellCooldownMs": 2000,
+    "instantConeMaxRadiusTiles": 3,
     "linkdeadSec": 10,
     "linkdeadInCombatMaxSec": 30,
     "ragePerHitDealt": 6,
@@ -172,7 +174,9 @@
     "aoeMaxTargetsCap": 10,
     "persistentAreaTickMs": 500,
     "maxBuffsPerEntity": 16,
-    "maxDebuffsPerEntity": 16
+    "maxDebuffsPerEntity": 16,
+    "maxSummonsPerCaster": 4,
+    "maxSummonsPerInstance": 32
   },
 
   "balanceTargets": {

@@ -53,9 +53,12 @@ autor, URL y licencia en `client/assets/CREDITS.md`. No uses assets de juegos co
 
 ## Arte del proyecto (generado)
 El arte actual lo dibuja `tools/art/generate_all.py` en Resurrect 64 (`client/assets/palette.png`, ADR-026): tiles con
-autotile dual-grid (`gen_tiles.py`, filas que lee `client/scripts/world/terrain_baker.gd`), sprites 3/4 de 32×32 (jefes de
-64×64) con `filas = s, n, e` y la tabla `anims` del `.json` (reposo, caminar, ataque o casteo, golpe y muerte, HU-090;
-`gen_chars.py`), las hojas HD de los héroes con `pixelScale` 3 (`import_heroes.py`, desde las hojas de referencia de
+autotile dual-grid (`gen_tiles.py`, filas que lee `client/scripts/world/terrain_baker.gd`; un atlas por tier y paleta de
+cueva con la misma disposición: `terrain.png`, `terrain_forest.png`, `terrain_crypt.png`, HU-108), sprites 3/4 de 32×32
+(jefes de 64×64) con `filas = s, n, e` y la tabla `anims` del `.json` (reposo, caminar, ataque o casteo, golpe y muerte, HU-090;
+`gen_chars.py`; los monstruos del Tier 2 en `gen_monsters_t2.py`, con `body(d, pose)` por monstruo y, en los humanoides,
+rasgos propios vía `extras` de `gen_chars.humanoid`; `gen_monsters_t2.lamina()` deja la lámina de revisión en
+`docs/screenshots/tier2/monsters.png`, HU-114), las hojas HD de los héroes con `pixelScale` 3 (`import_heroes.py`, desde las hojas de referencia de
 `tools/art/refs/`), efectos de hechizo (`gen_vfx.py`, HU-091), objetos de mapa (`gen_objects.py`: palancas y puertas, HU-083), íconos 16×16
 (`gen_icons.py`) y UI 9-slice (`gen_ui.py`). Necesita `pip install pillow numpy` (y `scipy` para `import_heroes.py`, que
 importa `generate_all.py`); es determinista, así que regenerar no cambia los PNG que no se tocan. Para añadir una hoja sin

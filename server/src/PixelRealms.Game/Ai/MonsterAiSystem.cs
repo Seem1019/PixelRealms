@@ -168,7 +168,8 @@ public sealed class MonsterAiSystem(CombatServices services, CastSystem casts, A
                 MonsterSpellTarget.RandomNotTopThreat => RandomNotTop(m, current, map, ctx),
                 _ => current,
             };
-            Vec2? targetPos = spell.Targeting.IsGround() ? target.Position : null;
+            // Áreas apuntadas, y conos o líneas aunque salgan del monstruo (HU-102): hacia su objetivo, fijado al empezar.
+            Vec2? targetPos = spell.Targeting.IsGround() || (spell.Targeting.IsArea() && spell.Shape != Shape.Circle) ? target.Position : null;
             if (casts.TryBeginCast(m, spell, target.Id, targetPos, map, ctx) is null) return true;
         }
         return false;

@@ -47,9 +47,17 @@ public static class CrossRefValidator
         var byClass = affinity.GetProperty("byClass");
         var combat = rules.GetProperty("combat");
         var minInstantCd = combat.GetProperty("minInstantSpellCooldownMs").GetInt32();
+        var instantConeMaxRadius = combat.GetProperty("instantConeMaxRadiusTiles").GetDouble();
+        var areaTickMs = rules.GetProperty("limits").GetProperty("persistentAreaTickMs").GetInt32();
+        var maxSummonsPerCaster = rules.GetProperty("limits").GetProperty("maxSummonsPerCaster").GetInt32();
+        // Tope de nivel de la fase activa: lo que ya se alcanza no puede quedarse en aviso.
+        var phaseCaps = progression.GetProperty("levelCapByPhase").EnumerateArray().Select(e => e.GetInt32()).ToList();
+        var phase = rules.GetProperty("world").GetProperty("currentPhase").GetInt32();
+        var activeCap = phase >= 1 && phase <= phaseCaps.Count ? phaseCaps[phase - 1] : maxLevel;
         var maxSpellsPerClass = rules.GetProperty("loadout").GetProperty("maxSpellsPerClass").GetInt32();
 
         var referencedAuras = new HashSet<string>(StringComparer.Ordinal);
+        var upgradeIds = new HashSet<string>(StringComparer.Ordinal);
 
         // --- hechizos
         var spellsByClass = new Dictionary<string, List<JsonElement>>(StringComparer.Ordinal);
@@ -74,7 +82,35 @@ public static class CrossRefValidator
                 }
                 if (!ImplementedEffects.Contains(type))
                     report.Warn("spells.json", $"{p}/effects/{k}/type", $"{id}: efecto '{type}' aún no implementado → hechizo no disponible (ADR-023)");
+                if (type == "summon")
+                {
+                    // HU-116: solo monstruos invocan, una plantilla que exista y dentro del tope por invocador.
+                    if (source != "monster")
+                        report.Error("spells.json", $"{p}/effects/{k}", $"{id}: solo los hechizos de monstruo invocan (HU-116)");
+                    var summoned = Str(eff, "monsterId");
+                    if (!monsterIds.Contains(summoned))
+                        report.Error("spells.json", $"{p}/effects/{k}/monsterId", $"{id}: monsterId '{summoned}' no existe en monsters.json");
+                    if (eff.TryGetProperty("count", out var cnt) && cnt.GetInt32() > maxSummonsPerCaster)
+                        report.Error("spells.json", $"{p}/effects/{k}/count", $"{id}: invoca {cnt.GetInt32()}, más que rules.limits.maxSummonsPerCaster ({maxSummonsPerCaster})");
+                }
             }
+
+            // HU-100: un área duradera es un área que dura al menos un pulso; sin desplazamientos, invocaciones ni proyectil (los
+            // pulsos solo tocan a los objetivos y un proyectil no deja área).
+            if (sp.TryGetProperty("areaDurationMs", out var durEl))
+            {
+                if (!targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && !targeting.StartsWith("self_aoe", StringComparison.Ordinal))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: solo un hechizo de área puede dejar un área duradera");
+                else if (effects.Any(e => Str(e, "type") is "leap" or "dash" or "summon"))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un salto, una carga o una invocación no dejan un área duradera");
+                if (sp.TryGetProperty("projectile", out _))
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: un hechizo con proyectil no deja un área duradera");
+                if (durEl.GetInt32() < areaTickMs)
+                    report.Error("spells.json", $"{p}/areaDurationMs", $"{id}: dura {durEl.GetInt32()} ms, menos que un pulso (rules.limits.persistentAreaTickMs = {areaTickMs})");
+            }
+
+            if (sp.TryGetProperty("upgrades", out var upgradesEl))
+                CheckUpgrades(sp, id, source, effects, upgradesEl, $"{p}/upgrades", auraIds, upgradeIds, referencedAuras, report);
 
             if (!ImplementedTargetings.Contains(targeting))
                 report.Warn("spells.json", $"{p}/targeting", $"{id}: targeting '{targeting}' aún no implementado → hechizo no disponible (ADR-023)");
@@ -117,9 +153,17 @@ public static class CrossRefValidator
                 if (castMs == 0 && cooldownMs < minInstantCd)
                     report.Error("spells.json", $"{p}/cooldownMs", $"{id}: hechizo instantáneo de clase con cooldown {cooldownMs} ms < rules.combat.minInstantSpellCooldownMs ({minInstantCd})");
 
-                if (targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && castMs == 0
+                // ADR-027 D4: un cono cuerpo a cuerpo se esquiva saliendo del frente del lanzador; no necesita casteo.
+                var meleeCone = Str(sp, "shape") == "cone" && sp.TryGetProperty("aoeRadius", out var ar) && ar.GetDouble() <= instantConeMaxRadius;
+                if (targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && castMs == 0 && !meleeCone
                     && effects.Any(e => Str(e, "type") == "damage") && !effects.Any(e => Str(e, "type") == "leap"))
-                    report.Warn("spells.json", $"{p}/castMs", $"{id}: área apuntada de daño sin casteo: no se puede esquivar (ADR-015)");
+                {
+                    // Revisión de autoridad (HU-102): en una fase que aún no llega a su nivel es un aviso; si ya se alcanza, error.
+                    if (levelReq <= activeCap)
+                        report.Error("spells.json", $"{p}/castMs", $"{id}: área apuntada de daño sin casteo que ya se alcanza (nivel {levelReq} ≤ tope {activeCap}): no se puede esquivar (ADR-015, ADR-027 D4)");
+                    else
+                        report.Warn("spells.json", $"{p}/castMs", $"{id}: área apuntada de daño sin casteo: no se puede esquivar (ADR-015)");
+                }
             }
         }
 
@@ -338,6 +382,10 @@ public static class CrossRefValidator
             foreach (var lvl in rankLevels.EnumerateArray().Select(e => e.GetInt32()))
                 if (lvl < 2 || lvl > maxLevel) report.Error("rules.json", "/progression/spellRankLevels", $"nivel de rango {lvl} fuera de 2..{maxLevel}");
                 else if (unlockLevels.Contains(lvl)) report.Warn("rules.json", "/progression/spellRankLevels", $"el nivel {lvl} desbloquea hechizo y sube rango a la vez");
+        // ADR-027 D1: la elección de mejoras llega con un rango (el segundo, nivel 8).
+        var upgradeLevel = progression.GetProperty("spellUpgradeLevel").GetInt32();
+        if (!progression.GetProperty("spellRankLevels").EnumerateArray().Any(e => e.GetInt32() == upgradeLevel))
+            report.Error("rules.json", "/progression/spellUpgradeLevel", $"spellUpgradeLevel {upgradeLevel} no es un nivel de rango (spellRankLevels)");
 
         foreach (var classId in classIds)
             if (!rules.GetProperty("classScaling").TryGetProperty(classId, out _))
@@ -369,6 +417,78 @@ public static class CrossRefValidator
             var refWeapon = cls.Value.GetProperty("referenceWeapon").GetString()!;
             if (byClass.TryGetProperty(cls.Name, out var row) && row.TryGetProperty(refWeapon, out var aff) && aff.GetString() != "alta")
                 report.Warn("rules.json", $"/balanceTargets/pentagram/classes/{cls.Name}/referenceWeapon", $"el arma de referencia '{refWeapon}' no tiene afinidad alta");
+        }
+    }
+
+    /// <summary>
+    /// HU-104: mejoras de un hechizo. Solo de clase; ids únicos en todo spells.json; cada modificador es de uno de los cuatro
+    /// tipos (campo del hechizo, efecto + mult, aura + campo, efecto añadido) y apunta a algo que el hechizo tiene.
+    /// </summary>
+    private static void CheckUpgrades(JsonElement sp, string id, string source, List<JsonElement> effects, JsonElement upgrades, string p,
+        HashSet<string> auraIds, HashSet<string> upgradeIds, HashSet<string> referencedAuras, ValidationReport report)
+    {
+        if (source != "class")
+        {
+            report.Error("spells.json", p, $"{id}: solo los hechizos de clase tienen mejoras (HU-104)");
+            return;
+        }
+        var effectTypes = effects.Select(e => Str(e, "type")).ToHashSet(StringComparer.Ordinal);
+        var appliedAuras = effects.Where(e => Str(e, "type") == "apply_aura").Select(e => Str(e, "auraId")).ToHashSet(StringComparer.Ordinal);
+        foreach (var (up, u) in upgrades.EnumerateArray().Select((x, u) => (x, u)))
+        {
+            var upId = Str(up, "id");
+            if (!upgradeIds.Add(upId))
+                report.Error("spells.json", $"{p}/{u}/id", $"{id}: id de mejora '{upId}' repetido en spells.json");
+            if (!up.TryGetProperty("mods", out var mods)) continue;
+            foreach (var (m, k) in mods.EnumerateArray().Select((x, k) => (x, k)))
+            {
+                var mp = $"{p}/{u}/mods/{k}";
+                var stat = Str(m, "stat");
+                var aura = Str(m, "aura");
+                var effect = Str(m, "effect");
+                var hasAdd = m.TryGetProperty("add", out _);
+                var hasMult = m.TryGetProperty("mult", out _);
+                var kinds = (stat != "" && aura == "" ? 1 : 0) + (effect != "" ? 1 : 0) + (aura != "" ? 1 : 0) + (m.TryGetProperty("addEffect", out _) ? 1 : 0);
+                if (kinds != 1)
+                {
+                    report.Error("spells.json", mp, $"{id}/{upId}: un modificador cambia un campo ('stat'), un tipo de efecto ('effect'), un aura ('aura' + 'stat') o añade un efecto ('addEffect'), uno solo");
+                    continue;
+                }
+                if (m.TryGetProperty("addEffect", out var added))
+                {
+                    // Las mismas reglas que los efectos del hechizo (revisión de autoridad de HU-100/HU-116).
+                    if (Str(added, "type") == "summon")
+                        report.Error("spells.json", $"{mp}/addEffect", $"{id}/{upId}: solo los hechizos de monstruo invocan (HU-116)");
+                    if (sp.TryGetProperty("areaDurationMs", out _) && Str(added, "type") is "leap" or "dash")
+                        report.Error("spells.json", $"{mp}/addEffect", $"{id}/{upId}: un salto o una carga no van en un área duradera");
+                    if (added.TryGetProperty("auraId", out var addedAura)) referencedAuras.Add(addedAura.GetString()!);
+                    if (added.TryGetProperty("auraId", out addedAura) && !auraIds.Contains(addedAura.GetString()!))
+                        report.Error("spells.json", $"{mp}/addEffect/auraId", $"{id}/{upId}: auraId '{addedAura.GetString()}' no existe en auras.json");
+                    if (!ImplementedEffects.Contains(Str(added, "type")))
+                        report.Error("spells.json", $"{mp}/addEffect/type", $"{id}/{upId}: el efecto añadido '{Str(added, "type")}' no está implementado");
+                    continue;
+                }
+                if (!hasAdd && !hasMult)
+                    report.Error("spells.json", mp, $"{id}/{upId}: el modificador no cambia nada (falta 'add' o 'mult')");
+                if (effect != "")
+                {
+                    if (hasAdd) report.Error("spells.json", $"{mp}/add", $"{id}/{upId}: un modificador de efecto solo escala ('mult')");
+                    if (!effectTypes.Contains(effect)) report.Error("spells.json", $"{mp}/effect", $"{id}/{upId}: el hechizo no tiene efectos '{effect}'");
+                }
+                else if (aura != "")
+                {
+                    if (!appliedAuras.Contains(aura)) report.Error("spells.json", $"{mp}/aura", $"{id}/{upId}: el hechizo no aplica el aura '{aura}'");
+                    if (!Content.SpellUpgrades.AuraStats.Contains(stat)) report.Error("spells.json", $"{mp}/stat", $"{id}/{upId}: '{stat}' no es un campo de aura que se pueda mejorar (durationMs, pct, amount)");
+                }
+                else if (!Content.SpellUpgrades.SpellStats.Contains(stat))
+                {
+                    report.Error("spells.json", $"{mp}/stat", $"{id}/{upId}: '{stat}' no es un campo de hechizo que se pueda mejorar");
+                }
+                else if (stat == "cost" && !sp.TryGetProperty("cost", out _))
+                {
+                    report.Error("spells.json", $"{mp}/stat", $"{id}/{upId}: el hechizo no tiene coste");
+                }
+            }
         }
     }
 

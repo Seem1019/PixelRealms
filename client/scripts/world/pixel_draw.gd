@@ -59,3 +59,51 @@ static func rect_outline(ci: CanvasItem, r: Rect2, color: Color) -> void:
 	ci.draw_rect(Rect2(p.x, p.y + s.y - 1, s.x, 1), color)
 	ci.draw_rect(Rect2(p.x, p.y, 1, s.y), color)
 	ci.draw_rect(Rect2(p.x + s.x - 1, p.y, 1, s.y), color)
+
+
+## Relleno de un polígono convexo (cono o línea apuntados, HU-102) por tramos horizontales de 1 px de alto.
+static func polygon_fill(ci: CanvasItem, points: PackedVector2Array, color: Color) -> void:
+	if points.size() < 3:
+		return
+	var top := INF
+	var bottom := -INF
+	for p: Vector2 in points:
+		top = minf(top, p.y)
+		bottom = maxf(bottom, p.y)
+	for y: int in range(floori(top), ceili(bottom)):
+		var row := y + 0.5
+		var left := INF
+		var right := -INF
+		for i: int in points.size():
+			var a := points[i]
+			var b := points[(i + 1) % points.size()]
+			if (a.y <= row) == (b.y <= row):
+				continue
+			var x := a.x + (row - a.y) / (b.y - a.y) * (b.x - a.x)
+			left = minf(left, x)
+			right = maxf(right, x)
+		if right > left:
+			ci.draw_rect(Rect2(roundf(left), y, roundf(right) - roundf(left), 1.0), color)
+
+
+## Borde de 1 px de un polígono cerrado, píxel a píxel (Bresenham entre vértices).
+static func polygon_outline(ci: CanvasItem, points: PackedVector2Array, color: Color) -> void:
+	for i: int in points.size():
+		var a := Vector2i(points[i].round())
+		var b := Vector2i(points[(i + 1) % points.size()].round())
+		var dx := absi(b.x - a.x)
+		var dy := -absi(b.y - a.y)
+		var sx := 1 if a.x < b.x else -1
+		var sy := 1 if a.y < b.y else -1
+		var err := dx + dy
+		while true:
+			ci.draw_rect(Rect2(Vector2(a), Vector2.ONE), color)
+			if a == b:
+				break
+			var e2 := 2 * err
+			if e2 >= dy:
+				err += dy
+				a.x += sx
+			if e2 <= dx:
+				err += dx
+				a.y += sy

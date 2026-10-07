@@ -23,6 +23,8 @@ signal trade_changed(d: Dictionary)
 signal online_list_received(players: Array)  ## HU-063: respuesta a OnlineListRequest
 signal map_objects_changed  ## HU-083: palancas o puertas del mapa actual
 signal map_object_toggled(id: String, state: String)  ## HU-083: una palanca o una puerta cambió (no el estado al entrar)
+signal hotbar_changed  ## HU-103: la barra cambió (Welcome, hechizo nuevo colocado o casilla asignada desde la interfaz)
+signal spell_upgrades_changed  ## HU-105: las mejoras elegidas cambiaron (Welcome, SpellUpgradesUpdate) o se desbloquearon
 signal duel_zone_changed  ## HU-101: zona del duelo o aviso de estar fuera de ella
 
 var self_id: int = -1
@@ -35,6 +37,10 @@ var inventory: Array = []
 var equipment: Array = []
 var hotbar: Array = []
 var known_spells: Array[String] = []
+## HU-103: hechizos aprendidos que no cupieron en la barra; el libro los marca como nuevos hasta que se cierra.
+var unseen_spells: Array[String] = []
+## HU-105: mejora elegida por hechizo (spellId → upgradeId), tal como la confirma el servidor.
+var spell_upgrades: Dictionary = {}
 var target_id: int = -1
 var party: Dictionary = {}  # {leader, members: [{name, entityId, classId, level, hpPct, online, mapId}]}
 var map_objects: Dictionary = {}  # HU-083: id → estado ("on"/"off", "open"/"closed") de los objetos del mapa actual
@@ -84,6 +90,7 @@ func _ready() -> void:
 	Net.register_handler("Died", _on_died)
 	Net.register_handler("XpGain", _on_xp_gain)
 	Net.register_handler("LevelUp", _on_level_up)
+	Net.register_handler("SpellUpgradesUpdate", _on_spell_upgrades)
 	Net.register_handler("ChatMessage", _on_chat_message)
 	Net.register_handler("PartyUpdate", _on_party_update)
 	Net.register_handler("DuelUpdate", _on_duel_update)
@@ -153,6 +160,10 @@ func _on_welcome(d: Dictionary, same_connection: bool = false) -> void:
 	known_spells.clear()
 	for s: Variant in d.get("knownSpells", []):
 		known_spells.append(str(s))
+	unseen_spells = unseen_spells.filter(func(id: String) -> bool: return known_spells.has(id))
+	spell_upgrades = (d["spellUpgrades"] as Dictionary).duplicate() if d.get("spellUpgrades") is Dictionary else {}
+	hotbar_changed.emit()
+	spell_upgrades_changed.emit()
 	rules_hash = str(d.get("rulesHash", ""))
 	stats_changed.emit()
 	inventory_changed.emit()
@@ -378,25 +389,85 @@ func _on_xp_gain(d: Dictionary) -> void:
 
 
 ## HU-041 CA2: los hechizos nuevos van a la primera casilla libre de hechizos (SetHotbar) con aviso; CA3b: aviso de rangos.
+## HU-103 CA1: con la barra llena el hechizo no se coloca solo: el aviso manda al libro, que lo marca como nuevo.
 func _on_level_up(d: Dictionary) -> void:
 	level = int(d.get("level", level))
 	var new_spells: Array = d.get("newSpells", [])
 	var rank_ups: Array = d.get("rankUps", []) if d.get("rankUps") != null else []
 	var spell_slots := int(Content.rule("loadout", "spellSlots", 4))
+	notice.emit("¡Nivel %d!" % level)
+	var placed := false
 	for s: Variant in new_spells:
 		var spell_id := str(s)
 		if not known_spells.has(spell_id):
 			known_spells.append(spell_id)
+		var spell_name := str(Content.spell(spell_id).get("name", spell_id))
 		var free := _first_free_slot(spell_slots)
 		if free >= 0:
 			hotbar.append({"slot": free, "kind": "spell", "ref": spell_id})
 			Net.send("SetHotbar", {"slot": free, "kind": "spell", "ref": spell_id})
-		notice.emit("Nuevo hechizo: %s" % str(Content.spell(spell_id).get("name", spell_id)))
+			placed = true
+			notice.emit("Nuevo hechizo: %s" % spell_name)
+		else:
+			if not unseen_spells.has(spell_id):
+				unseen_spells.append(spell_id)
+			notice.emit("Nuevo hechizo: %s (en el libro, P)" % spell_name)
 	if not rank_ups.is_empty():
 		notice.emit("Tus hechizos suben de rango (+%d %%)" % roundi(float(Content.rule("progression", "spellRankBonusPct", 0.15)) * 100.0))
-	notice.emit("¡Nivel %d!" % level)
+	var unlocked: Array = d.get("upgradesUnlocked", []) if d.get("upgradesUnlocked") != null else []
+	if not unlocked.is_empty():
+		notice.emit("Ya puedes elegir las mejoras de tus hechizos (P)")  # HU-105 CA2
+		spell_upgrades_changed.emit()
 	stats_changed.emit()
+	if placed:
+		hotbar_changed.emit()
 	leveled_up.emit(level, new_spells, rank_ups)
+
+
+## HU-105: lo que confirma el servidor tras un ChooseSpellUpgrade.
+func _on_spell_upgrades(d: Dictionary) -> void:
+	spell_upgrades = (d["upgrades"] as Dictionary).duplicate() if d.get("upgrades") is Dictionary else {}
+	spell_upgrades_changed.emit()
+
+
+## HU-105: nivel desde el que se eligen mejoras (`rules.progression.spellUpgradeLevel`).
+func spell_upgrade_level() -> int:
+	return int(Content.rule("progression", "spellUpgradeLevel", 8))
+
+
+## El hechizo como lo lanza el personaje: con su mejora si la eligió y le toca por nivel (el servidor hace lo mismo).
+func effective_spell(spell_id: String) -> Dictionary:
+	var spell := Content.spell(spell_id)
+	if level < spell_upgrade_level() or not spell_upgrades.has(spell_id):
+		return spell
+	return SpellUpgrades.apply(spell, str(spell_upgrades[spell_id]))
+
+
+## Hechizo aprendido con mejoras que aún no tiene ninguna elegida (el libro y la barra lo señalan, HU-105 CA2).
+func upgrade_pending(spell_id: String) -> bool:
+	return level >= spell_upgrade_level() and known_spells.has(spell_id) and not spell_upgrades.has(spell_id) \
+		and not (Content.spell(spell_id).get("upgrades", []) as Array).is_empty()
+
+
+## Pide elegir (o quitar, con "") la mejora; la copia local cambia con SpellUpgradesUpdate. En combate no se pide: se avisa.
+func choose_upgrade(spell_id: String, upgrade_id: String) -> bool:
+	if is_in_combat():
+		notice.emit("No puedes cambiar mejoras en combate")
+		return false
+	var payload := {"spellId": spell_id, "reqId": Net.next_req_id()}
+	if not upgrade_id.is_empty():
+		payload["upgradeId"] = upgrade_id
+	Net.send("ChooseSpellUpgrade", payload)
+	return true
+
+
+## HU-103: casilla de la barra (0–3) donde está equipado el hechizo, o -1.
+func spell_slot_of(spell_id: String) -> int:
+	for h: Variant in hotbar:
+		var hd: Dictionary = h
+		if str(hd.get("kind", "")) == "spell" and str(hd.get("ref", "")) == spell_id:
+			return int(hd.get("slot", -1))
+	return -1
 
 
 func _first_free_slot(spell_slots: int) -> int:

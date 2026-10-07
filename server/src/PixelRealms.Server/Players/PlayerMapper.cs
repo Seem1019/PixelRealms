@@ -54,6 +54,9 @@ public sealed class PlayerMapper(ReloadableContent content, ILogger<PlayerMapper
         foreach (var h in dto.Hotbar)
             if (h.Slot >= 0 && h.Slot < player.Hotbar.Length) player.Hotbar[h.Slot] = (h.Kind == 0 ? "spell" : "item", h.Ref);
         player.KnownSpells.AddRange(db.KnownSpells(cls.Id, dto.Level).Select(s => s.Id));
+        // HU-104: solo las mejoras que siguen valiendo (hechizo conocido, nivel y mejora que el contenido aún tiene).
+        foreach (var u in dto.SpellUpgrades ?? []) player.SpellUpgrades[u.SpellId] = u.UpgradeId;
+        SpellUpgradeRules.Prune(player, db, db.Rules.Progression);
         Recalculate(player);
         player.Hp = Math.Clamp(dto.Hp, 0, player.MaxHp);
         // HU-039 CA2: la ira empieza en 0 en cada entrada al mundo; maná y energía se conservan.
@@ -66,7 +69,7 @@ public sealed class PlayerMapper(ReloadableContent content, ILogger<PlayerMapper
             // Nunca más que la recarga actual del contenido (reloj del host corregido, contenido rebajado) ni de algo que ya no existe.
             int maxMs;
             Dictionary<string, long> cooldowns;
-            if (cd.Kind == 0 && db.TryGetSpell(cd.Ref, out var spell) && spell is not null) (maxMs, cooldowns) = (spell.CooldownMs, player.Combat.CooldownEndsAtMs);
+            if (cd.Kind == 0 && db.TryGetSpell(cd.Ref, out var spell) && spell is not null) (maxMs, cooldowns) = (db.LongestCooldownMs(spell), player.Combat.CooldownEndsAtMs);
             else if (cd.Kind == 1 && db.TryGetItem(cd.Ref, out var tpl) && tpl is not null) (maxMs, cooldowns) = (tpl.UseCooldownMs, player.ItemCooldownEndsAtMs);
             else continue;
             var remainingMs = Math.Min((long)(cd.EndsAtUtc - utcNow).TotalMilliseconds, maxMs);
@@ -95,7 +98,7 @@ public sealed class PlayerMapper(ReloadableContent content, ILogger<PlayerMapper
         for (var i = 0; i < p.Hotbar.Length; i++)
             if (p.Hotbar[i] is { } h) hotbar.Add(new SavedHotbarSlot((short)i, (short)(h.Kind == "spell" ? 0 : 1), h.Ref));
         return new CharacterSaveDto(p.CharacterId, p.AccountId, p.Name, p.ClassId, p.Level, p.Xp, p.Gold, MapIdOf(p), p.Position.X, p.Position.Y, p.Hp, p.Resource, items, hotbar, audit ?? [],
-            ToSavedCooldowns(p));
+            ToSavedCooldowns(p), p.SpellUpgrades.Select(u => new SavedSpellUpgrade(u.Key, u.Value)).ToList());
     }
 
     /// <summary>Cooldowns de hechizo y de consumible aún activos, como instante UTC de fin (el reloj de juego no sobrevive al reinicio).</summary>
@@ -145,7 +148,8 @@ public sealed class PlayerMapper(ReloadableContent content, ILogger<PlayerMapper
         for (var i = 0; i < p.Hotbar.Length; i++) if (p.Hotbar[i] is { } h) hotbar.Add(new HotbarSlotDto(i, h.Kind, h.Ref));
         var self = new SelfStateDto(p.Position.X * GameConstants.PixelsPerTile, p.Position.Y * GameConstants.PixelsPerTile, p.Level, p.Xp,
             XpCurve.XpToNextLevel(db.Rules.Progression, p.Level), p.Hp, p.MaxHp, p.Resource, p.MaxResource, ContentJson.EnumName(cls.Resource), p.ClassId, p.Name);
-        return new Welcome(p.Id.Value, tick, 1000 / GameConstants.TickMs, 1000 / (GameConstants.TickMs * GameConstants.SnapshotEveryTicks), mapId, self, bag, equip, hotbar, p.KnownSpells.ToList(), db.Rules.Hash);
+        return new Welcome(p.Id.Value, tick, 1000 / GameConstants.TickMs, 1000 / (GameConstants.TickMs * GameConstants.SnapshotEveryTicks), mapId, self, bag, equip, hotbar, p.KnownSpells.ToList(), db.Rules.Hash,
+            p.SpellUpgrades.Count == 0 ? null : new Dictionary<string, string>(p.SpellUpgrades, StringComparer.Ordinal));
     }
 
     public InventoryUpdate ToInventoryUpdate(Player p, int? reqId) =>

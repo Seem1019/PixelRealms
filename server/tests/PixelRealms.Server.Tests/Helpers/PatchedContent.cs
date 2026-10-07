@@ -32,6 +32,13 @@ public sealed class PatchedContent : IDisposable
         return new PatchedContent(dir, mapsDir);
     }
 
+    /// <summary>Modifica otro archivo de la copia de `content/` (p. ej. mejoras de prueba en `spells.json`, HU-104).</summary>
+    public PatchedContent PatchContent(string file, Action<JsonObject> patch)
+    {
+        Patch(Path.Combine(Dir, file), patch);
+        return this;
+    }
+
     /// <summary>Ajustes para `TestServer.StartAsync`.</summary>
     public Dictionary<string, string?> Settings => new() { ["Content:Dir"] = Dir, ["Maps:Dir"] = MapsDir };
 

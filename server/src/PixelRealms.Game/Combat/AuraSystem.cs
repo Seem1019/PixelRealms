@@ -71,7 +71,9 @@ public sealed class AuraSystem(CombatServices services, DamagePipeline damage) :
             amount = PerStackAmount(def with { Base = def.Base * Progression.SpellRanks.BaseMultiplier(ctx.Rules.Progression, rankPlayer.Level) }, casterStats);
         if (existing is not null)
         {
-            // Mismo lanzador, misma aura: duración completa sin reiniciar el ritmo de ticks; cargas solo si maxStacks > 1.
+            // Mismo lanzador, misma aura: duración completa sin reiniciar el ritmo de ticks; cargas solo si maxStacks > 1. Si llega
+            // con otra definición (la mejora del hechizo cambió, HU-104), manda la nueva.
+            existing.Def = def;
             existing.ExpiresAtMs = now + def.DurationMs;
             if (def.MaxStacks > 1) existing.Stacks = Math.Min(def.MaxStacks, existing.Stacks + 1);
             existing.Amount = amount;

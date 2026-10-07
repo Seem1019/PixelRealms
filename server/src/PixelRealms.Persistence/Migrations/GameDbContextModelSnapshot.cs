@@ -243,6 +243,29 @@ namespace PixelRealms.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PixelRealms.Persistence.Entities.CharacterSpellUpgrade", b =>
+                {
+                    b.Property<Guid>("CharacterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("character_id");
+
+                    b.Property<string>("SpellId")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
+                        .HasColumnName("spell_id");
+
+                    b.Property<string>("UpgradeId")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
+                        .HasColumnName("upgrade_id");
+
+                    b.HasKey("CharacterId", "SpellId")
+                        .HasName("pk_character_spell_upgrades");
+
+                    b.ToTable("character_spell_upgrades", (string)null);
+                });
+
             modelBuilder.Entity("PixelRealms.Persistence.Entities.ItemAuditLog", b =>
                 {
                     b.Property<long>("Id")
@@ -334,6 +357,16 @@ namespace PixelRealms.Persistence.Migrations
                         .HasConstraintName("fk_character_items_characters_character_id");
                 });
 
+            modelBuilder.Entity("PixelRealms.Persistence.Entities.CharacterSpellUpgrade", b =>
+                {
+                    b.HasOne("PixelRealms.Persistence.Entities.Character", null)
+                        .WithMany("SpellUpgrades")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_character_spell_upgrades_characters_character_id");
+                });
+
             modelBuilder.Entity("PixelRealms.Persistence.Entities.Account", b =>
                 {
                     b.Navigation("Characters");
@@ -346,6 +379,8 @@ namespace PixelRealms.Persistence.Migrations
                     b.Navigation("Hotbar");
 
                     b.Navigation("Items");
+
+                    b.Navigation("SpellUpgrades");
                 });
 #pragma warning restore 612, 618
         }

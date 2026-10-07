@@ -16,12 +16,12 @@ public sealed class ContentLoaderTests
         result.Report.Errors.ShouldBeEmpty();
         var db = result.ContentOrThrow;
         db.Classes.Count.ShouldBe(4);
-        db.Spells.Count.ShouldBe(41);
-        db.Auras.Count.ShouldBe(26);
-        db.Items.Count.ShouldBe(37);
-        db.Monsters.Count.ShouldBe(12); // + los élites de las ramas de la pradera (HU-080)
-        db.LootTables.Count.ShouldBe(12);
-        db.Vendors.Count.ShouldBe(1);
+        db.Spells.Count.ShouldBe(59); // + los 16 hechizos de los monstruos del Tier 2 (HU-109) y 2 de consumibles (HU-110)
+        db.Auras.Count.ShouldBe(38);
+        db.Items.Count.ShouldBe(170); // + el equipo de nivel 7 y 9, raros, chatarra y consumibles del Tier 2 (HU-110)
+        db.Monsters.Count.ShouldBe(24); // + los élites de las ramas de la pradera (HU-080) y los 12 del Tier 2 (HU-109)
+        db.LootTables.Count.ShouldBe(24);
+        db.Vendors.Count.ShouldBe(2); // + Brena, en el campamento del Linde (HU-110)
         db.Rules.Hash.Length.ShouldBe(16);
     }
 
@@ -70,16 +70,40 @@ public sealed class ContentLoaderTests
     }
 
     [Fact]
-    public void UnavailableSpells_AreMarked_NotErrors() // ADR-023, HU-003 CA4d
+    public void ConeAndLineSpells_AreAvailable() // ADR-023, HU-003 CA4d; HU-102 CA6
     {
+        // Hasta HU-102 estos cuatro se cargaban como no disponibles (cono y línea sin implementar); ya no queda ninguno.
         var result = ContentLoader.Load(TestContent.ContentDir);
         var db = result.ContentOrThrow;
-        db.UnavailableSpells.Keys.ToArray().ShouldBe(new[] { "warrior_cleave", "rogue_throwing_blades", "mage_cone_of_cold", "priest_path_of_light" }, ignoreOrder: true);
-        db.IsSpellAvailable("mage_fireball").ShouldBeTrue();
-        db.IsSpellAvailable("warrior_cleave").ShouldBeFalse();
-        result.Report.Warnings.ShouldContain(w => w.Contains("warrior_cleave", StringComparison.Ordinal) && w.Contains("ADR-023", StringComparison.Ordinal));
-        db.KnownSpells("warrior", 15).Select(s => s.Id).ShouldNotContain("warrior_cleave");
+        db.UnavailableSpells.ShouldBeEmpty();
+        foreach (var id in new[] { "warrior_cleave", "rogue_throwing_blades", "mage_cone_of_cold", "priest_path_of_light" })
+            db.IsSpellAvailable(id).ShouldBeTrue(id);
+        result.Report.Warnings.ShouldNotContain(w => w.Contains("ADR-023", StringComparison.Ordinal));
+        db.KnownSpells("warrior", 15).Select(s => s.Id).ShouldContain("warrior_cleave");
         db.KnownSpells("mage", 4).Select(s => s.Id).ToArray().ShouldBe(new[] { "mage_fireball", "mage_frostbolt", "mage_frost_nova" });
+    }
+
+    [Fact]
+    public void InstantDamageCones_WarnOnlyBeyondMeleeRange() // ADR-027 D4
+    {
+        var warnings = ContentLoader.Load(TestContent.ContentDir).Report.Warnings;
+        warnings.ShouldNotContain(w => w.Contains("warrior_cleave", StringComparison.Ordinal));        // radio 2,5
+        warnings.ShouldNotContain(w => w.Contains("rogue_throwing_blades", StringComparison.Ordinal)); // radio 3 desde HU-106
+        warnings.ShouldContain(w => w.Contains("mage_cone_of_cold", StringComparison.Ordinal)
+            && w.Contains("ADR-015", StringComparison.Ordinal));                                       // radio 5, sin casteo (Fase 3)
+    }
+
+    [Fact]
+    public void InstantDamageArea_ThatTheActivePhaseReaches_IsAnError() // revisión de autoridad de HU-102
+    {
+        using var dir = new TempContent();
+        dir.PatchPointer("rules.json", "/world/currentPhase", "2"); // tope 10: las Cuchillas (nivel 9) ya se alcanzan
+        dir.Patch("spells.json", root =>
+            root["spells"]!.AsArray().First(s => s!["id"]!.GetValue<string>() == "rogue_throwing_blades")!["aoeRadius"] = 4); // como antes de HU-106
+        var result = ContentLoader.Load(dir.Path);
+        result.Content.ShouldBeNull();
+        result.Report.Errors.ShouldContain(e => e.Contains("rogue_throwing_blades", StringComparison.Ordinal) && e.Contains("ya se alcanza", StringComparison.Ordinal));
+        result.Report.Errors.ShouldNotContain(e => e.Contains("mage_cone_of_cold", StringComparison.Ordinal)); // nivel 11: aún aviso
     }
 
     [Fact]
@@ -141,6 +165,13 @@ public sealed class ContentLoaderTests
     [InlineData("spells.json", "/spells/2/effects/1/auraId", "\"nope\"", "auraId 'nope' no existe")]
     [InlineData("rules.json", "/ai/wanderPauseMinMs", "7000", "mayor que wanderPauseMaxMs")]
     [InlineData("rules.json", "/loadout/usableSlots", "5", "más que las 8 teclas")]
+    [InlineData("spells.json", "/spells/0/areaDurationMs", "3000", "solo un hechizo de área puede dejar un área duradera")] // HU-100
+    [InlineData("spells.json", "/spells/3/areaDurationMs", "200", "menos que un pulso")]                                    // HU-100
+    [InlineData("spells.json", "/spells/10/areaDurationMs", "3000", "un salto, una carga o una invocación no dejan un área duradera")]                  // HU-100
+    [InlineData("spells.json", "/spells/0/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":2}", "solo los hechizos de monstruo invocan")] // HU-116
+    [InlineData("spells.json", "/spells/38/effects/0", "{\"type\":\"summon\",\"monsterId\":\"nope\",\"count\":2}", "monsterId 'nope' no existe")] // HU-116
+    [InlineData("spells.json", "/spells/38/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":6}", "más que rules.limits.maxSummonsPerCaster")] // HU-116
+    [InlineData("spells.json", "/spells/37/areaDurationMs", "3000", "con proyectil no deja un área duradera")] // HU-100 (goblin_shoot tiene proyectil)
     public void CrossReferenceRules_Fail(string file, string pointer, string valueJson, string expectedFragment)
     {
         using var dir = new TempContent();

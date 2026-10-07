@@ -142,6 +142,7 @@ public static class ServerApp
         router.Register(new AutoAttackHandler(combatDeps));
         router.Register(new RespawnHandler(combatDeps));
         router.Register(new SetHotbarHandler(content));
+        router.Register(new ChooseSpellUpgradeHandler(content));
         router.Register(new InventoryMoveHandler(combatDeps, content));
         router.Register(new UseItemHandler(combatDeps));
         router.Register(new DestroyItemHandler(combatDeps, content));

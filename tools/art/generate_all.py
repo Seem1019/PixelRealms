@@ -10,6 +10,7 @@ Todo es determinista: la misma versión del script da los mismos píxeles.
 """
 import gen_chars
 import gen_icons
+import gen_monsters_t2
 import gen_objects
 import gen_tiles
 import gen_ui
@@ -21,6 +22,7 @@ if __name__ == "__main__":
     palette_png()
     gen_tiles.build()
     gen_chars.build()
+    gen_monsters_t2.build()  # monstruos del Tier 2 (HU-114)
     import_heroes.build()  # guerrero y mago: hojas dibujadas a mano (HU-093)
     gen_icons.build()
     gen_ui.build()

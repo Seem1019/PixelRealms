@@ -28,7 +28,7 @@ public sealed class PlayerMapperTests
         mapper.Time = time;
         mapper.NowMs = () => 10_000;
         var p = mapper.ToPlayer(Dto(), new EntityId(1));
-        const string spellId = "warrior_shield_block"; // recarga de 20 s
+        const string spellId = "warrior_shield_block"; // recarga de 12 s (HU-106)
         p.Combat.CooldownEndsAtMs[spellId] = 25_000; // faltan 15 s
         p.Combat.CooldownEndsAtMs["warrior_strike"] = 9_000; // ya terminó: no se guarda
         p.ItemCooldownEndsAtMs["potion_minor"] = 15_000; // faltan 5 s

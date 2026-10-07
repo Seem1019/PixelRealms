@@ -1,11 +1,23 @@
 class_name TerrainBaker
-## Hornea un mapa (TmjMap) en dos imágenes con el tileset `assets/tiles/terrain.png` (lo genera tools/art/gen_tiles.py):
-## `ground` (suelo, decoración y objetos sólidos con su sombra; debajo de las entidades) y `above` (copas de árbol y aleros,
-## encima de las entidades). Solo cambia lo visual: lee los mismos GIDs del .tmj que la colisión (placeholder.tsj).
+## Hornea un mapa (TmjMap) en dos imágenes con el tileset de su tier (`assets/tiles/terrain*.png`, los genera
+## tools/art/gen_tiles.py): `ground` (suelo, decoración y objetos sólidos con su sombra; debajo de las entidades) y `above`
+## (copas de árbol y aleros, encima de las entidades). Solo cambia lo visual: lee los mismos GIDs del .tmj que la colisión
+## (placeholder.tsj).
 ## Los bordes entre terrenos se resuelven con "dual-grid": cada casilla de dibujo cae en la esquina de 4 casillas del mapa y
 ## elige una de 16 piezas según cuáles de las 4 son del terreno, así los caminos, el agua y las rocas tienen bordes irregulares.
 
+## Atlas de la Pradera y la Mina, y de los mapas sin `biome` ni `palette`.
 const ATLAS_PATH := "res://assets/tiles/terrain.png"
+## HU-108: un atlas por bioma (propiedad de mapa `biome`, exteriores) y por paleta de cueva (`palette`), todos con la misma
+## disposición de piezas. Si el mapa tiene las dos, manda `palette`.
+const BIOME_ATLASES := {
+	"meadow": ATLAS_PATH,
+	"forest": "res://assets/tiles/terrain_forest.png",
+}
+const PALETTE_ATLASES := {
+	"mine": ATLAS_PATH,
+	"crypt": "res://assets/tiles/terrain_crypt.png",
+}
 const T := 16
 
 ## GIDs de placeholder.tsj (firstgid 1).
@@ -43,29 +55,52 @@ const WELL_MAX_CELLS := 4
 const SHADOW := Color(0.12, 0.07, 0.14, 0.38)
 const CANOPY_SHADOW := Color(0.1, 0.12, 0.08, 0.3)
 
-static var _cache: Dictionary = {}  # clave del mapa → {ground: Image, above: Image}
-static var _atlas: Image
+static var _cache: Dictionary = {}  # clave del mapa y del atlas → {ground: Image, above: Image}
+static var _atlases: Dictionary = {}  # ruta → Image (RGBA8)
 
 
-static func atlas() -> Image:
-	if _atlas == null and ResourceLoader.exists(ATLAS_PATH):
-		var tex := load(ATLAS_PATH) as Texture2D
+static func atlas(path: String = ATLAS_PATH) -> Image:
+	if not _atlases.has(path) and ResourceLoader.exists(path):
+		var tex := load(path) as Texture2D
 		if tex != null:
-			_atlas = tex.get_image()
-			if _atlas.is_compressed():
-				_atlas.decompress()
-			_atlas.convert(Image.FORMAT_RGBA8)
-	return _atlas
+			var img := tex.get_image()
+			if img.is_compressed():
+				img.decompress()
+			img.convert(Image.FORMAT_RGBA8)
+			_atlases[path] = img
+	return _atlases.get(path)
 
 
-## {ground: Image, above: Image} o vacío si falta el tileset (el llamador usa el respaldo de colores).
+## Ruta del atlas con el que se hornea el mapa: el de su `palette`, si no el de su `biome`; sin ninguna (o con un valor
+## desconocido, que avisa), el de la Pradera.
+static func atlas_path_for(map: TmjMap) -> String:
+	if map.palette != "":
+		return _lookup(PALETTE_ATLASES, "palette", map.palette)
+	if map.biome != "":
+		return _lookup(BIOME_ATLASES, "biome", map.biome)
+	return ATLAS_PATH
+
+
+static func _lookup(table: Dictionary, property: String, value: String) -> String:
+	if table.has(value):
+		return table[value]
+	push_warning("Mapa con %s desconocido '%s': se hornea con el atlas de la Pradera" % [property, value])
+	return ATLAS_PATH
+
+
+## {ground: Image, above: Image} o vacío si falta el tileset (el llamador usa el respaldo de colores). El resultado se
+## guarda por mapa y atlas: volver a un mapa ya horneado en la sesión no lo hornea otra vez.
 static func bake(map: TmjMap) -> Dictionary:
-	if map == null or atlas() == null:
+	if map == null:
 		return {}
-	var key := "%s:%dx%d" % [map.map_id, map.width, map.height]
+	var path := atlas_path_for(map)
+	var src := atlas(path)
+	if src == null:
+		return {}
+	var key := "%s:%dx%d:%s" % [map.map_id, map.width, map.height, path]
 	if _cache.has(key):
 		return _cache[key]
-	var b := _Bake.new(map, atlas())
+	var b := _Bake.new(map, src)
 	var result := b.run()
 	_cache[key] = result
 	return result

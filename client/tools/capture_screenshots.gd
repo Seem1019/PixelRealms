@@ -175,7 +175,7 @@ func _world_shots() -> void:
 			w.set_process(false)
 			reticle.aim_pos = Vector2(845, 630)
 			reticle.aim_in_range = true
-			w.call("_update_area_preview", Vector2(845, 630))
+			w.call("_update_area_preview")
 			await _shot("area_spell")
 			w.set_process(true)
 			w.call("_stop_aiming")

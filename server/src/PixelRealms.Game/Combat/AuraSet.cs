@@ -10,7 +10,7 @@ namespace PixelRealms.Game.Combat;
 /// </summary>
 public sealed class AuraInstance
 {
-    public AuraDef Def { get; private set; } = null!;
+    public AuraDef Def { get; internal set; } = null!;
 
     public EntityId? CasterId { get; private set; }
 

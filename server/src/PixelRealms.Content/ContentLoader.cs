@@ -43,7 +43,40 @@ public static class ContentLoader
             report.Error("content", "", $"error de deserialización: {ex.Message}");
             return new LoadResult(null, report);
         }
+        CheckUpgradedSpells(db, report);
         return new LoadResult(report.IsValid ? db : null, report);
+    }
+
+    /// <summary>Área apuntada de daño sin casteo que no es un cono cuerpo a cuerpo (ADR-027 D4).</summary>
+    private static bool Undodgeable(SpellDef s, CombatRules combat) =>
+        s.Targeting.IsGround() && s.IsInstant && s.Effects.Any(e => e.Type == EffectType.Damage) && !s.Effects.Any(e => e.Type == EffectType.Leap)
+        && !(s.Shape == Shape.Cone && s.AoeRadius <= combat.InstantConeMaxRadiusTiles);
+
+    /// <summary>
+    /// HU-104: el hechizo con cada mejora aplicada sigue siendo válido (nada negativo, al menos un objetivo, auras con duración) y, si
+    /// la mejora lo deja instantáneo, respeta `minInstantSpellCooldownMs` como cualquier hechizo de clase. Un aura beneficiosa que
+    /// añade una mejora no dura más que la recarga: si no, se lanzaría con una mejora, se cambiaría gratis y se tendrían las dos.
+    /// </summary>
+    internal static void CheckUpgradedSpells(ContentDb db, ValidationReport report)
+    {
+        var minInstantCd = db.Rules.Combat.MinInstantSpellCooldownMs;
+        foreach (var (key, s) in db.UpgradedSpells)
+        {
+            if (Undodgeable(s, db.Rules.Combat) && !Undodgeable(db.Spell(s.Id), db.Rules.Combat))
+                report.Error("spells.json", "", $"{key}: la mejora deja un área de daño sin casteo que no se puede esquivar (ADR-015, ADR-027 D4)");
+            if (s.CastMs < 0 || s.CooldownMs < 0 || s.Cost is { Amount: < 0 } || s.Range < 0 || s.AoeRadius < 0 || s.AoeAngleDeg < 0
+                || s.AoeAngleDeg > 180 || s.AoeLength < 0 || s.AoeWidth < 0 || s.MaxTargets < 1)
+                report.Error("spells.json", "", $"{key}: la mejora deja un valor fuera de rango (negativo, cono de más de 180° o sin objetivos)");
+            if (s.IsInstant && s.CooldownMs < minInstantCd)
+                report.Error("spells.json", "", $"{key}: con la mejora queda instantáneo con cooldown {s.CooldownMs} ms < rules.combat.minInstantSpellCooldownMs ({minInstantCd})");
+            foreach (var e in s.Effects)
+                if (e.AuraOverride is { DurationMs: <= 0 } a)
+                    report.Error("spells.json", "", $"{key}: la mejora deja el aura '{a.Id}' sin duración");
+            var baseCount = db.Spell(s.Id).Effects.Count;
+            for (var i = baseCount; i < s.Effects.Count; i++)
+                if (s.Effects[i] is { Type: EffectType.ApplyAura, AuraId: { } added } && db.Aura(added) is { IsDebuff: false } buff && buff.DurationMs > s.CooldownMs)
+                    report.Error("spells.json", "", $"{key}: el aura beneficiosa '{added}' que añade la mejora dura {buff.DurationMs} ms, más que la recarga ({s.CooldownMs} ms): se acumularían las dos mejoras");
+        }
     }
 
     public static ContentDb LoadOrThrow(string contentDir) => Load(contentDir).ContentOrThrow;

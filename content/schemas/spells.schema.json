@@ -19,6 +19,79 @@
     }
   },
   "$defs": {
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "mods"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "description": {
+          "$ref": "common.schema.json#/$defs/localizedText"
+        },
+        "mods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/mod"
+          }
+        }
+      }
+    },
+    "mod": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Un modificador (valor final = valor · mult + add): 'stat' cambia un campo del hechizo; 'effect' + 'mult' escala sus efectos de ese tipo; 'aura' + 'stat' (durationMs, pct, amount) cambia un aura que aplica; 'addEffect' añade un efecto.",
+      "properties": {
+        "stat": {
+          "enum": [
+            "cooldownMs",
+            "castMs",
+            "cost",
+            "range",
+            "aoeRadius",
+            "aoeAngleDeg",
+            "aoeLength",
+            "aoeWidth",
+            "maxTargets",
+            "durationMs",
+            "pct",
+            "amount"
+          ]
+        },
+        "effect": {
+          "enum": [
+            "damage",
+            "heal",
+            "restore_resource"
+          ]
+        },
+        "aura": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "add": {
+          "type": "number"
+        },
+        "mult": {
+          "type": "number",
+          "minimum": 0
+        },
+        "addEffect": {
+          "$ref": "#/$defs/effect"
+        }
+      }
+    },
     "spell": {
       "type": "object",
       "additionalProperties": false,
@@ -121,6 +194,11 @@
           "minimum": 1,
           "default": 10
         },
+        "areaDurationMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "HU-100: el área se queda en el suelo este tiempo y aplica sus efectos cada rules.limits.persistentAreaTickMs (el primero, un intervalo después de aparecer). Solo hechizos de área; como mucho rules.limits.maxPersistentAreasPerCaster por lanzador."
+        },
         "projectile": {
           "type": "object",
           "additionalProperties": false,
@@ -184,6 +262,15 @@
         "provisional": {
           "type": "boolean",
           "description": "true = números provisionales, pendientes de la pasada del content-designer; false = medidos con tools/balance/ (docs/design/balance-report.md)."
+        },
+        "upgrades": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/upgrade"
+          },
+          "description": "Mejoras 1-de-2 (HU-104, ADR-027 D1): desde rules.progression.spellUpgradeLevel el jugador elige una, y la cambia gratis fuera de combate. Solo hechizos de clase."
         }
       },
       "allOf": [
@@ -494,6 +581,28 @@
             "type"
           ],
           "description": "Corta el casteo del objetivo y aplica rules.combat.interruptLockoutMs (ADR-019)."
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "summon"
+            },
+            "monsterId": {
+              "$ref": "common.schema.json#/$defs/id"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "type",
+            "monsterId",
+            "count"
+          ],
+          "description": "HU-116: invoca `count` monstruos junto al lanzador, una vez por lanzamiento. Solo hechizos de monstruo; topes en rules.limits (maxSummonsPerCaster, maxSummonsPerInstance). No dan XP ni botín y se van si el invocador muere o evade."
         }
       ]
     }

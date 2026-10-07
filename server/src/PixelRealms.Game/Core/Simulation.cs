@@ -98,7 +98,7 @@ public sealed class Simulation
     }
 
     /// <summary>Sistemas cuyo tiempo cuenta como "combate" (docs/architecture.md §8: ≤ 4 ms p99 por instancia).</summary>
-    public static readonly HashSet<string> CombatSystemNames = new(StringComparer.Ordinal) { "casts", "auras", "monster_ai", "auto_attack", "resources", "death" };
+    public static readonly HashSet<string> CombatSystemNames = new(StringComparer.Ordinal) { "casts", "auras", "monster_ai", "auto_attack", "resources", "death", "summons" };
 
     private readonly Dictionary<int, double> _combatMsThisTick = new();
 

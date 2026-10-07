@@ -24,6 +24,9 @@ public sealed class DeathSystem(CombatServices services, AuraSystem auras, Inter
     /// <summary>El cadáver desapareció (LootSystem olvida su bolsa).</summary>
     public Action<Monster, MapInstance>? OnCorpseRemoved { get; set; }
 
+    /// <summary>Alguien murió (CastSystem quita sus áreas duraderas, HU-100).</summary>
+    public Action<Actor, MapInstance, TickContext>? OnActorKilled { get; set; }
+
     public void Kill(Actor victim, Actor? killer, MapInstance map, TickContext ctx)
     {
         if (victim.Combat.DiedAtMs != long.MinValue) return; // ya muerto
@@ -36,6 +39,7 @@ public sealed class DeathSystem(CombatServices services, AuraSystem auras, Inter
         auras.ClearAll(victim, map, ctx);
         foreach (var m in map.Monsters.Values) m.Threat.Remove(victim.Id);
         if (victim is Monster mon) { mon.Threat.Clear(); OnMonsterKilled?.Invoke(mon, map, ctx); }
+        OnActorKilled?.Invoke(victim, map, ctx);
         ctx.Emit(new ActorDiedEvent(map.Id, victim, killer));
     }
 

@@ -93,6 +93,36 @@ public sealed record EffectDef
     public ApplyTo ApplyTo { get; init; } = ApplyTo.Targets;
     public double BonusBelowHpPct { get; init; }
     public double BonusMult { get; init; } = 1.0;
+    /// <summary>`summon` (HU-116): plantilla y cuántos.</summary>
+    public string? MonsterId { get; init; }
+    public int Count { get; init; }
+    /// <summary>`apply_aura` de un hechizo mejorado (HU-104): copia del aura con los campos que cambia la mejora, mismo id. No
+    /// viene del JSON: la pone <see cref="SpellUpgrades.Apply"/>.</summary>
+    [JsonIgnore] public AuraDef? AuraOverride { get; init; }
+}
+
+/// <summary>Mejora 1-de-2 de un hechizo de clase (HU-104, ADR-027 D1): una lista de modificadores genéricos.</summary>
+public sealed record SpellUpgradeDef
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required string Description { get; init; }
+    public required IReadOnlyList<SpellModDef> Mods { get; init; }
+}
+
+/// <summary>
+/// Un modificador de una mejora, de uno de cuatro tipos: un campo del hechizo (`stat`); la potencia de sus efectos de un tipo
+/// (`effect` + `mult`: base y coeficientes); un campo de un aura que aplica (`aura` + `stat`: `durationMs`, `pct` o `amount`);
+/// o un efecto añadido (`addEffect`). Valor final = valor · `mult` + `add`.
+/// </summary>
+public sealed record SpellModDef
+{
+    public string? Stat { get; init; }
+    public EffectType? Effect { get; init; }
+    public string? Aura { get; init; }
+    public double Add { get; init; }
+    public double Mult { get; init; } = 1.0;
+    public EffectDef? AddEffect { get; init; }
 }
 
 public sealed record SpellDef
@@ -113,6 +143,8 @@ public sealed record SpellDef
     public required Targeting Targeting { get; init; }
     public double AoeRadius { get; init; }
     public int MaxTargets { get; init; } = 10;
+    /// <summary>HU-100: área duradera (0 = se resuelve una vez). Pulsa cada `rules.limits.persistentAreaTickMs`.</summary>
+    public int AreaDurationMs { get; init; }
     public ProjectileDef? Projectile { get; init; }
     public required IReadOnlyList<EffectDef> Effects { get; init; }
     public required string Icon { get; init; }
@@ -123,6 +155,11 @@ public sealed record SpellDef
     public double AoeLength { get; init; }
     public double AoeWidth { get; init; }
     public bool Provisional { get; init; }
+    /// <summary>HU-104: las dos mejoras entre las que elige el jugador (vacío si el hechizo no tiene).</summary>
+    public IReadOnlyList<SpellUpgradeDef> Upgrades { get; init; } = [];
+    /// <summary>En un hechizo efectivo, la mejora aplicada (viaja en `CastStarted`/`AreaSpawn` para que los demás dibujen la
+    /// forma mejorada). No viene del JSON: la pone <see cref="SpellUpgrades.Apply"/>.</summary>
+    [JsonIgnore] public string? AppliedUpgradeId { get; init; }
 
     public bool IsInstant => CastMs == 0;
 }

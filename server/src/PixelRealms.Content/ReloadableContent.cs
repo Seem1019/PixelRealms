@@ -28,7 +28,10 @@ public sealed class ReloadableContent
         var (rules, report) = ContentLoader.LoadRules(ContentDir);
         if (rules is null || !report.IsValid) return report;
         var old = _current;
-        _current = new ContentDb(old.Classes, old.Spells, old.Auras, old.Items, old.Monsters, old.LootTables, old.Vendors, rules);
+        var next = new ContentDb(old.Classes, old.Spells, old.Auras, old.Items, old.Monsters, old.LootTables, old.Vendors, rules);
+        ContentLoader.CheckUpgradedSpells(next, report); // las reglas nuevas también valen para los hechizos mejorados (HU-104)
+        if (!report.IsValid) return report;
+        _current = next;
         return report;
     }
 }

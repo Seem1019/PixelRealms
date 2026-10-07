@@ -27,7 +27,7 @@ public enum Targeting { Self, Enemy, Ally, SelfAoeEnemies, SelfAoeAllies, Ground
 
 public enum Shape { Circle, Cone, Line }
 
-public enum EffectType { Damage, Heal, RestoreResource, ApplyAura, Taunt, Dash, Interrupt, Leap }
+public enum EffectType { Damage, Heal, RestoreResource, ApplyAura, Taunt, Dash, Interrupt, Leap, Summon }
 
 public enum ApplyTo { Targets, Self }
 

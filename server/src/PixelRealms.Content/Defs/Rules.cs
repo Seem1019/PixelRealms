@@ -81,6 +81,8 @@ public sealed record ProgressionRules
     public required IReadOnlyList<int> SpellUnlockLevels { get; init; }
     public required IReadOnlyList<int> SpellRankLevels { get; init; }
     public required double SpellRankBonusPct { get; init; }
+    /// <summary>HU-104: nivel desde el que cada hechizo de clase elige 1 de sus 2 mejoras (ADR-027 D1).</summary>
+    public required int SpellUpgradeLevel { get; init; }
     public required ClassChangeRules ClassChange { get; init; }
     public required AltCatchUpRules AltCatchUp { get; init; }
 }
@@ -147,6 +149,8 @@ public sealed record CombatRules
     public required int InterruptLockoutMs { get; init; }
     public required int AbilityLockMs { get; init; }
     public required int MinInstantSpellCooldownMs { get; init; }
+    /// <summary>Radio máximo de un cono de daño sin casteo (ADR-027 D4); lo usa el validador.</summary>
+    public required double InstantConeMaxRadiusTiles { get; init; }
     public required double LinkdeadSec { get; init; }
     public required double LinkdeadInCombatMaxSec { get; init; }
     public required double ManaPerBasicHitPctPerSec { get; init; }
@@ -298,6 +302,9 @@ public sealed record LimitRules
     public required int PersistentAreaTickMs { get; init; }
     public required int MaxBuffsPerEntity { get; init; }
     public required int MaxDebuffsPerEntity { get; init; }
+    /// <summary>HU-116: invocaciones vivas por invocador y por instancia.</summary>
+    public required int MaxSummonsPerCaster { get; init; }
+    public required int MaxSummonsPerInstance { get; init; }
 }
 
 public sealed record PentagramReferences

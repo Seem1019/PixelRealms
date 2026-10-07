@@ -22,4 +22,11 @@ public sealed class MigrationRoundTripTests(PostgresFixture pg) : IClassFixture<
         await migrator.MigrateAsync(cancellationToken: ct); // up otra vez
         (await db.Database.GetPendingMigrationsAsync(ct)).ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task Model_HasNoChangesWithoutAMigration() // las migraciones de HU-104 en adelante se escribieron sin `dotnet ef`
+    {
+        await using var db = await pg.Factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        db.Database.HasPendingModelChanges().ShouldBeFalse();
+    }
 }
