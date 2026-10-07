@@ -42,6 +42,7 @@ public static class MessageRegistry
         Register<PartyLeave>("PartyLeave");
         Register<PartyKick>("PartyKick");
         Register<SetHotbar>("SetHotbar");
+        Register<ChooseSpellUpgrade>("ChooseSpellUpgrade");
         Register<Respawn>("Respawn");
         Register<UsePortal>("UsePortal");
         Register<DuelRequest>("DuelRequest");
@@ -73,6 +74,7 @@ public static class MessageRegistry
         RegisterServer<StatsUpdate>("StatsUpdate");
         RegisterServer<XpGain>("XpGain");
         RegisterServer<LevelUp>("LevelUp");
+        RegisterServer<SpellUpgradesUpdate>("SpellUpgradesUpdate");
         RegisterServer<InventoryUpdate>("InventoryUpdate");
         RegisterServer<LootWindow>("LootWindow");
         RegisterServer<ChangeMap>("ChangeMap");

@@ -12,7 +12,7 @@
 
     "progression": {
       "type": "object", "additionalProperties": false,
-      "required": ["maxLevel", "levelCapByPhase", "minutesPerLevel", "killCycleSecTarget", "xpRate", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "spellRankLevels", "spellRankBonusPct", "classChange", "altCatchUp"],
+      "required": ["maxLevel", "levelCapByPhase", "minutesPerLevel", "killCycleSecTarget", "xpRate", "monsterXpPerLevel", "monsterXpBase", "monsterTypeMultiplier", "levelDiffGreyAt", "levelDiffModPerLevel", "levelDiffClamp", "spellUnlockLevels", "spellRankLevels", "spellRankBonusPct", "spellUpgradeLevel", "classChange", "altCatchUp"],
       "properties": {
         "maxLevel": { "type": "integer", "minimum": 2, "maximum": 60, "description": "Nivel máximo absoluto del MVP. xpParaSubir se define para L = 1..maxLevel-1." },
         "levelCapByPhase": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Tope de nivel efectivo por fase del MVP (índice = fase − 1). El tope activo es levelCapByPhase[world.currentPhase − 1]; el último valor debe ser igual a maxLevel." },
@@ -31,6 +31,7 @@
         "levelDiffClamp": { "type": "integer", "minimum": 0 },
         "spellUnlockLevels": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Niveles en que cada clase desbloquea su hechizo n.º i (ordenados). Informativo: el valor real es spells[].levelReq." },
         "spellRankLevels": { "type": "array", "items": { "type": "integer", "minimum": 2 }, "minItems": 1, "description": "Niveles en que todos los hechizos de clase suben un rango (ADR-024). En la Fase 1 solo se alcanza el primero." },
+        "spellUpgradeLevel": { "type": "integer", "minimum": 2, "description": "Nivel desde el que cada hechizo de clase elige 1 de sus 2 mejoras (HU-104, ADR-027 D1); es uno de spellRankLevels." },
         "spellRankBonusPct": { "type": "number", "exclusiveMinimum": 0, "description": "Fracción del valor base que añade cada rango (0.15 = +15 % por rango, ADR-024)." },
         "classChange": { "type": "object", "additionalProperties": false, "required": ["npcUntilPhase"],
           "properties": { "npcUntilPhase": { "type": "integer", "minimum": 0, "description": "Última fase en la que el NPC de la Aldea cambia la clase conservando nivel, items y oro (0 = nunca)." } } },

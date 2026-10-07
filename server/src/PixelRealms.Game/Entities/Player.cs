@@ -41,6 +41,9 @@ public sealed class Player(EntityId id, string name, string classId) : Actor(id,
 
     public List<string> KnownSpells { get; } = new();
 
+    /// <summary>HU-104: mejora elegida por hechizo (spellId → upgradeId); se guarda con el personaje.</summary>
+    public Dictionary<string, string> SpellUpgrades { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Marca de "hay cambios sin guardar" para el autosave (HU-026).</summary>
     public bool Dirty { get; set; }
 

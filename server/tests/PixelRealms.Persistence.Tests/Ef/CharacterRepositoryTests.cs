@@ -79,6 +79,22 @@ public sealed class CharacterRepositoryTests(PostgresFixture pg) : IClassFixture
     }
 
     [Fact]
+    public async Task SpellUpgrades_RoundTrip_AndEachSaveReplacesThePrevious() // HU-104 CA5
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var accounts = new EfAccountRepository(pg.Factory);
+        var chars = new EfCharacterRepository(pg.Factory);
+        var acc = (await accounts.CreateAsync("upg", "hash", ct)).ShouldNotBeNull();
+        var created = (await chars.CreateAsync(new NewCharacter(acc.Id, "Upg", "mage", "meadow", 10, 12, 60, 0, [], []), Max, ct)).Character.ShouldNotBeNull();
+        await chars.SaveAsync(created with { SpellUpgrades = [new SavedSpellUpgrade("mage_fireball", "fireball_quick"), new SavedSpellUpgrade("mage_frostbolt", "frostbolt_long")] }, ct);
+        await chars.SaveAsync(created with { SpellUpgrades = [new SavedSpellUpgrade("mage_fireball", "fireball_hot")] }, ct);
+
+        var loaded = (await chars.LoadAsync(created.Id, ct)).ShouldNotBeNull();
+        var up = loaded.SpellUpgrades.ShouldNotBeNull().ShouldHaveSingleItem(); // la de escarcha ya no estaba en el último guardado
+        up.ShouldBe(new SavedSpellUpgrade("mage_fireball", "fireball_hot"));
+    }
+
+    [Fact]
     public async Task DuplicateNames_AreRejected_CaseInsensitive() // HU-010 CA2, HU-012 CA3
     {
         var accounts = new EfAccountRepository(pg.Factory);

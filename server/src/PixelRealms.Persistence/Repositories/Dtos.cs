@@ -10,13 +10,16 @@ public sealed record SavedHotbarSlot(short Slot, short Kind, string Ref);
 /// personaje esté desconectado (HU-015).</summary>
 public sealed record SavedCooldown(short Kind, string Ref, DateTime EndsAtUtc);
 
+/// <summary>Mejora elegida para un hechizo (HU-104).</summary>
+public sealed record SavedSpellUpgrade(string SpellId, string UpgradeId);
+
 public sealed record AuditEntry(Guid ItemId, string Action, string TemplateId, int Quantity, Guid? CounterpartyCharacterId = null);
 
 /// <summary>Personaje completo tal como se guarda/carga (stats base no: se derivan de clase + nivel + equipo).</summary>
 public sealed record CharacterSaveDto(
     Guid Id, Guid AccountId, string Name, string ClassId, int Level, int Xp, long Gold, string MapId, float X, float Y, int Hp, int Resource,
     IReadOnlyList<SavedItem> Items, IReadOnlyList<SavedHotbarSlot> Hotbar, IReadOnlyList<AuditEntry> Audit,
-    IReadOnlyList<SavedCooldown>? Cooldowns = null);
+    IReadOnlyList<SavedCooldown>? Cooldowns = null, IReadOnlyList<SavedSpellUpgrade>? SpellUpgrades = null);
 
 public sealed record CharacterSummary(Guid Id, string Name, string ClassId, int Level, string MapId);
 

@@ -11,7 +11,9 @@ public sealed record XpGainedEvent(int MapInstanceId, Player Player, int Amount,
 
 public sealed record RankUp(string SpellId, int Rank);
 
-public sealed record LevelUpEvent(int MapInstanceId, Player Player, int Level, IReadOnlyList<string> NewSpells, IReadOnlyList<RankUp> RankUps) : IGameEvent;
+/// <param name="UpgradesUnlocked">HU-104: hechizos cuya mejora se puede elegir desde este nivel.</param>
+public sealed record LevelUpEvent(int MapInstanceId, Player Player, int Level, IReadOnlyList<string> NewSpells, IReadOnlyList<RankUp> RankUps,
+    IReadOnlyList<string>? UpgradesUnlocked = null) : IGameEvent;
 
 /// <summary>Stats del jugador cambiaron (nivel, equipo, auras con stats): el servidor envía StatsUpdate.</summary>
 public sealed record StatsChangedEvent(int MapInstanceId, Player Player) : IGameEvent;
@@ -78,6 +80,7 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
             player.Level = target;
             var db = services.Content;
             player.KnownSpells.RemoveAll(id => db.TryGetSpell(id, out var s) && s is not null && s.LevelReq > target);
+            SpellUpgradeRules.Prune(player, db, ctx.Rules.Progression); // HU-104 CA6: por debajo del nivel 8 no queda ninguna
             for (var i = 0; i < player.Hotbar.Length; i++)
                 if (player.Hotbar[i] is { Kind: "spell" } slot && !player.KnownSpells.Contains(slot.Ref)) player.Hotbar[i] = null;
             if (player.Combat.Cast is { } cast)
@@ -122,6 +125,6 @@ public sealed class ProgressionSystem(CombatServices services) : IMapSystem
         player.Hp = player.MaxHp;
         player.Resource = player.MaxResource;
         player.Dirty = true;
-        ctx.Emit(new LevelUpEvent(map.Id, player, player.Level, newSpells, rankUps));
+        ctx.Emit(new LevelUpEvent(map.Id, player, player.Level, newSpells, rankUps, SpellUpgradeRules.UnlockedAt(player, newSpells, db, p)));
     }
 }

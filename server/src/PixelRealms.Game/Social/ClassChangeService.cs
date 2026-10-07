@@ -38,6 +38,7 @@ public sealed class ClassChangeService(CombatServices services)
         p.ClassId = classId;
         p.KnownSpells.Clear();
         p.KnownSpells.AddRange(services.Content.KnownSpells(classId, p.Level).Select(s => s.Id));
+        Progression.SpellUpgradeRules.Prune(p, services.Content, rules.Progression); // HU-104 CA6: las de la clase anterior se van
         var spellSlots = rules.Loadout.SpellSlots;
         for (var i = 0; i < spellSlots; i++) p.Hotbar[i] = null;
         var slot = 0;

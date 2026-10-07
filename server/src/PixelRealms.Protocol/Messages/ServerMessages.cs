@@ -9,10 +9,11 @@ public sealed record SelfStateDto(float X, float Y, int Level, int Xp, int XpNex
 
 public sealed record HotbarSlotDto(int Slot, string Kind, string Ref);
 
+/// <param name="SpellUpgrades">HU-104: mejora elegida por hechizo (spellId → upgradeId); se omite si no hay ninguna.</param>
 public sealed record Welcome(
     int SelfId, long Tick, int TickRate, int SnapshotRate, string MapId, SelfStateDto Self,
     IReadOnlyList<ItemStackDto?> Inventory, IReadOnlyList<ItemStackDto?> Equipment, IReadOnlyList<HotbarSlotDto> Hotbar,
-    IReadOnlyList<string> KnownSpells, string RulesHash) : IServerMessage;
+    IReadOnlyList<string> KnownSpells, string RulesHash, IReadOnlyDictionary<string, string>? SpellUpgrades = null) : IServerMessage;
 
 public sealed record SnapshotSelfDto(float X, float Y, float Speed, int Hp, int MaxHp, int Res, int MaxRes);
 
@@ -25,7 +26,8 @@ public sealed record EntitySpawn(int Id, string Kind, string TemplateId, string 
 
 public sealed record EntityDespawn(int Id, string Reason) : IServerMessage;
 
-public sealed record CastStarted(int CasterId, string SpellId, int? TargetId, Vec2Dto? TargetPos, Vec2Dto? Origin, float? Radius, int DurationMs) : IServerMessage;
+/// <param name="UpgradeId">HU-104: la mejora con que se lanza; el cliente dibuja la forma del hechizo mejorado.</param>
+public sealed record CastStarted(int CasterId, string SpellId, int? TargetId, Vec2Dto? TargetPos, Vec2Dto? Origin, float? Radius, int DurationMs, string? UpgradeId = null) : IServerMessage;
 
 public sealed record CastEnded(int CasterId, string SpellId, string Result, string? Reason) : IServerMessage;
 
@@ -49,7 +51,11 @@ public sealed record XpGain(int Amount, int? SourceId) : IServerMessage;
 
 public sealed record RankUpDto(string SpellId, int Rank);
 
-public sealed record LevelUp(int Level, IReadOnlyList<string> NewSpells, IReadOnlyList<RankUpDto>? RankUps) : IServerMessage;
+/// <param name="UpgradesUnlocked">HU-104: hechizos cuya mejora se puede elegir desde este nivel (se omite si no hay).</param>
+public sealed record LevelUp(int Level, IReadOnlyList<string> NewSpells, IReadOnlyList<RankUpDto>? RankUps, IReadOnlyList<string>? UpgradesUnlocked = null) : IServerMessage;
+
+/// <summary>HU-104: las mejoras elegidas tras un `ChooseSpellUpgrade` aceptado (todas, spellId → upgradeId).</summary>
+public sealed record SpellUpgradesUpdate(IReadOnlyDictionary<string, string> Upgrades, int? ReqId) : IServerMessage;
 
 public sealed record InventoryUpdate(IReadOnlyList<ItemStackDto?> Bag, IReadOnlyList<ItemStackDto?> Equipment, long Gold, int? ReqId) : IServerMessage;
 

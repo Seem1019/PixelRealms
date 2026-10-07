@@ -19,6 +19,79 @@
     }
   },
   "$defs": {
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "mods"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "description": {
+          "$ref": "common.schema.json#/$defs/localizedText"
+        },
+        "mods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/mod"
+          }
+        }
+      }
+    },
+    "mod": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Un modificador (valor final = valor · mult + add): 'stat' cambia un campo del hechizo; 'effect' + 'mult' escala sus efectos de ese tipo; 'aura' + 'stat' (durationMs, pct, amount) cambia un aura que aplica; 'addEffect' añade un efecto.",
+      "properties": {
+        "stat": {
+          "enum": [
+            "cooldownMs",
+            "castMs",
+            "cost",
+            "range",
+            "aoeRadius",
+            "aoeAngleDeg",
+            "aoeLength",
+            "aoeWidth",
+            "maxTargets",
+            "durationMs",
+            "pct",
+            "amount"
+          ]
+        },
+        "effect": {
+          "enum": [
+            "damage",
+            "heal",
+            "restore_resource"
+          ]
+        },
+        "aura": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "add": {
+          "type": "number"
+        },
+        "mult": {
+          "type": "number",
+          "minimum": 0
+        },
+        "addEffect": {
+          "$ref": "#/$defs/effect"
+        }
+      }
+    },
     "spell": {
       "type": "object",
       "additionalProperties": false,
@@ -184,6 +257,15 @@
         "provisional": {
           "type": "boolean",
           "description": "true = números provisionales, pendientes de la pasada del content-designer; false = medidos con tools/balance/ (docs/design/balance-report.md)."
+        },
+        "upgrades": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/upgrade"
+          },
+          "description": "Mejoras 1-de-2 (HU-104, ADR-027 D1): desde rules.progression.spellUpgradeLevel el jugador elige una, y la cambia gratis fuera de combate. Solo hechizos de clase."
         }
       },
       "allOf": [

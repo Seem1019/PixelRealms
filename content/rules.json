@@ -17,6 +17,7 @@
     "spellUnlockLevels": [1, 2, 3, 5, 7, 9, 11, 13],
     "spellRankLevels": [4, 8, 12],
     "spellRankBonusPct": 0.15,
+    "spellUpgradeLevel": 8,
     "classChange": { "npcUntilPhase": 2 },
     "altCatchUp": { "fromPhase": 3, "xpMultiplier": 2.0 }
   },

@@ -63,6 +63,9 @@ public sealed record PartyKick(string Name) : IClientMessage;
 
 public sealed record SetHotbar(int Slot, string? Kind = null, string? Ref = null) : IClientMessage;
 
+/// <summary>HU-104: elige la mejora de un hechizo (sin `upgradeId`, la quita). Fuera de combate y desde `spellUpgradeLevel`.</summary>
+public sealed record ChooseSpellUpgrade(string SpellId, string? UpgradeId = null, int? ReqId = null) : IClientMessage;
+
 public sealed record Respawn : IClientMessage;
 
 public sealed record UsePortal(string PortalId) : IClientMessage;

@@ -78,7 +78,7 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     connections.Send(l.Observer.ConnectionId, new EntityDespawn(l.EntityId.Value, l.Reason));
                     break;
                 case CastStartedEvent cs:
-                    Broadcast(cs.MapInstanceId, cs.Caster, new CastStarted(cs.Caster.Id.Value, cs.Spell.Id, cs.TargetId?.Value, ToPx(cs.TargetPos), ToPx(cs.Origin), null, cs.DurationMs));
+                    Broadcast(cs.MapInstanceId, cs.Caster, new CastStarted(cs.Caster.Id.Value, cs.Spell.Id, cs.TargetId?.Value, ToPx(cs.TargetPos), ToPx(cs.Origin), null, cs.DurationMs, cs.Spell.AppliedUpgradeId));
                     break;
                 case CastEndedEvent ce:
                     Broadcast(ce.MapInstanceId, ce.Caster, new CastEnded(ce.Caster.Id.Value, ce.Spell.Id, ce.Result, ce.Reason));
@@ -114,7 +114,8 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     break;
                 case LevelUpEvent lu:
                     if (lu.Player.ConnectionId >= 0)
-                        connections.Send(lu.Player.ConnectionId, new LevelUp(lu.Level, lu.NewSpells.ToList(), lu.RankUps.Count == 0 ? null : lu.RankUps.Select(r => new RankUpDto(r.SpellId, r.Rank)).ToList()));
+                        connections.Send(lu.Player.ConnectionId, new LevelUp(lu.Level, lu.NewSpells.ToList(), lu.RankUps.Count == 0 ? null : lu.RankUps.Select(r => new RankUpDto(r.SpellId, r.Rank)).ToList(),
+                            lu.UpgradesUnlocked is { Count: > 0 } up ? up.ToList() : null));
                     // HU-041 CA3: los demás ven el nivel nuevo (EntitySpawn renovado) y HU-026 CA6: guardado al subir.
                     Broadcast(lu.MapInstanceId, lu.Player, SnapshotBuilder.ToSpawn(lu.Player));
                     session.Save(lu.Player, ctx.NowMs, "level_up");

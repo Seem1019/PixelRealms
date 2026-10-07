@@ -88,6 +88,8 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
             if (spell.Source == SpellSource.Class && !p.KnownSpells.Contains(spell.Id)) return CastErrors.NotFound;
             if (EngineCapabilities.UnavailableReason(spell) is not null) return CastErrors.NotFound;
             if (p.Level < spell.LevelReq) return CastErrors.LevelTooLow;
+            // HU-104: desde aquí todo (coste, recarga, casteo, alcance, área y efectos) sale del hechizo con su mejora.
+            spell = Progression.SpellUpgradeRules.Effective(p, spell, services.Content, ctx.Rules.Progression);
         }
         if (caster.IsDead) return CastErrors.IsDead;
         if (caster.Auras.IsStunned) return CastErrors.Stunned;

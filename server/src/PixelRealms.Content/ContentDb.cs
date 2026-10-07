@@ -19,6 +19,7 @@ public sealed class ContentDb
     private readonly FrozenDictionary<string, VendorDef> _vendors;
     private readonly FrozenDictionary<string, string> _unavailable;
     private readonly FrozenDictionary<string, IReadOnlyList<SpellDef>> _spellsByClass;
+    private readonly FrozenDictionary<(string Spell, string Upgrade), SpellDef> _upgraded; // (hechizo, mejora) → hechizo efectivo (HU-104)
 
     public ContentDb(
         IReadOnlyList<ClassDef> classes, IReadOnlyList<SpellDef> spells, IReadOnlyList<AuraDef> auras,
@@ -39,6 +40,27 @@ public sealed class ContentDb
         _spellsByClass = classes.ToFrozenDictionary(c => c.Id,
             c => (IReadOnlyList<SpellDef>)spells.Where(s => s.Source == SpellSource.Class && s.ClassId == c.Id).OrderBy(s => s.LevelReq).ThenBy(s => s.Id, StringComparer.Ordinal).ToList(),
             StringComparer.Ordinal);
+        _upgraded = spells.SelectMany(s => s.Upgrades.Select(u => (Key: (s.Id, u.Id), Spell: SpellUpgrades.Apply(s, u, Aura))))
+            .ToFrozenDictionary(x => x.Key, x => x.Spell);
+    }
+
+    /// <summary>HU-104: el hechizo con esa mejora aplicada, o null si el hechizo no tiene esa mejora. No asigna (se llama en cada casteo).</summary>
+    public SpellDef? Upgraded(string spellId, string upgradeId) => _upgraded.GetValueOrDefault((spellId, upgradeId));
+
+    /// <summary>Todos los hechizos mejorados, como "hechizo/mejora" (para el validador).</summary>
+    public IEnumerable<KeyValuePair<string, SpellDef>> UpgradedSpells =>
+        _upgraded.Select(kv => KeyValuePair.Create(kv.Key.Spell + "/" + kv.Key.Upgrade, kv.Value));
+
+    /// <summary>
+    /// Recarga más larga del hechizo entre el base y sus mejoras: el tope al restaurar una recarga guardada, para que cambiar
+    /// de mejora antes de salir no la acorte (revisión de autoridad de HU-104).
+    /// </summary>
+    public int LongestCooldownMs(SpellDef spell)
+    {
+        var longest = spell.CooldownMs;
+        foreach (var u in spell.Upgrades)
+            if (Upgraded(spell.Id, u.Id) is { } up && up.CooldownMs > longest) longest = up.CooldownMs;
+        return longest;
     }
 
     public IReadOnlyList<ClassDef> Classes { get; }

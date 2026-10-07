@@ -55,6 +55,7 @@ public static class CrossRefValidator
         var maxSpellsPerClass = rules.GetProperty("loadout").GetProperty("maxSpellsPerClass").GetInt32();
 
         var referencedAuras = new HashSet<string>(StringComparer.Ordinal);
+        var upgradeIds = new HashSet<string>(StringComparer.Ordinal);
 
         // --- hechizos
         var spellsByClass = new Dictionary<string, List<JsonElement>>(StringComparer.Ordinal);
@@ -80,6 +81,9 @@ public static class CrossRefValidator
                 if (!ImplementedEffects.Contains(type))
                     report.Warn("spells.json", $"{p}/effects/{k}/type", $"{id}: efecto '{type}' aún no implementado → hechizo no disponible (ADR-023)");
             }
+
+            if (sp.TryGetProperty("upgrades", out var upgradesEl))
+                CheckUpgrades(sp, id, source, effects, upgradesEl, $"{p}/upgrades", auraIds, upgradeIds, referencedAuras, report);
 
             if (!ImplementedTargetings.Contains(targeting))
                 report.Warn("spells.json", $"{p}/targeting", $"{id}: targeting '{targeting}' aún no implementado → hechizo no disponible (ADR-023)");
@@ -351,6 +355,10 @@ public static class CrossRefValidator
             foreach (var lvl in rankLevels.EnumerateArray().Select(e => e.GetInt32()))
                 if (lvl < 2 || lvl > maxLevel) report.Error("rules.json", "/progression/spellRankLevels", $"nivel de rango {lvl} fuera de 2..{maxLevel}");
                 else if (unlockLevels.Contains(lvl)) report.Warn("rules.json", "/progression/spellRankLevels", $"el nivel {lvl} desbloquea hechizo y sube rango a la vez");
+        // ADR-027 D1: la elección de mejoras llega con un rango (el segundo, nivel 8).
+        var upgradeLevel = progression.GetProperty("spellUpgradeLevel").GetInt32();
+        if (!progression.GetProperty("spellRankLevels").EnumerateArray().Any(e => e.GetInt32() == upgradeLevel))
+            report.Error("rules.json", "/progression/spellUpgradeLevel", $"spellUpgradeLevel {upgradeLevel} no es un nivel de rango (spellRankLevels)");
 
         foreach (var classId in classIds)
             if (!rules.GetProperty("classScaling").TryGetProperty(classId, out _))
@@ -382,6 +390,73 @@ public static class CrossRefValidator
             var refWeapon = cls.Value.GetProperty("referenceWeapon").GetString()!;
             if (byClass.TryGetProperty(cls.Name, out var row) && row.TryGetProperty(refWeapon, out var aff) && aff.GetString() != "alta")
                 report.Warn("rules.json", $"/balanceTargets/pentagram/classes/{cls.Name}/referenceWeapon", $"el arma de referencia '{refWeapon}' no tiene afinidad alta");
+        }
+    }
+
+    /// <summary>
+    /// HU-104: mejoras de un hechizo. Solo de clase; ids únicos en todo spells.json; cada modificador es de uno de los cuatro
+    /// tipos (campo del hechizo, efecto + mult, aura + campo, efecto añadido) y apunta a algo que el hechizo tiene.
+    /// </summary>
+    private static void CheckUpgrades(JsonElement sp, string id, string source, List<JsonElement> effects, JsonElement upgrades, string p,
+        HashSet<string> auraIds, HashSet<string> upgradeIds, HashSet<string> referencedAuras, ValidationReport report)
+    {
+        if (source != "class")
+        {
+            report.Error("spells.json", p, $"{id}: solo los hechizos de clase tienen mejoras (HU-104)");
+            return;
+        }
+        var effectTypes = effects.Select(e => Str(e, "type")).ToHashSet(StringComparer.Ordinal);
+        var appliedAuras = effects.Where(e => Str(e, "type") == "apply_aura").Select(e => Str(e, "auraId")).ToHashSet(StringComparer.Ordinal);
+        foreach (var (up, u) in upgrades.EnumerateArray().Select((x, u) => (x, u)))
+        {
+            var upId = Str(up, "id");
+            if (!upgradeIds.Add(upId))
+                report.Error("spells.json", $"{p}/{u}/id", $"{id}: id de mejora '{upId}' repetido en spells.json");
+            if (!up.TryGetProperty("mods", out var mods)) continue;
+            foreach (var (m, k) in mods.EnumerateArray().Select((x, k) => (x, k)))
+            {
+                var mp = $"{p}/{u}/mods/{k}";
+                var stat = Str(m, "stat");
+                var aura = Str(m, "aura");
+                var effect = Str(m, "effect");
+                var hasAdd = m.TryGetProperty("add", out _);
+                var hasMult = m.TryGetProperty("mult", out _);
+                var kinds = (stat != "" && aura == "" ? 1 : 0) + (effect != "" ? 1 : 0) + (aura != "" ? 1 : 0) + (m.TryGetProperty("addEffect", out _) ? 1 : 0);
+                if (kinds != 1)
+                {
+                    report.Error("spells.json", mp, $"{id}/{upId}: un modificador cambia un campo ('stat'), un tipo de efecto ('effect'), un aura ('aura' + 'stat') o añade un efecto ('addEffect'), uno solo");
+                    continue;
+                }
+                if (m.TryGetProperty("addEffect", out var added))
+                {
+                    if (added.TryGetProperty("auraId", out var addedAura)) referencedAuras.Add(addedAura.GetString()!);
+                    if (added.TryGetProperty("auraId", out addedAura) && !auraIds.Contains(addedAura.GetString()!))
+                        report.Error("spells.json", $"{mp}/addEffect/auraId", $"{id}/{upId}: auraId '{addedAura.GetString()}' no existe en auras.json");
+                    if (!ImplementedEffects.Contains(Str(added, "type")))
+                        report.Error("spells.json", $"{mp}/addEffect/type", $"{id}/{upId}: el efecto añadido '{Str(added, "type")}' no está implementado");
+                    continue;
+                }
+                if (!hasAdd && !hasMult)
+                    report.Error("spells.json", mp, $"{id}/{upId}: el modificador no cambia nada (falta 'add' o 'mult')");
+                if (effect != "")
+                {
+                    if (hasAdd) report.Error("spells.json", $"{mp}/add", $"{id}/{upId}: un modificador de efecto solo escala ('mult')");
+                    if (!effectTypes.Contains(effect)) report.Error("spells.json", $"{mp}/effect", $"{id}/{upId}: el hechizo no tiene efectos '{effect}'");
+                }
+                else if (aura != "")
+                {
+                    if (!appliedAuras.Contains(aura)) report.Error("spells.json", $"{mp}/aura", $"{id}/{upId}: el hechizo no aplica el aura '{aura}'");
+                    if (!Content.SpellUpgrades.AuraStats.Contains(stat)) report.Error("spells.json", $"{mp}/stat", $"{id}/{upId}: '{stat}' no es un campo de aura que se pueda mejorar (durationMs, pct, amount)");
+                }
+                else if (!Content.SpellUpgrades.SpellStats.Contains(stat))
+                {
+                    report.Error("spells.json", $"{mp}/stat", $"{id}/{upId}: '{stat}' no es un campo de hechizo que se pueda mejorar");
+                }
+                else if (stat == "cost" && !sp.TryGetProperty("cost", out _))
+                {
+                    report.Error("spells.json", $"{mp}/stat", $"{id}/{upId}: el hechizo no tiene coste");
+                }
+            }
         }
     }
 

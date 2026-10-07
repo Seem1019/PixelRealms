@@ -137,7 +137,8 @@ public sealed class EffectResolver(CombatServices services, DamagePipeline damag
                 if (target is Player rp && (e.Resource is null || services.ResourceOf(rp) == e.Resource)) damage.AddResource(rp, e.Amount, ctx);
                 break;
             case EffectType.ApplyAura:
-                if (e.AuraId is not null) auras.Apply(target, services.Content.Aura(e.AuraId), caster, map, ctx, spell.Id);
+                // HU-104: una mejora puede traer el aura con otra duración o potencia (mismo id).
+                if (e.AuraId is not null) auras.Apply(target, e.AuraOverride ?? services.Content.Aura(e.AuraId), caster, map, ctx, spell.Id);
                 break;
             case EffectType.Taunt:
                 if (target is Monster m && !m.Combat.Evading) m.Threat.Taunt(caster.Id, ctx.NowMs, e.DurationMs, rules.TauntThreatBonus);

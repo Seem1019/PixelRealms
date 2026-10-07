@@ -62,8 +62,8 @@ public sealed class EnvelopeTests
         MessageRegistry.ClientMessageNames.ShouldContain("MoveInput");
         MessageRegistry.ServerMessageNames.ShouldContain("CombatEvents");
         MessageRegistry.ServerMessageNames.ShouldNotContain("CombatEvent");
-        MessageRegistry.ClientMessageNames.Count.ShouldBe(37); // + OnlineListRequest (HU-063), Interact (HU-083)
-        MessageRegistry.ServerMessageNames.Count.ShouldBe(27); // + OnlineList (HU-063), MapObjects (HU-083)
+        MessageRegistry.ClientMessageNames.Count.ShouldBe(38); // + OnlineListRequest (HU-063), Interact (HU-083), ChooseSpellUpgrade (HU-104)
+        MessageRegistry.ServerMessageNames.Count.ShouldBe(28); // + OnlineList (HU-063), MapObjects (HU-083), SpellUpgradesUpdate (HU-104)
     }
 
     [Fact]
@@ -98,5 +98,18 @@ public sealed class EnvelopeTests
             .ShouldBeOfType<Interact>().ShouldBe(new Interact("mine_lever_west", 3));
         MessageRegistry.EncodeToString(new MapObjects([new MapObjectDto("mine_lever_west", "on"), new MapObjectDto("mine_boss_door", "closed")]))
             .ShouldBe("""{"t":"MapObjects","d":{"objects":[{"id":"mine_lever_west","state":"on"},{"id":"mine_boss_door","state":"closed"}]}}""");
+    }
+
+    [Fact]
+    public void ChooseSpellUpgrade_Decodes_AndSpellUpgradesUpdate_EncodesExactJson() // HU-104
+    {
+        MessageRegistry.Decode("""{"t":"ChooseSpellUpgrade","d":{"spellId":"mage_fireball","upgradeId":"fireball_quick","reqId":2}}""").Message
+            .ShouldBeOfType<ChooseSpellUpgrade>().ShouldBe(new ChooseSpellUpgrade("mage_fireball", "fireball_quick", 2));
+        MessageRegistry.Decode("""{"t":"ChooseSpellUpgrade","d":{"spellId":"mage_fireball"}}""").Message
+            .ShouldBeOfType<ChooseSpellUpgrade>().UpgradeId.ShouldBeNull(); // sin mejora: la quita
+        MessageRegistry.EncodeToString(new SpellUpgradesUpdate(new Dictionary<string, string> { ["mage_fireball"] = "fireball_quick" }, 2))
+            .ShouldBe("""{"t":"SpellUpgradesUpdate","d":{"upgrades":{"mage_fireball":"fireball_quick"},"reqId":2}}""");
+        MessageRegistry.EncodeToString(new LevelUp(8, [], null, ["mage_fireball"]))
+            .ShouldBe("""{"t":"LevelUp","d":{"level":8,"newSpells":[],"upgradesUnlocked":["mage_fireball"]}}""");
     }
 }

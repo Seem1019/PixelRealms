@@ -81,6 +81,8 @@ public sealed record ProgressionRules
     public required IReadOnlyList<int> SpellUnlockLevels { get; init; }
     public required IReadOnlyList<int> SpellRankLevels { get; init; }
     public required double SpellRankBonusPct { get; init; }
+    /// <summary>HU-104: nivel desde el que cada hechizo de clase elige 1 de sus 2 mejoras (ADR-027 D1).</summary>
+    public required int SpellUpgradeLevel { get; init; }
     public required ClassChangeRules ClassChange { get; init; }
     public required AltCatchUpRules AltCatchUp { get; init; }
 }
