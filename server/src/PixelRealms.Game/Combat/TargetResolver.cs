@@ -8,8 +8,9 @@ namespace PixelRealms.Game.Combat;
 /// <summary>
 /// Devuelve los objetivos de un hechizo según su `targeting` (combat.md §Modelo de combate, HU-034 CA2, HU-086 CA4):
 /// un objetivo, círculo alrededor del lanzador o círculo en `targetPos`. Áreas: solo vivos cuyo cuadro del cuerpo toca el
-/// círculo de `aoeRadius` (el mismo cuadro que dibuja el cliente; distancia al cuadrado, sin raíces), con LOS desde el centro,
-/// más cercanos primero, hasta `maxTargets` (tope `aoeMaxTargetsCap`).
+/// área (el mismo cuadro que dibuja el cliente; sin raíces por candidato), con LOS desde el centro, el vértice o el origen,
+/// más cercanos primero, hasta `maxTargets` (tope `aoeMaxTargetsCap`). HU-102: el cono y la línea salen del origen del lanzador
+/// hacia `targetPos` (o hacia donde mira) y la línea se corta en la primera pared (`AreaShape`).
 /// Sin fuego amigo: las áreas de enemigos nunca incluyen aliados ni al lanzador.
 /// </summary>
 public sealed class TargetResolver(CombatServices services)
@@ -38,19 +39,19 @@ public sealed class TargetResolver(CombatServices services)
                 break;
             }
             case Targeting.SelfAoeEnemies:
-                Circle(caster, origin, spell, map, ctx, enemies: true, allies: false, result);
+                Area(caster, ShapeOf(caster, spell, origin, origin, targetPos, map), spell, map, ctx, enemies: true, allies: false, result);
                 break;
             case Targeting.SelfAoeAllies:
-                Circle(caster, origin, spell, map, ctx, enemies: false, allies: true, result);
+                Area(caster, ShapeOf(caster, spell, origin, origin, targetPos, map), spell, map, ctx, enemies: false, allies: true, result);
                 break;
             case Targeting.GroundAoeEnemies:
-                Circle(caster, targetPos ?? origin, spell, map, ctx, enemies: true, allies: false, result);
+                Area(caster, ShapeOf(caster, spell, targetPos ?? origin, origin, targetPos, map), spell, map, ctx, enemies: true, allies: false, result);
                 break;
             case Targeting.GroundAoeAllies:
-                Circle(caster, targetPos ?? origin, spell, map, ctx, enemies: false, allies: true, result);
+                Area(caster, ShapeOf(caster, spell, targetPos ?? origin, origin, targetPos, map), spell, map, ctx, enemies: false, allies: true, result);
                 break;
             case Targeting.GroundAoeAll:
-                Circle(caster, targetPos ?? origin, spell, map, ctx, enemies: true, allies: true, result);
+                Area(caster, ShapeOf(caster, spell, targetPos ?? origin, origin, targetPos, map), spell, map, ctx, enemies: true, allies: true, result);
                 break;
             default:
                 break;
@@ -58,10 +59,24 @@ public sealed class TargetResolver(CombatServices services)
         return result;
     }
 
-    private void Circle(Actor caster, Vec2 center, SpellDef spell, MapInstance map, TickContext ctx, bool enemies, bool allies, List<Actor> result)
+    /// <summary>
+    /// Forma del área: el círculo va en `center`; el cono y la línea salen de `origin` (el lanzador al empezar el casteo) hacia
+    /// `targetPos`, o hacia donde mira si no hay punto o coincide con sus pies.
+    /// </summary>
+    public static AreaShape ShapeOf(Actor caster, SpellDef spell, Vec2 center, Vec2 origin, Vec2? targetPos, MapInstance map)
     {
-        var radius = (float)spell.AoeRadius;
-        var radiusSq = radius * radius;
+        if (spell.Shape == Shape.Circle) return AreaShape.Circle(center, (float)spell.AoeRadius);
+        // CastSystem ya fija el punto a origen + dirección · alcance; lo demás (efectos llamados a mano) cae en el facing.
+        var aim = targetPos is { } t ? t - origin : Vec2.Zero;
+        var dir = aim.LengthSquared > 1e-6f && float.IsFinite(aim.LengthSquared) ? aim.Normalized() : AreaShape.FacingVector(caster.Facing);
+        if (spell.Shape == Shape.Cone) return AreaShape.Cone(origin, dir, (float)spell.AoeRadius, (float)spell.AoeAngleDeg);
+        var length = LineOfSight.ClearDistance(map.Collision, origin, dir, (float)spell.AoeLength);
+        return AreaShape.Line(origin, dir, length, (float)spell.AoeWidth);
+    }
+
+    private void Area(Actor caster, AreaShape shape, SpellDef spell, MapInstance map, TickContext ctx, bool enemies, bool allies, List<Actor> result)
+    {
+        var center = shape.Origin;
         var max = Math.Min(spell.MaxTargets, ctx.Rules.Limits.AoeMaxTargetsCap);
         var body = BodyBox.From(ctx.Rules.Combat); // una vez por área, no por candidato
         _scratch.Clear();
@@ -71,8 +86,7 @@ public sealed class TargetResolver(CombatServices services)
             var isEnemy = services.IsEnemy(caster, a);
             var isAlly = !isEnemy && services.IsAlly(caster, a);
             if (!((enemies && isEnemy) || (allies && isAlly))) continue;
-            var d = DistanceSquaredToBody(center, a.Position, body);
-            if (d > radiusSq) continue;
+            if (!shape.Touches(a.Position, body, out var d)) continue;
             _scratch.Add((a, d, Vec2.DistanceSquared(a.Position, center)));
         }
         // Varios cuadros pueden contener el centro (distancia 0): desempate por los pies y luego por id, para que `maxTargets` no
@@ -82,8 +96,8 @@ public sealed class TargetResolver(CombatServices services)
         foreach (var (actor, _, _) in _scratch)
         {
             if (result.Count >= max) break;
-            // LOS del centro a los pies, no al punto del cuadro más cercano: la cabeza de quien está pegado a un muro entra en la
-            // casilla del muro, y LineOfSight no mira la casilla de destino.
+            // LOS del centro (o del vértice u origen) a los pies, no al punto del cuadro más cercano: la cabeza de quien está pegado
+            // a un muro entra en la casilla del muro, y LineOfSight no mira la casilla de destino.
             if (!LineOfSight.Has(map.Collision, center, actor.Position)) continue;
             result.Add(actor);
         }

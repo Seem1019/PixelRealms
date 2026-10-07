@@ -217,6 +217,7 @@ func _setup_combat_presenter() -> void:
 	_presenter.vfx = _vfx
 	_presenter.floating = _floating
 	_presenter.entity_pos = _entity_feet
+	_presenter.line_length = _line_length_px
 	_presenter.visual_of = _entity_visual
 	_presenter.archetype_of = _entity_archetype
 	add_child(_presenter)
@@ -395,9 +396,12 @@ func _process(delta: float) -> void:
 		if not _aiming_spell.is_empty():
 			var mouse := get_global_mouse_position()
 			_reticle.aim_pos = mouse
-			_update_area_preview(mouse)
-			var tolerance := float(Content.rule("combat", "castRangeToleranceTiles", 0.0))
-			_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
+			if _reticle.aim_shape == "circle":
+				var tolerance := float(Content.rule("combat", "castRangeToleranceTiles", 0.0))
+				_reticle.aim_in_range = mouse.distance_to(_player.position) <= (float(_aiming_spell.get("range", 0)) + tolerance) * 16.0
+			else:
+				_aim_directional(mouse)
+			_update_area_preview()
 		_vfx.view_rect = _view_rect()
 		_overlay.pending_inputs = prediction.pending.size()
 		_overlay.reconcile_error_px = prediction.last_error_px
@@ -495,7 +499,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var world_pos := get_global_mouse_position()
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if not _aiming_spell.is_empty():
-				_cast_ground(_aiming_spell, world_pos)
+				_cast_ground(_aiming_spell, _directional_aim_point(_aiming_spell, world_pos) if _is_directional(_aiming_spell) else world_pos)
 				_stop_aiming()
 				return
 			var hit := _entity_at(world_pos)
@@ -753,6 +757,46 @@ func _start_aiming(spell: Dictionary) -> void:
 	_aiming_spell = spell
 	_reticle.aiming = true
 	_reticle.aim_radius_px = float(spell.get("aoeRadius", 0.5)) * 16.0
+	_reticle.aim_shape = str(spell.get("shape", "circle")) if _is_directional(spell) else "circle"
+	_reticle.aim_angle_deg = float(spell.get("aoeAngleDeg", 90.0))
+	_reticle.aim_width_px = float(spell.get("aoeWidth", 1.0)) * 16.0
+
+
+## HU-102: cono o línea (salen del lanzador hacia donde se apunta); los saltos y los círculos se apuntan a un punto.
+func _is_directional(spell: Dictionary) -> bool:
+	return VfxCatalog.is_area(spell) and str(spell.get("shape", "circle")) != "circle"
+
+
+## El cono y la línea salen del jugador hacia el cursor: siempre "en alcance" (al lanzar, el punto se acerca al alcance).
+func _aim_directional(mouse: Vector2) -> void:
+	var to := mouse - _player.position
+	if to.length_squared() > 1.0:
+		_reticle.aim_dir = to.normalized()
+	_reticle.aim_origin = _player.position
+	_reticle.aim_in_range = true
+	_reticle.aim_length_px = _line_length_px(_aiming_spell, _player.position, _reticle.aim_dir)
+
+
+## Largo (px) de una línea desde `origin_px`: `aoeLength` recortado en la primera pared, como en el servidor.
+func _line_length_px(spell: Dictionary, origin_px: Vector2, dir: Vector2) -> float:
+	var length := float(spell.get("aoeLength", 0.0))
+	if map != null:
+		length = AreaGeometry.clear_distance(map.collision, origin_px / 16.0, dir, length)
+	return length * 16.0
+
+
+## En el cono y la línea el punto solo da la dirección: se acerca al alcance para que el servidor no lo rechace (out_of_range).
+func _directional_aim_point(spell: Dictionary, world_pos: Vector2) -> Vector2:
+	var origin := prediction.position
+	return origin + (world_pos - origin).limit_length(float(spell.get("range", 0.0)) * 16.0)
+
+
+## Área (px) de un cono o una línea lanzados desde `origin_px` hacia `aim_px` (marca de CastStarted).
+func _directional_area(spell: Dictionary, origin_px: Vector2, aim_px: Vector2) -> Dictionary:
+	var dir := (aim_px - origin_px).normalized() if aim_px.distance_squared_to(origin_px) > 1.0 else Vector2.RIGHT
+	return {"shape": str(spell.get("shape", "cone")), "origin": origin_px, "dir": dir,
+		"radius_px": float(spell.get("aoeRadius", 0.0)) * 16.0, "angle_deg": float(spell.get("aoeAngleDeg", 90.0)),
+		"length_px": _line_length_px(spell, origin_px, dir), "width_px": float(spell.get("aoeWidth", 1.0)) * 16.0}
 
 
 func _stop_aiming() -> void:
@@ -762,9 +806,9 @@ func _stop_aiming() -> void:
 		r.area_hint = false
 
 
-## Mientras se apunta: marca a quién alcanzaría el área en `center` con la misma cuenta que el servidor (solo visual: las
-## posiciones de los demás llegan con ~100 ms de retraso).
-func _update_area_preview(center: Vector2) -> void:
+## Mientras se apunta: marca a quién alcanzaría el área con la misma cuenta que el servidor (solo visual: las posiciones de los
+## demás llegan con ~100 ms de retraso).
+func _update_area_preview() -> void:
 	var targeting := str(_aiming_spell.get("targeting", ""))
 	var candidates: Array[Dictionary] = []
 	for r: RemoteEntity in _remotes.values():
@@ -772,7 +816,7 @@ func _update_area_preview(center: Vector2) -> void:
 		if affected and r.kind != "npc" and r.anim != "dead":
 			candidates.append({"id": r.entity_id, "feet_px": r.position})
 	var max_targets := mini(int(_aiming_spell.get("maxTargets", 99)), int(Content.rule("limits", "aoeMaxTargetsCap", 10)))
-	var hits := BodyShape.area_hits(center, _reticle.aim_radius_px, max_targets, candidates, map.collision if map != null else null)
+	var hits := BodyShape.shape_hits(_reticle.aim_area(), max_targets, candidates, map.collision if map != null else null)
 	for r: RemoteEntity in _remotes.values():
 		r.area_hint = hits.has(r.entity_id)
 
@@ -812,9 +856,14 @@ func _on_message(type: String, d: Dictionary) -> void:
 				(_remotes[caster] as RemoteEntity).begin_cast(int(d.get("durationMs", 0)))
 			if d.get("targetPos") != null and int(d.get("durationMs", 0)) > 0:
 				var tp: Dictionary = d["targetPos"]
+				var aim := Vector2(float(tp.get("x", 0)), float(tp.get("y", 0)))
 				var radius: float = float(d["radius"]) if d.get("radius") != null else float(spell.get("aoeRadius", 1.0))
 				var enemy: bool = _remotes.has(caster) and (_remotes[caster] as RemoteEntity).hostile
-				_reticle.set_mark(caster, Vector2(float(tp.get("x", 0)), float(tp.get("y", 0))), radius * 16.0, enemy, int(d.get("durationMs", 0)))
+				if d.get("origin") is Dictionary and _is_directional(spell):
+					var o: Dictionary = d["origin"]
+					_reticle.set_area_mark(caster, _directional_area(spell, Vector2(float(o.get("x", 0)), float(o.get("y", 0))), aim), enemy, int(d.get("durationMs", 0)))
+				else:
+					_reticle.set_mark(caster, aim, radius * 16.0, enemy, int(d.get("durationMs", 0)))
 			_presenter.cast_started(d)
 		"CastEnded":
 			var caster := int(d.get("casterId", -1))

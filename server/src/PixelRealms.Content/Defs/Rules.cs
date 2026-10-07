@@ -147,6 +147,8 @@ public sealed record CombatRules
     public required int InterruptLockoutMs { get; init; }
     public required int AbilityLockMs { get; init; }
     public required int MinInstantSpellCooldownMs { get; init; }
+    /// <summary>Radio máximo de un cono de daño sin casteo (ADR-027 D4); lo usa el validador.</summary>
+    public required double InstantConeMaxRadiusTiles { get; init; }
     public required double LinkdeadSec { get; init; }
     public required double LinkdeadInCombatMaxSec { get; init; }
     public required double ManaPerBasicHitPctPerSec { get; init; }

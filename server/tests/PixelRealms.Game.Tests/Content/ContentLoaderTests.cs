@@ -70,16 +70,37 @@ public sealed class ContentLoaderTests
     }
 
     [Fact]
-    public void UnavailableSpells_AreMarked_NotErrors() // ADR-023, HU-003 CA4d
+    public void ConeAndLineSpells_AreAvailable() // ADR-023, HU-003 CA4d; HU-102 CA6
     {
+        // Hasta HU-102 estos cuatro se cargaban como no disponibles (cono y línea sin implementar); ya no queda ninguno.
         var result = ContentLoader.Load(TestContent.ContentDir);
         var db = result.ContentOrThrow;
-        db.UnavailableSpells.Keys.ToArray().ShouldBe(new[] { "warrior_cleave", "rogue_throwing_blades", "mage_cone_of_cold", "priest_path_of_light" }, ignoreOrder: true);
-        db.IsSpellAvailable("mage_fireball").ShouldBeTrue();
-        db.IsSpellAvailable("warrior_cleave").ShouldBeFalse();
-        result.Report.Warnings.ShouldContain(w => w.Contains("warrior_cleave", StringComparison.Ordinal) && w.Contains("ADR-023", StringComparison.Ordinal));
-        db.KnownSpells("warrior", 15).Select(s => s.Id).ShouldNotContain("warrior_cleave");
+        db.UnavailableSpells.ShouldBeEmpty();
+        foreach (var id in new[] { "warrior_cleave", "rogue_throwing_blades", "mage_cone_of_cold", "priest_path_of_light" })
+            db.IsSpellAvailable(id).ShouldBeTrue(id);
+        result.Report.Warnings.ShouldNotContain(w => w.Contains("ADR-023", StringComparison.Ordinal));
+        db.KnownSpells("warrior", 15).Select(s => s.Id).ShouldContain("warrior_cleave");
         db.KnownSpells("mage", 4).Select(s => s.Id).ToArray().ShouldBe(new[] { "mage_fireball", "mage_frostbolt", "mage_frost_nova" });
+    }
+
+    [Fact]
+    public void InstantDamageCones_WarnOnlyBeyondMeleeRange() // ADR-027 D4
+    {
+        var warnings = ContentLoader.Load(TestContent.ContentDir).Report.Warnings;
+        warnings.ShouldNotContain(w => w.Contains("warrior_cleave", StringComparison.Ordinal));        // radio 2,5
+        warnings.ShouldContain(w => w.Contains("rogue_throwing_blades", StringComparison.Ordinal)
+            && w.Contains("ADR-015", StringComparison.Ordinal));                                       // radio 4, sin casteo (HU-106)
+    }
+
+    [Fact]
+    public void InstantDamageArea_ThatTheActivePhaseReaches_IsAnError() // revisión de autoridad de HU-102
+    {
+        using var dir = new TempContent();
+        dir.PatchPointer("rules.json", "/world/currentPhase", "2"); // tope 10: las Cuchillas (nivel 9) ya se alcanzan
+        var result = ContentLoader.Load(dir.Path);
+        result.Content.ShouldBeNull();
+        result.Report.Errors.ShouldContain(e => e.Contains("rogue_throwing_blades", StringComparison.Ordinal) && e.Contains("ya se alcanza", StringComparison.Ordinal));
+        result.Report.Errors.ShouldNotContain(e => e.Contains("mage_cone_of_cold", StringComparison.Ordinal)); // nivel 11: aún aviso
     }
 
     [Fact]

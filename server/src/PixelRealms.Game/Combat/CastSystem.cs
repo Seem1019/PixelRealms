@@ -150,12 +150,22 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                     // HU-033 CA4 / HU-086 CA7b: tope de marcas en el suelo por instancia (rendimiento del cliente y del servidor).
                     if (!spell.IsInstant && ActiveAreas(map) >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
                     if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
+                    // HU-102: en el cono y la línea el punto solo da la dirección (la línea se corta en la primera pared).
+                    if (spell.Shape != Shape.Circle) break;
                     if (!LineOfSight.Has(map.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
                     // LineOfSight no mira la casilla de destino: apuntar dentro de un muro alcanzaría a quien está detrás.
                     if (map.Collision.BlocksSight((int)MathF.Floor(targetPos.Value.X), (int)MathF.Floor(targetPos.Value.Y))) return CastErrors.NoLos;
                 }
+                // Alrededor del lanzador: un cono o una línea usan el punto como dirección, que tiene que estar en el mapa (un punto
+                // enorme desbordaba la dirección a cero y el cono pasaba a ser un círculo).
+                else if (spell.Shape != Shape.Circle && targetPos is not null && !ValidPoint(targetPos, map)) return CastErrors.InvalidPayload;
                 break;
         }
+        // Revisión de autoridad (HU-102): el cono y la línea salen en una dirección que se fija ahora, aunque luego gire o se mueva;
+        // el punto que viaja en CastStarted y llega a TargetResolver es el mismo para todos. Alrededor del lanzador, un círculo no
+        // usa el punto: no se reenvía.
+        if (spell.Targeting.IsArea() && spell.Shape != Shape.Circle) targetPos = AimPoint(caster, spell, targetPos);
+        else if (spell.Targeting is Targeting.SelfAoeEnemies or Targeting.SelfAoeAllies) targetPos = null;
 
         // Otro hechizo durante un casteo lo cancela sin coste (ADR-019); los usables (pociones) no.
         if (cancelCurrent && combat.Cast is { } current) EndCast(caster, current, CastResults.Cancelled, null, map, ctx);
@@ -170,15 +180,31 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
         if (spell.IsInstant)
         {
             // Instantáneo: CastStarted{durationMs:0} + CastEnded{done} para que el cliente dibuje el efecto (misma secuencia que un casteo).
-            ctx.Emit(new CastStartedEvent(map.Id, caster, spell, targetId, targetPos, 0));
+            ctx.Emit(new CastStartedEvent(map.Id, caster, spell, targetId, targetPos, 0, OriginFor(spell, caster)));
             ctx.Emit(new CastEndedEvent(map.Id, caster, spell, CastResults.Done, null));
             Resolve(caster, spell, targetId, targetPos, caster.Position, map, ctx);
             return null;
         }
         combat.Cast = new CastState(spell, now, now + spell.CastMs, targetId, targetPos, caster.Position);
-        ctx.Emit(new CastStartedEvent(map.Id, caster, spell, targetId, targetPos, spell.CastMs));
+        ctx.Emit(new CastStartedEvent(map.Id, caster, spell, targetId, targetPos, spell.CastMs, OriginFor(spell, caster)));
         return null;
     }
+
+    /// <summary>
+    /// Punto canónico de un cono o una línea: origen + dirección · alcance de la forma. La dirección va hacia el punto apuntado o,
+    /// si está a menos de un píxel de los pies (o no hay), hacia donde mira el lanzador ahora (como el cliente).
+    /// </summary>
+    private static Vec2 AimPoint(Actor caster, SpellDef spell, Vec2? aim)
+    {
+        const float minAimTiles = 1f / GameConstants.PixelsPerTile;
+        var d = aim is { } a ? a - caster.Position : Vec2.Zero;
+        var dir = d.LengthSquared >= minAimTiles * minAimTiles ? d.Normalized() : AreaShape.FacingVector(caster.Facing);
+        var reach = spell.Shape == Shape.Line ? spell.AoeLength : spell.AoeRadius;
+        return caster.Position + dir * (float)Math.Max(reach, 1.0);
+    }
+
+    /// <summary>HU-102: el cono y la línea se dibujan desde donde estaba el lanzador al empezar, aunque luego se mueva.</summary>
+    private static Vec2? OriginFor(SpellDef spell, Actor caster) => spell.Targeting.IsArea() && spell.Shape != Shape.Circle ? caster.Position : null;
 
     private static bool ValidPoint(Vec2? p, MapInstance map) =>
         p is { } v && !float.IsNaN(v.X) && !float.IsNaN(v.Y) && !float.IsInfinity(v.X) && !float.IsInfinity(v.Y)

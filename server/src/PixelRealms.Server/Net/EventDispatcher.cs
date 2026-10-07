@@ -78,7 +78,7 @@ public sealed class EventDispatcher(ConnectionManager connections, World world, 
                     connections.Send(l.Observer.ConnectionId, new EntityDespawn(l.EntityId.Value, l.Reason));
                     break;
                 case CastStartedEvent cs:
-                    Broadcast(cs.MapInstanceId, cs.Caster, new CastStarted(cs.Caster.Id.Value, cs.Spell.Id, cs.TargetId?.Value, ToPx(cs.TargetPos), null, null, cs.DurationMs));
+                    Broadcast(cs.MapInstanceId, cs.Caster, new CastStarted(cs.Caster.Id.Value, cs.Spell.Id, cs.TargetId?.Value, ToPx(cs.TargetPos), ToPx(cs.Origin), null, cs.DurationMs));
                     break;
                 case CastEndedEvent ce:
                     Broadcast(ce.MapInstanceId, ce.Caster, new CastEnded(ce.Caster.Id.Value, ce.Spell.Id, ce.Result, ce.Reason));

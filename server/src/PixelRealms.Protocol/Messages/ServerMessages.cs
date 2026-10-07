@@ -25,7 +25,7 @@ public sealed record EntitySpawn(int Id, string Kind, string TemplateId, string 
 
 public sealed record EntityDespawn(int Id, string Reason) : IServerMessage;
 
-public sealed record CastStarted(int CasterId, string SpellId, int? TargetId, Vec2Dto? TargetPos, string? Dir, float? Radius, int DurationMs) : IServerMessage;
+public sealed record CastStarted(int CasterId, string SpellId, int? TargetId, Vec2Dto? TargetPos, Vec2Dto? Origin, float? Radius, int DurationMs) : IServerMessage;
 
 public sealed record CastEnded(int CasterId, string SpellId, string Result, string? Reason) : IServerMessage;
 

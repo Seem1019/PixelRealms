@@ -47,6 +47,11 @@ public static class CrossRefValidator
         var byClass = affinity.GetProperty("byClass");
         var combat = rules.GetProperty("combat");
         var minInstantCd = combat.GetProperty("minInstantSpellCooldownMs").GetInt32();
+        var instantConeMaxRadius = combat.GetProperty("instantConeMaxRadiusTiles").GetDouble();
+        // Tope de nivel de la fase activa: lo que ya se alcanza no puede quedarse en aviso.
+        var phaseCaps = progression.GetProperty("levelCapByPhase").EnumerateArray().Select(e => e.GetInt32()).ToList();
+        var phase = rules.GetProperty("world").GetProperty("currentPhase").GetInt32();
+        var activeCap = phase >= 1 && phase <= phaseCaps.Count ? phaseCaps[phase - 1] : maxLevel;
         var maxSpellsPerClass = rules.GetProperty("loadout").GetProperty("maxSpellsPerClass").GetInt32();
 
         var referencedAuras = new HashSet<string>(StringComparer.Ordinal);
@@ -117,9 +122,17 @@ public static class CrossRefValidator
                 if (castMs == 0 && cooldownMs < minInstantCd)
                     report.Error("spells.json", $"{p}/cooldownMs", $"{id}: hechizo instantáneo de clase con cooldown {cooldownMs} ms < rules.combat.minInstantSpellCooldownMs ({minInstantCd})");
 
-                if (targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && castMs == 0
+                // ADR-027 D4: un cono cuerpo a cuerpo se esquiva saliendo del frente del lanzador; no necesita casteo.
+                var meleeCone = Str(sp, "shape") == "cone" && sp.TryGetProperty("aoeRadius", out var ar) && ar.GetDouble() <= instantConeMaxRadius;
+                if (targeting.StartsWith("ground_aoe", StringComparison.Ordinal) && castMs == 0 && !meleeCone
                     && effects.Any(e => Str(e, "type") == "damage") && !effects.Any(e => Str(e, "type") == "leap"))
-                    report.Warn("spells.json", $"{p}/castMs", $"{id}: área apuntada de daño sin casteo: no se puede esquivar (ADR-015)");
+                {
+                    // Revisión de autoridad (HU-102): en una fase que aún no llega a su nivel es un aviso; si ya se alcanza, error.
+                    if (levelReq <= activeCap)
+                        report.Error("spells.json", $"{p}/castMs", $"{id}: área apuntada de daño sin casteo que ya se alcanza (nivel {levelReq} ≤ tope {activeCap}): no se puede esquivar (ADR-015, ADR-027 D4)");
+                    else
+                        report.Warn("spells.json", $"{p}/castMs", $"{id}: área apuntada de daño sin casteo: no se puede esquivar (ADR-015)");
+                }
             }
         }
 

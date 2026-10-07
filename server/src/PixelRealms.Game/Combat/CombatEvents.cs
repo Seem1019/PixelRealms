@@ -24,7 +24,8 @@ public static class CastResults
     public const string Failed = "failed";
 }
 
-public sealed record CastStartedEvent(int MapInstanceId, Actor Caster, SpellDef Spell, EntityId? TargetId, Vec2? TargetPos, int DurationMs) : IGameEvent;
+/// <param name="Origin">Solo en conos y líneas (HU-102): el origen fijo del área, la posición del lanzador al empezar.</param>
+public sealed record CastStartedEvent(int MapInstanceId, Actor Caster, SpellDef Spell, EntityId? TargetId, Vec2? TargetPos, int DurationMs, Vec2? Origin = null) : IGameEvent;
 
 public sealed record CastEndedEvent(int MapInstanceId, Actor Caster, SpellDef Spell, string Result, string? Reason) : IGameEvent;
 

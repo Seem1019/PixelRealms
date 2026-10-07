@@ -88,25 +88,27 @@ static func is_area(spell: Dictionary) -> bool:
 
 
 ## Puntos (px del mundo) de los estallidos de un área al resolverse: círculo, cono o línea, sin trigonometría por cuadro.
-## `origin` = lanzador; `center` = targetPos (círculos de suelo) u origen (alrededor de uno mismo).
-static func area_points(spell: Dictionary, origin: Vector2, center: Vector2) -> Array[Vector2]:
+## `origin` = lanzador; `center` = targetPos (círculos de suelo) u origen (alrededor de uno mismo); en el cono y la línea,
+## `center` solo da la dirección (HU-102). `length_px` = largo de la línea ya recortado en paredes (< 0: `aoeLength` entero).
+static func area_points(spell: Dictionary, origin: Vector2, center: Vector2, length_px: float = -1.0) -> Array[Vector2]:
 	var pts: Array[Vector2] = []
 	var radius := float(spell.get("aoeRadius", 1.0)) * 16.0
 	var shape := str(spell.get("shape", "circle"))
 	var self_aoe := str(spell.get("targeting", "")).begins_with("self_aoe")
 	var c := origin if self_aoe else center
+	var dir := (center - origin).normalized() if center != origin else Vector2.RIGHT
 	if shape == "line":
-		var to := center if center != origin else origin + Vector2(radius, 0)
-		var steps := clampi(int(origin.distance_to(to) / 14.0), 2, AREA_MAX_BURSTS)
+		var length := length_px if length_px >= 0.0 else float(spell.get("aoeLength", 1.0)) * 16.0
+		var steps := clampi(int(length / 14.0), 2, AREA_MAX_BURSTS)
 		for i: int in range(1, steps + 1):
-			pts.append(origin.lerp(to, float(i) / steps).round())
+			pts.append((origin + dir * length * float(i) / steps).round())
 		return pts
 	if shape == "cone":
-		var dir := (center - origin).normalized() if center != origin else Vector2.RIGHT
 		var base := dir.angle()
+		var spread := deg_to_rad(float(spell.get("aoeAngleDeg", 90.0))) / 2.0 * 0.75  # los estallidos, dentro de los bordes
 		for ring: float in [0.45, 0.8]:
 			for k: int in [-2, -1, 0, 1, 2]:
-				pts.append((origin + Vector2.from_angle(base + k * 0.32) * radius * ring).round())
+				pts.append((origin + Vector2.from_angle(base + spread * k / 2.0) * radius * ring).round())
 		return pts
 	pts.append(c.round())
 	var rings: Array = [[0.5, 4], [0.9, 7]] if radius > 20.0 else [[0.7, 5]]

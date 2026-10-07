@@ -16,10 +16,12 @@ var entity_pos: Callable
 var visual_of: Callable
 ## Clase (jugadores) o plantilla (monstruos) de una entidad, para el proyectil de su ataque básico a distancia.
 var archetype_of: Callable
+## Largo (px) de una línea desde un origen y una dirección, recortada en paredes: (spell, origin_px, dir) → float (HU-102).
+var line_length: Callable
 var floating: FloatingText
 var vfx: VfxLayer
 
-var _casts: Dictionary = {}  # caster → {spell, target_id, target_pos}
+var _casts: Dictionary = {}  # caster → {spell, target_id, target_pos, origin}
 ## Proyectiles en vuelo: "src:dst" → {arrive_ms, queued: Array[Dictionary]}
 var _inflight: Dictionary = {}
 ## Proyectiles que ya llegaron (para no repetir el impacto cuando el número llega después): "src:dst" → ms
@@ -43,7 +45,11 @@ func cast_started(d: Dictionary) -> void:
 	if d.get("targetPos") is Dictionary:
 		var tp: Dictionary = d["targetPos"]
 		target_pos = Vector2(float(tp.get("x", 0)), float(tp.get("y", 0)))
-	_casts[caster] = {"spell": spell, "target_id": target_id, "target_pos": target_pos}
+	var origin := Vector2.INF  # HU-102: el cono y la línea salen de donde estaba el lanzador al empezar
+	if d.get("origin") is Dictionary:
+		var o: Dictionary = d["origin"]
+		origin = Vector2(float(o.get("x", 0)), float(o.get("y", 0)))
+	_casts[caster] = {"spell": spell, "target_id": target_id, "target_pos": target_pos, "origin": origin}
 	if int(d.get("durationMs", 0)) <= 0:
 		return
 	var v := _visual(caster)
@@ -69,7 +75,9 @@ func cast_ended(d: Dictionary) -> void:
 	var target_pos: Vector2 = info.get("target_pos", Vector2.INF)
 	if v != null and str(spell.get("targeting", "")) != "self":
 		v.play_attack(_toward(caster, target_id, target_pos))
-	var origin := _pos(caster)
+	var origin: Vector2 = info.get("origin", Vector2.INF)
+	if origin == Vector2.INF:
+		origin = _pos(caster)
 	if origin == Vector2.INF or vfx == null:
 		return
 	var proj := VfxCatalog.projectile_sheet(spell)
@@ -81,7 +89,10 @@ func cast_ended(d: Dictionary) -> void:
 		var center := target_pos if target_pos != Vector2.INF else origin
 		var sheet := "area_%s" % VfxCatalog.element(spell)
 		var i := 0
-		for p: Vector2 in VfxCatalog.area_points(spell, origin, center):
+		var length := -1.0
+		if str(spell.get("shape", "")) == "line" and line_length.is_valid() and center != origin:
+			length = float(line_length.call(spell, origin, (center - origin).normalized()))
+		for p: Vector2 in VfxCatalog.area_points(spell, origin, center, length):
 			vfx.play_once(sheet, p, i * VfxCatalog.AREA_STAGGER_MS)
 			i += 1
 
