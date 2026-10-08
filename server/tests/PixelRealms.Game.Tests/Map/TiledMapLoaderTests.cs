@@ -1,5 +1,7 @@
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Map;
+using PixelRealms.Game.Movement;
+using PixelRealms.Game.Portals;
 using PixelRealms.Game.Tests.Helpers;
 using Shouldly;
 using Xunit;
@@ -31,25 +33,29 @@ public sealed class TiledMapLoaderTests
     }
 
     /// <summary>Búsqueda en anchura por casillas (4 vecinos) sobre las no sólidas.</summary>
-    private static bool Reachable(CollisionGrid grid, Vec2 from, Vec2 to)
+    private static bool Reachable(CollisionGrid grid, Vec2 from, Vec2 to) => Steps(grid, from, to) >= 0;
+
+    /// <summary>Pasos del camino más corto (4 vecinos) sobre las casillas no sólidas ni tapadas por `blocked`; −1 si no se llega.</summary>
+    private static int Steps(CollisionGrid grid, Vec2 from, Vec2 to, Func<int, int, bool>? blocked = null)
     {
         var start = ((int)from.X, (int)from.Y);
         var goal = ((int)to.X, (int)to.Y);
-        var seen = new HashSet<(int, int)> { start };
+        var dist = new Dictionary<(int, int), int> { [start] = 0 };
         var queue = new Queue<(int X, int Y)>();
         queue.Enqueue(start);
         while (queue.Count > 0)
         {
             var (x, y) = queue.Dequeue();
-            if ((x, y) == goal) return true;
+            if ((x, y) == goal) return dist[(x, y)];
             foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
             {
                 var n = (x + dx, y + dy);
-                if (n.Item1 < 0 || n.Item2 < 0 || n.Item1 >= grid.Width || n.Item2 >= grid.Height || grid.IsSolid(n.Item1, n.Item2) || !seen.Add(n)) continue;
+                if (n.Item1 < 0 || n.Item2 < 0 || n.Item1 >= grid.Width || n.Item2 >= grid.Height || grid.IsSolid(n.Item1, n.Item2)) continue;
+                if (blocked?.Invoke(n.Item1, n.Item2) == true || !dist.TryAdd(n, dist[(x, y)] + 1)) continue;
                 queue.Enqueue(n);
             }
         }
-        return false;
+        return -1;
     }
 
     [Fact]
@@ -118,8 +124,7 @@ public sealed class TiledMapLoaderTests
         // El portal a la Mina está al final de las Colinas y la Mina devuelve al lado del portal.
         meadow.ZoneAt(meadow.Portals[0].Position)!.Name.ShouldBe("Colinas");
         var mine = maps.Single(m => m.MapId == "mine");
-        var back = mine.Portals.ShouldHaveSingleItem();
-        back.TargetMapId.ShouldBe("meadow");
+        var back = mine.Portals.Single(p => p.TargetMapId == "meadow");
         Vec2.Distance(new Vec2(back.TargetX, back.TargetY), meadow.Portals[0].Position).ShouldBeLessThan(8);
         meadow.Collision.IsSolidAt(back.TargetX, back.TargetY).ShouldBeFalse();
         mine.Collision.IsSolidAt(meadow.Portals[0].TargetX, meadow.Portals[0].TargetY).ShouldBeFalse();
@@ -185,14 +190,127 @@ public sealed class TiledMapLoaderTests
             inSafe.ShouldBeFalse(s.Id);
         }
 
-        // CA4: el portal de vuelta sale de la boca de la Mina, en el Linde, y deja en la Sala 3 junto a la hornacina tapiada
-        // (x 86..87 · y 25..27), donde HU-112 pondrá la salida hacia aquí.
+        // CA4: el portal de vuelta sale de la boca de la Mina, en el Linde, y deja en la Sala 3 junto a la salida hacia aquí
+        // (HU-112, la antigua hornacina tapiada en x 86..87 · y 25..27).
         var back = forest.Portals.ShouldHaveSingleItem();
         back.TargetMapId.ShouldBe("mine");
         open[0].Contains(back.Position).ShouldBeTrue();
         var mine = maps.Single(m => m.MapId == "mine");
         mine.Collision.IsSolidAt(back.TargetX, back.TargetY).ShouldBeFalse();
         Vec2.Distance(new Vec2(back.TargetX, back.TargetY), new Vec2(86, 26)).ShouldBeLessThan(3);
+    }
+
+    /// <summary>
+    /// HU-112 CA1–CA3: la hornacina de la Sala 3 es la salida al Linde del Bosque, cerrada hasta la Fase 2 con el aviso del
+    /// derrumbe, y sigue detrás del gólem élite: está al otro lado de la sala y el camino más corto desde la entrada pasa por su
+    /// aggro. Llegar desde el Bosque deja junto a ella, sin pisarla.
+    /// </summary>
+    [Fact]
+    public void Mine_Room3Exit_LeadsToTheForestEdge_ClosedUntilPhase2_BehindTheGolem()
+    {
+        var maps = TiledMapLoader.LoadAll(MapsDir, Check());
+        var mine = maps.Single(m => m.MapId == "mine");
+        var forest = maps.Single(m => m.MapId == "forest");
+        var exit = mine.Portals.Single(p => p.TargetMapId == "forest");
+        exit.PortalId.ShouldBe("mine_to_forest");
+        exit.MinPhase.ShouldBe(2);
+        exit.LockedText.ShouldBe("El derrumbe aún bloquea el paso");
+        exit.MinLevel.ShouldBeNull();
+        // CA1: la hornacina (x 86..87 · y 25..27) es el portal; deja en la llegada reservada del Linde (MINE_ARRIVAL), libre y
+        // fuera del portal de vuelta.
+        (exit.Position, exit.Size).ShouldBe((new Vec2(86, 25), new Vec2(2, 3)));
+        (exit.TargetX, exit.TargetY).ShouldBe((12f, 29f));
+        forest.Collision.IsSolidAt(exit.TargetX, exit.TargetY).ShouldBeFalse();
+        forest.ZoneAt(new Vec2(exit.TargetX, exit.TargetY))!.Name.ShouldBe("Linde del Bosque");
+        var back = forest.Portals.Single(p => p.TargetMapId == "mine");
+        back.Contains(new Vec2(exit.TargetX, exit.TargetY)).ShouldBeFalse();
+        var arrival = new Vec2(back.TargetX, back.TargetY);
+        exit.Contains(arrival).ShouldBeFalse("volver del Bosque no deja encima de la salida");
+        PortalPolicy.DistanceTo(exit, arrival).ShouldBeLessThanOrEqualTo(1f);
+
+        // CA3: el gólem élite está entre la entrada de la Sala 3 (oeste) y la salida (este), y no se llega a ella sin entrar en
+        // su aggro: con las casillas a su alcance tapadas, el camino desde la entrada de la Mina se alarga.
+        var golem = mine.Spawns.Single(s => s.MonsterId == "rubble_golem");
+        exit.Position.X.ShouldBeGreaterThan(golem.Position.X);
+        Vec2.Distance(golem.Position, exit.Position).ShouldBeLessThan(10, "la salida está en la Sala 3, la del gólem");
+        var aggro = (float)TestContent.Load().Monster("rubble_golem").AggroRange;
+        var from = mine.DefaultGraveyard.Position;
+        var to = exit.Position + new Vec2(0.5f, 1.5f);
+        var direct = Steps(mine.Collision, from, to);
+        direct.ShouldBeGreaterThan(0);
+        var aroundTheGolem = Steps(mine.Collision, from, to, (x, y) => Vec2.Distance(new Vec2(x + 0.5f, y + 0.5f), golem.Position) <= aggro);
+        (aroundTheGolem < 0 || aroundTheGolem > direct).ShouldBeTrue($"el camino más corto a la salida ({direct}) pasa por el aggro del gólem (sin pasar: {aroundTheGolem})");
+    }
+
+    /// <summary>
+    /// Cada llegada de un portal y cada punto seguro deja libre la caja de los pies (MovementStep, 10×6 px), no solo el punto, y
+    /// fuera de los portales del mapa: con la caja metida en una roca, el primer paso empuja al revés (en HU-112, una roca del
+    /// derrumbe en (85, 24) tapaba la llegada desde el Bosque y devolvía al jugador encima de la salida).
+    /// </summary>
+    [Fact]
+    public void PortalArrivals_AndSafePoints_LeaveTheFootBoxFree()
+    {
+        var maps = TiledMapLoader.LoadAll(MapsDir, Check()).ToDictionary(m => m.MapId);
+        foreach (var map in maps.Values)
+        {
+            foreach (var p in map.Portals)
+            {
+                var to = maps[p.TargetMapId];
+                var at = new Vec2(p.TargetX, p.TargetY);
+                FootBoxFree(to.Collision, at).ShouldBeTrue($"{p.PortalId} → {p.TargetMapId} {at}");
+                to.Portals.ShouldNotContain(q => q.Contains(at), $"{p.PortalId} deja encima de otro portal");
+            }
+            foreach (var gy in map.Graveyards) FootBoxFree(map.Collision, gy.Position).ShouldBeTrue($"{map.MapId}: {gy.Id}");
+        }
+    }
+
+    /// <summary>Lo que mira <see cref="MovementStep"/> al moverse: las casillas que toca la caja de los pies centrada en `at`.</summary>
+    private static bool FootBoxFree(CollisionGrid grid, Vec2 at)
+    {
+        double x = at.X * MovementStep.TileSize, y = at.Y * MovementStep.TileSize;
+        for (var row = (int)Math.Floor((y - MovementStep.HalfY) / MovementStep.TileSize); row <= (int)Math.Ceiling((y + MovementStep.HalfY) / MovementStep.TileSize) - 1; row++)
+            for (var col = (int)Math.Floor((x - MovementStep.HalfX) / MovementStep.TileSize); col <= (int)Math.Ceiling((x + MovementStep.HalfX) / MovementStep.TileSize) - 1; col++)
+                if (grid.IsSolid(col, row)) return false;
+        return true;
+    }
+
+    [Fact]
+    public void MinPhase_NotAPositiveInteger_Fails() // HU-112: un minPhase mal escrito no puede dejar abierto el paso
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "pr-map-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmp, "tilesets"));
+        foreach (var f in Directory.GetFiles(Path.Combine(MapsDir, "tilesets"))) File.Copy(f, Path.Combine(tmp, "tilesets", Path.GetFileName(f)));
+        var text = File.ReadAllText(Path.Combine(MapsDir, "mine.tmj"));
+        const string good = "{\"name\":\"minPhase\",\"type\":\"int\",\"value\":2}";
+        text.ShouldContain(good);
+        foreach (var bad in new[] { "{\"name\":\"minPhase\",\"type\":\"string\",\"value\":\"2\"}", "{\"name\":\"minPhase\",\"type\":\"int\",\"value\":0}" })
+        {
+            File.WriteAllText(Path.Combine(tmp, "mine.tmj"), text.Replace(good, bad, StringComparison.Ordinal));
+            Should.Throw<MapLoadException>(() => TiledMapLoader.Load(Path.Combine(tmp, "mine.tmj"), Check(), _ => true)).Errors
+                .ShouldContain(e => e.Contains("minPhase", StringComparison.Ordinal), bad);
+        }
+        Directory.Delete(tmp, true);
+    }
+
+    [Fact]
+    public void PortalToMissingMap_WithMinPhase_Loads_AndIsListedAsClosed() // HU-112 (lo usará la salida de la Cripta, HU-115)
+    {
+        // La Mina sin el Bosque: la salida (minPhase 2) carga; el portal a la Pradera (sin minPhase) sigue exigiendo que exista.
+        var path = Path.Combine(MapsDir, "mine.tmj");
+        TiledMapLoader.Load(path, Check(), id => id != "forest").Portals.Count.ShouldBe(2);
+        Should.Throw<MapLoadException>(() => TiledMapLoader.Load(path, Check(), id => id != "meadow")).Errors
+            .ShouldContain(e => e.Contains("targetMapId 'meadow'", StringComparison.Ordinal));
+
+        var tmp = Path.Combine(Path.GetTempPath(), "pr-map-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmp, "tilesets"));
+        foreach (var f in Directory.GetFiles(Path.Combine(MapsDir, "tilesets"))) File.Copy(f, Path.Combine(tmp, "tilesets", Path.GetFileName(f)));
+        File.Copy(path, Path.Combine(tmp, "mine.tmj"));
+        File.Copy(Path.Combine(MapsDir, "meadow.tmj"), Path.Combine(tmp, "meadow.tmj"));
+        var maps = TiledMapLoader.LoadAll(tmp, Check());
+        var (map, portal) = TiledMapLoader.PortalsToMissingMaps(maps).ShouldHaveSingleItem();
+        (map.MapId, portal.PortalId).ShouldBe(("mine", "mine_to_forest"));
+        TiledMapLoader.PortalsToMissingMaps(TiledMapLoader.LoadAll(MapsDir, Check())).ShouldBeEmpty();
+        Directory.Delete(tmp, true);
     }
 
     [Theory]

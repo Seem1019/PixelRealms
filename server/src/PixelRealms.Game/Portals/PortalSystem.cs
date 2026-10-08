@@ -8,7 +8,7 @@ namespace PixelRealms.Game.Portals;
 /// <summary>Un jugador cruzó un portal: el servidor lo mueve de instancia y envía ChangeMap (HU-027 CA1).</summary>
 public sealed record PortalUsed(int MapInstanceId, Player Player, PortalDef Portal) : IGameEvent;
 
-/// <summary>El portal se rechazó (en combate, muerto, nivel insuficiente): el servidor envía Error (HU-027 CA3/CA4).</summary>
+/// <summary>El portal se rechazó (en combate, muerto, nivel insuficiente, paso cerrado): el servidor envía Error (HU-027 CA3/CA4, HU-112).</summary>
 public sealed record PortalRejected(int MapInstanceId, Player Player, PortalDef Portal, string ErrorCode) : IGameEvent;
 
 /// <summary>Reglas puras de uso de un portal (HU-027).</summary>
@@ -18,10 +18,22 @@ public static class PortalPolicy
     public const string IsDead = "is_dead";
     public const string LevelTooLow = "level_too_low";
     public const string OutOfRange = "out_of_range";
+    public const string PortalLocked = "portal_locked";
 
-    /// <summary>Código de error o null si puede cruzar.</summary>
-    public static string? Check(Player player, PortalDef portal, long nowMs, IRules rules)
+    /// <summary>
+    /// ¿Está abierto el paso? (HU-112) Cerrado si la fase activa no llega a su `minPhase` o si su mapa de destino no está cargado
+    /// (la salida a un tier que aún no existe, HU-115), aunque la fase ya lo permita.
+    /// </summary>
+    public static bool IsOpen(PortalDef portal, IRules rules, bool targetLoaded) =>
+        targetLoaded && (portal.MinPhase is not { } phase || rules.World.CurrentPhase >= phase);
+
+    /// <summary>
+    /// Código de error o null si puede cruzar. El paso cerrado va primero: con el derrumbe delante, avisar de que estás en combate
+    /// o de que te falta nivel daría a entender que luego se podría cruzar.
+    /// </summary>
+    public static string? Check(Player player, PortalDef portal, long nowMs, IRules rules, bool targetLoaded)
     {
+        if (!IsOpen(portal, rules, targetLoaded)) return PortalLocked;
         if (player.IsDead) return IsDead;
         if (player.IsInCombat(nowMs, rules.Combat.InCombatWindowSec)) return InCombat;
         if (portal.MinLevel is { } min && player.Level < min) return LevelTooLow;
@@ -42,7 +54,8 @@ public static class PortalPolicy
 /// <see cref="PortalUsed"/> o <see cref="PortalRejected"/>. Un rechazo no se repite hasta que el jugador sale del portal
 /// (evita spam de errores cada tick). El cambio de instancia lo hace el servidor con el evento.
 /// </summary>
-public sealed class PortalSystem : IMapSystem
+/// <param name="isMapLoaded">¿Hay instancia del mapa de destino? Sin ella el portal está cerrado (HU-112); null = todos cargados.</param>
+public sealed class PortalSystem(Func<string, bool>? isMapLoaded = null) : IMapSystem
 {
     public string Name => "portals";
 
@@ -70,7 +83,7 @@ public sealed class PortalSystem : IMapSystem
                 if (player.RejectedPortalId == portal.PortalId) continue;
             }
 
-            var error = PortalPolicy.Check(player, portal, ctx.NowMs, ctx.Rules);
+            var error = PortalPolicy.Check(player, portal, ctx.NowMs, ctx.Rules, isMapLoaded?.Invoke(portal.TargetMapId) ?? true);
             if (error is null) ctx.Emit(new PortalUsed(map.Id, player, portal));
             else { player.RejectedPortalId = portal.PortalId; ctx.Emit(new PortalRejected(map.Id, player, portal, error)); }
         }

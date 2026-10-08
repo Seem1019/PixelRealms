@@ -35,8 +35,9 @@ EDGE_CAMP = (46, 44, 19, 17)        # zona segura del campamento de Brena (x, y,
 SWAMP_CAMP = (150, 48, 19, 15)      # zona segura del refugio del Pantano
 
 # --- Sitios de otras HU (dibujados y reservados aquí; su mecánica no) --------------------------------------------------------
-# HU-112: la Sala 3 de la Mina (mine.tmj, x 72..85 · y 16..35) tiene la hornacina tapiada en x 86..87 · y 25..27. El portal de
-# vuelta del Linde deja en (85, 25): casilla libre de la Sala 3 junto a la hornacina y a más de 6 casillas del gólem (79, 28).
+# HU-112: la Sala 3 de la Mina (mine.tmj, x 72..85 · y 16..35) tiene la salida hacia aquí en la hornacina (x 86..87 · y 25..27).
+# El portal de vuelta del Linde deja en (85, 25): casilla libre de la Sala 3 junto a la hornacina y a más de 6 casillas del gólem
+# (79, 28).
 MINE_ROOM3_TARGET = (85, 25)
 MINE_RETURN_PORTAL = (4, 28, 2, 3)  # en el fondo de la boca de la Mina, al oeste del Linde (x, y, ancho, alto)
 MINE_ARRIVAL = (12, 29)             # donde debe dejar el portal de la Sala 3 (HU-112): en la boca, fuera de MINE_RETURN_PORTAL

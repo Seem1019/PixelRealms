@@ -144,6 +144,7 @@ public static class ErrorCodes
     public const string BagFull = "bag_full";
     public const string NotEnoughGold = "not_enough_gold";
     public const string LevelTooLow = "level_too_low";
+    public const string PortalLocked = "portal_locked";
     public const string NotOwner = "not_owner";
     public const string InCombat = "in_combat";
     public const string PvpNotAllowed = "pvp_not_allowed";

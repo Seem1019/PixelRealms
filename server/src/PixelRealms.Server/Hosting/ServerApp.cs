@@ -69,12 +69,16 @@ public static class ServerApp
         try
         {
             var db = content.Current;
-            foreach (var map in Game.Map.TiledMapLoader.LoadAll(mapsDir, new Game.Map.TiledMapLoader.ContentCheck(id => db.TryGetMonster(id, out _), db.HasVendor)))
+            var maps = Game.Map.TiledMapLoader.LoadAll(mapsDir, new Game.Map.TiledMapLoader.ContentCheck(id => db.TryGetMonster(id, out _), db.HasVendor));
+            foreach (var map in maps)
             {
                 world.RegisterMap(map);
                 world.CreateInstance(map.MapId);
                 Console.WriteLine($"Mapa {map.MapId}: {map.Width}×{map.Height}, {map.Spawns.Count} spawns ({map.Spawns.Sum(s => s.Count)} monstruos), {map.Graveyards.Count} puntos seguros, {map.Portals.Count} portales");
             }
+            // HU-112: un portal a un mapa que aún no existe (solo con minPhase) queda cerrado aunque la fase lo permita.
+            foreach (var (map, portal) in Game.Map.TiledMapLoader.PortalsToMissingMaps(maps))
+                Console.WriteLine($"AVISO  Mapa {map.MapId}: el portal {portal.PortalId} lleva a '{portal.TargetMapId}', que no existe: queda cerrado (minPhase {portal.MinPhase})");
         }
         catch (Game.Map.MapLoadException ex)
         {
@@ -112,7 +116,7 @@ public static class ServerApp
         builder.Services.AddSingleton<IHelloGate, HelloGate>();
         builder.Services.AddSingleton<WorldSession>();
         builder.Services.AddSingleton<SaveService>();
-        builder.Services.AddSingleton<PortalSystem>();
+        builder.Services.AddSingleton(new PortalSystem(mapId => world.InstanceOf(mapId) is not null)); // HU-112: sin instancia, cerrado
         builder.Services.AddSingleton<MapTransferService>();
         builder.Services.AddSingleton<SnapshotBuilder>();
         builder.Services.AddSingleton<EventDispatcher>();

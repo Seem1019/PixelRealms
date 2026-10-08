@@ -280,7 +280,7 @@ def build_meadow() -> tuple[dict, dict]:
 
 # ----------------------------------------------------------------------------------------------------------------------------
 # mine (HU-083): entrada → Sala 1 (kóbolds) → Sala 2 (kóbolds + palancas) → rama lateral tras una puerta: sala del jefe · Sala 3
-# (gólem élite) → salida cerrada.
+# (gólem élite) → salida al Bosque, cerrada hasta la Fase 2 (HU-112).
 # ----------------------------------------------------------------------------------------------------------------------------
 
 def build_mine() -> tuple[dict, dict]:
@@ -311,7 +311,7 @@ def build_mine() -> tuple[dict, dict]:
     room1 = (22, 18, 18, 22)        # Sala 1: kóbolds
     room2 = (46, 10, 22, 26)        # Sala 2: kóbolds + dos palancas que abren la puerta de la rama del jefe
     boss = (46, 42, 26, 15)         # Sala del jefe (rama lateral al sur de la Sala 2)
-    room3 = (72, 16, 14, 20)        # Sala 3: gólem élite → salida al Tier 2 (cerrada)
+    room3 = (72, 16, 14, 20)        # Sala 3: gólem élite → salida al Tier 2 (cerrada hasta la Fase 2)
     for r in (entrance, room1, room2, boss, room3):
         room(*r)
     corridor([(17, 29), (22, 29)])
@@ -321,7 +321,7 @@ def build_mine() -> tuple[dict, dict]:
     # Pilares de la Sala 2 (obstáculos entre las dos palancas).
     for px, py in ((52, 16), (60, 16), (52, 28), (60, 28)):
         g.fill_rect(g.walls, px, py, 2, 2, ROCK)
-    # Salida al Tier 2: hornacina cerrada con roca al este de la Sala 3.
+    # Salida al Tier 2: hornacina al este de la Sala 3 (su portal y su dibujo, más abajo: HU-112).
     g.clear_rect(86, 25, 2, 3, ground=FLOOR); g.fill_rect(g.walls, 88, 24, 2, 5, ROCK)
     # Vagonetas/escombros decorativos (arbustos = bultos) y charcos.
     for _ in range(60):
@@ -340,6 +340,13 @@ def build_mine() -> tuple[dict, dict]:
     ]
     for s in spawns:
         g.clear_rect(s["x"] // TS - 1, s["y"] // TS - 1, max(1, s["width"] // TS) + 2, max(1, s["height"] // TS) + 2)
+    # HU-112: la hornacina es la salida al Linde del Bosque, una boca de galería derrumbada al otro lado del gólem. Se dibuja aquí,
+    # después de los escombros y los spawns, para no cambiar la secuencia del rng ni lo que despejan los spawns: sin el peñasco
+    # que tapaba la boca, con la roca adelantada a los lados y piedras del derrumbe caídas delante. (85, 24) queda libre: la caja de
+    # los pies de quien llega del Bosque a (85, 25) la toca.
+    g.walls[g.i(85, 26)] = 0
+    for bx, by in ((85, 23), (85, 28), (82, 29), (84, 31)):
+        g.walls[g.i(bx, by)] = ROCK
     graveyards = [obj(nid(), "gy_entrance", "graveyard", 11, 31, point=True)]
     portals = [obj(nid(), "to_meadow", "portal", 9, 27, 2, 3, [prop("portalId", "mine_to_meadow"), prop("targetMapId", "meadow"), prop("targetX", 238), prop("targetY", 54)])]
     zones = [obj(nid(), "Mina Abandonada", "zone", 1, 1, W - 2, H - 2,
@@ -354,6 +361,10 @@ def build_mine() -> tuple[dict, dict]:
         obj(nid(), "lever_inside", "lever", 57.5, 40.5, props=[prop("leverId", "mine_lever_inside"), prop("doorId", "mine_boss_door"), prop("opensAlone", True)], point=True),
     ]
     doors = [obj(nid(), "boss_door", "door", 55, 36, 5, 1, [prop("doorId", "mine_boss_door")])]
+    # HU-112: la salida de la hornacina, cerrada hasta la Fase 2 (minPhase), deja en la llegada reservada del Linde (MINE_ARRIVAL
+    # de gen_tier2_maps.py). Es el último objeto para no renumerar los demás.
+    portals.append(obj(nid(), "to_forest", "portal", 86, 25, 2, 3, [prop("portalId", "mine_to_forest"), prop("targetMapId", "forest"), prop("targetX", 12), prop("targetY", 29),
+                                                                    prop("minPhase", 2), prop("lockedText", "El derrumbe aún bloquea el paso")]))
     origin = (11, 31)
     sealed = g.seal_unreachable(origin, ROCK)
     report = check_map(g, origin, spawns, graveyards, [], portals)

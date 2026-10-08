@@ -18,9 +18,12 @@ var tile_size: int = 16
 var collision: CollisionGrid = CollisionGrid.new()
 var layers: Dictionary = {}  # nombre → PackedInt32Array de GIDs (ya enmascarados)
 var zones: Array[Dictionary] = []
-## Solo para dibujar: cementerios (fogata) y portales (entrada a la cueva), en píxeles.
+## Solo para dibujar: cementerios (fogata) y portales (entrada a la cueva), en píxeles. HU-112: de cada portal, su mapa de
+## destino y su `minPhase` (0 si no tiene), para dibujar distinto el que está cerrado (`portal_open`).
 var graveyards: Array[Vector2] = []
 var portals: Array[Rect2] = []
+var portal_targets: Array[String] = []
+var portal_min_phases: Array[int] = []
 ## HU-083: palancas {id, door, pos (px)} y puertas {id, rect (px)}. Las puertas empiezan cerradas en `collision`.
 var levers: Array[Dictionary] = []
 var doors: Array[Dictionary] = []
@@ -40,6 +43,12 @@ func gid_at(layer_name: String, x: int, y: int) -> int:
 		return 0
 	var data: PackedInt32Array = layers[layer_name]
 	return data[y * width + x]
+
+
+## HU-112: ¿se dibuja abierto el portal `i` en la fase dada? Cerrado si no llega a su `minPhase` o si su mapa de destino no
+## viene con el cliente. Solo elige el dibujo: quien deja pasar es el servidor.
+func portal_open(i: int, phase: int) -> bool:
+	return phase >= portal_min_phases[i] and FileAccess.file_exists("res://maps/%s.tmj" % portal_targets[i])
 
 
 func zone_at(pos: Vector2) -> Dictionary:
@@ -92,7 +101,10 @@ func _parse(path: String) -> bool:
 		elif str(l.get("type", "")) == "objectgroup" and name == "portals":
 			for o: Variant in l.get("objects", []):
 				var po: Dictionary = o
+				var pp := _props(po)
 				portals.append(Rect2(float(po.get("x", 0)), float(po.get("y", 0)), maxf(float(po.get("width", 0)), 1.0), maxf(float(po.get("height", 0)), 1.0)))
+				portal_targets.append(str(pp.get("targetMapId", "")))
+				portal_min_phases.append(int(pp.get("minPhase", 0)))
 		elif str(l.get("type", "")) == "objectgroup" and name == "levers":
 			for o: Variant in l.get("objects", []):
 				var lo: Dictionary = o

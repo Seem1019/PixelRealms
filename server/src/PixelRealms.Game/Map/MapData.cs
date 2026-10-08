@@ -14,7 +14,12 @@ public sealed record ZoneDef(string Id, string Name, bool Safe, int MinLevel, in
     public bool Contains(Vec2 p) => p.X >= Position.X && p.Y >= Position.Y && p.X < Position.X + Size.X && p.Y < Position.Y + Size.Y;
 }
 
-public sealed record PortalDef(string PortalId, string TargetMapId, float TargetX, float TargetY, int? MinLevel, Vec2 Position, Vec2 Size)
+/// <summary>
+/// Portal de la capa `portals` (HU-027). `MinPhase` (HU-112): cerrado mientras `rules.world.currentPhase` no llegue; `LockedText`:
+/// el aviso al pisarlo cerrado (si falta, uno genérico).
+/// </summary>
+public sealed record PortalDef(string PortalId, string TargetMapId, float TargetX, float TargetY, int? MinLevel, Vec2 Position, Vec2 Size,
+    int? MinPhase = null, string? LockedText = null)
 {
     public bool Contains(Vec2 p) => p.X >= Position.X && p.Y >= Position.Y && p.X < Position.X + Size.X && p.Y < Position.Y + Size.Y;
 }

@@ -89,18 +89,19 @@ static func _lookup(table: Dictionary, property: String, value: String) -> Strin
 
 
 ## {ground: Image, above: Image} o vacío si falta el tileset (el llamador usa el respaldo de colores). El resultado se
-## guarda por mapa y atlas: volver a un mapa ya horneado en la sesión no lo hornea otra vez.
-static func bake(map: TmjMap) -> Dictionary:
+## guarda por mapa, atlas y fase: volver a un mapa ya horneado en la sesión no lo hornea otra vez. `phase`: la activa
+## (`rules.world.currentPhase`, la pasa quien tiene el contenido), para dibujar cerrados los portales con `minPhase` (HU-112).
+static func bake(map: TmjMap, phase: int = 1) -> Dictionary:
 	if map == null:
 		return {}
 	var path := atlas_path_for(map)
 	var src := atlas(path)
 	if src == null:
 		return {}
-	var key := "%s:%dx%d:%s" % [map.map_id, map.width, map.height, path]
+	var key := "%s:%dx%d:%s:%d" % [map.map_id, map.width, map.height, path, phase]
 	if _cache.has(key):
 		return _cache[key]
-	var b := _Bake.new(map, src)
+	var b := _Bake.new(map, src, phase)
 	var result := b.run()
 	_cache[key] = result
 	return result
@@ -120,6 +121,8 @@ class _Bake:
 	var wl: PackedInt32Array
 	var ab: PackedInt32Array
 	var cave: bool = false
+	## Fase activa: un portal que aún no abre se dibuja con un cartel en vez de la escalera (HU-112).
+	var phase: int = 1
 	## Casillas de roca que tocan el borde del mapa: se dibujan como bosque en exteriores.
 	var forest_cells: Dictionary = {}
 	## Bloques de muro fuera de la zona segura: peñascos (se dibujan con la roca).
@@ -129,9 +132,10 @@ class _Bake:
 	var wells: Dictionary = {}
 	var well_centres: Array[Vector2i] = []
 
-	func _init(m: TmjMap, atlas_img: Image) -> void:
+	func _init(m: TmjMap, atlas_img: Image, active_phase: int) -> void:
 		map = m
 		src = atlas_img
+		phase = active_phase
 		w = m.width
 		h = m.height
 		g = _layer("ground")
@@ -423,14 +427,16 @@ class _Bake:
 				wells[i] = true
 			well_centres.append(Vector2i(roundi(centre.x * T), roundi(centre.y * T)))
 
-	## Cementerios (fogata), portales (escalera) y pozos del .tmj.
+	## Cementerios (fogata), portales (escalera; cartel si aún está cerrado, HU-112) y pozos del .tmj.
 	func _objects() -> void:
 		for c: Vector2i in well_centres:
 			solid.blend_rect(src, Rect2i(WELL_COL * T, ROW_EXTRA * T, 2 * T, 2 * T), c - Vector2i(T, T + 4))
 		for p: Vector2 in map.graveyards:
 			solid.blend_rect(src, _cell(7, ROW_OBJECTS), Vector2i(floori(p.x) - T / 2, floori(p.y) - T / 2))
-		for r: Rect2 in map.portals:
-			solid.blend_rect(src, _cell(8, ROW_OBJECTS), Vector2i(floori(r.get_center().x) - T / 2, floori(r.get_center().y) - T / 2))
+		for i: int in map.portals.size():
+			var r := map.portals[i]
+			var col := 8 if map.portal_open(i, phase) else 4  # escalera o cartel (fila de objetos del atlas)
+			solid.blend_rect(src, _cell(col, ROW_OBJECTS), Vector2i(floori(r.get_center().x) - T / 2, floori(r.get_center().y) - T / 2))
 
 	# --- Copas de árbol (capa above sin muro debajo) -------------------------------------------------------------
 

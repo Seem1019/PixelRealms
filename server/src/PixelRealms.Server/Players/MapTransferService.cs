@@ -12,11 +12,23 @@ namespace PixelRealms.Server.Players;
 /// <summary>
 /// Cambio de mapa (HU-027, ADR-007): con <see cref="PortalUsed"/> saca al jugador de su instancia (EntityDespawn{left} a quienes
 /// lo veían), lo mete en la instancia de destino en (targetX, targetY), envía ChangeMap y guarda (HU-026 CA6); los EntitySpawn
-/// de la nueva AOI salen en el siguiente tick. Con <see cref="PortalRejected"/> envía el Error correspondiente.
+/// de la nueva AOI salen en el siguiente tick. Con <see cref="PortalRejected"/> envía el Error correspondiente (con su texto
+/// para `level_too_low` y `portal_locked`).
 /// Gancho post-tick, antes del EventDispatcher.
 /// </summary>
 public sealed class MapTransferService(World world, InterestSystem interest, ConnectionManager connections, WorldSession session, ILogger<MapTransferService> logger)
 {
+    /// <summary>Aviso de un paso cerrado (HU-112) cuyo portal no trae `lockedText`.</summary>
+    public const string DefaultLockedText = "El paso sigue cerrado";
+
+    /// <summary>Texto del Error: el nivel que pide el portal (HU-027 CA4) o el aviso de un paso cerrado (HU-112).</summary>
+    private static string? MessageFor(PortalRejected rejected) => rejected.ErrorCode switch
+    {
+        PortalPolicy.LevelTooLow when rejected.Portal.MinLevel is { } min => $"Necesitas nivel {min}",
+        PortalPolicy.PortalLocked => rejected.Portal.LockedText ?? DefaultLockedText,
+        _ => null,
+    };
+
     public void OnPostTick(TickContext ctx)
     {
         // Los eventos nuevos (EntityLeftView) se añaden al final; recorremos por índice solo los ya existentes.
@@ -29,8 +41,7 @@ public sealed class MapTransferService(World world, InterestSystem interest, Con
                     Transfer(used.Player, used.Portal.TargetMapId, new Vec2(used.Portal.TargetX, used.Portal.TargetY), ctx, $"portal {used.Portal.PortalId}");
                     break;
                 case PortalRejected rejected when rejected.Player.ConnectionId >= 0:
-                    var message = rejected.ErrorCode == PortalPolicy.LevelTooLow && rejected.Portal.MinLevel is { } min ? $"Necesitas nivel {min}" : null;
-                    connections.Send(rejected.Player.ConnectionId, new Error(rejected.ErrorCode, message, null));
+                    connections.Send(rejected.Player.ConnectionId, new Error(rejected.ErrorCode, MessageFor(rejected), null));
                     break;
                 default:
                     break;
