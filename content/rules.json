@@ -224,7 +224,7 @@
 
   "world": {
     "startMapId": "meadow",
-    "currentPhase": 1,
+    "currentPhase": 2,
     "zoneCrossTimeSecTarget": [25, 40],
     "interactRangeTiles": 1.5,
     "doorResetSec": 600

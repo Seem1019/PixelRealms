@@ -178,7 +178,24 @@ docker compose -f docker-compose.prod.yml start server
 - **Pendiente**: ensayo en el VPS con un backup real y la copia automática fuera del VPS (decidir destino: otro servidor,
   almacenamiento S3 compatible con `rclone`, o el PC de alguien del grupo).
 
-## 10. Problemas frecuentes
+## 10. Abrir una fase (HU-118)
+La fase activa es `rules.world.currentPhase` en `content/rules.json`, que va dentro de la imagen: abrir la Fase 2 es mergear
+el cambio a `2` en `main`, y el *Deploy* reinicia el servidor y publica el cliente web (§7). El tope pasa de 6 a 10
+(`rules.progression.levelCapByPhase`); quien estaba en el 6 empieza el 7 desde 0, porque en el tope no se acumula XP.
+1. **Copia de la base antes** (§9): `docker compose -f docker-compose.prod.yml exec backup sh /backup.sh once`.
+2. **Migraciones de la Fase 2**, que se aplican solas al arrancar (`MigrateAsync`) en el orden de su marca de tiempo:
+   - `20261006120000_CharacterSpellUpgrades` (HU-104, mejoras elegidas por personaje): ya aplicada desde el despliegue de la
+     Fase 2 del motor (#21).
+   - El atajo del puente (HU-113) traerá otra cuando se haga; no hace falta para abrir la fase.
+   Comprobar antes y después: el log del servidor dice "sin migraciones pendientes" al arrancar.
+3. Avisar con `/announce` (el reinicio desconecta a todos) y mergear.
+4. Comprobar después: `/health`; `/admin/stats` (tick p99 parecido al de antes); con una cuenta admin, `/level 10` llega al
+   10; un personaje de nivel 6 vuelve a ganar XP; la salida de la Sala 3 de la Mina lleva al Bosque (`minPhase: 2`) y la de la
+   Cripta al Tier 3 sigue cerrada (`minPhase: 3`).
+5. **Volver atrás** bajando `currentPhase` no baja de nivel a nadie: el tope solo se aplica al ganar XP y con `/level`. Si hay
+   que deshacerlo de verdad, restaurar la copia del paso 1 (§9) y aceptar que se pierde lo jugado desde entonces.
+
+## 11. Problemas frecuentes
 - *Caddy no obtiene certificado*: el DNS no apunta aún o el puerto 80/443 está cerrado en el firewall del proveedor (además de ufw).
 - *Logs*: el servidor escribe JSON a consola (`AddJsonConsole`, HU-072 CA2) y Docker los guarda con rotación (5 archivos de
   10 MB por servicio, bloque `x-logging` del compose). Leerlos: `docker compose -f docker-compose.prod.yml logs -f server`.

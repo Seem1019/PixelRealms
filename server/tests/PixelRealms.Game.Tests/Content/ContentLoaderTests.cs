@@ -66,7 +66,7 @@ public sealed class ContentLoaderTests
         db.Item("worn_sword").MaxStack.ShouldBe(1);
         db.Monster("slime").Boss.ShouldBeFalse();
         db.LootTable("lt_slime").MaxItems.ShouldBe(4);
-        db.Rules.CurrentLevelCap.ShouldBe(6);
+        db.Rules.CurrentLevelCap.ShouldBe(10); // Fase 2 abierta (HU-118)
     }
 
     [Fact]

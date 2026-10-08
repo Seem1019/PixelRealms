@@ -164,7 +164,7 @@ public sealed class PortalSystemTests
     {
         var w = BuildExit(phase: 1);
         var ana = w.Player("Ana");
-        var rules = w.Content.Rules;
+        var rules = w.Content.Rules with { World = w.Content.Rules.World with { CurrentPhase = 1 } }; // el contenido ya está en Fase 2
         var phase2 = rules with { World = rules.World with { CurrentPhase = 2 } };
         var exitWithLevel = Exit with { MinLevel = 8 };
 

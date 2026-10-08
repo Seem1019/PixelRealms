@@ -9,8 +9,8 @@ const GEAR_TYPES := {
 }
 const ROLES := {"tank": "Tanque", "melee_dps": "Daño cuerpo a cuerpo", "ranged_dps": "Daño a distancia", "healer": "Sanador"}
 const RESOURCES := {"mana": "Maná", "rage": "Ira", "energy": "Energía"}
-## Mapas (`mapId` de Tiled) con el nombre del GDD: el Tier 1 entero vive en `meadow` y la Mina en el suyo.
-const MAPS := {"meadow": "Robledal", "mine": "Mina Abandonada"}
+## Mapas (`mapId` de Tiled) con el nombre del GDD: cada tier vive en un mapa (`meadow`, `forest`) y cada cueva en el suyo.
+const MAPS := {"meadow": "Robledal", "mine": "Mina Abandonada", "forest": "Bosque", "crypt": "Cripta de Raíces"}
 
 
 static func item_type(id: String) -> String:
