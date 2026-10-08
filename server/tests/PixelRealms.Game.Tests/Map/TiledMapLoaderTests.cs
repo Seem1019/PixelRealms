@@ -91,7 +91,7 @@ public sealed class TiledMapLoaderTests
     public void Meadow_And_Mine_Load_WithPortalsBetweenThem() // HU-020 CA1, HU-080 CA1–CA3
     {
         var maps = TiledMapLoader.LoadAll(MapsDir, Check());
-        maps.Select(m => m.MapId).ToArray().ShouldBe(new[] { "meadow", "mine", "test_small" });
+        maps.Select(m => m.MapId).ToArray().ShouldBe(new[] { "forest", "meadow", "mine", "test_small" });
         var meadow = maps.Single(m => m.MapId == "meadow");
         meadow.Width.ShouldBe(250); meadow.Height.ShouldBe(110); // aldea 42 + Campos 100 + Colinas 100 (~100×100 útiles por zona)
         meadow.Portals.ShouldHaveSingleItem().TargetMapId.ShouldBe("mine");
@@ -132,10 +132,93 @@ public sealed class TiledMapLoaderTests
         mine.Spawns.Single(s => s.MonsterId == "foreman_grask").Position.Y.ShouldBeGreaterThan(door.Position.Y); // el jefe, detrás
     }
 
+    /// <summary>HU-111 CA1–CA4: el Bosque tiene el Linde y el Pantano separados por un paso, un punto seguro por zona que es
+    /// siempre el más cercano dentro de ella, los monstruos del bestiario con subniveles y el portal de vuelta a la Sala 3.</summary>
+    [Fact]
+    public void Forest_TwoZonesSplitByAPass_ASafePointEach_AndThePortalBackToTheMine()
+    {
+        var maps = TiledMapLoader.LoadAll(MapsDir, Check());
+        var forest = maps.Single(m => m.MapId == "forest");
+        forest.Width.ShouldBe(214); forest.Height.ShouldBe(104); // dos zonas de ~105×100 (la Pradera, con tres, es 250×110)
+        var open = forest.Zones.Where(z => !z.Safe).ToArray();
+        open.Select(z => (z.Name, z.MinLevel, z.MaxLevel)).ToArray().ShouldBe(new[] { ("Linde del Bosque", 6, 8), ("Pantano", 8, 10) });
+        open.Select(z => z.Landmark).ToArray().ShouldBe(new[] { "Árbol Madre", "Torre hundida" });
+        // CA1: la cresta entre las dos zonas solo se cruza por el paso de 4 casillas.
+        var split = (int)open[1].Position.X;
+        Enumerable.Range(0, forest.Height).Count(y => !forest.Collision.IsSolid(split, y)).ShouldBe(4);
+
+        // CA3: una fogata por zona, dentro de una zona `safe`, y desde cualquier casilla de la zona es la más cercana (donde se
+        // reaparece, DeathSystem): nadie vuelve a la Aldea ni a la fogata de la otra zona.
+        forest.Graveyards.Count.ShouldBe(2);
+        foreach (var zone in open)
+        {
+            var gy = forest.Graveyards.Single(g => zone.Contains(g.Position));
+            forest.IsSafeZone(gy.Position).ShouldBeTrue(gy.Id);
+            var wrong = 0;
+            for (var y = (int)zone.Position.Y; y < (int)(zone.Position.Y + zone.Size.Y); y++)
+                for (var x = (int)zone.Position.X; x < (int)(zone.Position.X + zone.Size.X); x++)
+                    if (!forest.Collision.IsSolid(x, y) && forest.NearestGraveyard(new Vec2(x + 0.5f, y + 0.5f)).Id != gy.Id) wrong++;
+            wrong.ShouldBe(0, zone.Name);
+        }
+        var brena = forest.Npcs.ShouldHaveSingleItem();
+        brena.VendorId.ShouldBe("forest_camp");
+        forest.IsSafeZone(brena.Position).ShouldBeTrue();
+        open[0].Contains(brena.Position).ShouldBeTrue("Brena está en el punto seguro del Linde");
+
+        // CA2: los monstruos de cada zona según el bestiario, un élite en su rama lateral, subniveles de la entrada (oeste) a la
+        // salida (este) y ningún campamento dentro de un punto seguro.
+        string[] MonstersIn(ZoneDef z) => forest.Spawns.Where(s => z.Contains(s.Position)).Select(s => s.MonsterId).Distinct().Order(StringComparer.Ordinal).ToArray();
+        MonstersIn(open[0]).ShouldBe(new[] { "bandit_woodcutter", "forest_wolf", "old_bear", "weaver_spider" });
+        MonstersIn(open[1]).ShouldBe(new[] { "giant_toad", "lizardman", "swamp_witch", "will_o_wisp" });
+        forest.Spawns.Single(s => s.MonsterId == "old_bear").Count.ShouldBe(1);
+        forest.Spawns.Single(s => s.MonsterId == "swamp_witch").Count.ShouldBe(1);
+        float MaxX(string id) => forest.Spawns.Where(s => s.MonsterId == id).Max(s => s.Position.X);
+        float MinX(string id) => forest.Spawns.Where(s => s.MonsterId == id).Min(s => s.Position.X);
+        MaxX("forest_wolf").ShouldBeLessThan(MinX("bandit_woodcutter")); MaxX("bandit_woodcutter").ShouldBeLessThan(MinX("weaver_spider"));
+        MaxX("giant_toad").ShouldBeLessThan(MinX("lizardman")); MaxX("lizardman").ShouldBeLessThan(MinX("will_o_wisp"));
+        foreach (var s in forest.Spawns)
+        {
+            var inSafe = false;
+            for (var y = (int)s.Position.Y; y < (int)s.Position.Y + Math.Max(1, (int)s.Size.Y); y++)
+                for (var x = (int)s.Position.X; x < (int)s.Position.X + Math.Max(1, (int)s.Size.X); x++)
+                    inSafe |= forest.IsSafeZone(new Vec2(x + 0.5f, y + 0.5f));
+            inSafe.ShouldBeFalse(s.Id);
+        }
+
+        // CA4: el portal de vuelta sale de la boca de la Mina, en el Linde, y deja en la Sala 3 junto a la hornacina tapiada
+        // (x 86..87 · y 25..27), donde HU-112 pondrá la salida hacia aquí.
+        var back = forest.Portals.ShouldHaveSingleItem();
+        back.TargetMapId.ShouldBe("mine");
+        open[0].Contains(back.Position).ShouldBeTrue();
+        var mine = maps.Single(m => m.MapId == "mine");
+        mine.Collision.IsSolidAt(back.TargetX, back.TargetY).ShouldBeFalse();
+        Vec2.Distance(new Vec2(back.TargetX, back.TargetY), new Vec2(86, 26)).ShouldBeLessThan(3);
+    }
+
     [Theory]
     [InlineData("meadow")]
     [InlineData("mine")]
-    public void FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject(string mapId) // HU-080 CA4, HU-083 CA1
+    [InlineData("forest")]
+    public void Borders_AreSolid(string mapId) // skill world-maps, HU-111 CA5
+    {
+        var map = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == mapId);
+        for (var x = 0; x < map.Width; x++)
+        {
+            map.Collision.IsSolid(x, 0).ShouldBeTrue($"({x}, 0)");
+            map.Collision.IsSolid(x, map.Height - 1).ShouldBeTrue($"({x}, {map.Height - 1})");
+        }
+        for (var y = 0; y < map.Height; y++)
+        {
+            map.Collision.IsSolid(0, y).ShouldBeTrue($"(0, {y})");
+            map.Collision.IsSolid(map.Width - 1, y).ShouldBeTrue($"({map.Width - 1}, {y})");
+        }
+    }
+
+    [Theory]
+    [InlineData("meadow")]
+    [InlineData("mine")]
+    [InlineData("forest")]
+    public void FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject(string mapId) // HU-080 CA4, HU-083 CA1, HU-111 CA5
     {
         var map = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == mapId);
         var grid = map.Collision;

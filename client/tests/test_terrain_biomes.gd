@@ -17,6 +17,21 @@ func test_current_maps_keep_the_meadow_atlas() -> void:
 		assert_eq(TerrainBaker.atlas_path_for(map), TerrainBaker.ATLAS_PATH, id)
 
 
+## HU-111: el Bosque (tools/maps/gen_tier2_maps.py) se hornea con su atlas y el cliente lee sus dos zonas y sus puntos seguros.
+func test_the_forest_map_uses_the_forest_atlas() -> void:
+	var map := TmjMap.load_from("res://maps/forest.tmj")
+	assert_not_null(map, "falta client/maps/forest.tmj (tools/sync_content.gd)")
+	if map == null:
+		return
+	assert_eq(map.biome, "forest")
+	assert_eq(TerrainBaker.atlas_path_for(map), FOREST)
+	var names: Array[String] = []
+	for z: Dictionary in map.zones:
+		names.append(str(z["name"]))
+	assert_true(names.has("Linde del Bosque") and names.has("Pantano"), str(names))
+	assert_eq(map.graveyards.size(), 2, "una fogata por zona")
+
+
 func test_biome_and_palette_are_read_from_the_map_properties() -> void:
 	var forest := _map_with({"biome": "forest"})
 	assert_eq(forest.biome, "forest")

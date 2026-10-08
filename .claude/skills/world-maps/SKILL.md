@@ -67,5 +67,19 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
   fortaleza gris en la Fase 3): una paleta nueva es una entrada de `CAVE_PALETTES` en `tools/art/gen_tiles.py`, su PNG y
   su fila en `TerrainBaker.PALETTE_ATLASES`.
 - El pueblo (`safe=true`) debe estar a < 40 tiles de las zonas 1–3.
+- Reaparecer en la fogata de la zona: el servidor usa la más cercana (`MapData.NearestGraveyard`). Con dos zonas en un mapa, pon
+  las dos fogatas en la misma fila y a la misma distancia de la frontera: la mediatriz es la frontera.
 - Tras editar: `dotnet test --filter Map`, copiar los mapas al cliente (`godot --path client --headless -s ../tools/sync_content.gd`)
   y abrirlo para revisar capas `above`.
+
+## Generadores (mapas deterministas)
+- `tools/maps/gen_tier1_maps.py` (meadow, mine) y `tools/maps/gen_tier2_maps.py` (forest, HU-111; importa la rejilla y los
+  objetos del primero). Regenerar el Tier 1 cambia los fines de línea de sus `.tmj`: restaurarlos con `git checkout` si no se
+  tocaron. `--check` valida sin escribir y sale con código ≠ 0; el del Tier 2 comprueba además bordes, que la fogata más
+  cercana sea la de la zona, que el aggro de grupos distintos no se solape, los sitios reservados para otras HU (boca de la
+  Cripta, puente roto, llegada desde la Mina: constantes al principio del archivo), subniveles y tiempo de cruce por el sendero.
+- Cómo dibuja `TerrainBaker` los GIDs de `placeholder.tsj` en exteriores: la roca unida al borde es bosque cerrado (la suelta,
+  peñasco); el muro de una casilla de grosor es valla, sus bloques son cabañas dentro de una zona `safe` y peñascos fuera (un
+  ramal que corte un peñasco deja un poste de valla suelto); `above` sin muro debajo son copas; suelo 8 son losas.
+- Vista horneada sin entidades y tiempo del horneado en frío:
+  `godot --path client --headless -s res://tools/bake_map.gd -- <mapId> <salida.png> [escala]`.
