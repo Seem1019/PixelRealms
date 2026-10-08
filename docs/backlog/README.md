@@ -107,11 +107,11 @@
 | HU-104 | Mejoras de hechizo 1-de-2 | E4 | Must | L | Hecha |
 | HU-105 | Elegir mejoras en el libro de hechizos | E4 | Must | M | Hecha |
 | HU-106 | Números de los hechizos de nivel 7 y 9 | E8 | Must | M | Hecha |
-| HU-107 | Mejoras de los hechizos | E8 | Must | M | Pendiente |
+| HU-107 | Mejoras de los hechizos | E8 | Must | M | Hecha |
 | HU-108 | Tileset del Bosque y paleta de la Cripta | E8 | Must | M | Hecha |
 | HU-109 | Monstruos del Bosque y de la Cripta | E8 | Must | M | Hecha |
 | HU-110 | Equipo, botín y vendedor de los niveles 6 a 10 | E8 | Must | M | Hecha |
-| HU-111 | Mapa del Bosque: Linde y Pantano | E8 | Must | L | Pendiente |
+| HU-111 | Mapa del Bosque: Linde y Pantano | E8 | Must | L | Hecha |
 | HU-112 | Salida de la Mina al Bosque | E2 | Must | S | Pendiente |
 | HU-113 | Atajo del puente roto | E2 | Should | M | Pendiente |
 | HU-114 | Arte del Tier 2: monstruos, jefe e íconos | E8 | Must | M | Parcial |
