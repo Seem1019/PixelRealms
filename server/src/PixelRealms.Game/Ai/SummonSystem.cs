@@ -31,6 +31,10 @@ public sealed class SummonSystem(Func<ContentDb> content, World world, InterestS
     /// vuelven a la reserva), como a quien sale del mundo.</summary>
     public Action<Monster, MapInstance, TickContext>? OnRemoving { get; set; }
 
+    /// <summary>Lo fija la composición (<see cref="MonsterAiSystem.IsValidTarget"/>): la invocación hereda solo la amenaza de quien
+    /// podría tener de objetivo (ni duelistas, ni ausentes del mapa, ni señuelos fuera de su correa; revisión de autoridad, HU-117).</summary>
+    public Func<Monster, EntityId, MapInstance, bool>? IsValidTarget { get; set; }
+
     /// <summary>Crea las invocaciones del efecto (menos si no hay hueco o se llega a un tope). Devuelve cuántas creó.</summary>
     public int Summon(Monster invoker, EffectDef effect, MapInstance map, TickContext ctx)
     {
@@ -56,7 +60,11 @@ public sealed class SummonSystem(Func<ContentDb> content, World world, InterestS
                 Level = template.Level, Hp = template.Hp, MaxHp = template.Hp, Position = pos, BaseSpeed = (float)template.Speed,
                 SummonedBy = invoker.Id,
             };
-            foreach (var id in invoker.Threat.Ids) summon.Threat.Add(new EntityId(id), invoker.Threat.Of(new EntityId(id)));
+            foreach (var raw in invoker.Threat.Ids)
+            {
+                var id = new EntityId(raw);
+                if (IsValidTarget is null || IsValidTarget(summon, id, map)) summon.Threat.Add(id, invoker.Threat.Of(id));
+            }
             map.Add(summon);
             created++;
         }

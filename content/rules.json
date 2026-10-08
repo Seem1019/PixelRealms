@@ -220,7 +220,7 @@
 
   "social": { "_doc": "Chat (HU-060) e intercambio (HU-059).", "chatMaxLength": 200, "chatRateLimitCount": 5, "chatRateLimitWindowSec": 5, "tradeMaxItems": 6, "tradeRangeTiles": 3, "tradeRequestExpireSec": 30 },
 
-  "ai": { "_doc": "Ritmos de la IA de monstruos (HU-031, HU-036): percepción, A*, patrulla.", "perceptionMs": 250, "pathRecalcMs": 500, "pathRecalcMovedTiles": 2, "pathMaxNodes": 200, "wanderPauseMinMs": 2000, "wanderPauseMaxMs": 6000, "wanderSpeedMult": 0.5, "arriveToleranceTiles": 0.25, "rangedThreatThresholdTiles": 2 },
+  "ai": { "_doc": "Ritmos de la IA de monstruos (HU-031, HU-036): percepción, A*, patrulla; reinicio de los inmóviles (HU-117).", "perceptionMs": 250, "pathRecalcMs": 500, "pathRecalcMovedTiles": 2, "pathMaxNodes": 200, "wanderPauseMinMs": 2000, "wanderPauseMaxMs": 6000, "wanderSpeedMult": 0.5, "arriveToleranceTiles": 0.25, "rangedThreatThresholdTiles": 2, "immobileOutOfReachResetMs": 8000 },
 
   "world": {
     "startMapId": "meadow",

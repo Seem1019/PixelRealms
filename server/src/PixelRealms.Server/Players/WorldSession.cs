@@ -253,12 +253,7 @@ public sealed class WorldSession(World world, PlayerRegistry players, PlayerMapp
         {
             // Lo que dejó en marcha no sigue a su nombre: proyectiles en vuelo, amenaza y monstruos marcados (sin XP ni botín
             // para un ausente).
-            Combat?.Casts.ForgetCaster(player, instance);
-            foreach (var m in instance.Monsters.Values)
-            {
-                m.Threat.Remove(player.Id);
-                if (m.TaggedBy == player.Id) m.TaggedBy = null;
-            }
+            Combat?.ForgetLeaving(player, instance);
             instance.Remove(player.Id);
             PlayerLeft?.Invoke(player, new MapInstanceRef(instance));
         }

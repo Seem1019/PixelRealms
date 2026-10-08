@@ -208,12 +208,31 @@ cada 500 ms) → `Attack` (en rango; usa `spells[]` listos según su `cooldownMs
 Los duelistas no generan aggro ni amenaza mientras dura el duelo; la zona del duelo (§Muerte y reaparición) impide usarlo para
 cruzar el mapa ignorados por los monstruos.
 - Un monstruo solo lanza sus hechizos en `Attack`, es decir, con el objetivo a ≤ `attackRange`: un hechizo a distancia necesita
-  un monstruo a distancia. Las áreas se lanzan en el punto del objetivo (`target: current`) o en el del propio monstruo
+  un monstruo a distancia (salvo el inmóvil, abajo). Las áreas se lanzan en el punto del objetivo (`target: current`) o en el del propio monstruo
   (`target: self`, marca centrada en él).
-- **Inmóvil (`speed: 0`, HU-109):** funciona sin código aparte. No patrulla ni persigue (pasa a `Chase`, pero sus pasos son de
-  0 casillas); ataca y lanza hechizos a quien está a ≤ `attackRange`. Como no se aleja del spawn, la correa no lo hace evadir:
-  olvida al objetivo (sin curarse) cuando este pasa de 2 × `leashRange`, y evade al instante, curándose, si el A* hacia él
-  falla. Su `attackRange` debe cubrir el alcance de los jugadores (8) para que no se le mate gratis desde lejos.
+- **Inmóvil (`speed: 0`, HU-109, HU-117):** no patrulla ni persigue, ni calcula caminos. Pega con el básico a su objetivo a ≤
+  `attackRange` y a su vista; si su objetivo (por amenaza) no está a tiro, pega al de más amenaza que sí lo esté, sin cambiar su
+  tabla (el tanque no se aparta gratis). Sus hechizos van a quien les llegue aunque el objetivo quede más lejos o tras una
+  columna; si a su objetivo no le llega, al de más amenaza al que sí (no se intenta un casteo condenado): alejarse no es seguro.
+  Como no se aleja del spawn, la correa no lo hace evadir; se reinicia en su sitio (vida completa, sin auras ni amenaza; sus
+  invocaciones y áreas se van) cuando se queda sin nadie a quien pegar (todos pasan de 2 × `leashRange` o mueren) o cuando
+  acumula `rules.ai.immobileOutOfReachResetMs` (8 s) sin poder pegar con el básico a nadie de su tabla; el tiempo que pasa
+  pegando descuenta lo acumulado al mismo ritmo. Solo cuenta el básico, medido desde el monstruo: desde el anillo de sus
+  hechizos, que se esquivan, o tras una columna no se le tiene entretenido, y asomarse un instante no frena la cuenta
+  (revisión de autoridad). Su `attackRange` debe cubrir el alcance de las áreas de los jugadores de su fase (punto a 8 + 1,5,
+  radio hasta 3 y el cuerpo: ~13,3 con Pulso sagrado; el Árbol Podrido, 13,5) para que no se le pegue desde donde no contesta.
+- **Objetivos válidos:** el objetivo, `random_not_top_threat` y la amenaza que hereda una invocación salen solo de los jugadores
+  vivos del mapa que no están en duelo y están a ≤ 2 × `leashRange`; un candidato inválido nunca pasa a ser el objetivo y, si el
+  objetivo actual deja de serlo, sale de la tabla (y se suelta Provocar). `random_not_top_threat` sortea entre los válidos a los
+  que llega el hechizo salvo a quien está pegando (no «salvo el de más amenaza»: con la regla del 130 % no siempre es el mismo);
+  si no hay ninguno, va a quien está pegando si le llega. Quien cambia de mapa o sale del mundo sale de las tablas de amenaza y
+  deja de marcar monstruos de la instancia que deja.
+- **A por el que menos amenaza tiene (`threatTarget: lowest`, HU-117):** el monstruo persigue y pega a quien menos amenaza tiene en
+  su tabla, con la regla de cambio al revés (cambia cuando la amenaza del actual llega al 110 %/130 % de la del que menos tiene);
+  Provocar lo fija igual durante su `durationMs`. Solo cuenta a quien está además a ≤ `leashRange` de su sitio, y si no encuentra
+  camino hasta él (un sanador tras el agua) lo quita de su tabla y va a por el siguiente en vez de evadir: un señuelo no lo saca
+  de su correa ni borra a una invocación. Por defecto (`highest`) va a por el que más tiene. Lo usan los retoños del Árbol
+  Podrido: heredan la tabla del jefe y van a por el sanador.
 - **Invocaciones (`summon`, HU-116):** solo hechizos de monstruo. Salen en casillas libres a 1,5–2,5 del invocador con su
   tabla de amenaza (entran persiguiendo) y sin spawn (no reaparecen); topes `rules.limits.maxSummonsPerCaster` (4) y
   `maxSummonsPerInstance` (32). Se van sin cadáver al morir o evadir, o si su invocador muere, evade, se queda sin amenaza o

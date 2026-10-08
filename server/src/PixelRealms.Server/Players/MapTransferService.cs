@@ -70,6 +70,7 @@ public sealed class MapTransferService(World world, InterestSystem interest, Con
         }
         player.Combat.Flight = null;
         interest.ForgetEntity(from, player.Id, InterestSystem.ReasonLeft, ctx);
+        session.Combat?.ForgetLeaving(player, from); // amenaza, marcas y proyectiles del mapa que deja, como al salir del mundo
         from.Remove(player.Id);
         player.Position = position;
         player.MoveDx = 0;

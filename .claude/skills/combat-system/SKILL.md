@@ -62,6 +62,13 @@ entrada en `Evade`. Detalles en `docs/design/combat.md` §Monstruos.
 - `Chase`: A* sobre `CollisionGrid` (8 direcciones, sin cortar esquinas), recalcular cada 500 ms o si el objetivo se
   mueve > 2 tiles. Límite 200 nodos expandidos; si falla → `Evade`.
 - Hechizos de monstruo: en `Attack`, por cada `spells[i]` listo (CD y `hpBelowPct`) lo castea en vez del auto-ataque.
+- Inmóvil (`speed: 0`): no calcula caminos; si su objetivo no está a tiro, pega al de más amenaza que sí lo esté; castea a quien le
+  llegue el hechizo aunque su objetivo esté fuera de `attackRange`, y se reinicia en su sitio (vida completa) sin nadie a quien
+  pegar o al acumular `rules.ai.immobileOutOfReachResetMs` sin poder pegar con el básico (`MonsterBrain.OutOfReachMs`; pegar lo
+  descuenta). `random_not_top_threat` excluye a quien está pegando, no al Top.
+  `threatTarget: lowest` (plantilla): va a por quien menos amenaza tiene (y a ≤ `leashRange` de su sitio), con la regla 110 %/130 %
+  al revés; Provocar lo fija igual; si el A* no llega hasta él, lo quita de la tabla en vez de evadir (HU-117). Objetivos, `random_not_top_threat` y la amenaza heredada por una invocación salen de
+  `MonsterAiSystem.IsValidTarget`; `CombatModule.ForgetLeaving` saca de las tablas a quien deja la instancia.
 - `Evade`: inmune (`Combat.Evading = true`), velocidad × `rules.combat.evadeSpeedMult` (1.5), al llegar al spawn: vida completa, limpiar amenaza y auras.
 
 ## Cliente

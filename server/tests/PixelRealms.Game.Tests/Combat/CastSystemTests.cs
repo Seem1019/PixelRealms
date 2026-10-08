@@ -314,6 +314,10 @@ public sealed class CastSystemTests
         w.Combat.Casts.TryBeginCast(w.Player("Ana"), burst, null, new Vec2(13, 12), w.Map, w.Begin()).ShouldBeNull();
         w.Combat.Casts.ActiveAreas(w.Map).ShouldBe(1);
         w.Combat.Casts.TryBeginCast(w.Player("Bob"), burst, null, new Vec2(13, 12), w.Map, w.Begin()).ShouldBe(CastErrors.AreaLimit);
+        // Alcance y vista van antes que el tope (revisión de autoridad, HU-117): un casteo condenado no recorre la instancia.
+        w.Combat.Casts.TryBeginCast(w.Player("Bob"), burst, null, new Vec2(30, 30), w.Map, w.Begin()).ShouldBe(CastErrors.OutOfRange);
+        for (var y = 15; y <= 17; y++) { w.Map.Data.Collision.SetSolid(12, y); w.Map.Data.Collision.SetBlocksSight(12, y); }
+        w.Combat.Casts.TryBeginCast(w.Player("Bob"), burst, null, new Vec2(14, 16), w.Map, w.Begin()).ShouldBe(CastErrors.NoLos);
         TickRunner.RunMs(w, burst.CastMs + 50); // la primera termina: hay sitio otra vez
         w.Combat.Casts.ActiveAreas(w.Map).ShouldBe(0);
         w.Combat.Casts.TryBeginCast(w.Player("Bob"), burst, null, new Vec2(13, 12), w.Map, w.Begin()).ShouldBeNull();

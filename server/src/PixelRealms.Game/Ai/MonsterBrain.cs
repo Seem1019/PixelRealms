@@ -31,6 +31,10 @@ public sealed class MonsterBrain
     /// <summary>Posición del objetivo cuando se calculó el camino (recalcular si se movió > 2 casillas).</summary>
     public Vec2 PathTargetPos { get; set; }
 
+    /// <summary>Inmóviles (HU-117): ms acumulados sin poder pegar con el básico a nadie de su tabla; el tiempo pegando los descuenta
+    /// al mismo ritmo. Al llegar a `rules.ai.immobileOutOfReachResetMs` se reinicia en su sitio.</summary>
+    public long OutOfReachMs { get; set; }
+
     public void ClearPath()
     {
         Path.Clear();

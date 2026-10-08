@@ -199,6 +199,33 @@ public sealed class PortalTests
         }
     }
 
+    [Fact]
+    public async Task ChangingMap_ForgetsItsThreatAndTagInTheMapItLeaves() // revisión de autoridad (HU-117): como al salir del mundo
+    {
+        await using var server = await TestServer.StartAsync();
+        var (api, _, ana) = await Enter(server, "ana", "Ana", "warrior");
+        using (api)
+        {
+            var selfId = (await ana.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
+            var player = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId);
+            var world = server.Services.GetRequiredService<World>();
+            var transfer = server.Services.GetRequiredService<MapTransferService>();
+            (bool Moved, bool Threat, bool Tagged) after = default;
+            await server.RunOnTickAsync(t =>
+            {
+                var monster = world.GetInstance(player.MapInstanceId)!.Monsters.Values.First();
+                monster.Threat.Add(player.Id, 50);
+                monster.TaggedBy = player.Id;
+                var moved = transfer.Transfer(player, "mine", new Vec2(11, 28), t, "test");
+                after = (moved, monster.Threat.Contains(player.Id), monster.TaggedBy == player.Id);
+            });
+            after.Moved.ShouldBeTrue();
+            after.Threat.ShouldBeFalse("ni el jefe ni sus retoños siguen yendo a por quien ya no está en el mapa");
+            after.Tagged.ShouldBeFalse();
+            await ana.DisposeAsync();
+        }
+    }
+
     private static async Task WaitUntil(Func<bool> cond, int timeoutMs = 3000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
