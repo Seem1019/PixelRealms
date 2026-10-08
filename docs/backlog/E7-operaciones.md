@@ -153,7 +153,7 @@
 
 ### HU-118 · Abrir la Fase 2
 **Como** administrador **quiero** subir la fase activa a 2 en el servidor **para** que los amigos jueguen el Tier 2.
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-104, HU-105, HU-111, HU-112, HU-115, HU-117
 - Skills: `dotnet-server`, `game-content`
 
@@ -162,3 +162,11 @@
 2. **Dado** la Fase 2 **entonces** la salida de la Mina se abre (HU-112), la del Tier 3 sigue cerrada y el NPC de cambio de clase sigue en la Aldea (`classChange.npcUntilPhase` = 2).
 3. **Dado** los textos y la interfaz **entonces** nada da por hecho el tope 6 (barra de XP, `/level`, avisos) y `/level 10` funciona.
 4. **Dado** el despliegue **entonces** `docs/deploy.md` dice qué migraciones trae la Fase 2 (HU-104 y HU-113) y en qué orden se aplican, y se hace con copia de la BD antes (HU-075).
+
+**Notas de implementación**
+- `rules.world.currentPhase` = 2, con tope de nivel 10. En el tope no se acumula XP (HU-040 CA4), así que quien estaba en el 6 empieza el 7 desde 0. `/level` y la barra de XP ya leían el tope de las reglas; nada daba por hecho el 6.
+- La salida de la Mina se abre (`minPhase: 2`, HU-112), la de la Cripta sigue cerrada (`minPhase: 3`) y el NPC de cambio de clase sigue en la Aldea (`classChange.npcUntilPhase` = 2, sin cambios).
+- `docs/deploy.md` §10 explica cómo abrir una fase: copia de la base antes; las migraciones de la Fase 2 (`CharacterSpellUpgrades`, aplicada desde #21; la de HU-113 cuando llegue); qué comprobar después; y por qué bajar la fase no baja de nivel a nadie.
+- Cliente: `UiText.MAPS` incluye el Bosque y la Cripta (el marco de grupo mostraba el id).
+- Tests ajustados a la Fase 2: `ContentLoaderTests` (tope 10), `PortalSystemTests` (fija la fase 1 donde la prueba) y los de portales a mapas inexistentes.
+

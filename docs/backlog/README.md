@@ -112,13 +112,13 @@
 | HU-109 | Monstruos del Bosque y de la Cripta | E8 | Must | M | Hecha |
 | HU-110 | Equipo, botín y vendedor de los niveles 6 a 10 | E8 | Must | M | Hecha |
 | HU-111 | Mapa del Bosque: Linde y Pantano | E8 | Must | L | Hecha |
-| HU-112 | Salida de la Mina al Bosque | E2 | Must | S | Pendiente |
+| HU-112 | Salida de la Mina al Bosque | E2 | Must | S | Hecha |
 | HU-113 | Atajo del puente roto | E2 | Should | M | Pendiente |
 | HU-114 | Arte del Tier 2: monstruos, jefe e íconos | E8 | Must | M | Parcial |
-| HU-115 | Cripta de Raíces | E8 | Must | L | Pendiente |
+| HU-115 | Cripta de Raíces | E8 | Must | L | Hecha |
 | HU-116 | Invocaciones de monstruos | E3 | Must | M | Hecha |
-| HU-117 | Jefe Árbol Podrido | E8 | Must | M | Pendiente |
-| HU-118 | Abrir la Fase 2 | E7 | Must | S | Pendiente |
+| HU-117 | Jefe Árbol Podrido | E8 | Must | M | Hecha |
+| HU-118 | Abrir la Fase 2 | E7 | Must | S | Hecha |
 | HU-119 | Pasada de balance y partida de prueba de la Fase 2 | E8 | Must | M | Pendiente |
 
 ## Pendiente de diseño

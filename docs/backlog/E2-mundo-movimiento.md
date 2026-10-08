@@ -179,7 +179,7 @@
 
 ### HU-112 · Salida de la Mina al Bosque
 **Como** jugador de nivel 6 **quiero** salir de la Mina por el otro lado **para** llegar al Bosque (la cueva es el camino de ida).
-- Prioridad: Must · Estimación: S · Estado: Pendiente
+- Prioridad: Must · Estimación: S · Estado: Hecha
 - Dependencias: HU-027, HU-111
 - Skills: `world-maps`
 
@@ -190,6 +190,14 @@
 
 **Notas técnicas**
 - `minPhase` deja fusionar el Bosque en `main` y desplegar arreglos de la Fase 1 antes de abrir la Fase 2 (HU-118). La salida de la Cripta al Tier 3 usa lo mismo (HU-115).
+
+**Notas de implementación**
+- Portales con `minPhase` y `lockedText` (propiedades de Tiled). `PortalPolicy.Check` devuelve `portal_locked` (código nuevo, aditivo) si la fase activa es menor o si el mapa destino no está cargado. Se comprueba antes que muerto, en combate y nivel. El aviso (`lockedText`, o "El paso sigue cerrado") sale una vez hasta que el jugador sale del portal, como el de `level_too_low`.
+- Un portal a un mapa que aún no existe carga solo si lleva `minPhase`, y el servidor lo avisa al arrancar (`TiledMapLoader.PortalsToMissingMaps`). Lo usa la salida de la Cripta a la Montaña (HU-115).
+- Mina: la hornacina de la Sala 3 es ahora la salida `mine_to_forest` (86,25), que lleva a (12,29) del Linde, con `minPhase: 2` y el aviso "El derrumbe aún bloquea el paso". Sigue al otro lado del gólem: el camino más corto pasa por su aggro, aunque se puede rodear por el norte entre los kóbolds. Del mapa solo cambian 5 casillas de roca y el objeto portal.
+- Cliente: el aviso sale en el HUD. Un portal cerrado se hornea con un cartel en vez de la escalera, según la fase de su `rules.json` (solo es dibujo: decide el servidor).
+- Revisión de autoridad: un `minPhase` mal escrito (texto o 0) es error de carga, porque antes habría abierto el paso. La llegada desde el Bosque dejaba la caja de los pies sobre una roca; un test comprueba ahora todas las llegadas y todos los puntos seguros.
+- Tests: `PortalSystemTests`, `TiledMapLoaderTests` y `PortalTests` (en Fase 1 queda cerrado con el aviso, en Fase 2 se cruza y sin el mapa destino sigue cerrado), y GUT `test_tmj_map.gd` y `test_world_scene.gd`.
 
 ---
 

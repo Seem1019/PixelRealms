@@ -352,12 +352,13 @@
 **Notas de implementación**
 - CA1 hecho (2026-10-07): las hojas de los 12 monstruos del Tier 2 (HU-109) las dibuja `tools/art/gen_monsters_t2.py` (`build()`, con `gen_chars.sheet` y `write_meta`; `generate_all.py` lo llama) con las animaciones de HU-090, silueta propia y paleta de su bioma; los élites, más grandes. `gen_chars.py` gana armas y poses aditivas sin cambiar las hojas existentes (comprobado píxel a píxel, y dos ejecuciones dan los mismos bytes). Lámina: `docs/screenshots/tier2/monsters.png`.
 - Falta: CA2, la hoja del Árbol Podrido (llega con HU-117), y CA3, los íconos del equipo de nivel 7 y 9 (HU-110; mientras, esos objetos usan íconos que ya existen).
+- CA2 hecho (2026-10-08): el Árbol Podrido en una hoja de 64×64 dibujada a esa escala (como el Capataz) y los retoños en 32×32, en `tools/art/gen_monsters_t2.py` (`BOSSES`), con las 19 columnas de HU-090 (en el árbol, el "andar" es la copa que se mece); lámina en `docs/screenshots/tier2/rotten_tree.png`. Falta CA3: los íconos propios del equipo de los niveles 7, 9 y 10 (por ahora usan íconos que ya existen).
 
 ---
 
 ### HU-115 · Cripta de Raíces
 **Como** grupo de nivel 9–10 **queremos** una cueva con trampa, élite y jefe **para** cerrar el Tier 2.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-108, HU-109, HU-111
 - Skills: `world-maps`, `game-content`
 
@@ -370,11 +371,23 @@
 **Notas técnicas**
 - Una sola copia compartida, como la Mina (ADR-007). El puzle de palancas ya está en la Mina: aquí la variedad es la trampa.
 
+**Notas de implementación**
+- `tools/maps/gen_tier2_maps.py` genera también `maps/crypt.tmj` (118×80, `palette: crypt`). Recorrido:
+  - el Umbral: la entrada, segura y con la única fogata, así que morir dentro deja allí;
+  - el Osario y la Galería de raíces: esqueletos y espíritus del musgo;
+  - el Jardín de espinas: 5 plantas trampa en hornacinas alternas; por el centro despiertan todas y con cuidado hay un eslalon;
+  - una bifurcación: al oeste, la sala del jefe en una rama lateral; al sur, la Antesala del guardián, delante de la salida al Tier 3.
+- Sala del jefe: un círculo de radio 13 sin columnas, todo a la vista del Árbol Podrido y a 13 casillas o menos de él (su básico llega a 13,5 y sus hechizos a 15,5; a 8 s sin poder pegar a nadie se reinicia), así que no hay rincón desde el que pegarle sin que responda. La puerta queda a 14 casillas; su aggro es 7.
+- Salida al Tier 3: `crypt_to_mountain`, con `minPhase: 3`, lleva a un mapa que aún no existe (HU-112): el servidor la deja cerrada con su aviso. El destino, provisional en (0,0), lo fijará la Montaña; cuando exista, `PortalArrivals_AndSafePoints_LeaveTheFootBoxFree` lo exigirá libre.
+- Bosque ⇄ Cripta: `forest_to_crypt`, en la boca del fondo del Pantano, deja en el Umbral; la vuelta deja en (201,74).
+- Tiempos: 72 s a pie; 5–7 min para un trío, según crucen por el eslalon o limpien las plantas. Se hornea en frío en 0,3 s.
+- Tests en `TiledMapLoaderTests`: flood-fill, bordes, la única fogata en la entrada, el par de portales, la trampa antes, el élite entre la trampa y la salida, y el jefe en una rama lateral con 12 casillas libres. En GUT, que la Cripta usa el atlas de su paleta.
+
 ---
 
 ### HU-117 · Jefe Árbol Podrido
 **Como** grupo **queremos** un jefe que obligue a moverse y a reorganizarse **para** tener el objetivo final del Tier 2 y botín raro.
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-100, HU-115, HU-116
 - Skills: `combat-system`, `game-content`
 
@@ -386,6 +399,29 @@
 
 **Notas técnicas**
 - Inmóvil (`speed: 0`): quedarse lejos no es seguro porque Raíces y Esporas apuntan a jugadores a distancia.
+
+**Notas de implementación**
+- Contenido: `rotten_tree` (nivel 11, `boss`, `speed: 0`, 3 600 de vida, básico de alcance 13,5) y `rotten_sapling` (nivel 10). Hechizos del árbol:
+  - Raíces: área marcada sobre alguien que no es el tanque; enraíza 3 s y se puede esquivar.
+  - Raíces y Esporas alcanzan a 24 casillas (2 × `leashRange`): todo lo que el árbol ve, también el pasillo recto de entrada, desde el que un sanador curaba al tanque sin respuesta (revisión de autoridad final; lo comprueban `check_crypt` y `TiledMapLoaderTests.Crypt_EveryTileTheBossSees_IsWithinItsAimedAreas`).
+  - Esporas: área duradera (`areaDurationMs` 9 s) de daño mágico por pulso.
+  - Retoños: bajo el 50 %, con un casteo que se puede interrumpir, invoca 2 retoños, con un tope de 4 vivos.
+- Inmune a aturdir, enraizar y ralentizar con `rules.combat.bossImmuneToAuraKinds`, sin cambios en las reglas.
+- IA genérica:
+  - `threatTarget` en la plantilla (`highest` por defecto, `lowest` en los retoños): los retoños van a por quien menos amenaza tiene, por lo general el sanador, y solo eligen entre objetivos válidos.
+  - Los monstruos inmóviles no buscan camino y lanzan sus hechizos a quien alcancen.
+  - Reinicio de los inmóviles: un acumulador `OutOfReachMs` suma mientras no pueden pegar a nadie de su tabla y resta mientras pegan. A los `rules.ai.immobileOutOfReachResetMs` (8 s) se reinician en su sitio con la vida completa, y se van los retoños y las Esporas.
+  - Afecta también a la planta trampa: ya no se cura al fallar el A*.
+- Botín: oro, pociones y exactamente un raro de su grupo (una pieza de nivel 10 por rol), asignado al azar y anunciado en el chat global, como el Capataz. Los retoños no dan XP ni botín (HU-116).
+- Balance (`tools/balance/boss.py --arbol`, `balance-report.md` §HU-117): 3 jugadores de nivel 9 con el equipo esperado de HU-110 lo matan en 63–94 s y nadie lo mata solo. Si se ignoran los retoños, dejan al Sacerdote al 8 % o lo matan. Los casos de 2 de nivel 11 y de 12 + 10 quedan para la Fase 3.
+- Revisión de autoridad (4 pasadas, ninguna con hallazgos ALTO pendientes):
+  - la zona muerta del inmóvil a 15,5–24 casillas o tras una columna, que dejaba matarlo solo saliendo a curarse;
+  - el señuelo que anulaba a los retoños;
+  - las entradas de amenaza que quedaban tras cambiar de mapa (`CombatModule.ForgetLeaving`, que usan `WorldSession` y `MapTransferService`), y que reiniciaban al jefe a mitad del combate;
+  - Provocar al quitar el objetivo;
+  - `random_not_top_threat` con el mismo predicado de validez (el Capataz y la Bruja azotan al tanque si no alcanzan a nadie más);
+  - alcance y vista antes de `ActiveAreas` en `CastSystem`.
+- Tests: `RottenTreeTests` y casos nuevos en `MonsterAiTests`, `CastSystemTests` y `PortalTests`.
 
 ---
 
