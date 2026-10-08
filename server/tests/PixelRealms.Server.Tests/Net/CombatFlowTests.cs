@@ -22,16 +22,24 @@ public sealed class CombatFlowTests
         return (client, w.GetProperty("selfId").GetInt32());
     }
 
-    /// <summary>Teletransporta al jugador junto a un monstruo (hilo del tick no: solo tests, antes de que el jugador se mueva).</summary>
-    private static (int MonsterId, float X, float Y) PlaceNextToMonster(TestServer server, int selfId, string templateId)
+    /// <summary>
+    /// Teletransporta al jugador junto a un monstruo, en el hilo del tick (regla 2): escrito desde el test, el tick podía pisar
+    /// la posición o la vida a mitad de su propia escritura.
+    /// </summary>
+    private static async Task<(int MonsterId, float X, float Y)> PlaceNextToMonster(TestServer server, int selfId, string templateId)
     {
         var world = server.Services.GetRequiredService<World>();
         var registry = server.Services.GetRequiredService<PlayerRegistry>();
-        var player = registry.All.First(p => p.Id.Value == selfId);
-        var map = world.GetInstance(player.MapInstanceId)!;
-        var monster = map.Monsters.Values.First(m => m.TemplateId == templateId && m.IsAlive);
-        player.Position = new Vec2(monster.Position.X - 1f, monster.Position.Y);
-        return (monster.Id.Value, monster.Position.X, monster.Position.Y);
+        (int, float, float) placed = default;
+        await server.RunOnTickAsync(_ =>
+        {
+            var player = registry.All.First(p => p.Id.Value == selfId);
+            var map = world.GetInstance(player.MapInstanceId)!;
+            var monster = map.Monsters.Values.First(m => m.TemplateId == templateId && m.IsAlive);
+            player.Position = new Vec2(monster.Position.X - 1f, monster.Position.Y);
+            placed = (monster.Id.Value, monster.Position.X, monster.Position.Y);
+        });
+        return placed;
     }
 
     [Fact]
@@ -40,7 +48,7 @@ public sealed class CombatFlowTests
         await using var server = await TestServer.StartAsync();
         var (ana, selfId) = await Enter(server, "ana", "Ana", "mage"); // bastón: alcance 5, el slime puede pasear
         await using var _ = ana;
-        var (slimeId, _, _) = PlaceNextToMonster(server, selfId, "slime");
+        var (slimeId, _, _) = await PlaceNextToMonster(server, selfId, "slime");
         await ana.ExpectForIdAsync("EntitySpawn", slimeId);
         await ana.SendAsync("SelectTarget", $$"""{"targetId":{{slimeId}}}""");
         await ana.SendAsync("AutoAttack", """{"on":true}""");
@@ -68,7 +76,7 @@ public sealed class CombatFlowTests
         await using var server = await TestServer.StartAsync();
         var (ana, selfId) = await Enter(server, "ana", "Ana", "mage");
         await using var _ = ana;
-        var (slimeId, _, _) = PlaceNextToMonster(server, selfId, "slime");
+        var (slimeId, _, _) = await PlaceNextToMonster(server, selfId, "slime");
         await ana.ExpectForIdAsync("EntitySpawn", slimeId);
 
         await ana.SendAsync("CastSpell", $$"""{"spellId":"mage_fireball","targetId":{{slimeId}},"reqId":7}""");
@@ -160,7 +168,7 @@ public sealed class CombatFlowTests
         var (ana, selfId) = await Enter(server, "ana", "Ana", "mage");
         await using var _ = ana;
         var player = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId);
-        var (slimeId, _, _) = PlaceNextToMonster(server, selfId, "slime");
+        var (slimeId, _, _) = await PlaceNextToMonster(server, selfId, "slime");
         await ana.SendAsync("SelectTarget", $$"""{"targetId":{{slimeId}}}""");
         await ana.SendAsync("Ping", """{"clientTime":0}""");
         await ana.ExpectAsync("Pong");
@@ -204,8 +212,8 @@ public sealed class CombatFlowTests
         var player = registry.All.First(p => p.Id.Value == selfId);
         var saver = server.Services.GetRequiredService<PixelRealms.Server.Hosting.SaveService>();
         var savedBefore = saver.Saved;
-        player.Hp = 1; // la muerte la provoca el jabalí: lo colocamos encima y lo agitamos
-        var (boarId, _, _) = PlaceNextToMonster(server, selfId, "boar");
+        await server.RunOnTickAsync(_ => player.Hp = 1); // la muerte la provoca el jabalí: lo colocamos encima y lo agitamos
+        var (boarId, _, _) = await PlaceNextToMonster(server, selfId, "boar");
         var died = await ana.ExpectAsync("Died", 15000);
         for (var i = 0; i < 40 && saver.Saved == savedBefore; i++) await Task.Delay(50, TestContext.Current.CancellationToken);
         saver.Saved.ShouldBeGreaterThan(savedBefore); // HU-026 CA6: morir guarda
