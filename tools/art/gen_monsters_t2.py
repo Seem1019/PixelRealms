@@ -5,9 +5,12 @@ con `write_meta`), la misma paleta Resurrect 64 y el mismo contorno. Cada monstr
 de combate y distinta de los del Tier 1: los cuerpos se dibujan con una función `body(d, pose)` y `animate` saca de ella
 reposo, andar, golpe recibido y muerte; el ataque y el casteo encajan con sus hechizos (content/spells.json). Los élites
 (oso viejo, bruja del pantano y guardián de la cripta) llenan la celda como el gólem. Los humanoides (leñador, hombre lagarto
-y esqueleto de raíces) usan `gen_chars.humanoid` con sus rasgos en `extras`. Determinista: sin azar.
+y esqueleto de raíces) usan `gen_chars.humanoid` con sus rasgos en `extras`. El jefe de la Cripta, el Árbol Podrido (HU-114
+CA2, HU-117), va en `BOSSES` con cuadro de 64×64 (pies en y=60), como el Capataz, y sus retoños en `MONSTERS`. Determinista:
+sin azar.
 
     python -c "import sys; sys.path.insert(0, 'tools/art'); import gen_monsters_t2; gen_monsters_t2.build()"
+    python -c "import sys; sys.path.insert(0, 'tools/art'); import gen_monsters_t2; gen_monsters_t2.lamina_arbol()"
 """
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ import numpy as np
 import gen_chars as gc
 from gen_chars import (BOOTS, SKIN, fwd_vec, frame_kind, fx_dust, fx_sparkle, fx_speedlines, fx_trail, humanoid, kneel, lay_down,
                        mat, shaded_ellipse, shaded_rect, shift, squash_rows)
-from pix import canvas, ellipse, hash01, hline, line, outline, put, rect, recolor, save, vline
+from pix import canvas, ellipse, hash01, hline, line, outline, paste, put, rect, recolor, save, shade_edges, vline
 
 FEET = 28
 STEP = [1, 0, -1, 0]
@@ -1580,6 +1583,380 @@ def crypt_guardian(spec: dict, d: str, frame: str, size: int = 32) -> np.ndarray
     return animate(body, d, frame, attack, cast, death)
 
 
+# --- Jefe de la Cripta: Árbol Podrido (HU-114 CA2, HU-117) ----------------------------------------------------------------
+
+# Árbol Podrido (jefe): hoja de 64×64 como el Capataz, pero dibujada a esa escala (no un cuerpo de 32 ampliado). Tronco muerto y
+# retorcido que se abre en contrafuertes, una cara en el tronco (cuencas hondas que brillan en verde, ceño de corteza y boca de
+# astillas), copa rala de ramas secas con matas de hojas podridas y musgo colgando, hongos morados en la corteza y raíces gruesas
+# que se abren por el suelo. Es inmóvil: su "andar" es la copa que se mece. Azota con raíces (ataque: alza una rama y la descarga
+# mientras las raíces revientan delante), al castear (Raíces, Esporas, Retoños) abre la boca, se le encienden los ojos y las
+# raíces y suelta esporas, y al morir se agrieta, se le cae la copa y queda un tocón.
+TREE = 64
+TF = TREE - 4                      # pies
+TREE_TOP = 14                      # donde empiezan las ramas
+TREE_BARK = mat("mauve", "dusty", "ink")
+TREE_LEAF = mat("olive", "moss", "mud")
+TREE_MOSS = ("sage", "sage_l", "sage_d")
+TREE_FUNGUS = mat("berry", "rose", "berry_d")
+TREE_EYE = ("lime", "cream")
+TREE_SPORES = ("sage_p", "pale", "lime")
+TREE_WITHER = {"olive": "mud", "moss": "olive", "sage": "sage_d", "sage_l": "sage", "lime": "olive", "cream": "taupe",
+               "rose": "berry", "berry": "berry_d", "pale": "sage_p"}
+TREE_WITHER_MORE = {"dusty": "mauve", "taupe": "dusty", "mud": "coal", "olive": "mud", "sage_d": "coal", "sage": "sage_d",
+                    "berry_d": "grape_d", "sage_p": "taupe"}
+# Ramas (desde el tronco hasta la punta, grosor) y matas de hojas podridas (centro y radios) de la copa.
+TREE_BRANCHES = (((28, 17), (12, 8), 2), ((36, 17), (52, 7), 2), ((32, 15), (31, 3), 2), ((26, 24), (6, 17), 2),
+                 ((38, 24), (58, 16), 2), ((19, 12), (21, 6), 1), ((44, 11), (42, 4), 1), ((14, 20), (10, 25), 1))
+TREE_CLUMPS = ((12, 7, 6, 3.5), (52, 6, 6.5, 3.5), (31, 4, 5.5, 3), (6, 16, 4.5, 3), (58, 15, 4.5, 3), (21, 6, 4, 2.5),
+               (42, 4, 4, 2.5))
+TREE_HANGING = ((9, 9, 7), (15, 10, 5), (47, 9, 8), (55, 8, 5), (4, 18, 5), (60, 17, 6), (27, 6, 4), (36, 6, 6), (19, 8, 3))
+TREE_ROOTS = (((26, TF - 4), (14, TF - 1), (3, TF), 3.2), ((38, TF - 4), (50, TF - 1), (61, TF - 1), 3.2),
+              ((29, TF - 2), (24, TF + 1), (17, TF + 2), 2.4), ((35, TF - 2), (41, TF + 1), (47, TF + 2), 2.4))
+
+
+def tree_x(y: int, lean: int) -> tuple[int, int]:
+    """Bordes del tronco a la altura `y`: se abre en contrafuertes abajo, se retuerce y se inclina `lean` arriba (sin azar)."""
+    k = (y - TREE_TOP) / (TF - TREE_TOP)
+    half = 7.5 + 1.5 * k + 6 * k ** 4
+    bulge = math.sin(k * 7.0)
+    cx = 32 + lean * (1 - k) + 0.7 * bulge
+    return (int(round(cx - half - max(0.0, bulge))) - (hash01(y, 3) > 0.8),
+            int(round(cx + half + max(0.0, -bulge))) + (hash01(y, 5) > 0.8))
+
+
+def tree_trunk(img, lean: int, top: int = TREE_TOP, crack: bool = False) -> None:
+    B = TREE_BARK
+    for y in range(top, TF):
+        x0, x1 = tree_x(y, lean)
+        hline(img, x0, x1, y, B["b"])
+        hline(img, x0, x0 + 2, y, B["l"])
+        hline(img, x1 - 1, x1, y, B["d"])
+        if hash01(y, 9) > 0.7:
+            put(img, x0 + 1, y, "taupe")  # luz de arriba a la izquierda en las vetas
+    for sx, seed in ((-4, 1), (0, 2), (4, 3), (8, 4)):  # vetas y grietas de la corteza
+        x = 32 + sx
+        for y in range(max(top, 31), TF - 1):
+            if hash01(y, seed) > 0.7:
+                x += 1 if hash01(y, seed + 7) > 0.5 else -1
+            x0, x1 = tree_x(y, lean)
+            xx = max(x0 + 3, min(x1 - 3, x + round(lean * (1 - (y - TREE_TOP) / (TF - TREE_TOP)))))
+            if hash01(y, seed + 3) > 0.2:  # veta casi continua, con luz a la izquierda a ratos
+                put(img, xx, y, "ink")
+                if hash01(y, seed + 5) > 0.75:
+                    put(img, xx - 1, y, B["l"])
+    for (x, y) in ((26, 38), (37, 44), (29, 52), (36, 34)):  # nudos
+        if y >= top:
+            ellipse(img, x, y, 1.6, 1.2, "ink")
+            put(img, x - 1, y - 1, B["l"])
+    if crack:  # al morir: una grieta abre el tronco de arriba abajo
+        x = 32
+        for y in range(top, TF - 4):
+            if hash01(y, 21) > 0.6:
+                x += 1 if (hash01(y, 22) > 0.5) == (x < 33) else -1
+            hline(img, x, x + (y % 3 == 0), y, "outline")
+
+
+def tree_roots(img, wiggle: int = 0, glow: int = 0) -> None:
+    """Raíces gruesas que se afinan hacia la punta (círculos a lo largo de dos tramos), sombreadas aparte."""
+    layer = canvas(TREE, TREE)
+    for k, (a, b, c, w) in enumerate(TREE_ROOTS):
+        lift = (k + wiggle) % 2 if wiggle else 0
+        for (p0, p1, r0, r1) in ((a, b, w, w * 0.6), (b, c, w * 0.6, 0.6)):
+            n = max(abs(p1[0] - p0[0]), abs(p1[1] - p0[1])) * 2
+            for j in range(n + 1):
+                t = j / n
+                r = r0 + (r1 - r0) * t
+                ellipse(layer, p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t - lift * t, r, r * 0.7, TREE_BARK["b"])
+    shade_edges(layer, TREE_BARK["l"], TREE_BARK["d"])
+    if glow:  # Raíces: se encienden al castear
+        for k, (a, b, c, w) in enumerate(TREE_ROOTS):
+            for j in range(3):
+                t = (j + glow / 3) / 3
+                put(layer, round(b[0] + (c[0] - b[0]) * t), round(b[1] + (c[1] - b[1]) * t) - 1, "lime" if (j + k) % 2 else "leaf")
+    paste(img, layer, 0, 0)
+
+
+def tree_canopy(img, sway: int, droop: int = 0, holes: bool = True) -> None:
+    B = TREE_BARK
+    for (a, b, w) in TREE_BRANCHES:
+        ex, ey = b[0] + sway, b[1] + droop
+        line(img, a[0], a[1], ex, ey, B["d"])
+        if w > 1:
+            line(img, a[0], a[1] - 1, ex, ey - 1, B["l"])
+    for k, (x, y, rx, ry) in enumerate(TREE_CLUMPS):
+        cx, cy = x + sway * (1 + k % 2), y + droop
+        for (ox, oy, f) in ((-0.45, 0.25, 0.65), (0.45, 0.35, 0.6), (0.0, -0.3, 0.7)):
+            shaded_ellipse(img, cx + ox * rx, cy + oy * ry, rx * f, ry * f + 0.4, TREE_LEAF)
+        if holes:  # la copa está podrida: huecos y hojas muertas
+            for j in range(4):
+                put(img, int(cx + (hash01(k, j, 1) - 0.5) * rx * 1.4), int(cy + (hash01(k, j, 2) - 0.45) * ry), (0, 0, 0, 0))
+            put(img, int(cx + (hash01(k, 9) - 0.5) * rx), int(cy + 1), "mud")
+        put(img, int(cx - rx / 2), int(cy - ry / 2), TREE_LEAF["l"])
+    for k, (x, y, n) in enumerate(TREE_HANGING):  # musgo que cuelga y se mece con la copa
+        for j in range(n):
+            put(img, x + sway + ((j + k) // 3) % 2 - (j > n // 2 and sway < 0), y + droop + j,
+                TREE_MOSS[(j + k) % 3 if j < n - 1 else 1])
+
+
+def tree_fungus(img, d: str, lean: int) -> None:
+    """Hongos de repisa en la corteza (en otro sitio por detrás)."""
+    spots = ((-1, 38, 5), (1, 47, 4), (-1, 54, 3), (1, 31, 3)) if d != "n" else ((1, 34, 5), (-1, 43, 4), (1, 53, 3))
+    for side, y, w in spots:
+        x0, x1 = tree_x(y, lean)
+        x = x0 - w + 2 if side < 0 else x1 - 1
+        hline(img, x, x + w - 1, y, TREE_FUNGUS["b"])
+        hline(img, x + 1, x + w - 2, y - 1, TREE_FUNGUS["l"])
+        hline(img, x + 1, x + w - 2, y + 1, TREE_FUNGUS["d"])
+        put(img, x + w // 2, y - 1, "pink_p")
+
+
+def tree_face(img, d: str, eyes: str, mouth: int, glow: int, lean: int) -> None:
+    """Cara en el tronco: cuencas hondas con brillo verde (crema si castea), ceño de corteza y boca de astillas."""
+    cx = 32 + round(lean * (1 - (20 - TREE_TOP) / (TF - TREE_TOP)))
+    B = TREE_BARK
+    if d == "n":  # por detrás: un hueco oscuro en la corteza
+        ellipse(img, cx + 1, 26, 3, 5, "outline")
+        ellipse(img, cx + 1, 27, 2, 3.5, "ink")
+        hline(img, cx - 1, cx + 3, 20, B["l"])
+        return
+    eye_xs = (cx - 6, cx + 3) if d == "s" else (cx + 3,)
+    core = TREE_EYE[1] if glow else TREE_EYE[0]
+    for n, ex in enumerate(eye_xs):
+        inner = (n == 0) == (d == "s")  # el lado del ceño que baja hacia la nariz
+        line(img, ex - 1, 16 + (0 if inner else 1), ex + 4, 16 + (1 if inner else 0), "ink")  # ceño
+        hline(img, ex - 1, ex + 4, 15 + (0 if inner else 1), B["l"])
+        rect(img, ex, 18, 4, 3, "outline")
+        if eyes == "open":
+            hline(img, ex + 1, ex + 2, 19, TREE_EYE[0])
+            put(img, ex + 1 + (n == 0), 19, core)
+            if glow > 1:
+                hline(img, ex + 1, ex + 2, 20, TREE_EYE[0])
+                put(img, ex + 1, 18, "pale")
+        elif eyes == "closed":
+            rect(img, ex, 18, 4, 2, B["b"])
+            hline(img, ex, ex + 3, 20, "outline")
+        else:  # muerto: aspa
+            for (ox, oy) in ((0, 0), (1, 1), (2, 1), (3, 0), (0, 2), (3, 2)):
+                put(img, ex + ox, 18 + oy, "ink")
+            hline(img, ex + 1, ex + 2, 19, "outline")
+    if d == "s":
+        vline(img, cx, 19, 22, B["l"])  # caballete de la nariz
+        put(img, cx + 1, 22, B["d"])
+    # Boca: una raja dentada que se abre al castear y al pegar.
+    x0, x1 = (cx - 5, cx + 5) if d == "s" else (cx + 1, cx + 7)
+    rows = 2 + mouth
+    for r in range(rows):
+        taper = 1 if r in (0, rows - 1) and rows > 2 else 0
+        hline(img, x0 + taper, x1 - taper, 25 + r, "outline" if r else "ink")
+    for x in range(x0 + 1, x1, 3):  # astillas arriba y abajo
+        put(img, x, 25, "taupe")
+        put(img, x, 26, "taupe" if rows > 2 else "outline")
+        if rows > 2:
+            put(img, x + 1, 25 + rows - 1, "taupe")
+    hline(img, x0 + 1, x1 - 1, 25 + rows, B["l"])  # labio de corteza
+    if d == "e":  # nariz de nudo en el perfil
+        put(img, x1 + 1, 21, B["b"])
+        put(img, x1 + 2, 22, B["d"])
+        put(img, x1 + 1, 22, B["l"])
+
+
+def tree_arm(img, pose: str, d: str) -> None:
+    """La rama con la que azota: en alto, más alta, golpeando hacia delante o volviendo."""
+    base = (41, 31)
+    tip = {"raised": (55, 15), "high": (50, 5), "mid": (57, 33),
+           "slam": {"s": (50, 56), "e": (61, 47), "n": (54, 41)}[d]}[pose]
+    for o in range(3):
+        line(img, base[0], base[1] + o - 1, tip[0], tip[1] + (o > 1), (TREE_BARK["l"], TREE_BARK["b"], TREE_BARK["d"])[o])
+    for (ox, oy) in ((3, -2), (3, 2), (0, 3), (-2, 3)):  # dedos de rama
+        line(img, tip[0], tip[1], tip[0] + ox, tip[1] + oy, TREE_BARK["d"])
+
+
+def tree_spores(img, phase: int, n: int) -> None:
+    pts = ((8, 28), (56, 26), (18, 1), (46, 0), (3, 8), (61, 9), (22, 30), (43, 29), (11, 36), (53, 38))
+    for k in range(n):
+        x, y = pts[(k + phase * 3) % len(pts)]
+        put(img, x, y - phase, TREE_SPORES[(k + phase) % 3])
+        if k % 3 == 0:
+            put(img, x + 1, y - phase - 1, TREE_SPORES[0])
+
+
+def rotten_tree_body(d: str, p: dict) -> np.ndarray:
+    img = canvas(TREE, TREE)
+    sway = p.get("step", 0) if p.get("walking") else [0, 1][p.get("phase", 0) % 2] * (1 if d != "n" else -1)
+    lean = {"s": 0, "n": 0, "e": -1}[d]
+    eyes, mouth, glow = p.get("eyes", "open"), p.get("mouth", 0), p.get("glow", 0)
+    tree_canopy(img, sway, p.get("droop", 0))
+    tree_trunk(img, lean, crack=p.get("crack", False))
+    tree_roots(img, wiggle=p.get("wiggle", 0), glow=p.get("root_glow", 0))
+    tree_fungus(img, d, lean)
+    tree_face(img, d, eyes, mouth, glow if eyes == "open" else 0, lean)
+    if p.get("arm"):
+        tree_arm(img, p["arm"], d)
+    if p.get("hurt"):  # astillas al recibir el golpe
+        for (x, y) in ((21, 30), (44, 26), (19, 40), (45, 37)):
+            put(img, x, y, "taupe")
+    return img
+
+
+def tree_stump(fallen: bool) -> np.ndarray:
+    """Muerte: tocón partido con raíces y la copa caída a un lado, ya marchita."""
+    img = canvas(TREE, TREE)
+    top = 38
+    if fallen:
+        for (x, y, rx, ry) in ((10, TF - 4, 7, 3), (19, TF - 6, 5, 2.5), (54, TF - 4, 6, 2.5)):
+            shaded_ellipse(img, x, y, rx, ry, TREE_LEAF)
+        for (x0, y0, x1, y1) in ((4, TF - 7, 20, TF - 2), (44, TF - 8, 59, TF - 3)):
+            line(img, x0, y0, x1, y1, TREE_BARK["b"])
+            line(img, x0, y0 + 1, x1, y1 + 1, TREE_BARK["d"])
+    tree_trunk(img, 0, top=top)
+    for x in range(tree_x(top, 0)[0], tree_x(top, 0)[1] + 1):  # borde roto en dientes de sierra
+        for y in range(top, top + 1 + int(hash01(x, 31) * 5)):
+            put(img, x, y, (0, 0, 0, 0))
+    tree_roots(img)
+    tree_fungus(img, "s", 0)
+    return img
+
+
+def rotten_tree(spec: dict, d: str, frame: str, size: int = TREE) -> np.ndarray:
+    body = lambda dd, p: finish(rotten_tree_body(dd, p))
+    fx_, fy_ = fwd_vec(d)
+
+    def attack(dd, i):  # azote de raíces: alza la rama, la descarga y las raíces revientan delante
+        arm = ["raised", "high", "slam", "mid"][i]
+        img = finish(rotten_tree_body(dd, {"arm": arm, "mouth": [1, 1, 2, 0][i], "glow": int(i in (1, 2)), "wiggle": int(i == 2)}))
+        if i == 2:
+            burst = {"s": (32, 63), "e": (57, 59), "n": (32, 50)}[dd]
+            for k, (ox, h) in enumerate(((-7, 5), (-3, 8), (2, 7), (6, 5))):
+                bx = burst[0] + ox
+                for o in range(2):
+                    line(img, bx + o, burst[1], bx + o + (1 if k % 2 else -1), burst[1] - h, TREE_BARK["d" if o else "l"])
+                put(img, bx + (1 if k % 2 else -1), burst[1] - h - 1, "outline")
+            fx_dust(burst[0] - fx_ * 8, min(burst[1], TF + 2), dd)(img)
+        if i == 1:
+            fx_trail(46, 20, -120, -40, 14, ("mist", "white"))(img)
+        return img
+
+    def cast(dd, i):  # Raíces, Esporas y Retoños: boca abierta, ojos encendidos, esporas y raíces que brillan
+        img = finish(rotten_tree_body(dd, {"mouth": 2, "glow": 2, "root_glow": i + 1, "phase": i % 2}))
+        tree_spores(img, i, 8)
+        fx_sparkle(*((32, 8), (14, 12), (50, 11))[i], 1, "lime", "cream")(img)
+        return img
+
+    def death(dd, i):
+        if i == 0:
+            img = shift(body(dd, {"eyes": "closed", "mouth": 1}), -fx_, 0)
+            fx_pixels([(14, 20), (48, 22), (24, 30), (40, 34)], "moss")(img)  # caen hojas
+            return img
+        if i == 1:
+            return finish(recolor(rotten_tree_body(dd, {"eyes": "x", "mouth": 2, "droop": 3, "crack": True}), TREE_WITHER))
+        if i == 2:
+            raw = rotten_tree_body(dd, {"eyes": "x", "mouth": 1, "droop": 7, "crack": True})
+            return squash_rows(finish(recolor(recolor(raw, TREE_WITHER), TREE_WITHER_MORE)), 9, TF)
+        return finish(recolor(recolor(tree_stump(True), TREE_WITHER), TREE_WITHER_MORE))
+
+    return animate(body, d, frame, attack, cast, death)
+
+
+# Retoño podrido (invocación, 32×32): un arbolito que anda sobre dos raíces, con la misma madera, ojos verdes, un penacho de
+# hojas podridas y brazos de rama. Araña con las ramas (ataque), se sacude soltando esporas (casteo) y al morir se deshace.
+SAPLING_LEAF = mat("olive", "moss", "mud")
+
+
+def rotten_sapling_body(d: str, p: dict) -> np.ndarray:
+    img = canvas(32, 32)
+    B = TREE_BARK
+    st, bob, eyes = p.get("step", 0), p.get("bob", 0), p.get("eyes", "open")
+    lunge, arms = p.get("lunge", 0), p.get("arms", 0)
+    fx_, fy_ = fwd_vec(d)
+    cx = 16 + (fx_ * lunge if d == "e" else 0)
+    cyl = 13 + bob + (fy_ * lunge if d != "e" else 0)
+    # Piernas de raíz.
+    if d == "e":
+        for lx, ph in ((cx - 2, -st), (cx + 2, st)):
+            line(img, lx, cyl + 10, lx + ph, FEET - 1, B["d"])
+            line(img, lx + 1, cyl + 10, lx + ph + 1, FEET - 1, B["b"])
+            put(img, lx + ph + 2, FEET - 1, B["d"])
+    else:
+        for lx, ph, out in ((cx - 2, st, -1), (cx + 2, -st, 1)):
+            foot = FEET - 1 + min(0, ph)
+            line(img, lx, cyl + 10, lx + out, foot, B["d"])
+            line(img, lx + 1, cyl + 10, lx + 1 + out, foot, B["b"])
+            put(img, lx + out * 2 + (1 if out > 0 else 0), foot, B["d"])
+    # Tronco (cuerpo).
+    for y in range(cyl, cyl + 11):
+        half = 3 + (y - cyl) * 0.15
+        hline(img, int(cx - half), int(cx + half), y, B["b"])
+        put(img, int(cx - half), y, B["l"])
+        put(img, int(cx + half), y, B["d"])
+    put(img, cx - 1, cyl + 8, "ink")
+    put(img, cx + 1, cyl + 9, B["d"])
+    # Brazos de rama: abajo (0), hacia delante (1) o en alto (2).
+    for side in (-1, 1):
+        sx = cx + side * 4
+        if arms == 2:
+            line(img, sx, cyl + 4, sx + side * 3, cyl - 2, B["d"])
+            put(img, sx + side * 4, cyl - 3, B["d"])
+        elif arms == 1:
+            tx = sx + (fx_ * 5 if d == "e" else side)
+            ty = cyl + 4 + (fy_ * 5 if d != "e" else 1)
+            line(img, sx, cyl + 4, tx, ty, B["d"])
+            put(img, tx, ty, B["l"])
+        else:
+            line(img, sx, cyl + 4, sx + side * 2, cyl + 8, B["d"])
+    # Penacho de hojas podridas.
+    shaded_ellipse(img, cx - (1 if d == "e" else 0), cyl - 2, 5, 3, SAPLING_LEAF)
+    put(img, cx - 3, cyl - 4, (0, 0, 0, 0))
+    put(img, cx + 2, cyl - 3, (0, 0, 0, 0))
+    put(img, cx + 3, cyl, TREE_MOSS[1])
+    put(img, cx + 3, cyl + 1, TREE_MOSS[0])
+    put(img, cx - 4, cyl, TREE_MOSS[0])
+    vline(img, cx + 1, cyl - 7, cyl - 5, B["d"])
+    put(img, cx + 2, cyl - 7, SAPLING_LEAF["l"])
+    # Cara.
+    if d != "n":
+        for ex in ((cx - 2, cx + 1) if d == "s" else (cx + 2,)):
+            eye(img, ex, cyl + 2, eyes, TREE_EYE[0], 2)
+        if d == "s":
+            hline(img, cx - 1, cx, cyl + 5, "ink")
+        else:
+            put(img, cx + 3, cyl + 5, "ink")
+    else:
+        put(img, cx, cyl + 3, "ink")
+        put(img, cx, cyl + 4, "ink")
+    if p.get("spores"):
+        k = p["spores"]
+        fx_pixels([(cx - 6, cyl - 3 - k), (cx + 6, cyl - 2 - k), (cx, cyl - 8 - k)], "pale")(img)
+        fx_pixels([(cx - 5, cyl - 6 - k), (cx + 5, cyl - 5 - k)], "sage_p")(img)
+    return img
+
+
+def rotten_sapling(spec: dict, d: str, frame: str, size: int = 32) -> np.ndarray:
+    body = lambda dd, p: finish(rotten_sapling_body(dd, p))
+
+    def attack(dd, i):  # arañazo de ramas
+        img = finish(rotten_sapling_body(dd, {"arms": [2, 2, 1, 0][i], "lunge": [-1, 0, 2, 0][i]}))
+        if i == 2:
+            tip = {"e": (27, 17), "s": (16, 27), "n": (16, 7)}[dd]
+            fx_sparkle(*tip, 1, "mist", "white")(img)
+        return img
+
+    def cast(dd, i):  # se sacude y suelta esporas
+        return finish(rotten_sapling_body(dd, {"arms": 2, "bob": [0, 1, 0][i], "spores": i + 1}))
+
+    def death(dd, i):  # se deshace en ramitas
+        if i < 2:
+            return fall_over(body, dd, i)
+        img = canvas(32, 32)
+        for k, (x0, y0, x1, y1) in enumerate(((9, FEET - 1, 15, FEET - 3), (16, FEET - 1, 22, FEET - 2), (12, FEET - 3, 19, FEET - 4))):
+            line(img, x0, y0, x1, y1 + (i == 3), TREE_BARK["d" if k % 2 else "b"])
+        shaded_ellipse(img, 21, FEET - 3 + (i == 3), 3.5, 1.8, SAPLING_LEAF)
+        out = finish(recolor(img, TREE_WITHER) if i == 3 else img)
+        eye(out, 13, FEET - 5 + (i == 3), "x", "")
+        return out
+
+    return animate(body, d, frame, attack, cast, death)
+
+
 MONSTERS = {
     "monsters/forest_wolf": (forest_wolf, {}),
     "monsters/bandit_woodcutter": (humanoid, WOODCUTTER),
@@ -1593,6 +1970,11 @@ MONSTERS = {
     "monsters/moss_spirit": (moss_spirit, {}),
     "monsters/trap_plant": (trap_plant, {}),
     "monsters/crypt_guardian": (crypt_guardian, {}),
+    "monsters/rotten_sapling": (rotten_sapling, {}),
+}
+# Jefes del Tier 2 a escala de jefe (64×64, como el Capataz de gen_chars.BOSSES), con su tamaño de cuadro.
+BOSSES = {
+    "monsters/rotten_tree": (rotten_tree, {}, TREE),
 }
 
 
@@ -1600,7 +1982,10 @@ def build() -> list[str]:
     for rel, (draw, spec) in MONSTERS.items():
         save(gc.sheet(draw, spec), "sprites/" + rel + ".png")
         gc.write_meta(rel, 32)
-    return list(MONSTERS)
+    for rel, (draw, spec, size) in BOSSES.items():
+        save(gc.sheet(draw, spec, size), "sprites/" + rel + ".png")
+        gc.write_meta(rel, size)
+    return list(MONSTERS) + list(BOSSES)
 
 
 # Lámina de revisión: cuadros sueltos de cada hoja a ×3 sobre el suelo de su bioma y, debajo, los 12 junto a los del Tier 1
@@ -1655,6 +2040,83 @@ def lamina(path: str = "docs/screenshots/tier2/monsters.png") -> str:
     dest = Path(ROOT) / path
     dest.parent.mkdir(parents=True, exist_ok=True)
     out.save(dest)
+    return str(dest)
+
+
+# Lámina del jefe (HU-114 CA2): el Árbol Podrido a ×2 y sus retoños a ×3, en cada dirección, sobre el suelo de la Cripta, y
+# la escala a ×2 junto al Capataz, el Guardián de la cripta y un humanoide de 32 (los héroes HD no caben en 256 colores). Texto sin suavizar para que quepa en una paleta de
+# 256 colores (docs/screenshots no usa LFS). No la llama `build`; la escribe en docs/screenshots/tier2/rotten_tree.png.
+LAMINA_BOSS_FRAMES = ["idle0", "walk1", "attack0", "attack1", "attack2", "attack3", "cast0", "cast1", "hurt0", "death0", "death1",
+                      "death2", "death3"]
+
+
+def save_indexed(img, dest) -> None:
+    """PNG de paleta si la imagen tiene como mucho 256 colores (sin pérdida); si no, RGB."""
+    from PIL import Image
+    rgb = img.convert("RGB")
+    colors = rgb.getcolors(256)
+    if colors is None:
+        rgb.save(dest, optimize=True)
+        return
+    pal = [c for _, c in colors]
+    index = {c: i for i, c in enumerate(pal)}
+    arr = np.asarray(rgb)
+    flat = arr.reshape(-1, 3)
+    idx = np.fromiter((index[tuple(p)] for p in flat), dtype=np.uint8, count=flat.shape[0]).reshape(arr.shape[:2])
+    out = Image.fromarray(idx, "P")
+    out.putpalette([v for c in pal for v in c])
+    out.save(dest, optimize=True)
+
+
+def lamina_arbol(path: str = "docs/screenshots/tier2/rotten_tree.png") -> str:
+    from pathlib import Path
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    from pix import ASSETS, ROOT, rgba
+    label_w = 70
+    tree = Image.fromarray(gc.sheet(rotten_tree, {}, TREE), "RGBA")
+    sap = Image.fromarray(gc.sheet(rotten_sapling, {}), "RGBA")
+    rows = [("Árbol Podrido", tree, TREE, 2, LAMINA_BOSS_FRAMES), ("Retoño", sap, 32, 3, gc.COLS)]
+    width = label_w + max(size * z * len(frames) for _, _, size, z, frames in rows)
+    height = 24 + sum(20 + size * z * 3 for _, _, size, z, _ in rows) + 20 + 140 + 8
+    out = Image.new("RGBA", (width, height), rgba("navy"))
+    dr = ImageDraw.Draw(out)
+    dr.fontmode = "1"
+    font = ImageFont.truetype(str(ASSETS / "fonts" / "AlegreyaSans-Medium.ttf"), 15)
+    dr.text((8, 4), "HU-114 CA2 · Árbol Podrido (64×64, ×2) y retoños (32×32, ×3): " + ", ".join(LAMINA_BOSS_FRAMES),
+            fill=rgba("mist"), font=font)
+    y = 24
+    for title, sheet, size, z, frames in rows:
+        dr.text((8, y + 2), title, fill=rgba("gold"), font=font)
+        y += 20
+        for r, d in enumerate(gc.DIRS):
+            cell = size * z
+            dr.rectangle([label_w, y, width, y + cell - 1], fill=rgba("coal"))
+            dr.text((8, y + cell // 2 - 8), d, fill=rgba("white"), font=font)
+            for k, f in enumerate(frames):
+                c = gc.COLS.index(f)
+                fr = sheet.crop((c * size, r * size, c * size + size, r * size + size)).resize((cell, cell), Image.NEAREST)
+                out.alpha_composite(fr, (label_w + k * cell, y))
+                feet = y + (size - 4) * z
+                dr.line([(label_w + k * cell, feet), (label_w + k * cell + 3, feet)], fill=rgba("scarlet"))
+            y += cell
+    dr.text((8, y + 2), "Escala (×2, pies alineados): Capataz, Guardián de la cripta, Árbol Podrido, retoño y Esqueleto de raíces (de la talla de un héroe)", fill=rgba("gold"), font=font)
+    y += 20
+    dr.rectangle([0, y, width, y + 139], fill=rgba("coal"))
+    feet = y + 128
+    lineup = [Image.open(ROOT / "client/assets/sprites/monsters/foreman.png").convert("RGBA").crop((0, 0, 64, 64)).resize((128, 128), Image.NEAREST),
+              Image.open(ROOT / "client/assets/sprites/monsters/crypt_guardian.png").convert("RGBA").crop((0, 0, 32, 32)).resize((64, 64), Image.NEAREST),
+              tree.crop((0, 0, TREE, TREE)).resize((128, 128), Image.NEAREST), sap.crop((0, 0, 32, 32)).resize((64, 64), Image.NEAREST),
+              Image.fromarray(gc.sheet(*MONSTERS["monsters/root_skeleton"]), "RGBA").crop((0, 0, 32, 32)).resize((64, 64), Image.NEAREST)]
+    feet_in = [120, 56, 120, 56, 56]  # fila de los pies de cada recorte ya ampliado
+    x = label_w
+    for im, fy in zip(lineup, feet_in):
+        out.alpha_composite(im, (x, feet - fy))
+        x += im.width + 16
+    dest = Path(ROOT) / path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    save_indexed(out, dest)
     return str(dest)
 
 

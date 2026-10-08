@@ -58,7 +58,8 @@ cueva con la misma disposición: `terrain.png`, `terrain_forest.png`, `terrain_c
 (jefes de 64×64) con `filas = s, n, e` y la tabla `anims` del `.json` (reposo, caminar, ataque o casteo, golpe y muerte, HU-090;
 `gen_chars.py`; los monstruos del Tier 2 en `gen_monsters_t2.py`, con `body(d, pose)` por monstruo y, en los humanoides,
 rasgos propios vía `extras` de `gen_chars.humanoid`; `gen_monsters_t2.lamina()` deja la lámina de revisión en
-`docs/screenshots/tier2/monsters.png`, HU-114), las hojas HD de los héroes con `pixelScale` 3 (`import_heroes.py`, desde las hojas de referencia de
+`docs/screenshots/tier2/monsters.png`, HU-114; el Árbol Podrido, jefe de 64×64 dibujado a esa escala, va en su `BOSSES` y
+`lamina_arbol()` deja `docs/screenshots/tier2/rotten_tree.png` como PNG de paleta), las hojas HD de los héroes con `pixelScale` 3 (`import_heroes.py`, desde las hojas de referencia de
 `tools/art/refs/`), efectos de hechizo (`gen_vfx.py`, HU-091), objetos de mapa (`gen_objects.py`: palancas y puertas, HU-083), íconos 16×16
 (`gen_icons.py`) y UI 9-slice (`gen_ui.py`). Necesita `pip install pillow numpy` (y `scipy` para `import_heroes.py`, que
 importa `generate_all.py`); es determinista, así que regenerar no cambia los PNG que no se tocan. Para añadir una hoja sin
