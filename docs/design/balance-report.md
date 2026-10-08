@@ -1298,8 +1298,8 @@ valida al abrir la Fase 3, con su equipo (CA2).
   daño.
 
 ### Sala del jefe (para colocarlo en la Cripta, HU-115)
-- **Tamaño:** que todo el suelo de la sala quede a ≤ 13 casillas del spawn del árbol (Raíces y Esporas llegan a 14 + 1,5 de
-  tolerancia; su básico, a 13,5): unas 18 × 18 a 22 × 22 con el árbol en el centro o algo al fondo. Quien se quede a más de 13,5 no
+- **Tamaño:** que todo el suelo de la sala quede a ≤ 13 casillas del spawn del árbol (su básico llega a 13,5; Raíces y Esporas,
+  a 24 + 1,5 de tolerancia, para que tampoco haya sitio seguro en el pasillo de entrada desde el que curar al tanque): unas 18 × 18 a 22 × 22 con el árbol en el centro o algo al fondo. Quien se quede a más de 13,5 no
   le pega (ni con áreas apuntadas) y, si nadie más está a tiro, el árbol acaba reiniciándose.
 - **Spawn:** fijo, de `rotten_tree`, con `wanderRadius` 0, en una casilla libre con un anillo de 2–3 casillas libres alrededor (los
   retoños salen a 1,5–2,5 del árbol, en casillas libres con vista) y sin columnas pegadas.

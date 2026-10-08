@@ -20,7 +20,7 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 | `npcs` | objetos | NPCs (vendedores) |
 | `graveyards` | objetos (puntos) | respawn de jugadores |
 | `zones` | objetos (rectángulos) | nombre de zona, `safe=true` (sin combate), rango de niveles |
-| `portals` | objetos | cambio de mapa (entrada a la Mina, salida al Bosque; ADR-007) |
+| `portals` | objetos | cambio de mapa (Pradera⇄Mina, Mina⇄Bosque, Bosque⇄Cripta; ADR-007) |
 | `levers` | objetos (puntos) | palancas (HU-083): `leverId`, `doorId` de la puerta que abren; `opensAlone: true` = la abre ella sola (pon una dentro de cada sala que se pueda cerrar) |
 | `doors` | objetos (rectángulos) | puertas (HU-083): `doorId`; cerradas son sólidas y tapan la vista; se abren con todas sus palancas |
 
@@ -72,7 +72,10 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 - Cuevas (mapas aparte): 3–5 salas, 5–10 min; sala del jefe en rama lateral; sala élite antes de la salida al tier siguiente.
   Todas comparten las piezas de interior y cambian de paleta con la propiedad `palette` (mina marrón, cripta verde;
   fortaleza gris en la Fase 3): una paleta nueva es una entrada de `CAVE_PALETTES` en `tools/art/gen_tiles.py`, su PNG y
-  su fila en `TerrainBaker.PALETTE_ATLASES`.
+  su fila en `TerrainBaker.PALETTE_ATLASES`. Una sola fogata, en la entrada (zona `safe`): morir dentro deja allí.
+- Monstruos inmóviles (`speed: 0`, plantas trampa): spawn puntual con `count` 1 y `wanderRadius` 0, y su aggro a más de 2
+  casillas de la puerta de su sala para que se vean antes de despertar. Un jefe inmóvil pide una sala amplia y convexa (sin
+  columnas: desde él se ve todo el suelo) con la puerta lejos de su aggro.
 - El pueblo (`safe=true`) debe estar a < 40 tiles de las zonas 1–3.
 - La llegada de cada portal y cada punto seguro deja libre la caja de los pies (10×6 px, `MovementStep`), no solo la casilla:
   una roca que la toque hace que el primer paso empuje al revés (`TiledMapLoaderTests.PortalArrivals_AndSafePoints_LeaveTheFootBoxFree`).
@@ -82,11 +85,18 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
   y abrirlo para revisar capas `above`.
 
 ## Generadores (mapas deterministas)
-- `tools/maps/gen_tier1_maps.py` (meadow, mine) y `tools/maps/gen_tier2_maps.py` (forest, HU-111; importa la rejilla y los
-  objetos del primero). Regenerar el Tier 1 cambia los fines de línea de sus `.tmj`: restaurarlos con `git checkout` si no se
-  tocaron. `--check` valida sin escribir y sale con código ≠ 0; el del Tier 2 comprueba además bordes, que la fogata más
-  cercana sea la de la zona, que el aggro de grupos distintos no se solape, los sitios reservados para otras HU (boca de la
-  Cripta, puente roto, llegada desde la Mina: constantes al principio del archivo), subniveles y tiempo de cruce por el sendero.
+- `tools/maps/gen_tier1_maps.py` (meadow, mine) y `tools/maps/gen_tier2_maps.py` (forest, HU-111, y crypt, HU-115; importa la
+  rejilla y los objetos del primero). Regenerar el Tier 1 cambia los fines de línea de sus `.tmj`: restaurarlos con `git checkout`
+  si no se tocaron. `--check` valida sin escribir y sale con código ≠ 0; el del Tier 2 comprueba además bordes, que la fogata más
+  cercana sea la de la zona, que el aggro de grupos distintos no se solape, los sitios reservados para otras HU (puente roto,
+  llegada desde la Mina: constantes al principio del archivo), subniveles y tiempo de cruce por el sendero. En la Cripta: una sola
+  fogata en la entrada segura, ningún aggro en la puerta de su sala, la trampa (las plantas se ven desde la puerta, por el centro
+  despiertan todas y hay un eslalon de ≥ 1 casilla fuera de su aggro), el orden de las salas (jardín → élite → salida, jefe en
+  rama lateral), la sala del jefe libre y a la vista, y el recorrido estimado en 5–10 min. El jefe y la salida al Tier 3 son
+  constantes (`BOSS_SPAWN`, `TIER3_EXIT`) hasta que HU-117 y el portal con `minPhase` los añadan.
+- En una cueva (más de la mitad del suelo es interior, 8) `TerrainBaker` dibuja la roca como pared de la cueva, el arbusto como
+  raíces, el agua como charca, la tierra (2) como mantillo y el camino (3) como losas; el muro (4) en bloque no se dibuja (en
+  fila es valla): no usarlo.
 - Cómo dibuja `TerrainBaker` los GIDs de `placeholder.tsj` en exteriores: la roca unida al borde es bosque cerrado (la suelta,
   peñasco); el muro de una casilla de grosor es valla, sus bloques son cabañas dentro de una zona `safe` y peñascos fuera (un
   ramal que corte un peñasco deja un poste de valla suelto); `above` sin muro debajo son copas; suelo 8 son losas.

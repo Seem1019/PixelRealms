@@ -185,6 +185,7 @@ public sealed class PortalTests
     {
         using var content = StartInTheMine(phase: 2);
         File.Delete(Path.Combine(content.MapsDir, "forest.tmj"));
+        File.Delete(Path.Combine(content.MapsDir, "crypt.tmj")); // su vuelta al Bosque no lleva minPhase: sin Bosque no cargaría
         await using var server = await TestServer.StartAsync(content.Settings);
         var (api, _, ana) = await Enter(server, "ana", "Ana", "warrior");
         using (api)

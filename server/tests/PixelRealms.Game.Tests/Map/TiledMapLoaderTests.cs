@@ -1,3 +1,5 @@
+using PixelRealms.Content.Defs;
+using PixelRealms.Game.Combat;
 using PixelRealms.Game.Core;
 using PixelRealms.Game.Map;
 using PixelRealms.Game.Movement;
@@ -97,7 +99,7 @@ public sealed class TiledMapLoaderTests
     public void Meadow_And_Mine_Load_WithPortalsBetweenThem() // HU-020 CA1, HU-080 CA1–CA3
     {
         var maps = TiledMapLoader.LoadAll(MapsDir, Check());
-        maps.Select(m => m.MapId).ToArray().ShouldBe(new[] { "forest", "meadow", "mine", "test_small" });
+        maps.Select(m => m.MapId).ToArray().ShouldBe(new[] { "crypt", "forest", "meadow", "mine", "test_small" });
         var meadow = maps.Single(m => m.MapId == "meadow");
         meadow.Width.ShouldBe(250); meadow.Height.ShouldBe(110); // aldea 42 + Campos 100 + Colinas 100 (~100×100 útiles por zona)
         meadow.Portals.ShouldHaveSingleItem().TargetMapId.ShouldBe("mine");
@@ -191,13 +193,181 @@ public sealed class TiledMapLoaderTests
         }
 
         // CA4: el portal de vuelta sale de la boca de la Mina, en el Linde, y deja en la Sala 3 junto a la salida hacia aquí
-        // (HU-112, la antigua hornacina tapiada en x 86..87 · y 25..27).
-        var back = forest.Portals.ShouldHaveSingleItem();
-        back.TargetMapId.ShouldBe("mine");
+        // (HU-112, la antigua hornacina tapiada en x 86..87 · y 25..27). El otro es el de la Cripta (HU-115).
+        forest.Portals.Select(p => p.TargetMapId).Order(StringComparer.Ordinal).ToArray().ShouldBe(new[] { "crypt", "mine" });
+        var back = forest.Portals.Single(p => p.TargetMapId == "mine");
         open[0].Contains(back.Position).ShouldBeTrue();
         var mine = maps.Single(m => m.MapId == "mine");
         mine.Collision.IsSolidAt(back.TargetX, back.TargetY).ShouldBeFalse();
         Vec2.Distance(new Vec2(back.TargetX, back.TargetY), new Vec2(86, 26)).ShouldBeLessThan(3);
+    }
+
+    // Casilla del jefe y esquina de la salida al Tier 3 en la Cripta (BOSS_SPAWN y TIER3_EXIT de tools/maps/gen_tier2_maps.py):
+    // HU-115 deja el sitio y HU-117 / HU-112 añaden el spawn del Árbol Podrido y el portal con `minPhase`; desde entonces mandan
+    // los del mapa.
+    private static readonly Vec2 CryptBossSpawn = new(60, 49);
+    private static readonly Vec2 CryptTier3Exit = new(99, 71);
+
+    private static Vec2 TileCentre(Vec2 p) => new(MathF.Floor(p.X) + 0.5f, MathF.Floor(p.Y) + 0.5f);
+
+    /// <summary>Casillas alcanzables (4 vecinos) desde `from` sin pisar las que `blocked` descarta (recibe el centro de la casilla).</summary>
+    private static HashSet<(int X, int Y)> ReachAvoiding(MapData map, Vec2 from, Func<Vec2, bool> blocked)
+    {
+        var start = ((int)from.X, (int)from.Y);
+        var seen = new HashSet<(int X, int Y)> { start };
+        var queue = new Queue<(int X, int Y)>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var (x, y) = queue.Dequeue();
+            foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+            {
+                if (map.Collision.IsSolid(nx, ny) || blocked(new Vec2(nx + 0.5f, ny + 0.5f)) || !seen.Add((nx, ny))) continue;
+                queue.Enqueue((nx, ny));
+            }
+        }
+        return seen;
+    }
+
+    private static (int X, int Y) Tile(Vec2 p) => ((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y));
+
+    /// <summary>HU-115 CA1 y CA4: la Cripta se entra por el portal del fondo del Pantano y sale al lado; su única fogata está en la
+    /// entrada, que es zona segura: morir en cualquier sala deja allí.</summary>
+    [Fact]
+    public void Crypt_TheEntranceIsTheOnlySafePoint_AndItsPortalsPairWithTheSwamp()
+    {
+        var maps = TiledMapLoader.LoadAll(MapsDir, Check());
+        var crypt = maps.Single(m => m.MapId == "crypt");
+        var forest = maps.Single(m => m.MapId == "forest");
+        crypt.DisplayName.ShouldBe("Cripta de Raíces");
+
+        var gy = crypt.Graveyards.ShouldHaveSingleItem();
+        crypt.DefaultGraveyard.ShouldBe(gy);
+        crypt.IsSafeZone(gy.Position).ShouldBeTrue();
+        for (var y = 0; y < crypt.Height; y++)
+            for (var x = 0; x < crypt.Width; x++)
+                if (!crypt.Collision.IsSolid(x, y)) crypt.NearestGraveyard(new Vec2(x + 0.5f, y + 0.5f)).ShouldBe(gy); // DeathSystem
+
+        // Ida: del fondo del Pantano a la entrada segura de la Cripta, junto al portal de vuelta y fuera de él. Vuelta: al lado de
+        // la boca del Pantano. Sin nivel mínimo ni fase: el Bosque solo se alcanza en la Fase 2.
+        var into = forest.Portals.Single(p => p.TargetMapId == "crypt");
+        var back = crypt.Portals.Single(p => p.TargetMapId == "forest");
+        forest.ZoneAt(into.Position)!.Name.ShouldBe("Pantano");
+        into.Position.X.ShouldBeGreaterThan(forest.Width - 10); // al fondo, en el borde este
+        foreach (var (portal, here, there) in new[] { (into, forest, crypt), (back, crypt, forest) })
+        {
+            portal.MinLevel.ShouldBeNull(portal.PortalId);
+            var target = new Vec2(portal.TargetX, portal.TargetY);
+            there.Collision.IsSolidAt(target.X, target.Y).ShouldBeFalse(portal.PortalId);
+            var returning = there.Portals.Single(p => p.TargetMapId == here.MapId);
+            returning.Contains(target).ShouldBeFalse(portal.PortalId);
+            Vec2.Distance(target, returning.Position).ShouldBeLessThan(8, portal.PortalId);
+        }
+        crypt.IsSafeZone(new Vec2(into.TargetX, into.TargetY)).ShouldBeTrue();
+        crypt.ZoneAt(back.Position).ShouldBe(crypt.ZoneAt(gy.Position));
+    }
+
+    /// <summary>HU-115 CA1 y CA2: las plantas trampa se ven antes de despertar, por el centro despiertan todas y con cuidado se
+    /// cruza sin despertar ninguna; la sala del élite queda entre la trampa y la salida, y la del jefe en una rama lateral.</summary>
+    [Fact]
+    public void Crypt_EveryTileTheBossSees_IsWithinItsAimedAreas() // revisión de autoridad (HU-117)
+    {
+        // Ni en la sala ni en el pasillo recto de entrada hay sitio con vista al Árbol Podrido fuera del alcance de Raíces y Esporas:
+        // desde ahí un sanador curaría al tanque sin que el árbol pudiera responderle.
+        var db = TestContent.Load();
+        var crypt = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == "crypt");
+        var boss = TileCentre(crypt.Spawns.Single(s => s.MonsterId == "rotten_tree").Position);
+        var reach = db.Monster("rotten_tree").Spells.Select(s => db.Spell(s.SpellId)).Where(s => s.Targeting.IsGround()).Min(s => s.Range)
+            + db.Rules.Combat.CastRangeToleranceTiles;
+        var seenOutOfReach = new List<(int X, int Y)>();
+        for (var y = 0; y < crypt.Height; y++)
+            for (var x = 0; x < crypt.Width; x++)
+            {
+                var tile = new Vec2(x + 0.5f, y + 0.5f);
+                if (!crypt.Collision.IsSolid(x, y) && Vec2.Distance(tile, boss) > reach && LineOfSight.Has(crypt.Collision, boss, tile))
+                    seenOutOfReach.Add((x, y));
+            }
+        seenOutOfReach.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Crypt_TheTrapComesFirst_TheEliteGuardsTheExit_AndTheBossIsOnASideBranch()
+    {
+        var db = TestContent.Load();
+        var crypt = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == "crypt");
+        var from = crypt.DefaultGraveyard.Position;
+        var boss = crypt.Spawns.SingleOrDefault(s => s.MonsterId == "rotten_tree")?.Position ?? CryptBossSpawn;
+        var exit = crypt.Portals.SingleOrDefault(p => p.TargetMapId != "forest")?.Position ?? CryptTier3Exit;
+        var guardian = crypt.Spawns.Single(s => s.MonsterId == "crypt_guardian");
+        var guard = TileCentre(guardian.Position);
+
+        // Salas de monstruos: esqueletos y espíritus del musgo, del nivel de la Cripta.
+        crypt.Spawns.Where(s => s.MonsterId is "root_skeleton" or "moss_spirit").Sum(s => s.Count).ShouldBeGreaterThanOrEqualTo(10);
+
+        // CA2: plantas inmóviles en su sitio (punto, una, sin pasear).
+        var plantAggro = (float)db.Monster("trap_plant").AggroRange;
+        var plantReach = (float)db.Monster("trap_plant").AttackRange;
+        var plants = crypt.Spawns.Where(s => s.MonsterId == "trap_plant").ToArray();
+        plants.Length.ShouldBeGreaterThanOrEqualTo(3);
+        plants.ShouldAllBe(p => p.Size == Vec2.Zero && p.Count == 1 && p.WanderRadius == 0f);
+        var centres = plants.Select(p => TileCentre(p.Position)).ToArray();
+        bool InPlantAggro(Vec2 t) => centres.Any(c => Vec2.Distance(t, c) <= plantAggro);
+        // Con cuidado: hay camino hasta el élite, la salida y el jefe sin entrar en el aggro de ninguna planta…
+        var careful = ReachAvoiding(crypt, from, InPlantAggro);
+        careful.ShouldContain(Tile(guard));
+        careful.ShouldContain(Tile(exit));
+        careful.ShouldContain(Tile(boss));
+        // …y desde ese camino cada planta se ve (línea de visión) a su alcance antes de despertarla.
+        foreach (var c in centres)
+            careful.Any(t => Vec2.Distance(new Vec2(t.X + 0.5f, t.Y + 0.5f), c) <= plantReach && LineOfSight.Has(crypt.Collision, new Vec2(t.X + 0.5f, t.Y + 0.5f), c))
+                .ShouldBeTrue($"la planta de {c} no se ve desde fuera de su aggro");
+        // Por el camino más corto (el centro del jardín) despiertan todas.
+        var path = ShortestPath(crypt, from, guard);
+        centres.Count(c => path.Any(t => Vec2.Distance(new Vec2(t.X + 0.5f, t.Y + 0.5f), c) <= plantAggro)).ShouldBe(plants.Length);
+
+        // Orden: sin cruzar el jardín (la caja de las plantas más su aggro) no se llega al élite, a la salida ni al jefe.
+        var (x0, x1) = (centres.Min(c => c.X) - plantAggro, centres.Max(c => c.X) + plantAggro);
+        var (y0, y1) = (centres.Min(c => c.Y) - plantAggro, centres.Max(c => c.Y) + plantAggro);
+        var withoutTrap = ReachAvoiding(crypt, from, t => t.X >= x0 && t.X <= x1 && t.Y >= y0 && t.Y <= y1);
+        withoutTrap.ShouldNotContain(Tile(guard));
+        withoutTrap.ShouldNotContain(Tile(exit));
+        withoutTrap.ShouldNotContain(Tile(boss));
+        // La salida está detrás del élite: no se llega a ella sin entrar en su aggro. El jefe no.
+        var guardAggro = (float)db.Monster("crypt_guardian").AggroRange;
+        var pastTheGuard = ReachAvoiding(crypt, from, t => Vec2.Distance(t, guard) <= guardAggro);
+        pastTheGuard.ShouldNotContain(Tile(exit));
+        pastTheGuard.ShouldContain(Tile(boss));
+        // Rama lateral: el camino al élite y a la salida no pasa por la sala del jefe.
+        var aroundTheBoss = ReachAvoiding(crypt, from, t => Vec2.Distance(t, TileCentre(boss)) <= 12);
+        aroundTheBoss.ShouldContain(Tile(guard));
+        aroundTheBoss.ShouldContain(Tile(exit));
+        // Sala del jefe (HU-117: inmóvil, con áreas sobre jugadores a distancia): amplia y sin columnas a 12 casillas a la redonda.
+        for (var y = (int)boss.Y - 12; y <= (int)boss.Y + 12; y++)
+            for (var x = (int)boss.X - 12; x <= (int)boss.X + 12; x++)
+                if (Vec2.Distance(new Vec2(x + 0.5f, y + 0.5f), TileCentre(boss)) <= 12) crypt.Collision.IsSolid(x, y).ShouldBeFalse($"({x}, {y})");
+    }
+
+    /// <summary>Camino más corto (4 vecinos) de `from` a `to`, con sus casillas.</summary>
+    private static List<(int X, int Y)> ShortestPath(MapData map, Vec2 from, Vec2 to)
+    {
+        var start = Tile(from);
+        var goal = Tile(to);
+        var parent = new Dictionary<(int X, int Y), (int X, int Y)> { [start] = start };
+        var queue = new Queue<(int X, int Y)>();
+        queue.Enqueue(start);
+        while (queue.Count > 0 && !parent.ContainsKey(goal))
+        {
+            var (x, y) = queue.Dequeue();
+            foreach (var n in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+            {
+                if (map.Collision.IsSolid(n.Item1, n.Item2) || !parent.TryAdd(n, (x, y))) continue;
+                queue.Enqueue(n);
+            }
+        }
+        var path = new List<(int X, int Y)>();
+        for (var c = goal; c != start; c = parent[c]) path.Add(c);
+        path.Add(start);
+        return path;
     }
 
     /// <summary>
@@ -255,7 +425,11 @@ public sealed class TiledMapLoaderTests
         {
             foreach (var p in map.Portals)
             {
-                var to = maps[p.TargetMapId];
+                if (!maps.TryGetValue(p.TargetMapId, out var to))
+                {
+                    p.MinPhase.ShouldNotBeNull($"{p.PortalId}: su mapa no existe y no lleva minPhase");
+                    continue; // la salida a un tier que aún no existe (la Montaña): su destino lo fija ese mapa
+                }
                 var at = new Vec2(p.TargetX, p.TargetY);
                 FootBoxFree(to.Collision, at).ShouldBeTrue($"{p.PortalId} → {p.TargetMapId} {at}");
                 to.Portals.ShouldNotContain(q => q.Contains(at), $"{p.PortalId} deja encima de otro portal");
@@ -309,7 +483,9 @@ public sealed class TiledMapLoaderTests
         var maps = TiledMapLoader.LoadAll(tmp, Check());
         var (map, portal) = TiledMapLoader.PortalsToMissingMaps(maps).ShouldHaveSingleItem();
         (map.MapId, portal.PortalId).ShouldBe(("mine", "mine_to_forest"));
-        TiledMapLoader.PortalsToMissingMaps(TiledMapLoader.LoadAll(MapsDir, Check())).ShouldBeEmpty();
+        // En el repo, el único cerrado por no existir su mapa es la salida de la Cripta a la Montaña (Tier 3, HU-115).
+        TiledMapLoader.PortalsToMissingMaps(TiledMapLoader.LoadAll(MapsDir, Check())).Select(x => (x.Map.MapId, x.Portal.PortalId))
+            .ShouldBe(new[] { ("crypt", "crypt_to_mountain") });
         Directory.Delete(tmp, true);
     }
 
@@ -317,6 +493,7 @@ public sealed class TiledMapLoaderTests
     [InlineData("meadow")]
     [InlineData("mine")]
     [InlineData("forest")]
+    [InlineData("crypt")]
     public void Borders_AreSolid(string mapId) // skill world-maps, HU-111 CA5
     {
         var map = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == mapId);
@@ -336,7 +513,8 @@ public sealed class TiledMapLoaderTests
     [InlineData("meadow")]
     [InlineData("mine")]
     [InlineData("forest")]
-    public void FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject(string mapId) // HU-080 CA4, HU-083 CA1, HU-111 CA5
+    [InlineData("crypt")]
+    public void FloodFill_FromDefaultGraveyard_ReachesEveryWalkableTile_AndEveryObject(string mapId) // HU-080 CA4, HU-083 CA1, HU-111 CA5, HU-115 CA4
     {
         var map = TiledMapLoader.LoadAll(MapsDir, Check()).Single(m => m.MapId == mapId);
         var grid = map.Collision;
