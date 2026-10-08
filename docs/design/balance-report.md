@@ -960,3 +960,233 @@ Los 131 objetos nuevos usan íconos que ya existen y piden uno propio en HU-114:
 `hood_apprentice`, `robe_novice`, `vest_leather`, `mail_recruit`, `plate_foreman`, `helm_iron`, `gloves_bandit`, `legs_miner`,
 `boots_boar` y `boots_shadowstep`), los 4 escudos (`shield_wood`), las 12 joyas (`necklace_wolf`, `amulet_lantern`, `ring_bone`), los
 3 raros y las 8 chatarras (`goo`, `tusk`, `bone`). La poción mayor y el venado usarán `potion_red` y `bread`.
+
+# Fase 2 · Mejoras de los hechizos (HU-107, 2026-10-07)
+
+48 mejoras, dos por cada hechizo de clase de los niveles 1 a 9 (`upgrades` en `content/spells.json`; la lista y lo que no entró,
+en [class-kits.md](class-kits.md) §Mejoras). Medidas con `python tools/balance/upgrades.py` (nuevo; `--draft f.json` mide un
+borrador sin tocar el contenido) con las reglas actuales: sin las propuestas pendientes (`spellRankBonusPct` 0,20, `hpPerSta` 12,
+`hpRegenDelaySec` 5, élites ×1,3). Valores esperados, sin azar.
+
+**Decisiones de medición nuevas** (siguen las de §HU-106: nivel 10 con el equipo aproximado de `tier2.py`, segundo rango,
+referencias del nivel 10 y valor de la clase = pentagrama completo):
+1. **La mejora se aplica como en el servidor** (`SpellUpgrades.Apply`: valor · `mult` + `add`; `effect` escala base, coeficientes
+   y porcentaje de arma; `aura` cambia una copia del aura; `addEffect` añade el efecto al final; los campos enteros se redondean
+   alejándose de cero) y el rango multiplica el `base` ya mejorado. `upgrades.py` lo comprueba con los casos de
+   `shared/test-vectors/spell_upgrades.json`: 7 de 7.
+2. **Lo que suma una mejora en mono y área es la diferencia media con ventanas de 24, 27, 30, 33 y 36 s.** Sin azar, en 30 s
+   exactos una recarga o un casteo algo más corto da 0 o un lanzamiento entero más: Eviscerar con 4 s menos de recarga cabe 3
+   veces, como sin mejora (0 puntos), y Estallido de llamas con 0,5 s menos de casteo cabe 4 veces en vez de 3 (+8,6 de área). Con
+   las ventanas, +3,0 y +1,7 (más 1,4 de mono). Los hechizos sin mejora conservan su valor de 30 s: `phase2.py` da lo mismo que en
+   §HU-106.
+3. **Lo que el modelo no miraba porque ningún hechizo lo cambiaba** (no mueve a ningún hechizo sin mejora): el radio, la apertura
+   o el ancho de un área escalan la parte de los secundarios, en área y en control, con la cobertura del grupo de referencia
+   (`phase2.coverage`); la Carga recorre (alcance mínimo + alcance) / 2 casillas (5 con el alcance de 8, lo que ya contaba); una
+   ralentización cuenta como mucho `rules.combat.maxSlowPct` (0,4), lo que aplica el servidor; las auras propias de un hechizo que
+   no es sobre uno mismo y las curas propias cuentan en armadura, como un escudo.
+4. **Que ninguna de las dos sea mejor en todo.** Se comparan en las 5 puntas (empate: menos de 0,5 puntos) y en lo que el
+   pentagrama no ve: recurso por minuto lanzándolo en cuanto está listo, valor de un lanzamiento (daño, cura, todo el DoT/HoT o el
+   escudo sobre un objetivo), alcance, secundarios tocados con un grupo disperso (3 en un radio de 3; el de referencia, de radio 2,
+   ya cabe entero en casi todas las áreas) y, en el Sacerdote, el daño por segundo, que no está en su pentagrama (empate: menos de
+   un 2 %).
+5. **Builds:** 4 de los 6 hechizos × (sin mejora, A o B) = 1 215 por clase. La regla 40/75 se mide al nivel 10 (el de la Fase 2,
+   como en §HU-106) y, aparte, al 8 y al 9 con los hechizos aprendidos.
+
+### Cada mejora sobre el pentagrama (nivel 10)
+Aporte del hechizo sin mejora y, debajo, lo que cambia cada mejora (puntos; «·» = sin cambio). Las cinco últimas columnas son lo
+de fuera del pentagrama.
+
+| Clase | Hechizo | Mejora | Mono | Área | Control | Movilidad | Armadura | Suma (total) | Recurso/min | Por lanzamiento | Alcance | Disperso | Daño/s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Pícaro | Golpe siniestro | sin mejora | 18 | 0 | 0 | 0 | 0 | 18 | 600 | 23 | 1,5 | — | — |
+|  |  | Filo afilado | +2,7 | · | · | · | · | +2,7 (21) | 600 | 27 | 1,5 | — | — |
+|  |  | Golpe ágil | · | · | · | · | · | +0,0 (18) | 400 | 23 | 1,5 | — | — |
+|  | Gubia | sin mejora | 2 | 0 | 15 | 0 | 0 | 17 | 60 | 11 | 1,5 | — | — |
+|  |  | Gubia profunda | · | · | +3,0 | · | · | +3,0 (20) | 60 | 11 | 1,5 | — | — |
+|  |  | Gubia evasiva | · | · | · | +6,0 | · | +6,0 (23) | 60 | 11 | 1,5 | — | — |
+|  | Paso sombrío | sin mejora | 5 | 0 | 4 | 25 | 0 | 35 | 120 | 0 | 5,0 | 1,4 | — |
+|  |  | Paso fugaz | +0,3 | · | +0,5 | +2,8 | · | +3,6 (38) | 133 | 0 | 5,0 | 1,4 | — |
+|  |  | Emboscada | +2,7 | · | · | · | · | +2,7 (37) | 120 | 0 | 5,0 | 1,4 | — |
+|  | Carrera | sin mejora | 0 | 0 | 0 | 25 | 0 | 25 | 0 | 0 | 0,0 | — | — |
+|  |  | Carrera larga | · | · | · | +5,0 | · | +5,0 (30) | 0 | 0 | 0,0 | — | — |
+|  |  | Huida | · | · | · | +5,0 | · | +5,0 (30) | 0 | 0 | 0,0 | — | — |
+|  | Eviscerar | sin mejora | 11 | 0 | 0 | 0 | 0 | 11 | 150 | 47 | 1,5 | — | — |
+|  |  | Remate rápido | +3,0 | · | · | · | · | +3,0 (14) | 210 | 47 | 1,5 | — | — |
+|  |  | Corte en seco | · | · | +5,4 | · | · | +5,4 (16) | 150 | 47 | 1,5 | — | — |
+|  | Cuchillas arrojadizas | sin mejora | 0 | 10 | 0 | 15 | 0 | 25 | 150 | 26 | 3,0 | 1,0 | — |
+|  |  | Abanico | · | +2,1 | · | · | · | +2,1 (27) | 150 | 26 | 3,0 | 1,4 | — |
+|  |  | Impulso largo | · | · | · | +5,0 | · | +5,0 (30) | 150 | 26 | 3,0 | 1,0 | — |
+| Mago | Bola de fuego | sin mejora | 16 | 0 | 0 | 0 | 0 | 16 | 240 | 31 | 8,0 | — | — |
+|  |  | Llama rápida | +3,3 | · | · | · | · | +3,3 (19) | 267 | 31 | 8,0 | — | — |
+|  |  | Llama intensa | +2,7 | · | · | · | · | +2,7 (19) | 240 | 33 | 8,0 | — | — |
+|  | Descarga de escarcha | sin mejora | 4 | 0 | 15 | 0 | 0 | 19 | 40 | 28 | 8,0 | — | — |
+|  |  | Frío profundo | · | · | +3,8 | · | · | +3,8 (23) | 40 | 28 | 8,0 | — | — |
+|  |  | Lanza de hielo | +1,1 | · | · | · | · | +1,1 (21) | 40 | 34 | 8,0 | — | — |
+|  | Nova de escarcha | sin mejora | 0 | 4 | 30 | 0 | 0 | 34 | 50 | 16 | 0,0 | 2,5 | — |
+|  |  | Hielo eterno | · | · | +5,0 | · | · | +5,0 (39) | 50 | 16 | 0,0 | 2,5 | — |
+|  |  | Nova cortante | · | +4,3 | · | · | · | +4,3 (38) | 50 | 32 | 0,0 | 2,5 | — |
+|  | Estallido de llamas | sin mejora | -2 | 26 | 0 | 0 | 0 | 24 | 188 | 67 | 8,0 | 2,9 | — |
+|  |  | Estallido rápido | +1,4 | +1,7 | · | · | · | +3,1 (27) | 188 | 67 | 8,0 | 2,9 | — |
+|  |  | Estallido intenso | · | +5,9 | · | · | · | +5,9 (29) | 225 | 80 | 8,0 | 2,9 | — |
+|  | Campo ardiente | sin mejora | -2 | 26 | 0 | 0 | 0 | 24 | 120 | 29 | 8,0 | 1,4 | — |
+|  |  | Campo amplio | · | +1,3 | · | · | · | +1,3 (25) | 120 | 29 | 8,0 | 2,2 | — |
+|  |  | Campo abrasador | +0,4 | +0,9 | · | · | · | +1,4 (25) | 96 | 36 | 8,0 | 1,4 | — |
+|  | Parpadeo | sin mejora | 0 | 0 | 0 | 20 | 0 | 20 | 32 | 0 | 6,0 | — | — |
+|  |  | Parpadeo ligero | · | · | · | · | · | +0,0 (20) | 8 | 0 | 6,0 | — | — |
+|  |  | Parpadeo reparador | · | · | · | -5,0 | +4,4 | -0,6 (19) | 24 | 32 | 6,0 | — | — |
+| Guerrero | Golpe heroico | sin mejora | 9 | 0 | 0 | 0 | 0 | 9 | 200 | 11 | 1,5 | — | — |
+|  |  | Golpe brutal | +2,2 | · | · | · | · | +2,2 (11) | 200 | 14 | 1,5 | — | — |
+|  |  | Golpe desafiante | -4,1 | · | +6,2 | · | · | +2,1 (11) | 100 | 11 | 1,5 | — | — |
+|  | Provocar | sin mejora | 0 | 0 | 15 | 0 | 0 | 15 | 0 | 0 | 6,0 | — | — |
+|  |  | Grito lejano | · | · | · | · | · | +0,0 (15) | 0 | 0 | 9,0 | — | — |
+|  |  | Provocación rápida | · | · | +2,6 | · | · | +2,6 (18) | 0 | 0 | 6,0 | — | — |
+|  | Carga | sin mejora | 0 | 0 | 14 | 16 | 0 | 30 | 0 | 0 | 8,0 | — | — |
+|  |  | Carga lejana | · | · | -0,8 | +2,0 | · | +1,2 (31) | 0 | 0 | 10,0 | — | — |
+|  |  | Carga aplastante | · | · | +2,6 | -1,7 | · | +0,9 (31) | 0 | 0 | 8,0 | — | — |
+|  | Torbellino | sin mejora | 0 | 19 | 0 | 0 | 0 | 19 | 120 | 49 | 0,0 | 1,7 | — |
+|  |  | Torbellino amplio | · | +3,3 | · | · | · | +3,3 (22) | 120 | 49 | 0,0 | 2,1 | — |
+|  |  | Torbellino feroz | · | +2,8 | · | · | · | +2,8 (22) | 120 | 56 | 0,0 | 1,7 | — |
+|  | Bloqueo con escudo | sin mejora | 0 | 0 | 0 | 0 | 18 | 18 | 50 | 0 | 0,0 | — | — |
+|  |  | Muro de escudo | · | · | · | · | +1,2 | +1,2 (20) | 38 | 0 | 0,0 | — | — |
+|  |  | Bloqueo ligero | · | · | · | · | · | +0,0 (18) | 0 | 0 | 0,0 | — | — |
+|  | Tajo amplio | sin mejora | 0 | 15 | 0 | 0 | 0 | 15 | 150 | 22 | 2,5 | 1,2 | — |
+|  |  | Tajo ancho | · | +2,0 | · | · | · | +2,0 (17) | 150 | 22 | 2,5 | 1,8 | — |
+|  |  | Tajo profundo | · | +2,1 | · | · | · | +2,1 (17) | 150 | 26 | 2,5 | 1,2 | — |
+| Sacerdote | Sanar | sin mejora | 27 | 0 | 0 | 0 | 0 | 27 | 240 | 19 | 8,0 | — | -8,3 |
+|  |  | Sanación rápida | +5,2 | · | · | · | · | +5,2 (33) | 288 | 19 | 8,0 | — | -8,3 |
+|  |  | Sanación potente | +4,1 | · | · | · | · | +4,1 (32) | 240 | 21 | 8,0 | — | -8,3 |
+|  | Castigo | sin mejora | 0 | 0 | 0 | 0 | 0 | 0 | 240 | 26 | 8,0 | — | 8,3 |
+|  |  | Castigo ardiente | · | · | · | · | · | +0,0 (0) | 240 | 31 | 8,0 | — | 11,6 |
+|  |  | Castigo rápido | · | · | · | · | · | +0,0 (0) | 540 | 26 | 8,0 | — | 16,1 |
+|  | Palabra de poder: Escudo | sin mejora | 17 | 0 | 0 | 11 | 0 | 27 | 80 | 108 | 8,0 | — | 0,0 |
+|  |  | Escudo grueso | +4,0 | · | · | · | · | +4,0 (31) | 80 | 130 | 8,0 | — | 0,0 |
+|  |  | Escudo ligero | · | · | · | · | · | +0,0 (27) | 56 | 108 | 10,0 | — | 0,0 |
+|  | Pulso sagrado | sin mejora | 0 | 26 | 10 | 0 | 0 | 36 | 120 | 80 | 8,0 | 3,0 | 5,0 |
+|  |  | Pulso radiante | · | +4,1 | -3,4 | · | · | +0,8 (36) | 120 | 90 | 8,0 | 3,0 | 5,0 |
+|  |  | Pulso cegador | · | -4,1 | +3,4 | · | · | -0,8 (35) | 120 | 70 | 8,0 | 3,0 | 5,0 |
+|  | Renovar | sin mejora | 20 | 0 | 0 | 0 | 0 | 20 | 300 | 115 | 8,0 | — | 0,0 |
+|  |  | Renovar duradero | · | · | · | · | · | +0,0 (20) | 300 | 144 | 8,0 | — | 0,0 |
+|  |  | Renovar intenso | +4,0 | · | · | · | · | +4,0 (24) | 300 | 103 | 8,0 | — | 0,0 |
+|  | Sendero de luz | sin mejora | 0 | 15 | 9 | 13 | 0 | 37 | 60 | 57 | 8,0 | 1,6 | 0,0 |
+|  |  | Sendero ancho | · | +0,3 | +1,2 | · | · | +1,4 (39) | 60 | 49 | 8,0 | 2,1 | 0,0 |
+|  |  | Sendero cegador | · | · | +2,2 | -1,7 | · | +0,6 (38) | 60 | 57 | 8,0 | 1,6 | 0,0 |
+
+**Ninguna pareja tiene una mejora mejor en todo** contando lo de fuera del pentagrama. Por tipo:
+- **Suben puntas distintas (12):** Gubia (control / movilidad), Paso sombrío (movilidad / mono), Eviscerar (mono / control),
+  Cuchillas (área / movilidad), Descarga (control / mono), Nova (control / área), Estallido (mono y algo de área / área), Parpadeo
+  (movilidad / armadura), Golpe heroico (mono / control), Carga (movilidad / control), Pulso sagrado (área / control) y Sendero de
+  luz (área y control / control a cambio de movilidad).
+- **Empatan en la misma punta y las separa lo de fuera (5):** Torbellino y Tajo amplio (más radio: más secundarios con el grupo
+  disperso / más daño: más por lanzamiento), Campo ardiente (radio / más daño por lanzamiento y menos maná por minuto, con más
+  recarga), Castigo (más por lanzamiento y menos maná / más daño por segundo) y Carrera, igual en todo lo medido: la larga (8 s
+  cada 40 s) sirve para viajar y perseguir; Huida (2 s cada 20 s) rompe una raíz el doble de veces.
+- **Una sube más la punta y la otra gana fuera (7):** Golpe siniestro (+2,7 de mono / 10 de energía menos), Bola de fuego
+  (+3,3 / +2,7 de mono, la intensa con menos maná por minuto y más por lanzamiento), Provocar (+2,6 de control / +3 de alcance),
+  Bloqueo con escudo (+1,2 de armadura / sin ira), Sanar (+5,2 / +4,1 de mono, la potente con menos maná y más por lanzamiento),
+  Escudo (+4,0 de mono / 6 de maná menos y +2 de alcance) y Renovar (el intenso cura más por segundo, +4,0; el duradero, un 40 %
+  más por lanzamiento con el mismo maná).
+
+### Builds al nivel 10: regla 40/75 y valor de la clase (CA3)
+
+| Clase | Builds | Máx. total (de 187,5) | Mín. total | Máx. mono | Máx. área | Máx. control | Máx. movilidad | Máx. armadura | Incumplen |
+|---|---|---|---|---|---|---|---|---|---|
+| Pícaro | 1 215 | 177,6 (159 sin mejoras) | 127,4 | 73 (de 85) | 12 (de 15) | 28 (de 35) | 84 (de 85) | 27 (de 30) | 0 |
+| Mago | 1 215 | 153,3 (138) | 114,8 | 43 (de 45) | 67 (de 90) | 54 (de 70) | 20 (de 20) | 23 (de 25) | 0 |
+| Guerrero | 1 215 | 185,0 (177) | 151,6 | 36 (de 45) | 39 (de 45) | 41 (de 50) | 18 (de 20) | 90 (de 90) | 0 |
+| Sacerdote | 1 215 | 164,2 (153) | 100,1 | 78 (de 85) | 45 (de 85) | 25 (de 25) | 24 (de 25) | 25 (de 30) | 0 |
+
+Ningún hechizo con mejora pasa de 40 (el que más: Nova de escarcha con Hielo eterno, 39,2) y ninguna build pasa de 187,5 ni del
+valor de la clase en una punta. Las puntas que tocan techo: movilidad del Mago (Parpadeo ya daba 20 de 20: sus mejoras no dan
+movilidad), armadura del Guerrero (89,6 de 90 con Muro de escudo), control del Sacerdote (24,7 de 25 con Pulso y Sendero
+cegadores) y movilidad del Pícaro (83,8 de 85).
+
+| Clase | Build más fuerte | Build más débil | Más débil con una mejora en cada hechizo |
+|---|---|---|---|
+| Pícaro | 177,6: Gubia evasiva + Paso fugaz + Huida + Impulso largo (36 / 10 / 20 / 84 / 27) | 127,4: Golpe siniestro + Gubia + Carrera + Eviscerar, sin mejoras (60 / 0 / 15 / 25 / 27) | 135,6: Golpe ágil + Gubia profunda + Remate rápido + Abanico (63 / 12 / 18 / 15 / 27) |
+| Mago | 153,3: Frío profundo + Hielo eterno + Estallido intenso + Campo abrasador (18 / 63 / 54 / 0 / 19) | 114,8: Bola de fuego + Descarga + Estallido + Parpadeo reparador (36 / 26 / 15 / 15 / 23) | 120,1: Llama intensa + Lanza de hielo + Campo amplio + Parpadeo reparador (40 / 27 / 15 / 15 / 23) |
+| Guerrero | 185,0: Provocación rápida + Carga lejana + Torbellino amplio + Muro de escudo (25 / 22 / 31 / 18 / 90) | 151,6: Golpe heroico + Provocar + Bloqueo + Tajo amplio, sin mejoras (34 / 15 / 15 / 0 / 88) | 155,8: Golpe desafiante + Grito lejano + Bloqueo ligero + Tajo ancho (30 / 17 / 21 / 0 / 88) |
+| Sacerdote | 164,2: Sanación rápida + Escudo grueso + Pulso radiante + Sendero ancho (53 / 45 / 17 / 24 / 25) | 100,1: Sanar + Castigo + Escudo + Renovar, sin mejoras (64 / 0 / 0 / 11 / 25) | 104,2: Sanación potente + Castigo ardiente + Escudo ligero + Renovar duradero (68 / 0 / 0 / 11 / 25) |
+
+(Puntas: mono / área / control / movilidad / armadura.) Las más débiles con mejoras eligen las que el pentagrama no ve (Golpe
+ágil, Grito lejano, Bloqueo ligero, Escudo ligero, Renovar duradero) o las que cambian una punta por otra (Parpadeo reparador,
+Golpe desafiante): son las que más valor dejan fuera de la cuenta, no malas elecciones. Con las mejoras, la build más cargada de
+cada clase sube 8–19 puntos sobre la de §HU-106 y se queda a 2,5 puntos o más de 187,5.
+
+### Del nivel 8 al 10 (hechizos aprendidos a cada nivel)
+
+| Nv | Pícaro: hechizo máx. · build máx. · puntas por encima | Mago | Guerrero | Sacerdote |
+|---|---|---|---|---|
+| 8 | 38,1 (Paso fugaz) · 171,8 · ninguna | 39,6 (Hielo eterno) · 162,6 · **mono 45,8 de 45** | 30,9 (Carga lejana) · 186,4 · ninguna | 39,9 (Pulso radiante) · 165,2 · **mono 88,0 de 85** |
+| 9 | 38,1 (Paso fugaz) · 178,9 · ninguna | 39,4 (Hielo eterno) · 157,6 · ninguna | 30,9 (Carga lejana) · 185,6 · ninguna | 39,4 (Sendero ancho) · 170,5 · ninguna |
+| 10 | 38,1 (Paso fugaz) · 177,6 · ninguna | 39,2 (Hielo eterno) · 153,3 · ninguna | 30,9 (Carga lejana) · 185,0 · ninguna | 38,5 (Sendero ancho) · 164,2 · ninguna |
+
+Al nivel 8 el segundo rango llega con el equipo del 7 y los hechizos de `base` alto valen más que al 10 (§HU-106, Rangos): sin
+mejoras, la build con más mono ya llega a 39,6 de 45 en el Mago y a 73,0 de 85 en el Sacerdote. Con las mejoras que suben el mono
+pasan de su valor de la clase al 8 (Mago con Llama rápida, Lanza de hielo y Estallido rápido; Sacerdote con Sanación rápida,
+Escudo grueso y Renovar intenso); al 9 y al 10 no. Ver §Desviaciones 1.
+
+### XP por hora en solitario (suavizado de `phase2.py`, normal de cada nivel)
+Cada clase con su mejor equipo de `phase2.FARM_KITS` y, en cada hechizo, la mejora que más XP por hora le da.
+
+| Nv | Monstruo | Pícaro | Mago | Guerrero | Sacerdote | Diferencia con mejoras | Sin mejoras (§HU-106) |
+|---|---|---|---|---|---|---|---|
+| 8 | Sapo gigante | 5 402 (+3,0 %) | 4 425 (+3,7 %) | 4 748 (+5,1 %) | 5 084 (+8,7 %) | 18 % | 19 % |
+| 9 | Hombre lagarto | 6 129 (+2,6 %) | 5 151 (+3,7 %) | 5 231 (+0,0 %) | 5 802 (+11,0 %) | 16 % | 17 % |
+| 10 | Esqueleto de raíces | 6 574 (+1,4 %) | 5 907 (+4,0 %) | 5 972 (+4,2 %) | 6 523 (+10,5 %) | 10 % | 12 % |
+
+- **Las mejoras no agravan la diferencia** (baja 1–2 puntos): el Pícaro, el que más farmea, gana lo menos (+1–3 %: Remate rápido
+  solo cuenta en peleas de más de 10 s y Filo afilado es +15 % de un golpe). El Guerrero al 9 da +0,0 % porque con Tajo amplio el
+  tiempo para matar no cambia con +15 % de daño (el modelo va a saltos); al 8 y al 10, +4–5 %.
+- **Castigo es lo que más mueve la XP por hora del Sacerdote** (+9–11 % con Castigo ardiente). Sin el coste de maná, Castigo
+  rápido daba +13–19 % y dejaba al Sacerdote primero al 9 y al 10; con +3 de maná, +3,5–10 %.
+
+### Validación y formas
+- `ContentValidator`: 0 errores (el aviso de Cono de frío, nivel 11, ya estaba); con `world.currentPhase` en 2, en una copia del
+  contenido, igual. Ninguna mejora deja un instantáneo con menos de 2 s de recarga (las que la acortan la dejan en 8,5 s o más),
+  un área de daño sin casteo que no se pueda esquivar (Tajo ancho queda en un cono de radio 3, el tope de
+  `instantConeMaxRadiusTiles`, y 120°; Abanico, 3 × 80°) ni un aura beneficiosa añadida más larga que la recarga (Gubia evasiva:
+  Impulso, 3 s, en una recarga de 25 s).
+- **Áreas más grandes** (secundarios tocados de 3 con el grupo disperso, sin mejora → con ella): Tajo ancho 1,2 → 1,8; Torbellino
+  amplio 1,7 → 2,1; Abanico 1,0 → 1,4; Campo amplio 1,4 → 2,2; Sendero ancho 1,6 → 2,1. Estallido y Pulso ya tocan casi todo
+  (2,9 y 3,0 de 3): por eso ninguna mejora suya es de radio.
+
+### Parejas que se potencian o no se suman (el modelo suma y no las ve)
+- **Velocidades:** Gubia evasiva, Impulso largo y Carrera no se suman (ADR-022, manda la más fuerte); el modelo cuenta 84 de
+  movilidad para el Pícaro y en partida es menos.
+- **Emboscada + Remate rápido:** el +60 % de daño dura 4,5 s y cubre Eviscerar y un Golpe siniestro más: la apertura del Pícaro en
+  duelo (HU-119).
+- **Hielo eterno (3,5 s de raíz) con Campo ardiente o Estallido rápido:** más tiempo dentro del área.
+- **Carga aplastante (2 s) con Torbellino feroz o Tajo profundo.**
+- **Golpe ágil y Bloqueo ligero liberan recurso** (200 de energía o 50 de ira por minuto) para los otros tres hechizos: el modelo
+  mide cada hechizo solo y no lo ve.
+- **Sanación rápida + Escudo grueso + Renovar intenso sobre el tanque:** el Sacerdote cura más por segundo (HU-117, jefe).
+- **Pulso cegador + Sendero cegador:** el control del Sacerdote, en su tope (25).
+
+### Lo que no se midió
+- **Duelos** (HU-119 CA3): las mejoras de control mueven el triángulo. Gubia profunda (2,5 s) y Corte en seco (otra interrupción)
+  van a favor del favorito en Pícaro > Mago (67 % al nivel 6); Frío profundo (5 s de ralentización) y Hielo eterno (3,5 s de raíz),
+  en Mago > Guerrero (68 %); Carga aplastante (2 s), del Guerrero contra el Mago; Pulso y Sendero cegadores, del Sacerdote contra
+  el control.
+- **El jefe y los élites** con las mejoras de cura (HU-117).
+- **El equipo real de HU-110:** todo usa `gear_factor`, como §HU-106.
+
+### Desviaciones y propuestas (no aplicadas)
+1. **Al nivel 8, el mono del Mago (45,8 de 45) y del Sacerdote (88,0 de 85) pasan de su valor de la clase** con las mejoras que
+   suben el mono de Bola de fuego, Descarga y Estallido, y de Sanar, Escudo y Renovar; al 9 y al 10 se cumple. La causa es el rango
+   del nivel 8 con el equipo del 7 (sin mejoras ya están al 88 % y al 86 %). Propongo dejarlo: el nivel de la Fase 2 es el 10 y al
+   9 ya cumple.
+   Si la regla tiene que cumplirse también al 8, esto lo deja en 44,6 y 83,4 (y el 10 en 41,4 y 73,5), a costa de dos mejoras que
+   pasan a sumar +2:
+   ```json
+   { "id": "mage_frostbolt", "upgrades": [{ "id": "frostbolt_reach", "name": "Descarga lejana", "description": "+3 casillas de alcance.",
+       "mods": [{ "stat": "range", "add": 3 }] }] },
+   { "id": "priest_power_shield", "upgrades": [{ "id": "shield_thick", "description": "Absorbe un 10 % más.",
+       "mods": [{ "aura": "priest_power_shield_aura", "stat": "amount", "mult": 1.1 }] }] },
+   { "id": "priest_renew", "upgrades": [{ "id": "renew_strong", "description": "+10 % de cura por pulso; dura 3 s menos.",
+       "mods": [{ "aura": "priest_renew_hot", "stat": "amount", "mult": 1.1 }, { "aura": "priest_renew_hot", "stat": "durationMs", "add": -3000 }] }] }
+   ```
+   (sustituyen a Lanza de hielo, Escudo grueso y Renovar intenso; las otras mejoras de esos hechizos no cambian).
+2. **XP por hora:** sigue la desviación de §HU-106 al 8 y al 9 (18 % y 16 %, antes 19 % y 17 %; objetivo ≤ 15 %). Las mejoras no
+   la agravan; sin propuesta nueva (HU-119).
+3. **Observación de método:** el pentagrama de 30 s exactos va a saltos con las recargas y los casteos (decisión 2). Para la pasada
+   de HU-119 conviene medir también los hechizos sin mejora con las ventanas de 24–36 s.

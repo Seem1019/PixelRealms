@@ -11,8 +11,8 @@ namespace PixelRealms.Server.Tests.Net;
 
 /// <summary>
 /// HU-104: `ChooseSpellUpgrade` elige la mejora por la red, el servidor responde con `SpellUpgradesUpdate`, se guarda con el
-/// personaje y vuelve en el `Welcome`; `LevelUp` avisa al llegar al nivel 8. Con mejoras de prueba en Bola de fuego y la Fase 2
-/// abierta (el contenido real aún no tiene mejoras: HU-107).
+/// personaje y vuelve en el `Welcome`; `LevelUp` avisa al llegar al nivel 8. Con mejoras de prueba en Bola de fuego (en lugar de
+/// las del contenido, HU-107) y la Fase 2 abierta.
 /// </summary>
 public sealed class SpellUpgradeNetTests
 {

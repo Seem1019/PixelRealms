@@ -2,8 +2,8 @@
 
 > Estructura aprobada el 2026-09-30 (ADR-020). `content/spells.json` y `content/auras.json` tienen estos 32 hechizos y sus
 > auras. Los 16 de la Fase 1 (niveles 1–5) y los 8 de la Fase 2 (niveles 7 y 9, HU-106) tienen **números medidos**
-> (`"provisional": false`, ver [balance-report.md](balance-report.md)); los 8 de la Fase 3 están escalados a la misma escala
-> pero siguen **provisionales** (`"provisional": true`) hasta su pasada de balance.
+> (`"provisional": false`, ver [balance-report.md](balance-report.md)) y sus **mejoras 1-de-2** (HU-107, §Mejoras); los 8 de
+> la Fase 3 están escalados a la misma escala pero siguen **provisionales** (`"provisional": true`) hasta su pasada de balance.
 
 ## Pentagrama
 Cada clase se define por 5 puntas, iguales para todas. En el Sacerdote, sus curas ocupan mono-objetivo y área; un hechizo
@@ -138,6 +138,71 @@ radio 3 sin casteo (ADR-027 D4).
 **Sale del kit anterior:** Desgarrar, Escudo de maná, Rezo de sanación (lo reemplaza Pulso sagrado) y Hoja envenenada
 (pasa a ser Veneno debilitante).
 
+## Mejoras 1-de-2 (HU-107)
+Cada hechizo de los niveles 1 a 9 tiene dos mejoras (`upgrades` en `content/spells.json`); se elige una desde el nivel 8 y se
+cambia gratis fuera de combate (ADR-027 D1). Los de los niveles 11 y 13 las reciben en la Fase 3. Las dos de un hechizo cambian
+cosas distintas y ninguna es mejor en todo: o suben puntas distintas del pentagrama, o suben la misma y una gana en lo que el
+pentagrama no mide (recurso, alcance, valor de un lanzamiento, área con enemigos dispersos). Medidas y builds en
+[balance-report.md](balance-report.md) §HU-107.
+
+| Clase | Hechizo | Mejora A | Mejora B |
+|---|---|---|---|
+| Pícaro | Golpe siniestro | Filo afilado: +15 % de daño | Golpe ágil: −10 de energía |
+| | Gubia | Gubia profunda: aturde 0,5 s más | Gubia evasiva: +25 % de velocidad 3 s |
+| | Paso sombrío | Paso fugaz: recarga −1 s | Emboscada: el +60 % de daño dura 1,5 s más |
+| | Carrera | Carrera larga: dura 2 s más | Huida: recarga −20 s, dura 4 s menos |
+| | Eviscerar | Remate rápido: recarga −4 s | Corte en seco: además interrumpe |
+| | Cuchillas arrojadizas | Abanico: +30° de apertura | Impulso largo: la velocidad dura 1 s más |
+| Mago | Bola de fuego | Llama rápida: casteo −0,2 s | Llama intensa: +8 % de daño |
+| | Descarga de escarcha | Frío profundo: ralentiza 1 s más | Lanza de hielo: +20 % de daño |
+| | Nova de escarcha | Hielo eterno: raíz 0,5 s más | Nova cortante: el doble de daño |
+| | Estallido de llamas | Estallido rápido: casteo −0,5 s | Estallido intenso: +20 % de daño, +5 de maná |
+| | Campo ardiente | Campo amplio: radio +0,5 | Campo abrasador: +25 % de daño, recarga +1 s |
+| | Parpadeo | Parpadeo ligero: −6 de maná | Parpadeo reparador: cura 12 + 20 % del poder de hechizo, recarga +5 s |
+| Guerrero | Golpe heroico | Golpe brutal: +25 % de daño | Golpe desafiante: provoca 0,5 s, recarga +3 s |
+| | Provocar | Grito lejano: +3 casillas de alcance | Provocación rápida: recarga −1,5 s |
+| | Carga | Carga lejana: +2 de alcance, recarga +1 s | Carga aplastante: aturde 0,5 s más, recarga +2 s |
+| | Torbellino | Torbellino amplio: radio +0,5 | Torbellino feroz: +15 % de daño |
+| | Bloqueo con escudo | Muro de escudo: dura 2 s más, recarga +4 s | Bloqueo ligero: no gasta ira |
+| | Tajo amplio | Tajo ancho: radio +0,5 (3) y +30° | Tajo profundo: +15 % de daño |
+| Sacerdote | Sanar | Sanación rápida: casteo −0,25 s | Sanación potente: +15 % de cura |
+| | Castigo | Castigo ardiente: +20 % de daño | Castigo rápido: casteo −0,5 s, +3 de maná |
+| | Palabra de poder: Escudo | Escudo grueso: absorbe un 20 % más | Escudo ligero: −6 de maná, +2 de alcance |
+| | Pulso sagrado | Pulso radiante: +15 % de cura, ralentiza 0,5 s menos | Pulso cegador: ralentiza un 40 %, −15 % de cura |
+| | Renovar | Renovar duradero: dura 3 s más (un pulso) | Renovar intenso: +20 % por pulso, dura 3 s menos |
+| | Sendero de luz | Sendero ancho: +1 de ancho, −15 % de cura | Sendero cegador: ralentiza 0,5 s más, la velocidad 0,5 s menos |
+
+**Lo que limita cada clase al nivel 10** (builds de 4 hechizos con mejoras frente a 187,5 y al valor de la clase):
+- **Guerrero:** su combinación más cargada ya sumaba 177 sin mejoras; Provocar, Carga, Torbellino y Bloqueo suben poco o
+  cambian una cosa por otra (la armadura llega a 89,6 de 90 con Muro de escudo). Máximo con mejoras: 185.
+- **Mago:** Parpadeo ya está en la movilidad de la clase (20 de 20): sus mejoras no dan movilidad (una cambia 5 de movilidad
+  por armadura). Bola de fuego y Descarga comparten el mono, que llega a 43 de 45.
+- **Pícaro:** la movilidad llega a 84 de 85 con Gubia evasiva, Paso fugaz, Huida e Impulso largo (el modelo suma velocidades
+  que en el juego no se suman: manda la más fuerte). El área, a 12 de 15 con Abanico.
+- **Sacerdote:** el control llega a 25 de 25 con Pulso cegador y Sendero cegador; Sendero cede velocidad para ralentizar más.
+
+**Ideas que no entraron: necesitan un modificador que HU-104 no tiene** (criterio 4, pilar 6):
+- **Provocar +1 s** (ejemplo de la HU): la duración es un campo del efecto `taunt`, y el modificador de efecto solo escala
+  `damage`, `heal` y `restore_resource`. Entró la recarga en su lugar.
+- **Parpadeo más largo o con dos cargas:** la distancia es `maxRange` del efecto `leap` (cambiar el `range` del hechizo no la
+  mueve) y no hay cargas. Con la movilidad del Mago ya en su tope, tampoco cabía en la punta.
+- **Cambiar la fuerza de un aura de modificadores** (Bloqueo −60 %, Carrera +70 %, Paso sombrío +80 % de daño, más velocidad
+  en Escudo o Sendero): `pct` solo cambia la ralentización (`slow.pct`); `mods.damageTakenPct`, `damageDonePct` y `speedPct` no
+  se pueden tocar. Entraron duración y recarga.
+- **Ajustar un aura que añade la mejora** (p. ej. un Golpe bajo que ralentice un 30 % con la ralentización de Paso sombrío):
+  el validador solo deja modificar auras que el hechizo ya aplica; un aura añadida llega con sus números.
+- **Cambiar la forma o los objetivos:** Bola de fuego que salpica a los cercanos, Provocar en área, Golpe heroico a dos
+  objetivos, Nova de escarcha lanzada a distancia. Necesitan un modificador de `targeting` o de forma.
+
+**Descartadas por números** (cabían en HU-104, pero rompían un límite o pesaban mucho más que la otra mejora):
+- **Renovar cura al instante un 30 %** (ejemplo de la HU): con recarga de 3 s es una cura directa que se repite; Renovar
+  pasaba de 20 a 49 puntos (máximo 40) y el mono del Sacerdote a 102 de 85.
+- **Bola de fuego −0,5 s de casteo / +20 % de daño** (ejemplo de la HU): +11,5 y +7 de mono; el Mago llegaba a 51 de 45.
+- **Castigo −0,5 s de casteo sin más coste:** +13–19 % de XP por hora del Sacerdote; con +3 de maná se queda en +3,5–10 %.
+- **Golpe heroico que provoca 1 s:** +12,5 de control frente a +2 de Golpe brutal; con 0,5 s las dos pesan parecido.
+- **Ideas con auras nuevas** (contenido, no motor; fuera de esta HU): escudo de maná propio en Parpadeo, quemadura en el tiempo
+  en Bola de fuego o Campo ardiente, sangrado en Golpe siniestro.
+
 ## Auras del kit (ADR-021)
 - **Reutilizadas (9):** Cargado, Gubia, Veneno, Carrera, Helado (Descarga de escarcha y Cono de frío), Congelado (Nova),
   Bloqueo con escudo, Renovar y Escudo sagrado.
@@ -146,6 +211,8 @@ radio 3 sin casteo (ADR-027 D4).
   poderoso; velocidad de Palabra de poder: Escudo; ralentización de Pulso sagrado; velocidad y
   ralentización de Sendero de luz; cura en el tiempo de Himno.
 - **Se quedan para items y monstruos:** Comiendo (Pan), Latigazo y Enfurecido (Capataz), Congelado (Rey Liche, Tier 3).
+- **Mejoras (HU-107):** sin auras nuevas. Gubia evasiva reutiliza Impulso (Cuchillas arrojadizas); las demás cambian la duración,
+  la fuerza o el porcentaje de las auras de su propio hechizo (una copia por mejora, con el mismo id).
 - **Eliminadas:** Desgarro, Escudo de maná y la ralentización de Castigo (su control pasa a Pulso sagrado).
 - Paso sombrío da "+daño durante 3 s" en lugar de "el siguiente golpe" para no añadir una mecánica de consumir la carga.
 - Torbellino no tiene todavía un mecanismo de "mucha amenaza": hoy genera amenaza solo por su daño.

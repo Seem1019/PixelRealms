@@ -214,7 +214,7 @@
 
 ### HU-107 · Mejoras de los hechizos
 **Como** jugador **quiero** que cada hechizo tenga dos mejoras con sentido **para** elegir entre estilos (más daño o más control, más alcance o menos recarga).
-- Prioridad: Must · Estimación: M · Estado: Pendiente
+- Prioridad: Must · Estimación: M · Estado: Hecha
 - Dependencias: HU-104, HU-106
 - Skills: `game-content` (subagente `content-designer`)
 
@@ -227,6 +227,14 @@
 **Notas técnicas**
 - Ejemplos orientativos: Bola de fuego (−0,5 s de casteo / +20 % de daño); Provocar (+1 s / +3 tiles de alcance); Renovar (+2 s / cura al instante un 30 % del total).
 - Los hechizos de los niveles 11 y 13 reciben sus mejoras en la Fase 3.
+
+**Notas de implementación**
+- Contenido: 48 mejoras (2 por hechizo) en los 24 hechizos de clase de los niveles 1 a 9, solo con los cuatro modificadores de HU-104 y sin auras nuevas (Gubia evasiva reutiliza Impulso). Nombres de 18 caracteres como mucho y descripción con el número.
+- Modelo nuevo `tools/balance/upgrades.py`: aplica las mejoras como `SpellUpgrades.Apply` (lo comprueba con los 7 casos de `shared/test-vectors/spell_upgrades.json`) y mide cada una como diferencia media en ventanas de 24 a 36 s, porque con 30 s fijos una recarga algo más corta daba 0 o un lanzamiento entero. Al nivel 10, las 1 215 builds de cada clase cumplen la regla 40/75 y el valor de la clase en cada punta (máximo de 187,5: Pícaro 177,6, Mago 153,3, Guerrero 185,0, Sacerdote 164,2). Informe, con la build más fuerte y la más débil de cada clase, en `balance-report.md` §HU-107.
+- Ninguna pareja queda dominada contando lo que el pentagrama no mide; en 7 parejas una mejora es igual o mejor en las 5 puntas y la otra gana fuera (recurso, alcance, valor por lanzamiento).
+- Desviación que se deja así (propuesta): al nivel 8 el Mago llega a 45,8 de 45 en mono y el Sacerdote a 88 de 85; en los niveles 9 y 10 cumplen. El informe trae la alternativa que también lo cumple al 8. La XP por hora entre clases queda en 18/16/10 % en los niveles 8/9/10 (19/17/12 % sin mejoras): las mejoras no la agravan; sigue para HU-119.
+- Lo que necesitaría modificadores nuevos (duración de Provocar, distancia de Parpadeo, `pct` de auras que no son ralentización, formas u objetivos nuevos) queda anotado en `class-kits.md` §Mejoras 1-de-2.
+- Tests: `SpellUpgradeTests` y `test_spell_upgrade_book.gd` conviven con las mejoras reales (el test de GUT ya no deja el contenido sin ellas al terminar) y `PlayerMapperTests` topa la recarga guardada con `LongestCooldownMs`, como el servidor.
 
 ---
 
@@ -304,7 +312,7 @@
 
 ### HU-111 · Mapa del Bosque: Linde y Pantano
 **Como** jugador **quiero** un Bosque con dos zonas para subir del 6 al 10 **para** tener un sitio nuevo que explorar después de la Mina.
-- Prioridad: Must · Estimación: L · Estado: Pendiente
+- Prioridad: Must · Estimación: L · Estado: Hecha
 - Dependencias: HU-108, HU-109, HU-110
 - Skills: `world-maps`
 
@@ -318,6 +326,14 @@
 **Notas técnicas**
 - Generador determinista como `gen_tier1_maps.py`. Regenerar el Tier 1 deja `meadow.tmj` con cambios de fin de línea: se restaura con `git checkout`.
 - Densidad: un spawn cada ~8×8 tiles en las zonas de farmeo (skill `world-maps`).
+
+**Notas de implementación**
+- `tools/maps/gen_tier2_maps.py` genera `maps/forest.tmj` (214×104, `biome: forest`) de forma determinista y reutiliza el generador del Tier 1. Su `--check` valida conectividad, bordes sólidos, el paso como único cruce, que la fogata más cercana a cada casilla sea la de su zona, aggro sin solapes ni sobre el sendero de llegada, subniveles y tiempos de cruce.
+- Linde del Bosque (6–8) y Pantano (8–10), separados por una cresta con un paso de 4 casillas. Por el sendero de 3 casillas se tarda 36 s y 32 s en cruzarlos (26 s campo a través). Referencias: el Árbol Madre y la Torre hundida. Dos campamentos por monstruo, con subniveles de oeste a este. Élites: el Oso viejo en una guarida con un solo ramal y la Bruja del pantano dentro de la Torre hundida, que es a la vez referencia y rama lateral porque no cabían por separado sin solapar aggros.
+- Puntos seguros: el campamento de Brena (`forest_camp`) y el Refugio del Pantano. Desde cualquier casilla de cada zona, la fogata más cercana (`NearestGraveyard`) es la suya.
+- Conexiones: portal de vuelta a la Sala 3 de la Mina, en (85,25). La ida desde la Mina, con `minPhase`, es HU-112 y debe dejar en (12,29); hasta entonces el Bosque no es accesible jugando. Sitios reservados, sin mecánica: la boca de la Cripta (portal en (206,73), llegada en (201,74); HU-115) y el lado alto del puente (tablero en (8,88), manivela en (15,86); HU-113).
+- Cliente: el Bosque se hornea en frío en 0,69–0,75 s (la Pradera, 0,84–0,95 s). `client/tools/bake_map.gd` hornea cualquier mapa a PNG; la captura está en `docs/screenshots/tier2/forest.png`.
+- Tests: `TiledMapLoaderTests` (el Bosque con CA1–CA4, bordes sólidos de los tres mapas y flood-fill) y GUT `test_terrain_biomes.gd`. Para HU-119 queda medir si bastan 12–14 monstruos por tipo (en el Tier 1 hay más de 20).
 
 ---
 

@@ -13,8 +13,9 @@ using Xunit;
 namespace PixelRealms.Game.Tests.Progression;
 
 /// <summary>
-/// HU-104 (ADR-027 D1): mejoras 1-de-2 por hechizo. El contenido real aún no tiene mejoras (HU-107): estos tests cargan una copia
-/// con mejoras de prueba en Bola de fuego, Descarga de escarcha y Tajo amplio, y la Fase 2 abierta (tope 10).
+/// HU-104 (ADR-027 D1): mejoras 1-de-2 por hechizo. Estos tests cargan una copia del contenido con la Fase 2 abierta (tope 10) en
+/// la que Bola de fuego, Descarga de escarcha y Tajo amplio llevan mejoras de prueba en lugar de las suyas (HU-107) y Nova de
+/// escarcha se queda sin mejoras; los demás hechizos llevan las del contenido.
 /// </summary>
 public sealed class SpellUpgradeTests
 {
@@ -47,6 +48,7 @@ public sealed class SpellUpgradeTests
                 _ => null,
             };
             if (ups is not null) s["upgrades"] = ups;
+            if (id == "mage_frost_nova") s.AsObject().Remove("upgrades"); // un hechizo sin mejoras para los casos que lo necesitan
         }
     }
 
@@ -233,7 +235,8 @@ public sealed class SpellUpgradeTests
         var ana = w.Player("Ana");
         var ctx = w.Begin();
         w.Combat.Progression.SetLevel(ana, 8, w.Map, ctx);
-        ctx.Events.OfType<LevelUpEvent>().Single().UpgradesUnlocked.ShouldBe([]); // el guerrero aún no tiene hechizos con mejoras
+        ctx.Events.OfType<LevelUpEvent>().Single().UpgradesUnlocked!.ShouldBe( // todos los que conoce tienen mejoras (HU-107)
+            ["warrior_heroic_strike", "warrior_taunt", "warrior_charge", "warrior_whirlwind", "warrior_shield_block"], ignoreOrder: true);
         ctx = w.Begin();
         w.Combat.Progression.SetLevel(ana, 9, w.Map, ctx);
         ctx.Events.OfType<LevelUpEvent>().Single().UpgradesUnlocked.ShouldBe(["warrior_cleave"]); // Tajo amplio se aprende en el 9
@@ -241,7 +244,8 @@ public sealed class SpellUpgradeTests
         var mage = Arena("mage", 7);
         ctx = mage.Begin();
         mage.Combat.Progression.SetLevel(mage.Player("Ana"), 8, mage.Map, ctx);
-        ctx.Events.OfType<LevelUpEvent>().Single().UpgradesUnlocked!.ShouldBe(["mage_fireball", "mage_frostbolt"], ignoreOrder: true);
+        ctx.Events.OfType<LevelUpEvent>().Single().UpgradesUnlocked!.ShouldBe( // Nova de escarcha no: en esta copia no tiene mejoras
+            ["mage_fireball", "mage_frostbolt", "mage_flame_burst", "mage_burning_field"], ignoreOrder: true);
     }
 
     [Fact]
