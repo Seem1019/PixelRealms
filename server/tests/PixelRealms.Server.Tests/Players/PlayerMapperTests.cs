@@ -70,7 +70,8 @@ public sealed class PlayerMapperTests
 
         var p = mapper.ToPlayer(dto, new EntityId(1));
 
-        p.Combat.CooldownEndsAtMs.ShouldHaveSingleItem().ShouldBe(new KeyValuePair<string, long>(spell.Id, 1_000 + spell.CooldownMs));
+        // Tope: la recarga más larga entre el hechizo y sus mejoras (revisión de autoridad de HU-104; desde HU-107 alguna la alarga).
+        p.Combat.CooldownEndsAtMs.ShouldHaveSingleItem().ShouldBe(new KeyValuePair<string, long>(spell.Id, 1_000 + content.LongestCooldownMs(spell)));
         p.ItemCooldownEndsAtMs.ShouldBeEmpty(); // un kind desconocido no se trata como item
     }
 
