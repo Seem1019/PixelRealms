@@ -1,12 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
+using PixelRealms.Game.Core;
+using PixelRealms.Game.Portals;
 using PixelRealms.Server.Hosting;
+using PixelRealms.Server.Players;
 using PixelRealms.Server.Tests.Helpers;
 using Shouldly;
 using Xunit;
 
 namespace PixelRealms.Server.Tests.Net;
 
-/// <summary>HU-027: portales y cambio de mapa de extremo a extremo.</summary>
+/// <summary>HU-027: portales y cambio de mapa de extremo a extremo; HU-112: la salida de la Mina al Bosque, cerrada por fase.</summary>
 public sealed class PortalTests
 {
     /// <summary>Mueve el portal `to_mine` de meadow sobre el cementerio de la aldea (donde aparecen los personajes nuevos).</summary>
@@ -105,6 +108,121 @@ public sealed class PortalTests
             (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("out_of_range");
             await ana.SendAsync("UsePortal", """{"portalId":"nope"}""");
             (await ana.ExpectAsync("Error")).GetProperty("code").GetString().ShouldBe("not_found");
+            await ana.DisposeAsync();
+        }
+    }
+
+    /// <summary>HU-112: los personajes nuevos empiezan en la entrada de la Mina; `phase` = `rules.world.currentPhase`.</summary>
+    private static PatchedContent StartInTheMine(int phase) => PatchedContent.WithRules(r =>
+    {
+        r["world"]!["startMapId"] = "mine";
+        r["world"]!["currentPhase"] = phase;
+    });
+
+    /// <summary>Pone al jugador en el centro del portal, en el hilo del tick (regla 2): lo pisa en ese mismo tick.</summary>
+    private static Task StepOnPortal(TestServer server, int selfId, string portalId) => server.RunOnTickAsync(_ =>
+    {
+        var player = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId);
+        var portal = server.Services.GetRequiredService<World>().GetInstance(player.MapInstanceId)!.Data.Portals.First(p => p.PortalId == portalId);
+        player.Position = portal.Position + portal.Size * 0.5f;
+    });
+
+    [Fact]
+    public async Task MineExit_Phase1_DoesNotCross_AndWarnsOnceThatTheCollapseBlocksIt() // HU-112 CA2
+    {
+        using var content = StartInTheMine(phase: 1);
+        await using var server = await TestServer.StartAsync(content.Settings);
+        var (api, _, ana) = await Enter(server, "ana", "Ana", "warrior");
+        using (api)
+        {
+            var welcome = await ana.ExpectAsync("Welcome");
+            welcome.GetProperty("mapId").GetString().ShouldBe("mine");
+            await StepOnPortal(server, welcome.GetProperty("selfId").GetInt32(), "mine_to_forest");
+            var err = await ana.ExpectAsync("Error");
+            err.GetProperty("code").GetString().ShouldBe("portal_locked");
+            err.GetProperty("message").GetString().ShouldBe("El derrumbe aún bloquea el paso");
+            await Should.ThrowAsync<TimeoutException>(() => ana.ExpectAsync("Error", 400)); // sin spam mientras sigue encima
+            await Should.ThrowAsync<TimeoutException>(() => ana.ExpectAsync("ChangeMap", 100));
+            await ana.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MineExit_Phase2_GoesToTheForestEdge_AndTheWayBackLeadsToRoom3() // HU-112 CA1
+    {
+        using var content = StartInTheMine(phase: 2);
+        await using var server = await TestServer.StartAsync(content.Settings);
+        var (api, _, ana) = await Enter(server, "ana", "Ana", "warrior");
+        using (api)
+        {
+            var selfId = (await ana.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
+            await StepOnPortal(server, selfId, "mine_to_forest");
+            var change = await ana.ExpectAsync("ChangeMap");
+            change.GetProperty("mapId").GetString().ShouldBe("forest");
+            change.GetProperty("x").GetSingle().ShouldBe(12 * 16f); // MINE_ARRIVAL del Linde
+            change.GetProperty("y").GetSingle().ShouldBe(29 * 16f);
+
+            await StepOnPortal(server, selfId, "forest_to_mine");
+            var back = await ana.ExpectAsync("ChangeMap");
+            back.GetProperty("mapId").GetString().ShouldBe("mine");
+            var at = new Vec2(back.GetProperty("x").GetSingle() / 16f, back.GetProperty("y").GetSingle() / 16f);
+            var exit = server.Services.GetRequiredService<World>().Maps["mine"].Portals.Single(p => p.PortalId == "mine_to_forest");
+            exit.Contains(at).ShouldBeFalse("no deja encima de la salida");
+            PortalPolicy.DistanceTo(exit, at).ShouldBeLessThanOrEqualTo(1f); // en la Sala 3, junto a la salida
+            // Sigue andando hacia el oeste, como al cruzar el portal del Linde: se aleja de la salida y no rebota al Bosque
+            // (con la caja de los pies metida en una roca, el primer paso la empujaba al revés, encima de la salida).
+            await ana.SendAsync("MoveInput", """{"seq":1,"dx":-1,"dy":0}""");
+            await Should.ThrowAsync<TimeoutException>(() => ana.ExpectAsync("ChangeMap", 400));
+            var x = 0f;
+            await server.RunOnTickAsync(_ => x = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId).Position.X);
+            x.ShouldBeLessThan(at.X);
+            await ana.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MineExit_TargetMapNotLoaded_StaysClosed_EvenInPhase2() // HU-112: la salida de un tier que aún no existe
+    {
+        using var content = StartInTheMine(phase: 2);
+        File.Delete(Path.Combine(content.MapsDir, "forest.tmj"));
+        File.Delete(Path.Combine(content.MapsDir, "crypt.tmj")); // su vuelta al Bosque no lleva minPhase: sin Bosque no cargaría
+        await using var server = await TestServer.StartAsync(content.Settings);
+        var (api, _, ana) = await Enter(server, "ana", "Ana", "warrior");
+        using (api)
+        {
+            var selfId = (await ana.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
+            await StepOnPortal(server, selfId, "mine_to_forest");
+            var err = await ana.ExpectAsync("Error");
+            err.GetProperty("code").GetString().ShouldBe("portal_locked");
+            err.GetProperty("message").GetString().ShouldBe("El derrumbe aún bloquea el paso");
+            await Should.ThrowAsync<TimeoutException>(() => ana.ExpectAsync("ChangeMap", 300));
+            await ana.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ChangingMap_ForgetsItsThreatAndTagInTheMapItLeaves() // revisión de autoridad (HU-117): como al salir del mundo
+    {
+        await using var server = await TestServer.StartAsync();
+        var (api, _, ana) = await Enter(server, "ana", "Ana", "warrior");
+        using (api)
+        {
+            var selfId = (await ana.ExpectAsync("Welcome")).GetProperty("selfId").GetInt32();
+            var player = server.Services.GetRequiredService<PlayerRegistry>().All.First(p => p.Id.Value == selfId);
+            var world = server.Services.GetRequiredService<World>();
+            var transfer = server.Services.GetRequiredService<MapTransferService>();
+            (bool Moved, bool Threat, bool Tagged) after = default;
+            await server.RunOnTickAsync(t =>
+            {
+                var monster = world.GetInstance(player.MapInstanceId)!.Monsters.Values.First();
+                monster.Threat.Add(player.Id, 50);
+                monster.TaggedBy = player.Id;
+                var moved = transfer.Transfer(player, "mine", new Vec2(11, 28), t, "test");
+                after = (moved, monster.Threat.Contains(player.Id), monster.TaggedBy == player.Id);
+            });
+            after.Moved.ShouldBeTrue();
+            after.Threat.ShouldBeFalse("ni el jefe ni sus retoños siguen yendo a por quien ya no está en el mapa");
+            after.Tagged.ShouldBeFalse();
             await ana.DisposeAsync();
         }
     }

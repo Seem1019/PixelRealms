@@ -101,6 +101,14 @@
             "type": "boolean",
             "default": false
           },
+          "threatTarget": {
+            "enum": [
+              "highest",
+              "lowest"
+            ],
+            "default": "highest",
+            "description": "A quién de su tabla de amenaza persigue y pega: highest (el que más tiene, con la regla 110 %/130 %) o lowest (el que menos tiene; cambia cuando el actual llega al 110 %/130 % del que menos; Provocar lo fija igual). HU-117"
+          },
           "spells": {
             "type": "array",
             "items": {

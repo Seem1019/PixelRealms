@@ -101,8 +101,15 @@ public static class TiledMapLoader
                         {
                             var target = op.GetValueOrDefault("targetMapId") as string ?? "";
                             var minLevel = op.TryGetValue("minLevel", out var ml) ? ToInt(ml, 0) : (int?)null;
-                            portals.Add(new PortalDef(op.GetValueOrDefault("portalId") as string ?? oname, target, ToFloat(op.GetValueOrDefault("targetX"), 0), ToFloat(op.GetValueOrDefault("targetY"), 0), minLevel, pos, size));
-                            if (mapExists is not null && !mapExists(target)) errors.Add($"portal '{oname}': targetMapId '{target}' no existe en maps/");
+                            var minPhase = op.TryGetValue("minPhase", out var mp) ? ToInt(mp, 0) : (int?)null;
+                            // Mal escrito (texto, 0) dejaría abierto el paso que separa los tiers: no arranca.
+                            if (minPhase is not null && (mp is not double d || d != Math.Floor(d) || d < 1))
+                                errors.Add($"portal '{oname}': minPhase debe ser un entero ≥ 1 (es '{mp}')");
+                            var lockedText = op.GetValueOrDefault("lockedText") is string { Length: > 0 } lt ? lt : null;
+                            portals.Add(new PortalDef(op.GetValueOrDefault("portalId") as string ?? oname, target, ToFloat(op.GetValueOrDefault("targetX"), 0), ToFloat(op.GetValueOrDefault("targetY"), 0), minLevel, pos, size, minPhase, lockedText));
+                            // HU-112: un portal con `minPhase` puede llevar a un mapa que aún no existe (la salida a un tier de una fase
+                            // futura): queda cerrado y el servidor lo avisa al arrancar (PortalsToMissingMaps).
+                            if (mapExists is not null && !mapExists(target) && minPhase is null) errors.Add($"portal '{oname}': targetMapId '{target}' no existe en maps/ (solo se admite con minPhase)");
                             break;
                         }
                         case "levers":
@@ -155,6 +162,16 @@ public static class TiledMapLoader
         var files = Directory.GetFiles(mapsDir, "*.tmj").Order().ToList();
         var ids = files.Select(f => Path.GetFileNameWithoutExtension(f)).ToHashSet(StringComparer.Ordinal);
         return files.Select(f => Load(f, content, ids.Contains)).ToList();
+    }
+
+    /// <summary>
+    /// Portales cuyo mapa de destino no está entre los cargados (HU-112). El cargador solo los admite con `minPhase`; en juego
+    /// están cerrados aunque la fase lo permita, y el servidor los avisa al arrancar.
+    /// </summary>
+    public static IReadOnlyList<(MapData Map, PortalDef Portal)> PortalsToMissingMaps(IReadOnlyList<MapData> maps)
+    {
+        var ids = maps.Select(m => m.MapId).ToHashSet(StringComparer.Ordinal);
+        return maps.SelectMany(m => m.Portals.Where(p => !ids.Contains(p.TargetMapId)).Select(p => (m, p))).ToList();
     }
 
     private static bool RectHasFreeTile(CollisionGrid grid, SpawnDef s)

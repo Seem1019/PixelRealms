@@ -39,6 +39,8 @@ public enum Stat { Str, Agi, Int }
 
 public enum MonsterSpellTarget { Current, RandomNotTopThreat, Self }
 
+public enum ThreatTarget { Highest, Lowest }
+
 public enum LootOwnerMode { RandomPerItem, FreeForAll }
 
 public enum GoldSplit { Equal, ToLooter }

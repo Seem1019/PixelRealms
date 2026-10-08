@@ -35,6 +35,7 @@ const TEXTS := {
 	"bag_full": "Bolsa llena",
 	"not_enough_gold": "No tienes suficiente oro",
 	"level_too_low": "Nivel insuficiente",
+	"portal_locked": "El paso sigue cerrado",
 	"not_owner": "Ese botín no es tuyo",
 	"in_combat": "No puedes hacer eso en combate",
 	"pvp_not_allowed": "PvP no permitido aquí",

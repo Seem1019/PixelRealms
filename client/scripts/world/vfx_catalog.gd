@@ -21,6 +21,9 @@ const ELEMENT_BY_SPELL := {
 	"priest_desperate_prayer": "holy",
 	"rogue_crippling_poison": "nature",
 	"rogue_shadowstep": "shadow",
+	"rotten_tree_roots": "nature",
+	"rotten_tree_spores": "nature",
+	"rotten_tree_saplings": "nature",
 	"lich_frost_nova": "frost",
 	"lich_shadow_bolt": "shadow",
 }

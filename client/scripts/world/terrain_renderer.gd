@@ -12,7 +12,7 @@ var baked: bool = false
 func setup(tmj: TmjMap, layers_to_draw: Array[String]) -> void:
 	for c: Node in get_children():
 		c.queue_free()
-	var result := TerrainBaker.bake(tmj)
+	var result := TerrainBaker.bake(tmj, int(Content.rule("world", "currentPhase", 1)))
 	if result.is_empty():
 		baked = false
 		super.setup(tmj, layers_to_draw)

@@ -61,6 +61,21 @@ func test_a_renewed_welcome_that_revives_counts_as_a_respawn() -> void:
 	assert_signal_emitted(GameState, "respawned")
 
 
+## HU-112: al pisar la salida cerrada de la Mina, el aviso del servidor sale en el HUD; sin texto, uno genérico.
+func test_a_closed_exit_shows_the_server_notice() -> void:
+	_dispatch("Welcome", {
+		"selfId": 1, "tick": 10, "tickRate": 20, "snapshotRate": 10, "mapId": "mine",
+		"self": {"x": 1392.0, "y": 416.0, "level": 6, "xp": 0, "xpNext": 100, "hp": 80, "maxHp": 100, "res": 0, "maxRes": 100, "resource": "rage", "classId": "warrior", "name": "Ana"},
+		"inventory": [], "equipment": [], "hotbar": [], "knownSpells": [], "rulesHash": "x",
+	})
+	var hud: CombatHud = _world.get("_hud")
+	_dispatch("Error", {"code": "portal_locked", "message": "El derrumbe aún bloquea el paso"})
+	assert_eq((hud.get("_error_label") as Label).text, "El derrumbe aún bloquea el paso")
+	assert_true((hud.get("_toast") as Control).visible)
+	_dispatch("Error", {"code": "portal_locked"})
+	assert_eq((hud.get("_error_label") as Label).text, "El paso sigue cerrado")
+
+
 ## HU-083: el puzle de la Mina avisa de cuántas palancas faltan y de cuándo se abre la puerta.
 func test_mine_puzzle_tells_what_is_missing_and_when_the_door_opens() -> void:
 	_dispatch("Welcome", {

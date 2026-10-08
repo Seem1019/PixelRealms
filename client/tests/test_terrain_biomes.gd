@@ -32,6 +32,25 @@ func test_the_forest_map_uses_the_forest_atlas() -> void:
 	assert_eq(map.graveyards.size(), 2, "una fogata por zona")
 
 
+## HU-115: la Cripta (tools/maps/gen_tier2_maps.py) es una cueva con la paleta verde: se hornea con el atlas de la Cripta y su
+## única fogata está en la entrada, que es zona segura.
+func test_the_crypt_map_uses_the_crypt_palette_atlas() -> void:
+	var map := TmjMap.load_from("res://maps/crypt.tmj")
+	assert_not_null(map, "falta client/maps/crypt.tmj (tools/sync_content.gd)")
+	if map == null:
+		return
+	assert_eq(map.palette, "crypt")
+	assert_eq(map.biome, "")
+	assert_eq(TerrainBaker.atlas_path_for(map), CRYPT)
+	assert_eq(map.graveyards.size(), 1, "una sola fogata")
+	if not map.graveyards.is_empty():
+		assert_true(bool(map.zone_at(map.graveyards[0] / map.tile_size).get("safe", false)), "la fogata está en la entrada segura")
+	var baked: Dictionary = TerrainBaker.bake(map)
+	assert_false(baked.is_empty(), "falta %s" % CRYPT)
+	if not baked.is_empty():
+		assert_eq((baked["ground"] as Image).get_size(), Vector2i(map.width, map.height) * map.tile_size)
+
+
 func test_biome_and_palette_are_read_from_the_map_properties() -> void:
 	var forest := _map_with({"biome": "forest"})
 	assert_eq(forest.biome, "forest")

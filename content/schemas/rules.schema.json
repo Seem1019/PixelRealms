@@ -261,11 +261,12 @@
 
     "ai": {
       "type": "object", "additionalProperties": false,
-      "required": ["perceptionMs", "pathRecalcMs", "pathRecalcMovedTiles", "pathMaxNodes", "wanderPauseMinMs", "wanderPauseMaxMs", "wanderSpeedMult", "arriveToleranceTiles", "rangedThreatThresholdTiles"],
+      "required": ["perceptionMs", "pathRecalcMs", "pathRecalcMovedTiles", "pathMaxNodes", "wanderPauseMinMs", "wanderPauseMaxMs", "wanderSpeedMult", "arriveToleranceTiles", "rangedThreatThresholdTiles", "immobileOutOfReachResetMs"],
       "properties": { "_doc": { "type": "string" }, "perceptionMs": { "type": "integer", "minimum": 50 }, "pathRecalcMs": { "type": "integer", "minimum": 50 },
         "pathRecalcMovedTiles": { "type": "number", "minimum": 0 }, "pathMaxNodes": { "type": "integer", "minimum": 1 }, "wanderPauseMinMs": { "type": "integer", "minimum": 0 },
         "wanderPauseMaxMs": { "type": "integer", "minimum": 0 }, "wanderSpeedMult": { "type": "number", "minimum": 0 }, "arriveToleranceTiles": { "type": "number", "minimum": 0 },
-        "rangedThreatThresholdTiles": { "type": "number", "minimum": 0, "description": "attackRange a partir del cual un monstruo usa threatSwitchRanged (130 %) en vez de threatSwitchMelee (110 %)." } }
+        "rangedThreatThresholdTiles": { "type": "number", "minimum": 0, "description": "attackRange a partir del cual un monstruo usa threatSwitchRanged (130 %) en vez de threatSwitchMelee (110 %)." },
+        "immobileOutOfReachResetMs": { "type": "integer", "minimum": 1000, "description": "Un monstruo inmóvil (speed 0) se reinicia en su sitio (vida completa) cuando acumula este tiempo sin poder pegar con el básico (a ≤ attackRange y a su vista) a nadie de su tabla de amenaza; el tiempo que pasa pegando lo descuenta al mismo ritmo (HU-117)." } }
     },
 
     "world": {

@@ -105,4 +105,77 @@ public sealed class PortalSystemTests
         PortalPolicy.DistanceTo(Portal, new Vec2(13, 11)).ShouldBe(1f);
         PortalPolicy.DistanceTo(Portal, new Vec2(13, 13)).ShouldBe(MathF.Sqrt(2), 0.0001f);
     }
+
+    /// <summary>HU-112: la salida de la Mina al Bosque, cerrada hasta la Fase 2.</summary>
+    private static readonly PortalDef Exit = new("to_forest", "forest", 12, 29, MinLevel: null, new Vec2(10, 10), new Vec2(2, 3), MinPhase: 2, LockedText: "El derrumbe aún bloquea el paso");
+
+    /// <summary>Ana (nivel 6) sobre la salida, con la fase activa dada; `isMapLoaded` null = todos los destinos cargados.</summary>
+    private static TestWorld BuildExit(int phase, Func<string, bool>? isMapLoaded = null)
+    {
+        var data = new MapData("test", "Test", new CollisionGrid(32, 32), [], [], [new GraveyardDef("gy", new Vec2(2, 2))], [], [Exit], "gy");
+        var w = new WorldBuilder().WithMap(data).WithPlayer("Ana", "warrior", 6, (11, 11)).Build();
+        var rules = w.Content.Rules with { World = w.Content.Rules.World with { CurrentPhase = phase } };
+        w.Simulation.Context.RulesProvider = () => rules;
+        w.Simulation.AddSystem(new PortalSystem(isMapLoaded));
+        return w;
+    }
+
+    [Fact]
+    public void MinPhase_AboveTheActivePhase_PortalLocked_Once_UntilLeavingPortal() // HU-112 CA2
+    {
+        var w = BuildExit(phase: 1);
+        var events = TickRunner.Run(w, 5);
+        events.OfType<PortalUsed>().ShouldBeEmpty();
+        events.OfType<PortalRejected>().Single().ErrorCode.ShouldBe(PortalPolicy.PortalLocked);
+        // Sale y vuelve a pisarla: se vuelve a avisar (como con el nivel).
+        w.Player("Ana").Position = new Vec2(20, 20);
+        TickRunner.Run(w, 1);
+        w.Player("Ana").Position = new Vec2(11, 11);
+        TickRunner.Run(w, 1).OfType<PortalRejected>().Single().ErrorCode.ShouldBe(PortalPolicy.PortalLocked);
+
+        var asked = BuildExit(phase: 1);
+        asked.Player("Ana").Position = new Vec2(12.5f, 11); // a menos de 1 casilla, sin pisarla: con UsePortal
+        asked.Player("Ana").RequestedPortalId = "to_forest";
+        var askedEvents = TickRunner.Run(asked, 1);
+        askedEvents.OfType<PortalUsed>().ShouldBeEmpty();
+        askedEvents.OfType<PortalRejected>().Single().ErrorCode.ShouldBe(PortalPolicy.PortalLocked);
+    }
+
+    [Fact]
+    public void MinPhase_Reached_Crosses() // HU-112 CA1
+    {
+        var w = BuildExit(phase: 2);
+        TickRunner.Run(w, 1).OfType<PortalUsed>().Single().Portal.TargetMapId.ShouldBe("forest");
+    }
+
+    [Fact]
+    public void TargetMapNotLoaded_Locked_EvenWhenThePhaseAllowsIt() // HU-112 (HU-115: salida a un tier que aún no existe)
+    {
+        var w = BuildExit(phase: 3, isMapLoaded: id => id != "forest");
+        TickRunner.Run(w, 3).OfType<PortalRejected>().Single().ErrorCode.ShouldBe(PortalPolicy.PortalLocked);
+
+        var asked = BuildExit(phase: 3, isMapLoaded: id => id != "forest");
+        asked.Player("Ana").RequestedPortalId = "to_forest"; // también con UsePortal
+        TickRunner.Run(asked, 1).OfType<PortalRejected>().Single().ErrorCode.ShouldBe(PortalPolicy.PortalLocked);
+    }
+
+    [Fact]
+    public void Check_ClosedPassage_GoesBeforeLevelAndCombat() // HU-112 CA2: el aviso es el del derrumbe, no "en combate"
+    {
+        var w = BuildExit(phase: 1);
+        var ana = w.Player("Ana");
+        var rules = w.Content.Rules with { World = w.Content.Rules.World with { CurrentPhase = 1 } }; // el contenido ya está en Fase 2
+        var phase2 = rules with { World = rules.World with { CurrentPhase = 2 } };
+        var exitWithLevel = Exit with { MinLevel = 8 };
+
+        PortalPolicy.Check(ana, Exit, 0, rules, targetLoaded: true).ShouldBe(PortalPolicy.PortalLocked);
+        PortalPolicy.Check(ana, Exit, 0, phase2, targetLoaded: true).ShouldBeNull();
+        PortalPolicy.Check(ana, Exit, 0, phase2, targetLoaded: false).ShouldBe(PortalPolicy.PortalLocked);
+        PortalPolicy.Check(ana, Portal, 0, rules, targetLoaded: false).ShouldBe(PortalPolicy.PortalLocked); // sin minPhase, también
+        PortalPolicy.Check(ana, exitWithLevel, 0, rules, targetLoaded: true).ShouldBe(PortalPolicy.PortalLocked);
+        PortalPolicy.Check(ana, exitWithLevel, 0, phase2, targetLoaded: true).ShouldBe(PortalPolicy.LevelTooLow);
+        ana.EnterCombat(0);
+        PortalPolicy.Check(ana, Exit, 0, rules, targetLoaded: true).ShouldBe(PortalPolicy.PortalLocked);
+        PortalPolicy.Check(ana, Exit, 0, phase2, targetLoaded: true).ShouldBe(PortalPolicy.InCombat);
+    }
 }

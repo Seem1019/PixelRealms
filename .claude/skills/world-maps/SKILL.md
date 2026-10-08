@@ -20,7 +20,7 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 | `npcs` | objetos | NPCs (vendedores) |
 | `graveyards` | objetos (puntos) | respawn de jugadores |
 | `zones` | objetos (rectángulos) | nombre de zona, `safe=true` (sin combate), rango de niveles |
-| `portals` | objetos | cambio de mapa (MVP: entrada a la Mina; ADR-007) |
+| `portals` | objetos | cambio de mapa (Pradera⇄Mina, Mina⇄Bosque, Bosque⇄Cripta; ADR-007) |
 | `levers` | objetos (puntos) | palancas (HU-083): `leverId`, `doorId` de la puerta que abren; `opensAlone: true` = la abre ella sola (pon una dentro de cada sala que se pueda cerrar) |
 | `doors` | objetos (rectángulos) | puertas (HU-083): `doorId`; cerradas son sólidas y tapan la vista; se abren con todas sus palancas |
 
@@ -30,7 +30,11 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
   Punto = 1 spawn fijo; rectángulo = `count` posiciones aleatorias libres dentro (determinista por seed del mapa).
 - Objeto en `npcs`: `vendorId: string` (en `content/vendors.json`), `name: string`.
 - Objeto en `zones`: `name: string`, `safe: bool`, `minLevel`, `maxLevel`, `landmark: string` (punto de referencia visible).
-- Objeto en `portals`: `portalId`, `targetMapId`, `targetX`, `targetY` (tiles), `minLevel?`. Rectángulo = se activa al pisarlo.
+- Objeto en `portals`: `portalId`, `targetMapId`, `targetX`, `targetY` (tiles), `minLevel?`, `minPhase?` (int), `lockedText?`
+  (string). Rectángulo = se activa al pisarlo. Con `minPhase` (HU-112) está cerrado mientras `rules.world.currentPhase` sea menor:
+  al pisarlo, `Error{portal_locked}` con `lockedText` (por defecto "El paso sigue cerrado"), una vez hasta salir del portal; el
+  cliente lo dibuja con un cartel en vez de la escalera. Es lo que separa los tiers por fase: la salida de la Mina al Bosque
+  (`minPhase: 2`, "El derrumbe aún bloquea el paso") y la de la Cripta al Tier 3 (`minPhase: 3`, HU-115).
 - Objeto en `graveyards`: uno **por zona** (punto seguro: fogata/santuario); `defaultGraveyard` del mapa es el de la aldea.
 - Mapa: `mapId: string`, `displayName: string`, `defaultGraveyard: string`; y para el dibujo (HU-108, solo cliente)
   `biome: string` en exteriores (`meadow`, `forest`) o `palette: string` en cuevas (`mine`, `crypt`). Eligen el atlas de
@@ -45,6 +49,9 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 4. Lee objetos → `SpawnDef`, `NpcDef`, `GraveyardDef`, `ZoneDef`. Coordenadas de objetos en píxeles; los puntos de
    Tiled están en la esquina superior-izquierda del objeto si es rectángulo.
 5. Valida: `monsterId`/`vendorId` existen, spawns no caen en sólido, al menos un cementerio, `targetMapId` de portales existe en `maps/`. Error → no arranca.
+   Excepción (HU-112): un portal con `minPhase` puede llevar a un mapa que aún no existe (la salida a un tier futuro). Carga con
+   un `AVISO` al arrancar (`TiledMapLoader.PortalsToMissingMaps`) y en juego está cerrado aunque la fase ya lo permita. Un
+   `minPhase` que no sea un entero ≥ 1 (p. ej. de tipo string) es error: dejaría abierto el paso.
 5b. Un `MapData` por archivo; el `GameLoop` crea una `MapInstance` por `MapData` al arrancar (ADR-007). `MapInstance.Id` es un int propio, distinto de `mapId`.
 6. Test: `TiledMapLoaderTests` con `maps/test_small.tmj` (10×10) versionado para tests.
 
@@ -65,19 +72,31 @@ Fuente de verdad: `maps/<mapId>.tmj` (Tiled JSON, **no** .tmx). Tilesets externo
 - Cuevas (mapas aparte): 3–5 salas, 5–10 min; sala del jefe en rama lateral; sala élite antes de la salida al tier siguiente.
   Todas comparten las piezas de interior y cambian de paleta con la propiedad `palette` (mina marrón, cripta verde;
   fortaleza gris en la Fase 3): una paleta nueva es una entrada de `CAVE_PALETTES` en `tools/art/gen_tiles.py`, su PNG y
-  su fila en `TerrainBaker.PALETTE_ATLASES`.
+  su fila en `TerrainBaker.PALETTE_ATLASES`. Una sola fogata, en la entrada (zona `safe`): morir dentro deja allí.
+- Monstruos inmóviles (`speed: 0`, plantas trampa): spawn puntual con `count` 1 y `wanderRadius` 0, y su aggro a más de 2
+  casillas de la puerta de su sala para que se vean antes de despertar. Un jefe inmóvil pide una sala amplia y convexa (sin
+  columnas: desde él se ve todo el suelo) con la puerta lejos de su aggro.
 - El pueblo (`safe=true`) debe estar a < 40 tiles de las zonas 1–3.
+- La llegada de cada portal y cada punto seguro deja libre la caja de los pies (10×6 px, `MovementStep`), no solo la casilla:
+  una roca que la toque hace que el primer paso empuje al revés (`TiledMapLoaderTests.PortalArrivals_AndSafePoints_LeaveTheFootBoxFree`).
 - Reaparecer en la fogata de la zona: el servidor usa la más cercana (`MapData.NearestGraveyard`). Con dos zonas en un mapa, pon
   las dos fogatas en la misma fila y a la misma distancia de la frontera: la mediatriz es la frontera.
 - Tras editar: `dotnet test --filter Map`, copiar los mapas al cliente (`godot --path client --headless -s ../tools/sync_content.gd`)
   y abrirlo para revisar capas `above`.
 
 ## Generadores (mapas deterministas)
-- `tools/maps/gen_tier1_maps.py` (meadow, mine) y `tools/maps/gen_tier2_maps.py` (forest, HU-111; importa la rejilla y los
-  objetos del primero). Regenerar el Tier 1 cambia los fines de línea de sus `.tmj`: restaurarlos con `git checkout` si no se
-  tocaron. `--check` valida sin escribir y sale con código ≠ 0; el del Tier 2 comprueba además bordes, que la fogata más
-  cercana sea la de la zona, que el aggro de grupos distintos no se solape, los sitios reservados para otras HU (boca de la
-  Cripta, puente roto, llegada desde la Mina: constantes al principio del archivo), subniveles y tiempo de cruce por el sendero.
+- `tools/maps/gen_tier1_maps.py` (meadow, mine) y `tools/maps/gen_tier2_maps.py` (forest, HU-111, y crypt, HU-115; importa la
+  rejilla y los objetos del primero). Regenerar el Tier 1 cambia los fines de línea de sus `.tmj`: restaurarlos con `git checkout`
+  si no se tocaron. `--check` valida sin escribir y sale con código ≠ 0; el del Tier 2 comprueba además bordes, que la fogata más
+  cercana sea la de la zona, que el aggro de grupos distintos no se solape, los sitios reservados para otras HU (puente roto,
+  llegada desde la Mina: constantes al principio del archivo), subniveles y tiempo de cruce por el sendero. En la Cripta: una sola
+  fogata en la entrada segura, ningún aggro en la puerta de su sala, la trampa (las plantas se ven desde la puerta, por el centro
+  despiertan todas y hay un eslalon de ≥ 1 casilla fuera de su aggro), el orden de las salas (jardín → élite → salida, jefe en
+  rama lateral), la sala del jefe libre y a la vista, y el recorrido estimado en 5–10 min. El jefe y la salida al Tier 3 son
+  constantes (`BOSS_SPAWN`, `TIER3_EXIT`) hasta que HU-117 y el portal con `minPhase` los añadan.
+- En una cueva (más de la mitad del suelo es interior, 8) `TerrainBaker` dibuja la roca como pared de la cueva, el arbusto como
+  raíces, el agua como charca, la tierra (2) como mantillo y el camino (3) como losas; el muro (4) en bloque no se dibuja (en
+  fila es valla): no usarlo.
 - Cómo dibuja `TerrainBaker` los GIDs de `placeholder.tsj` en exteriores: la roca unida al borde es bosque cerrado (la suelta,
   peñasco); el muro de una casilla de grosor es valla, sus bloques son cabañas dentro de una zona `safe` y peñascos fuera (un
   ramal que corte un peñasco deja un poste de valla suelto); `above` sin muro debajo son copas; suelo 8 son losas.

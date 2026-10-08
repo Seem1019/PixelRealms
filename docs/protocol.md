@@ -46,7 +46,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 | `SetHotbar` | `{ slot, kind: "spell"|"item"|null, ref? }` | slot 0–7: 0–3 solo `spell` (teclas 1–4), 4–7 solo `item` (teclas 5–8) (`rules.loadout`, ADR-014). En combate, una casilla de hechizo ocupada no se cambia ni se vacía (`in_combat`); una vacía sí se puede llenar |
 | `ChooseSpellUpgrade` | `{ spellId, upgradeId?, reqId? }` | HU-104 (ADR-027 D1): elige la mejora de un hechizo propio con mejoras; sin `upgradeId` la quita. Desde `rules.progression.spellUpgradeLevel` (`level_too_low`), fuera de combate (`in_combat`) y gratis; hechizo ajeno, sin mejoras o mejora que no es suya → `invalid_payload`. Responde `SpellUpgradesUpdate` |
 | `Respawn` | `{}` | está muerto |
-| `UsePortal` | `{ portalId }` | a ≤ 1 tile, vivo, fuera de combate, `minLevel` |
+| `UsePortal` | `{ portalId }` | a ≤ 1 tile, paso abierto, vivo, fuera de combate, `minLevel`. Paso cerrado (HU-112: la fase activa no llega a su `minPhase` o su mapa de destino no está cargado) → `Error{portal_locked}` con el `lockedText` del portal ("El paso sigue cerrado" si no tiene); va antes que los demás rechazos |
 | `Interact` | `{ objectId, reqId? }` | HU-083: usar una palanca del mapa (id de la capa `levers`): vivo, a ≤ `rules.world.interactRangeTiles` (`out_of_range`), que exista (`not_found`). Con la puerta abierta, tirar de cualquiera de sus palancas renueva el plazo; una palanca `opensAlone` (la de dentro de la sala) abre su puerta ella sola. El cambio llega como `MapObjects` a todos los del mapa |
 | `DuelRequest` / `DuelRespond` / `DuelForfeit` | `{ name }` / `{ accept }` / `{}` | ruleset `duel` habilitado, ambos vivos, sin duelo ni intercambio, **ambos fuera de combate** (`in_combat`: si no, el duelo serviría para que los monstruos los soltaran), a ≤ `maxDistanceTiles` y fuera de zona segura si el ruleset lo exige. Al aceptar se revalida todo; si alguien entra en combate durante la cuenta atrás, el duelo se retira. `DuelForfeit` antes de que empiece retira el reto (`declined`: nadie gana). Al terminar (`ended`) cada uno se queda con la vida y el recurso con que acabó y pierde las auras que le puso el rival; quien pierde por vida (al `endAtHpPct`; rendirse o salir de la zona no cuenta) regenera vida × `loserRegenMult` y sin esperar `hpRegenDelaySec` hasta la vida con que empezó el duelo o hasta volver a entrar en combate (HU-064 CA3). En duelo activo, un duelista no es aliado de nadie más (ni cura ni lo curan). **Zona del duelo (HU-101):** círculo de `zoneRadiusTiles` alrededor del punto medio entre los dos al aceptar (para retar y aceptar, como mucho 2 × `zoneRadiusTiles` de distancia); fuera se gasta un plazo de `zoneGraceSec` que dentro se recupera al mismo ritmo, y quien lo agota pierde (`reason: "zone"`; si son los dos, el que más tiempo lleva fuera) |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | `{ name }` / `{ accept }` / `{ items: {itemId, qty}[], gold }` / `{ version }` / `{}` | ≤ 3 tiles, items propios y no bloqueados, `version` vigente |
@@ -93,7 +93,7 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 ## Códigos de error
 `bad_version`, `bad_ticket`, `rate_limited`, `not_found`, `out_of_range`, `no_los`, `on_cooldown`, `on_gcd`,
 `not_enough_resource`, `invalid_target`, `is_dead`, `stunned`, `rooted`, `silenced`, `locked_out`, `area_limit`, `not_equipped`, `bag_full`, `in_combat`,
-`not_enough_gold`, `level_too_low`, `not_owner`, `pvp_not_allowed`, `duel_busy`, `trade_busy`, `trade_version`, `forbidden`, `invalid_payload`.
+`not_enough_gold`, `level_too_low`, `portal_locked`, `not_owner`, `pvp_not_allowed`, `duel_busy`, `trade_busy`, `trade_version`, `forbidden`, `invalid_payload`.
 (`cannot_equip` y `wrong_class` **no existen**: cualquier clase equipa cualquier item, ADR-009. `is_casting` tampoco: un `CastSpell` durante un casteo lo cancela, ADR-019.)
 
 ## Reglas de evolución
@@ -124,6 +124,8 @@ EquipSlot 0 head,1 neck,2 chest,3 hands,4 legs,5 feet,6 ring,7 main_hand,8 off_h
 - v1 · HU-104 (revisión de autoridad): `CastStarted.upgradeId` y `AreaSpawn.upgradeId` (aditivos).
 - v1 · HU-100: `AreaSpawn` y `AreaDespawn` (S→C), sin subir versión: solo los hay con contenido que deja áreas duraderas (ninguno
   hasta el Árbol Podrido, HU-117); un cliente antiguo no dibuja el área pero recibe los golpes igual.
+- v1 · HU-112: código `portal_locked` (aditivo) al pisar o pedir un portal cerrado por `minPhase` o sin mapa de destino, con
+  su texto en `message`; un cliente antiguo muestra ese texto, como el de `level_too_low`.
 
 ## REST (HTTP)
 | Método y ruta | Cuerpo / auth | Respuesta |

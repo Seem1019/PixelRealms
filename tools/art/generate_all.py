@@ -22,7 +22,7 @@ if __name__ == "__main__":
     palette_png()
     gen_tiles.build()
     gen_chars.build()
-    gen_monsters_t2.build()  # monstruos del Tier 2 (HU-114)
+    gen_monsters_t2.build()  # monstruos del Tier 2 y el Árbol Podrido (HU-114)
     import_heroes.build()  # guerrero y mago: hojas dibujadas a mano (HU-093)
     gen_icons.build()
     gen_ui.build()

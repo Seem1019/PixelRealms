@@ -51,6 +51,7 @@ public sealed class CombatModule
         Death.OnCorpseRemoved = (m, map) => Loot.Forget(map, m.Id);
         Death.OnActorKilled = Casts.DropAreasOf;
         Summons.OnRemoving = (m, map, ctx) => { Casts.ForgetCaster(m, map); Auras.ClearAll(m, map, ctx); };
+        Summons.IsValidTarget = Ai.IsValidTarget;
         Services.PvpCanAttack = (a, b) => Pvp.CanAttack(a, b, Services.Content.Rules) is not null;
         Services.InDuel = Pvp.InActiveDuel;
         Damage.DuelClamp = Pvp.ClampDamage;
@@ -121,6 +122,21 @@ public sealed class CombatModule
     }
     public MovementSystem Movement { get; }
     public InterestSystem Interest { get; }
+
+    /// <summary>
+    /// Quien deja la instancia (sale del mundo o cambia de mapa) no sigue a su nombre en ella: sus proyectiles en vuelo se olvidan,
+    /// sale de las tablas de amenaza (un jefe y sus retoños no siguen yendo a por un ausente) y deja de marcar monstruos (sin XP
+    /// ni botín para él). Lo llaman WorldSession y MapTransferService antes de sacarlo del mapa.
+    /// </summary>
+    public void ForgetLeaving(Entities.Player player, Map.MapInstance map)
+    {
+        Casts.ForgetCaster(player, map);
+        foreach (var m in map.Monsters.Values)
+        {
+            m.Threat.Remove(player.Id);
+            if (m.TaggedBy == player.Id) m.TaggedBy = null;
+        }
+    }
 
     public static CombatModule Create(Func<ContentDb> content, World world, MovementSystem movement, InterestSystem interest) => new(content, world, movement, interest);
 

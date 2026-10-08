@@ -1190,3 +1190,121 @@ Cada clase con su mejor equipo de `phase2.FARM_KITS` y, en cada hechizo, la mejo
    la agravan; sin propuesta nueva (HU-119).
 3. **Observación de método:** el pentagrama de 30 s exactos va a saltos con las recargas y los casteos (decisión 2). Para la pasada
    de HU-119 conviene medir también los hechizos sin mejora con las ventanas de 24–36 s.
+
+# Fase 2 · Jefe Árbol Podrido (HU-117, 2026-10-08)
+
+El jefe de la Cripta de Raíces (`rotten_tree`) y sus retoños (`rotten_sapling`), medidos con `python tools/balance/boss.py --arbol`
+(ampliado: combate paso a paso, ver su cabecera). Sin azar ni movimiento; valores esperados.
+
+### Números
+
+| | Árbol Podrido (`rotten_tree`) | Retoño podrido (`rotten_sapling`) |
+|---|---|---|
+| Nivel · tipo | 11 · `boss` (XP de la fórmula: 560) | 10 · `normal` (como invocación: 0 XP y sin botín, HU-116) |
+| Vida · armadura | **3 600** · 100 | 90 · 30 |
+| Básico | 80–110 físico cada 2,6 s, **alcance 13,5** (azote de raíces; el cliente lo dibuja como proyectil) | 14–20 cada 2,0 s, cuerpo a cuerpo |
+| Movimiento | **inmóvil** (`speed: 0`), aggro 7, correa 12 (olvida a quien pasa de 24 y entonces se reinicia) | 3,5 casillas/s (el jugador anda a 4), correa 25 |
+| IA | tanque = el de más amenaza (regla del 130 %, a distancia) | **`threatTarget: lowest`**: hereda la tabla del jefe y va a por quien menos amenaza tiene |
+
+Hechizos (cada mecánica se ve antes de doler: marca en el suelo o casteo):
+
+| Hechizo | A quién | Casteo · recarga | Efecto |
+|---|---|---|---|
+| Retoños (`rotten_tree_saplings`) | sí mismo, bajo el 50 % | 2 s · 20 s | invoca 2 retoños (tope 4 vivos, `maxSummonsPerCaster`); el casteo se puede interrumpir (Gubia) |
+| Raíces (`rotten_tree_roots`) | quien no es su objetivo, a ≤ 14 | 1,5 s · 12 s | área marcada de radio 1,5: 20 físico y raíz 3 s (`rotten_tree_roots_root`) |
+| Esporas (`rotten_tree_spores`) | quien no es su objetivo, a ≤ 14 | 1,5 s · 9 s | área duradera (`areaDurationMs` 9 s, radio 2): 12 mágico por pulso de 0,5 s; el primer pulso, 0,5 s después de caer |
+
+- Inmune a aturdir, enraizar y ralentizar por `rules.combat.bossImmuneToAuraKinds` (sin cambios de reglas); los retoños no lo son.
+- **Raíces + Esporas:** quien no esquiva la marca de Raíces queda enraizado 3 s y, si le cae la nube encima, no puede salir: 6
+  pulsos, 72 de daño. Quedarse en una nube entera son 216 (el 63–71 % de la vida de un Pícaro, Mago o Sacerdote de nivel 9).
+- **Botín (CA3):** `lt_rotten_tree`, oro 250–450, pociones mayores de vida y menores de maná (50 %, 2–3) y un grupo con exactamente
+  un raro de nivel 10, uno por rol: Coraza de corteza podrida (placas, tanque: armadura 46, Agu 8 Fue 7), Espina del Árbol Podrido
+  (daga, daño físico: 9–13 c/1,6 s, Agi 8 Agu 4 Fue 3), Bastón de raíz podrida (bastón, daño mágico: 8–15 c/3 s, PH 8, Int 8 Agu 4
+  Esp 3) y Maza de savia (maza, sanador: 10–18 c/2,6 s, PH 8, Esp 7 Int 5 Agu 3). 15 puntos de stats (la guía de la skill para un
+  raro de nivel 10, como los raros de élite de HU-110) y un 10–15 % más de daño o armadura que el verde de nivel 9. Las entradas no
+  llevan raros: cae uno y solo uno. Íconos de los que ya existen (`plate_foreman`, `dagger_fang`, `staff_oak`, `mace_blessed`); los
+  propios son HU-114 CA3.
+
+### Supuestos del modelo
+- **Grupo de referencia** (`rules.boss`): 3 de nivel 9 con el equipo «esperado» de `gear.py` (HU-110); «recién llegado» (el de nivel
+  7) y «completo» (todo verde de nivel 9) como sensibilidad. Rangos de hechizo del servidor y barras de 4 con los hechizos de nivel
+  7 y 9: Guerrero con Bloqueo con escudo, Torbellino, Tajo y Golpe heroico; Pícaro con Paso sombrío, Eviscerar, Golpe siniestro y
+  Gubia; Mago con Estallido de llamas, Descarga de escarcha, Campo ardiente y Bola de fuego; Sacerdote con Pulso sagrado y Castigo
+  cuando no cura. Sin las mejoras de HU-107 (conservador).
+- **El jefe** pega al tanque con el básico y no pega mientras castea (Raíces, Esporas y Retoños se comen ~35 % del tiempo bajo el
+  50 %); Raíces y Esporas van, por turnos, a los que no son el tanque. El Guerrero tanquea con Bloqueo con escudo (−21 % de media).
+- **Esquivando:** nadie se queda en una marca; esquivar le cuesta al cuerpo a cuerpo el casteo + 0,5 s sin pegar y a quien pega a
+  distancia 0,5 s. **Sin esquivar:** Raíces daña y enraíza; de las Esporas se sale al primer pulso (o al soltarse de la raíz) y
+  salir cuesta 1 s o 0,5 s sin pegar.
+- **Retoños:** llegan desde 6 casillas a su velocidad y van a por quien menos amenaza tiene (daño + 0,5 · cura). «A por ellos» =
+  todos menos el sanador mientras cura les pegan hasta matarlos; «ignorados» = nadie.
+- **Sacerdote:** cura a quien baja del 60 % hasta el 80 % (capacidad de Escudo + Sanar en 60 s: 20,3/s al 9), sin pegar mientras
+  cura y gastando maná. Pociones mayores de vida (100, cada 60 s) bajo el 40 %.
+
+### Resultado (CA2)
+**Básico del jefe sin curas ni casteos:** el Guerrero de nivel 9 (660 de vida) cae en **32 s** (41 s con Bloqueo con escudo), el
+«~30 s» de la guía; un Pícaro de nivel 11 (360) en 15 s (la guía dice ~25 s, ver §Desviaciones).
+
+Tríos de nivel 9, retoños a por ellos (vida más baja de cada uno; entre paréntesis, % del combate que cura el Sacerdote):
+
+| Equipo | Guerrero + Mago + Sacerdote | Guerrero + Pícaro + Sacerdote | Guerrero + Pícaro + Mago | Pícaro + Mago + Sacerdote |
+|---|---|---|---|---|
+| **Esperado**, esquivando | **75 s**; G 54 %, M 100 %, S 96 % (35 %) | 94 s; G 54 %, P 100 %, S 87 % (44 %) | 66 s; G **6 %** con pociones | 79 s; P 40 % (71 %) |
+| **Esperado**, sin esquivar | **77 s**; M 69 %, S 69 % | 86 s; P 71 %, S 56 % | 63 s; G 19 % | 80 s; M 69 %, S 65 % |
+| Recién llegado | 89–93 s | **106–108 s** | 74–81 s, **muere el Guerrero** | 96–99 s |
+| Completo | 62–65 s | 67–74 s | **56–59 s** | 63–66 s |
+
+- **Esperado: 63–94 s** en los cuatro tríos (objetivo 60–100 s); el de referencia, como el del Capataz (Guerrero, Mago, Sacerdote),
+  75–77 s. Los casters acaban con 170–230 de maná (de 415–468) alternando básicos: nadie se queda sin maná (pilar 4).
+- **Sin sanador** (Guerrero + Pícaro + Mago) lo matan con pociones y el Guerrero al 6–19 %; recién llegados, el Guerrero cae y
+  terminan con una baja. Sin tanque (tanquea el Pícaro), el Sacerdote cura el 71 % del combate.
+- **Retoños:** salen 4 (6 en los combates más largos) y el grupo pasa 6–14 s matándolos. Ignorados, van a por el sanador: lo dejan
+  al 8 % (Guerrero + Mago + Sacerdote) o lo matan (Guerrero + Pícaro + Sacerdote); sin sanador, dejan al Pícaro al 32 %. Matarlos
+  cuesta menos que no hacerlo: obligan a reorganizarse.
+- **Nadie lo mata solo** (nivel 10, tope de la Fase 2, con pociones, esquivando o no, equipo esperado o completo): el Pícaro y el
+  Mago mueren en 19–33 s dejándole el 77–89 % de la vida, el Guerrero en 58–83 s (61–77 %) y el Sacerdote, curándose, apenas le hace
+  daño (81–94 %).
+- **Sensibilidad** (`--hp`, `--dmg`): con 3 200 de vida, 57–79 s (Guerrero + Pícaro + Mago baja de 60); con 4 000, 69–103 s. El
+  básico ×0,8 o ×1,2 apenas mueve la duración (63–89 s y 63–95 s), pero con ×1,2 el trío sin sanador pierde al Guerrero.
+
+**Fase 3, orientativo** (sin los hechizos de nivel 11 ni equipo de nivel 11 o más, que aún no existen; equipo del nivel 9): las
+parejas con Sacerdote lo matan despacio (Guerrero 11 + Sacerdote 11 en 139 s, Pícaro 11 + Sacerdote 11 en 157 s, Guerrero 12 +
+Sacerdote 10 en 137 s); Guerrero + Mago y Pícaro + Mago de nivel 11, y Pícaro 12 + Mago 10, mueren (le dejan el 7 % y el 48 %). Se
+valida al abrir la Fase 3, con su equipo (CA2).
+
+### Desviaciones y propuestas (no aplicadas; ningún cambio en `rules.json`)
+1. **Un dps de nivel B (11) cae en 15 s, no en ~25 s.** Con el equipo de HU-110 el Guerrero de nivel 9 tiene 1,8 veces la vida del
+   Pícaro de nivel 11 (con el Capataz, 1,4): ningún básico cumple las dos guías a la vez. Manda la del grupo de referencia (32 s
+   para el tanque). Si en la partida de prueba quitarle el aggro al tanque castiga demasiado, la palanca es el básico (×0,8: 40 s
+   y 19 s, con la duración casi igual).
+2. **Recién llegado, Guerrero + Pícaro + Sacerdote tarda 106–108 s** (un 8 % por encima): es el trío con menos daño, con equipo de
+   nivel 7. Aceptable; HU-119 lo mira con la partida de prueba.
+3. **Fase 3:** con el equipo del nivel 9, las parejas sin sanador de nivel B no lo matan. Revisarlo al abrir la Fase 3 con el
+   equipo y los hechizos de nivel 11; si sigue igual, la palanca es la vida, no el daño.
+4. **Monstruos inmóviles (código):** antes, un inmóvil que se quedaba sin objetivo seguía herido (salir de la sala y volver dejaba
+   al jefe a medias) y uno con su objetivo fuera de `attackRange` no hacía nada. Ahora pega con el básico al de más amenaza que
+   tenga a tiro, castea a quien le llegue y se reinicia en su sitio con la vida completa si se queda sin nadie o si acumula
+   `rules.ai.immobileOutOfReachResetMs` (8 s, constante nueva) sin poder pegar con el básico (el tiempo pegando lo descuenta).
+   Revisión de autoridad: el pasillo de la sala era una zona muerta donde regenerar, y un solo jugador en el anillo de sus
+   hechizos o tras una columna podía pausar el combate. Vale también para la planta trampa (`combat.md` §Monstruos). El básico
+   del árbol pasa de 12 a 13,5 casillas para cubrir las áreas de los jugadores de la Fase 2 (Estallido de llamas ~12,75 y Pulso
+   sagrado ~13,3 con el cuerpo); Meteoro (nivel 13, ~15,25) queda para la Fase 3.
+
+### Lo que el modelo no ve
+- Las posiciones: Raíces y Esporas van por turnos y no salpican al de al lado (en la sala, una nube sobre el Pícaro pegado al
+  tanque también les toca a los dos), ni el kiteo de los retoños (más lentos que el jugador) ni las áreas de los jugadores sobre
+  los dos retoños a la vez.
+- Interrumpir Retoños con Gubia (lo retrasa: bloqueo de 1,5 s y la recarga no empieza), las mejoras de HU-107 y la variación de
+  daño.
+
+### Sala del jefe (para colocarlo en la Cripta, HU-115)
+- **Tamaño:** que todo el suelo de la sala quede a ≤ 13 casillas del spawn del árbol (su básico llega a 13,5; Raíces y Esporas,
+  a 24 + 1,5 de tolerancia, para que tampoco haya sitio seguro en el pasillo de entrada desde el que curar al tanque): unas 18 × 18 a 22 × 22 con el árbol en el centro o algo al fondo. Quien se quede a más de 13,5 no
+  le pega (ni con áreas apuntadas) y, si nadie más está a tiro, el árbol acaba reiniciándose.
+- **Spawn:** fijo, de `rotten_tree`, con `wanderRadius` 0, en una casilla libre con un anillo de 2–3 casillas libres alrededor (los
+  retoños salen a 1,5–2,5 del árbol, en casillas libres con vista) y sin columnas pegadas.
+- **Vista:** sin columnas que tapen al tanque en la zona de combate; con una, el árbol sigue lanzando Raíces y Esporas a los
+  demás, pero su básico no alcanza a quien se esconde.
+- **Aggro 7:** la entrada de la sala a más de 7 casillas del árbol, para entrar y colocarse antes de despertarlo. Si acumula 8 s
+  (`rules.ai.immobileOutOfReachResetMs`) sin nadie a tiro de su básico (≤ 13,5 y a su vista), o todos pasan de 24, se reinicia con
+  la vida completa: salir al pasillo a regenerar no sirve, ni asomarse de vez en cuando.

@@ -44,6 +44,7 @@
     {"id": "root_skeleton_thorn_slash_bleed", "name": "Espinas", "kind": "dot", "isDebuff": true, "school": "physical", "durationMs": 9000, "tickMs": 3000, "base": 5, "icon": "spells/whip"},
     {"id": "crypt_guardian_bark_shield", "name": "Coraza de raíces", "kind": "shield", "isDebuff": false, "durationMs": 10000, "base": 160, "icon": "spells/shield_block"},
     {"id": "trap_plant_snare_root", "name": "Enraizado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"},
+    {"id": "rotten_tree_roots_root", "name": "Enraizado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"},
     {"id": "lich_root", "name": "Congelado", "kind": "root", "isDebuff": true, "durationMs": 3000, "icon": "spells/frost_nova"}
   ]
 }

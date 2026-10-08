@@ -134,6 +134,20 @@ public sealed class MonsterAiTests
     }
 
     [Fact]
+    public void Foreman_Whip_GoesToItsTarget_WhenNobodyElseIsInReach() // HU-117 (revisión de autoridad): random_not_top_threat
+    {
+        // Bob, a 15 casillas, no está al alcance del látigo (7): antes el sorteo caía en él, el casteo fallaba y no azotaba a nadie.
+        var w = new WorldBuilder().WithMap(40, 40).WithPlayer("Ana", "warrior", 6, (10, 10)).WithPlayer("Bob", "mage", 6, (10, 25))
+            .WithMonster("foreman_grask", (11, 10), wanderRadius: 0).BuildWithCombat();
+        var ana = w.Player("Ana"); var bob = w.Player("Bob"); var boss = w.Monster("foreman_grask");
+        boss.Threat.Add(ana.Id, 1000); boss.Threat.Add(bob.Id, 10);
+        boss.Combat.CooldownEndsAtMs["foreman_slam"] = long.MaxValue;
+        var whip = TickRunner.RunMs(w, 500).OfType<CastStartedEvent>().Where(e => e.Spell.Id == "foreman_whip").ToList();
+        whip.ShouldNotBeEmpty();
+        whip.ShouldAllBe(e => e.TargetId == ana.Id);
+    }
+
+    [Fact]
     public void Wander_StaysInRadius_WithPauses_Spawn_PopulatesAndRespawns() // HU-031 CA1/CA2/CA3
     {
         var db = TestContent.Load();

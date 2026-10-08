@@ -16,11 +16,11 @@ public sealed class ContentLoaderTests
         result.Report.Errors.ShouldBeEmpty();
         var db = result.ContentOrThrow;
         db.Classes.Count.ShouldBe(4);
-        db.Spells.Count.ShouldBe(59); // + los 16 hechizos de los monstruos del Tier 2 (HU-109) y 2 de consumibles (HU-110)
-        db.Auras.Count.ShouldBe(38);
-        db.Items.Count.ShouldBe(170); // + el equipo de nivel 7 y 9, raros, chatarra y consumibles del Tier 2 (HU-110)
-        db.Monsters.Count.ShouldBe(24); // + los élites de las ramas de la pradera (HU-080) y los 12 del Tier 2 (HU-109)
-        db.LootTables.Count.ShouldBe(24);
+        db.Spells.Count.ShouldBe(62); // + los 16 hechizos de los monstruos del Tier 2 (HU-109), 2 de consumibles (HU-110) y 3 del Árbol Podrido (HU-117)
+        db.Auras.Count.ShouldBe(39);
+        db.Items.Count.ShouldBe(174); // + el equipo de nivel 7 y 9, raros, chatarra y consumibles del Tier 2 (HU-110) y los 4 raros del Árbol Podrido (HU-117)
+        db.Monsters.Count.ShouldBe(26); // + los élites de las ramas de la pradera (HU-080), los 12 del Tier 2 (HU-109) y el Árbol Podrido y sus retoños (HU-117)
+        db.LootTables.Count.ShouldBe(26);
         db.Vendors.Count.ShouldBe(2); // + Brena, en el campamento del Linde (HU-110)
         db.Rules.Hash.Length.ShouldBe(16);
     }
@@ -66,7 +66,7 @@ public sealed class ContentLoaderTests
         db.Item("worn_sword").MaxStack.ShouldBe(1);
         db.Monster("slime").Boss.ShouldBeFalse();
         db.LootTable("lt_slime").MaxItems.ShouldBe(4);
-        db.Rules.CurrentLevelCap.ShouldBe(6);
+        db.Rules.CurrentLevelCap.ShouldBe(10); // Fase 2 abierta (HU-118)
     }
 
     [Fact]
@@ -172,6 +172,7 @@ public sealed class ContentLoaderTests
     [InlineData("spells.json", "/spells/38/effects/0", "{\"type\":\"summon\",\"monsterId\":\"nope\",\"count\":2}", "monsterId 'nope' no existe")] // HU-116
     [InlineData("spells.json", "/spells/38/effects/0", "{\"type\":\"summon\",\"monsterId\":\"slime\",\"count\":6}", "más que rules.limits.maxSummonsPerCaster")] // HU-116
     [InlineData("spells.json", "/spells/37/areaDurationMs", "3000", "con proyectil no deja un área duradera")] // HU-100 (goblin_shoot tiene proyectil)
+    [InlineData("monsters.json", "/monsters/0/threatTarget", "\"nobody\"", "no está en enum [\"highest\", \"lowest\"]")] // HU-117
     public void CrossReferenceRules_Fail(string file, string pointer, string valueJson, string expectedFragment)
     {
         using var dir = new TempContent();

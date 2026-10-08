@@ -25,7 +25,7 @@ func _ready() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var map := TmjMap.load_from(MAP)
-	var baked := TerrainBaker.bake(map) if map != null else {}
+	var baked := TerrainBaker.bake(map, int(Content.rule("world", "currentPhase", 1))) if map != null else {}
 	if not baked.is_empty():
 		_scene = Node2D.new()
 		add_child(_scene)

@@ -394,6 +394,8 @@ public sealed record AiRules
     public required double WanderSpeedMult { get; init; }
     public required double ArriveToleranceTiles { get; init; }
     public required double RangedThreatThresholdTiles { get; init; }
+    /// <summary>HU-117: un inmóvil sin nadie de su tabla a su alcance y a la vista durante este tiempo se reinicia en su sitio.</summary>
+    public required int ImmobileOutOfReachResetMs { get; init; }
 }
 
 public sealed record WorldRules

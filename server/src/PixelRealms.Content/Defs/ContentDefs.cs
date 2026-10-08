@@ -275,6 +275,8 @@ public sealed record MonsterTemplate
     public required string LootTableId { get; init; }
     public required int RespawnSec { get; init; }
     public bool Boss { get; init; }
+    /// <summary>HU-117: a quién de su tabla de amenaza persigue y pega: al que más tiene (por defecto) o al que menos.</summary>
+    public ThreatTarget ThreatTarget { get; init; } = ThreatTarget.Highest;
     public IReadOnlyList<MonsterSpellDef> Spells { get; init; } = [];
     public required string Sprite { get; init; }
     [JsonPropertyName("_note")] public string? Note { get; init; }

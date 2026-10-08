@@ -150,15 +150,18 @@ public sealed class CastSystem(CombatServices services, EffectResolver effects, 
                 {
                     if (!ValidPoint(targetPos, map)) return CastErrors.InvalidPayload;
                     if (hasLeap) break;
+                    // Alcance y vista primero: son baratos, y ActiveAreas recorre la instancia (revisión de autoridad, HU-117).
+                    if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
+                    // HU-102: en el cono y la línea el punto solo da la dirección (la línea se corta en la primera pared).
+                    if (spell.Shape == Shape.Circle)
+                    {
+                        if (!LineOfSight.Has(map.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
+                        // LineOfSight no mira la casilla de destino: apuntar dentro de un muro alcanzaría a quien está detrás.
+                        if (map.Collision.BlocksSight((int)MathF.Floor(targetPos.Value.X), (int)MathF.Floor(targetPos.Value.Y))) return CastErrors.NoLos;
+                    }
                     // HU-033 CA4 / HU-086 CA7b: tope de marcas en el suelo por instancia (rendimiento del cliente y del servidor). Las
                     // áreas duraderas lo comprueban abajo, contando la que sustituyen (HU-100).
                     if (!spell.IsInstant && spell.AreaDurationMs == 0 && ActiveAreas(map) >= ctx.Rules.Limits.MaxAreasPerInstance) return CastErrors.AreaLimit;
-                    if (Vec2.Distance(caster.Position, targetPos!.Value) > spell.Range + rules.CastRangeToleranceTiles) return CastErrors.OutOfRange;
-                    // HU-102: en el cono y la línea el punto solo da la dirección (la línea se corta en la primera pared).
-                    if (spell.Shape != Shape.Circle) break;
-                    if (!LineOfSight.Has(map.Collision, caster.Position, targetPos.Value)) return CastErrors.NoLos;
-                    // LineOfSight no mira la casilla de destino: apuntar dentro de un muro alcanzaría a quien está detrás.
-                    if (map.Collision.BlocksSight((int)MathF.Floor(targetPos.Value.X), (int)MathF.Floor(targetPos.Value.Y))) return CastErrors.NoLos;
                 }
                 // Alrededor del lanzador: un cono o una línea usan el punto como dirección, que tiene que estar en el mapa (un punto
                 // enorme desbordaba la dirección a cero y el cono pasaba a ser un círculo).
